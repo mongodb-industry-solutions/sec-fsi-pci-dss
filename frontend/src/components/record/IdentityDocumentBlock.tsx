@@ -15,7 +15,7 @@ export interface GovernmentIdView {
 
 export const IDENTITY_DOCUMENT_INFO =
   'The government-issued identity document verified at KYC (SD-53). Each leaf is QE-encrypted at rest: '
-  + 'number by suffix search, type and issuing country by equality, expiry by range. The tax ID is a '
+  + 'number by suffix search, type and issuing country by equality, expiry by range. The Tax ID (TIN) is a '
   + 'separate QE:prefix field.';
 
 /** Field help, declared once so every surface explains the datum identically (P3). */
@@ -24,7 +24,7 @@ export const IDENTITY_FIELD_INFO = {
   number: 'Identity document number. QE:suffix encrypted, so it stays searchable by suffix (for example the last 4) while encrypted at rest.',
   issuingCountry: 'Country that issued the document (ISO 3166-1 alpha-2). QE:equality encrypted at rest.',
   expiryDate: 'Document expiry date. QE:range encrypted, searchable by range (for example expiring soon) without exposing the value.',
-  taxId: 'Taxpayer identification number. QE:prefix encrypted, so it stays searchable by prefix while encrypted at rest.',
+  taxId: 'Tax Identification Number (TIN). QE:prefix encrypted, so it stays searchable by prefix while encrypted at rest.',
 } as const;
 
 export function IdentityDocumentBlock({
@@ -47,7 +47,7 @@ export function IdentityDocumentBlock({
       <RecordField label="Issuing country" tier="lookup" value={humanize(gov.issuingCountry)} info={IDENTITY_FIELD_INFO.issuingCountry} />
       <RecordField label="Expiry date" tier="lookup" value={fmtDate(gov.expiryDate)} info={IDENTITY_FIELD_INFO.expiryDate} />
       {showTaxId && (
-        <RecordField label="Tax ID" tier="lookup" mono value={taxIdNumber ? String(taxIdNumber) : ''} info={IDENTITY_FIELD_INFO.taxId} />
+        <RecordField label="Tax ID (TIN)" tier="lookup" mono value={taxIdNumber ? String(taxIdNumber) : ''} info={IDENTITY_FIELD_INFO.taxId} />
       )}
     </>
   );

@@ -29,6 +29,13 @@ describe('validateMappingRules (PCI guardrails)', () => {
     expect(errs[0]).toContain('secret');
   });
 
+  it('rejects a path with a prototype-walking or empty segment', () => {
+    for (const path of ['__proto__.polluted', 'a.constructor.prototype.x', 'prototype', 'a..b', '']) {
+      expect(validateMappingRules([rule(path, 'target')], { allowCardData: true })[0]).toContain('valid document path');
+      expect(validateMappingRules([rule('source', path)], { allowCardData: true })[0]).toContain('valid document path');
+    }
+  });
+
   it('mayMapCardData is true only for card issuer / card authorization', () => {
     expect(mayMapCardData('card_issuer')).toBe(true);
     expect(mayMapCardData('card_authorization')).toBe(true);

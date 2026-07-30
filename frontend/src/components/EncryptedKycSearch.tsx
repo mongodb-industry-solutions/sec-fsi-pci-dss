@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Search, ShieldCheck, Lock, RefreshCw } from 'lucide-react';
+import { Search, ShieldCheck, Lock, RefreshCw, X } from 'lucide-react';
 import {
   api,
   KycSearchFieldDef,
@@ -55,6 +55,33 @@ const MODE_BADGE_COLOR: Record<KycSearchMode, string> = {
 };
 
 const DEBOUNCE_MS = 450;
+
+// Text modes are directional: the label, placeholder and empty-result wording say which part of the
+// value is matched.
+const MODE_INPUT_LABEL: Record<KycSearchMode, string> = {
+  substring: 'Contains',
+  prefix:    'Starts with',
+  suffix:    'Ends with',
+  range:     'Range',
+  equality:  'Value',
+};
+
+function modePlaceholder(field: KycSearchFieldDef): string {
+  const label = field.label.toLowerCase();
+  if (field.mode === 'suffix')    return `Full or last characters of the ${label}…`;
+  if (field.mode === 'prefix')    return `Full or first characters of the ${label}…`;
+  if (field.mode === 'substring') return `Any part of the ${label}…`;
+  return `Exact ${label}…`;
+}
+
+function noMatchHint(field: KycSearchFieldDef, value: string): string {
+  const v = value.trim();
+  if (field.mode === 'suffix')    return `No ${field.label.toLowerCase()} ends with "${v}".`;
+  if (field.mode === 'prefix')    return `No ${field.label.toLowerCase()} starts with "${v}".`;
+  if (field.mode === 'substring') return `No ${field.label.toLowerCase()} contains "${v}".`;
+  if (field.mode === 'range')     return `No record falls in this ${field.label.toLowerCase()} range.`;
+  return `No record matches this ${field.label.toLowerCase()}.`;
+}
 
 // Human explanation of each QE query mode, for the debug detail shown to a demo audience.
 const MODE_DESCRIPTION: Record<KycSearchMode, string> = {
@@ -134,12 +161,12 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
   const [results, setResults] = useState<KycSearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  /** Query that produced the rows on screen. Rows render only while it matches the active query. */
+  const [committedKey, setCommittedKey] = useState('');
   const [page, setPage] = useState(1);
 
   const { debugMode } = useDebugMode();
   const authorized = KYC_SEARCH_ROLES.has(role);
-  const canSeeSensitive = role === 'security_auditor' || (role === 'level2_investigator' && !!escalationToken);
   const canSeeContactPii = role === 'security_auditor' || role === 'level2_investigator';
 
   // Load the field registry on mount (and whenever the acting token changes).
@@ -163,15 +190,26 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
   const field = useMemo(() => fields.find((f) => f.key === selectedKey), [fields, selectedKey]);
 
   // Reset the inputs when the field changes.
-  useEffect(() => { setValue(''); setFrom(''); setTo(''); setResults(null); setHasSearched(false); setSearchError(null); }, [selectedKey]);
+  useEffect(() => { setValue(''); setFrom(''); setTo(''); setResults(null); setCommittedKey(''); setSearchError(null); }, [selectedKey]);
+
+  const isTextMode = !!field && ['substring', 'prefix', 'suffix'].includes(field.mode);
 
   // Inline (UX-only) validation for text modes: block queries shorter than minQueryLength.
   const textTooShort = useMemo(() => {
-    if (!field) return false;
-    if (!['substring', 'prefix', 'suffix'].includes(field.mode)) return false;
+    if (!isTextMode || !field) return false;
     const min = field.minQueryLength ?? 1;
     return value.trim().length > 0 && value.trim().length < min;
-  }, [field, value]);
+  }, [isTextMode, field, value]);
+
+  // Slice the QE index can match when the value is longer than maxQueryLength; the server refines
+  // the full value afterwards.
+  const queryWindow = useMemo(() => {
+    if (!isTextMode || !field) return null;
+    const v = value.trim();
+    const max = field.maxQueryLength ?? v.length;
+    if (v.length <= max) return null;
+    return { window: field.mode === 'suffix' ? v.slice(-max) : v.slice(0, max), max };
+  }, [isTextMode, field, value]);
 
   // Build the request body for the active field/mode, or null when there is nothing to run.
   const body = useMemo(() => {
@@ -195,21 +233,32 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
   // manual "Reload" button (which re-fetches even when the query is unchanged, e.g. to pick up
   // provider verdicts written after the last search). Client validation gates the request; the
   // server re-validates.
+  // Responses can arrive out of order, so only the newest request may write state.
+  const seqRef = useRef(0);
+  const inflightRef = useRef<AbortController | null>(null);
+
   const runSearch = useCallback(async () => {
     if (!token || !body) return;
+    inflightRef.current?.abort();
+    const controller = new AbortController();
+    inflightRef.current = controller;
+    const seq = ++seqRef.current;
+    const key = bodyKey;
     setLoading(true);
     setSearchError(null);
     try {
-      const res = await api.customer.search({ ...body, limit: 100 }, token, escalationToken);
+      const res = await api.customer.search({ ...body, limit: 100 }, token, escalationToken, controller.signal);
+      if (seq !== seqRef.current) return;
       setResults(res.results);
       setPage(1);
-      setHasSearched(true);
+      setCommittedKey(key);
     } catch (e) {
+      if (controller.signal.aborted || seq !== seqRef.current) return;
       setResults([]);
-      setHasSearched(true);
+      setCommittedKey(key);
       setSearchError((e as Error).message || 'Search failed');
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
   }, [token, bodyKey, escalationToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -221,6 +270,24 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
     timer.current = setTimeout(() => { void runSearch(); }, DEBOUNCE_MS);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [runSearch, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => { inflightRef.current?.abort(); }, []);
+
+  const clearFilters = useCallback(() => {
+    inflightRef.current?.abort();
+    seqRef.current++;
+    if (timer.current) clearTimeout(timer.current);
+    setValue('');
+    setFrom('');
+    setTo('');
+    setResults(null);
+    setCommittedKey('');
+    setSearchError(null);
+    setLoading(false);
+    setPage(1);
+  }, []);
+
+  const hasFilters = !!value || !!from || !!to || results != null;
 
   if (!authorized) {
     return (
@@ -241,6 +308,8 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
     return <LoadingIndicator inline label="Loading searchable fields…" />;
   }
 
+  // The active query has not produced its own rows yet (typing, debounce or request in flight).
+  const stale = !!body && bodyKey !== committedKey;
   const totalResults = results?.length ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PAGE_SIZE));
   const pageRows = results ? results.slice((page - 1) * RESULTS_PAGE_SIZE, page * RESULTS_PAGE_SIZE) : [];
@@ -298,17 +367,27 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
             </div>
           )}
 
-          {/* Manual reload: re-run the current query against the server (e.g. to refresh after
-              provider verdicts change). Disabled when there is no active query or one is running. */}
-          <button
-            type="button"
-            onClick={() => void runSearch()}
-            disabled={!body || loading}
-            title="Reload results from the server"
-            className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-[#001E2B] px-3 py-2 text-sm font-medium text-[#001E2B] transition-colors hover:bg-[#001E2B] hover:text-[#00ED64] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Reload
-          </button>
+          <div className="ml-auto flex items-end gap-2">
+            {/* Re-run the current query, e.g. to pick up provider verdicts written since. */}
+            <button
+              type="button"
+              onClick={() => void runSearch()}
+              disabled={!body || loading}
+              title="Reload results from the server"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#001E2B] px-3 py-2 text-sm font-medium text-[#001E2B] transition-colors hover:bg-[#001E2B] hover:text-[#00ED64] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Reload
+            </button>
+            <button
+              type="button"
+              onClick={clearFilters}
+              disabled={!hasFilters}
+              title="Clear the search value and results"
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <X size={13} /> Clear filters
+            </button>
+          </div>
         </div>
 
         {/* Control */}
@@ -388,22 +467,32 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
         ) : field ? (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              {field.mode === 'substring' ? 'Contains' : field.mode === 'prefix' ? 'Starts with' : field.mode === 'suffix' ? 'Ends with' : 'Value'}
+              {MODE_INPUT_LABEL[field.mode]}
             </label>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={value}
-                maxLength={field.maxQueryLength}
+                maxLength={field.inputMaxLength ?? field.maxQueryLength}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder={`Search ${field.label.toLowerCase()}…`}
+                placeholder={modePlaceholder(field)}
                 className="w-full max-w-md border rounded-lg pl-9 pr-3 py-2 text-sm"
               />
             </div>
             {textTooShort && (
               <p className="mt-1 text-xs text-amber-600">
                 Enter at least {field.minQueryLength} characters to search.
+              </p>
+            )}
+            {/* A value longer than the encrypted index window is NOT truncated: the server queries
+                the window over ciphertext and then refines the full value. Say so, otherwise a full
+                document ID that matches nothing looks like a system error. */}
+            {queryWindow && (
+              <p className="mt-1 text-xs text-gray-500">
+                The encrypted index matches up to {queryWindow.max} characters, so MongoDB is queried
+                with <span className="font-mono text-gray-700">{queryWindow.window}</span> and the full
+                value is then matched exactly on the decrypted result.
               </p>
             )}
           </div>
@@ -441,6 +530,17 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
 
               <dt className="text-gray-500">filter</dt>
               <dd className="text-emerald-300">{body ? JSON.stringify(body) : <span className="text-gray-500">none (enter a value)</span>}</dd>
+
+              {queryWindow && (
+                <>
+                  <dt className="text-gray-500">qe window</dt>
+                  <dd className="text-amber-300">
+                    {queryWindow.window}
+                    <span className="text-gray-500"> (index matches {queryWindow.max} chars; the full
+                    value is refined server-side over the decrypted result)</span>
+                  </dd>
+                </>
+              )}
             </dl>
             <p className="text-gray-500 pt-1 border-t border-white/5">
               The value is encrypted before it reaches Atlas and matched ciphertext-to-ciphertext; the
@@ -451,17 +551,20 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
       </div>
 
       {/* Results */}
-      {loading ? (
+      {loading || stale ? (
         <LoadingIndicator label="Searching over encrypted data…" />
+      ) : !body ? (
+        <div className="rounded-lg border border-dashed bg-gray-50 py-8 text-center text-sm text-gray-400">
+          {textTooShort && field
+            ? `Enter at least ${field.minQueryLength} characters to search encrypted KYC records.`
+            : 'Choose a field and enter a value to search encrypted KYC records.'}
+        </div>
       ) : searchError ? (
         <div className="text-sm text-red-600">{searchError}</div>
-      ) : results == null && !hasSearched ? (
-        <div className="rounded-lg border border-dashed bg-gray-50 py-8 text-center text-sm text-gray-400">
-          Choose a field and enter a value to search encrypted KYC records.
-        </div>
       ) : results && results.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-gray-50 py-8 text-center text-sm text-gray-500">
-          No matches. Encrypted search ran successfully but returned no records.
+          {field ? noMatchHint(field, value) : 'No matches.'}{' '}
+          The encrypted search ran successfully and returned no records.
         </div>
       ) : results ? (
         <div className="space-y-3">
@@ -470,14 +573,10 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
             <thead className="bg-gray-50 text-left text-xs uppercase text-gray-500">
               <tr>
                 <th className="px-3 py-2 font-medium">Name</th>
-                <th className="px-3 py-2 font-medium">Agreement</th>
-                <th className="px-3 py-2 font-medium">Segment</th>
-                <th className="px-3 py-2 font-medium">Status</th>
-                {canSeeContactPii && <th className="px-3 py-2 font-medium">Email</th>}
-                {canSeeContactPii && <th className="px-3 py-2 font-medium">Phone</th>}
-                <th className="px-3 py-2 font-medium">Address</th>
                 <th className="px-3 py-2 font-medium">Gov. ID</th>
-                <th className="px-3 py-2 font-medium">Risk notes</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Agreement</th>
+                <th className="px-3 py-2 font-medium">Status</th>
+                {canSeeContactPii && <th className="hidden px-3 py-2 font-medium md:table-cell">Email</th>}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -492,42 +591,26 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
                       r.customerName || <Restricted />
                     )}
                   </td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-600">{r.customerAgreementReference}</td>
-                  <td className="px-3 py-2 text-gray-700">{r.customerSegment ?? '—'}</td>
-                  <td className="px-3 py-2 capitalize text-gray-700">{(r.customerAgreementStatus ?? '—').replace(/_/g, ' ')}</td>
-                  {canSeeContactPii && (
-                    <td className="px-3 py-2 text-gray-700">{r.customerEmailAddress ?? <Restricted />}</td>
-                  )}
-                  {canSeeContactPii && (
-                    <td className="px-3 py-2 text-gray-700">{r.customerMobilePhoneNumber ?? <Restricted />}</td>
-                  )}
-                  <td className="px-3 py-2 text-gray-700">
-                    {r.sensitive?.customerAgreementResidentialAddress != null
-                      ? renderValue(r.sensitive.customerAgreementResidentialAddress)
-                      : <Restricted />}
-                  </td>
-                  <td className="px-3 py-2 text-gray-700">
+                  <td className="px-3 py-2 font-mono text-xs text-gray-700">
                     {(r.customerAgreementGovernmentID as { number?: unknown } | undefined)?.number != null
                       ? renderValue((r.customerAgreementGovernmentID as { number?: unknown }).number)
                       : <Restricted />}
                   </td>
-                  <td className="px-3 py-2 text-gray-700">
-                    {r.sensitive?.customerAgreementRiskNotes != null
-                      ? renderValue(r.sensitive.customerAgreementRiskNotes)
-                      : <Restricted />}
-                  </td>
+                  <td className="hidden px-3 py-2 font-mono text-xs text-gray-600 lg:table-cell">{r.customerAgreementReference}</td>
+                  <td className="px-3 py-2 capitalize text-gray-700">{(r.customerAgreementStatus ?? '—').replace(/_/g, ' ')}</td>
+                  {canSeeContactPii && (
+                    <td className="hidden px-3 py-2 text-gray-700 md:table-cell">{r.customerEmailAddress ?? <Restricted />}</td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
-          {!canSeeSensitive && (
-            <p className="border-t bg-gray-50 px-3 py-2 text-xs text-gray-500">
-              Sensitive fields (address, government ID, risk notes) are shown as <em>restricted (encrypted)</em>.
-              {role === 'level2_investigator'
-                ? ' Approve a case escalation to unlock them for Level 2.'
-                : ' They require a Level 2 escalation or the security auditor role.'}
-            </p>
-          )}
+          {/* Address, risk notes, source of funds and screening reference stay off the result list
+              (QE:none tier); they are disclosed on the customer detail, which audits the reveal. */}
+          <p className="border-t bg-gray-50 px-3 py-2 text-xs text-gray-500">
+            Open a customer for the full KYC record, including the sensitive fields
+            {role === 'level2_investigator' ? ' an approved case escalation unlocks.' : '.'}
+          </p>
         </div>
         {totalResults > RESULTS_PAGE_SIZE && (
           <Pagination

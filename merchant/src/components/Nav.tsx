@@ -3,6 +3,7 @@
 import { getSession, hasScope } from '@/lib/session';
 import NavBar, { type NavLink } from './NavBar';
 import { BRAND } from '@/lib/brand';
+import { ENV } from '@/lib/env';
 
 export default async function Nav() {
   const session = await getSession();
@@ -24,5 +25,11 @@ export default async function Nav() {
       }
     : null;
 
-  return <NavBar links={all.filter((l) => l.show)} user={user} />;
+  return (
+    <NavBar
+      links={all.filter((l) => l.show)}
+      user={user}
+      pspLinks={{ portal: ENV.pspPortalUrl(), dashboard: ENV.pspDashboardUrl() }}
+    />
+  );
 }

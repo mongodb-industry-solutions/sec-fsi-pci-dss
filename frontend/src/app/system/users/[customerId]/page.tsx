@@ -6,7 +6,7 @@ import { api, type ConsentGrant, type CustomerTransactionRow, type FraudCase } f
 import { getToken, decodeToken } from '../../../../lib/auth';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
-import { readEscalationToken } from '../../../../lib/escalation';
+import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { useDebugMode } from '../../../../lib/debugMode';
 import { useEffectivePermissions } from '../../../../lib/permissions';
 import { LoadingIndicator } from '../../../../components/LoadingIndicator';
@@ -407,9 +407,12 @@ export default function CustomerDetailPage() {
     }
   }, [customerId, router]);
 
-  // When arriving from a case, reuse that case's escalation token so an L2 who approved the
-  // escalation keeps sensitive access here (the backend re-validates it; expired → no PII).
-  const escToken = navCtx?.from === 'investigation' && navCtx.caseId ? readEscalationToken(navCtx.caseId) : undefined;
+  // Arriving from a case: reuse that case's escalation token, re-deriving it when this tab has
+  // none (deep link / new tab). The backend re-validates it; expired or absent → no PII.
+  const caseIdCtx = navCtx?.from === 'investigation' ? navCtx.caseId : undefined;
+  const { escalationToken: escToken, resolving: escResolving } = useCaseEscalation({
+    caseId: caseIdCtx, role, token,
+  });
   // Cache key scoped by role AND escalation so a summary view is never reused as a full view.
   const key = authReady ? `customer:${customerId}:${role}:${escToken ? 'e' : 'n'}` : null;
   const { data: customer, loading: resLoading, error } = useResource<Record<string, unknown>>(
@@ -547,11 +550,15 @@ export default function CustomerDetailPage() {
           title={`Protected details${debugMode ? ' (QE:none)' : ''}`}
           info="QE:none fields (encrypted at rest, NOT searchable): residential address and risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI DSS Req 3.2/3.3 and Req 10, GDPR need-to-know). The value is never persisted; only the fact of the reveal is audited, by field name."
           badge={
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sensitiveAvailable ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'}`}>
-              {sensitiveAvailable ? 'Reveal available' : 'Restricted'}
+            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              sensitiveAvailable ? 'bg-purple-100 text-purple-700'
+                : escResolving ? 'bg-gray-100 text-gray-600'
+                : 'bg-amber-100 text-amber-700'
+            }`}>
+              {sensitiveAvailable ? 'Reveal available' : escResolving ? 'Checking access…' : 'Restricted'}
             </span>
           }
-          accessNote={sensitiveAvailable
+          accessNote={sensitiveAvailable || escResolving
             ? undefined
             : (isAuditor
               ? 'These fields are unavailable for this record.'

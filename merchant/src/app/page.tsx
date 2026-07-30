@@ -126,7 +126,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ a
             href={simulatorUrl}
             className="btn-primary shrink-0 text-sm"
           >
-            <Clapperboard className="h-4 w-4" aria-hidden /> Go to the demo simulator <ArrowRight className="h-4 w-4" aria-hidden />
+            <Clapperboard className="h-4 w-4" aria-hidden /> Go to the PSP demo simulator <ArrowRight className="h-4 w-4" aria-hidden />
           </a>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
