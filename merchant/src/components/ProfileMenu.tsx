@@ -79,7 +79,7 @@ export default function ProfileMenu({ user, pspLinks }: { user: ProfileUser; psp
               href={pspLinks.dashboard}
               role="menuitem"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 border-t border-line px-4 py-2 hover:bg-surface-alt"
             >
@@ -90,7 +90,7 @@ export default function ProfileMenu({ user, pspLinks }: { user: ProfileUser; psp
               href={pspLinks.portal}
               role="menuitem"
               target="_blank"
-              rel="noreferrer"
+              rel="noopener noreferrer"
               onClick={() => setOpen(false)}
               className="flex items-center gap-2.5 px-4 py-2 hover:bg-surface-alt"
             >

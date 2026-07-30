@@ -1,5 +1,5 @@
 import { FieldMapping, FieldTransform } from '../models/externalProviderArrangement.model';
-import { getNestedValue, setNestedValue } from '../../../shared/services/objectPath';
+import { getNestedValue, setNestedValue, isSafeObjectPath } from '../../../shared/services/objectPath';
 
 export { getNestedValue, setNestedValue };
 
@@ -18,6 +18,8 @@ const SECRET_FIELDS = new Set([
 
 function blockedReason(path: string, allowCardData: boolean): string | null {
   const lower = path.toLowerCase().replace(/\./g, '');
+  // Rejected here (400) rather than silently dropped when the mapping runs.
+  if (!isSafeObjectPath(path)) return 'not a valid document path (empty or prototype-walking segment)';
   if (SECRET_FIELDS.has(lower)) return 'a protected secret';
   if (!allowCardData && CHD_FIELDS.has(lower)) return 'a PCI DSS-protected cardholder-data field';
   return null;
