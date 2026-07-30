@@ -202,7 +202,7 @@ function MerchantApplicationForm({
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Tax ID / Company Registration</label>
+          <label className="block text-xs text-gray-500 mb-1">Tax ID (TIN) / Company Registration</label>
           <input
             required value={legalRef} onChange={(e) => setLegalRef(e.target.value)}
             placeholder="12-3456789"

@@ -322,7 +322,7 @@ export default function MerchantReviewPage() {
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                       {m.merchantLegalEntityReference && (
                         <>
-                          <dt className="text-gray-500">Tax ID / Reg #</dt>
+                          <dt className="text-gray-500">Tax ID (TIN) / Reg #</dt>
                           <dd className="font-mono text-gray-700">{m.merchantLegalEntityReference}</dd>
                         </>
                       )}
