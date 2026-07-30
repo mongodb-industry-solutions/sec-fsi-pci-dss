@@ -7,6 +7,7 @@ import { Pagination } from '../../../components/Pagination';
 import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
 import { getSimTokenForRole, getSimToken } from '../../../lib/simulatorAuth';
 import { ROLE_LABELS } from '../../../lib/constants';
+import { LoadingIndicator } from '../../../components/LoadingIndicator';
 
 type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
 
@@ -195,7 +196,7 @@ export default function SimulatorInvestigationPage() {
 
           {simPayment.caseId ? (
             pinnedLoading ? (
-              <p className="text-xs text-gray-400 animate-pulse">Loading case details…</p>
+              <LoadingIndicator inline label="Loading case details…" size={13} className="text-gray-300" />
             ) : pinnedCase ? (
               <div className="bg-white/10 rounded-lg p-3 flex items-center justify-between gap-3 flex-wrap">
                 <div className="text-xs space-y-0.5">
@@ -320,7 +321,7 @@ export default function SimulatorInvestigationPage() {
 
       {/* ── Table ──────────────────────────────────────────────────── */}
       {loading ? (
-        <div className="text-center py-10 text-gray-400">Loading cases...</div>
+        <LoadingIndicator label="Loading cases…" className="py-10" />
       ) : (
         <>
           <CaseTable cases={cases} basePath="/simulator/investigation" />
@@ -396,10 +397,7 @@ function SimulatorKycSearchPanel() {
       {tokenError ? (
         <div className="text-sm text-red-600">{tokenError}</div>
       ) : !token ? (
-        <div className="flex items-center gap-3 py-6 text-sm text-gray-500">
-          <span className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-[#001E2B]" />
-          Waiting for the server to load the {ROLE_LABELS[role] ?? role} token…
-        </div>
+        <LoadingIndicator label={`Waiting for the server to load the ${ROLE_LABELS[role] ?? role} token…`} className="py-6" size={20} />
       ) : (
         <EncryptedKycSearch token={token} role={role} />
       )}
