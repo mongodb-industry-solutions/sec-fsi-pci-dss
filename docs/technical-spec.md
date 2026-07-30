@@ -2092,6 +2092,17 @@ The `escalationToken` is a short-lived UUID (TTL 4 hours) stored in an in-memory
 
 **Response 422:** Case is not in `escalated` status.
 
+**Client-side resume (`useCaseEscalation`).** The token lives in `sessionStorage` under `esc:<caseId>`,
+which is per tab, so a deep link into a case, its transaction or its customer opened in a new tab
+arrives without it and the server correctly returns no sensitive data. Every page that renders
+sensitive case data uses the shared `frontend/src/lib/useCaseEscalation.ts` hook: it reuses the token
+from this tab and, failing that, re-derives it for a `level2_investigator` when the case is
+`escalated` **and** already has `escalationAcceptedAt`. Re-deriving calls this same endpoint, which
+is idempotent for an accepted escalation, so it adds no audit noise and never approves an escalation
+that was not accepted (the 422 above keeps it fail-closed). It runs at most once per case per mount,
+and while it runs the UI shows a pending state rather than "restricted", which would misreport the
+operator's access.
+
 ---
 
 #### `POST /fraud/:id/notes` *(Ch-03 — BIAN SD-83 append-only)*

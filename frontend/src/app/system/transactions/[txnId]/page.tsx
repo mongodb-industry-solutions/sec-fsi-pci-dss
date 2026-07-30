@@ -13,7 +13,7 @@ import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
 import { useEffectivePermissions } from '../../../../lib/permissions';
 import { AccessDenied } from '../../../../components/AccessDenied';
-import { storeEscalationToken, readEscalationToken } from '../../../../lib/escalation';
+import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { Tooltip } from '../../../../components/Tooltip';
 import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle } from 'lucide-react';
 
@@ -72,7 +72,6 @@ export default function TransactionDetailPage() {
   const [role, setRole] = useState('level1_analyst');
   const [authReady, setAuthReady] = useState(false);
   const [linkedCase, setLinkedCase] = useState<{ id: string; ref: string; status: string } | null>(null);
-  const [escalationToken, setEscalationToken] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
   const [openingCase, setOpeningCase] = useState(false);
   const [openCaseError, setOpenCaseError] = useState<string | null>(null);
@@ -112,18 +111,21 @@ export default function TransactionDetailPage() {
     }).catch(() => {});
 
     // Breadcrumb context from the navigation that led here (no PII; ids/refs only).
-    // If we came from a case the L2 has escalated, reuse that case's token so sensitive
-    // fields and parties resolve here too (backend re-validates; expired → no PII).
     if (typeof window !== 'undefined') {
       const sp = new URLSearchParams(window.location.search);
       const cid = sp.get('caseId');
       if (sp.get('from') === 'investigation' && cid) {
         setFromCase({ caseId: cid, caseRef: sp.get('caseRef') ?? undefined });
-        const persisted = readEscalationToken(cid);
-        if (persisted) setEscalationToken(persisted);
       }
     }
   }, [txnId, router]);
+
+  // Sensitive access comes from the case this transaction belongs to: the one we navigated from,
+  // or the linked case. Reused from this tab, or re-derived when its escalation was accepted.
+  const escalationCaseId = fromCase?.caseId ?? linkedCase?.id;
+  const { escalationToken, adopt: adoptEscalation } = useCaseEscalation({
+    caseId: escalationCaseId, role, token,
+  });
 
   // Cached transaction resource (stale-while-revalidate). Key is scoped by role and by whether
   // an escalation token is active, so obtaining a token transparently refetches the sensitive
@@ -210,8 +212,7 @@ export default function TransactionDetailPage() {
     setApproving(true);
     try {
       const res = await api.fraud.escalateApprove(linkedCase.id, {}, token);
-      setEscalationToken(res.escalationToken);
-      storeEscalationToken(linkedCase.id, res.escalationToken); // persist for reload/navigation
+      adoptEscalation(linkedCase.id, res.escalationToken); // persist for reload/navigation
     } catch {
       // No linked case or escalation not possible
     } finally {

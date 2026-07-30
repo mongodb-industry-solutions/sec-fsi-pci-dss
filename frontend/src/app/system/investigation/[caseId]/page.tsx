@@ -13,7 +13,7 @@ import { useDebugMode } from '../../../../lib/debugMode';
 import { SensitiveReveal } from '../../../../components/SensitiveReveal';
 import { humanize, fmtAddress } from '../../../../components/record/format';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
-import { storeEscalationToken } from '../../../../lib/escalation';
+import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight, RotateCcw } from 'lucide-react';
 import { useConfirm } from '../../../../components/ui/ConfirmProvider';
 
@@ -82,7 +82,6 @@ export default function DemoCaseDetailPage() {
   // Action state
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-  const [escalationToken, setEscalationToken] = useState<string | null>(null);
   const [liveSignal, setLiveSignal] = useState(0);
 
   // ADR-031: live updates via SSE — when the customer answers a question, refresh the case + panel.
@@ -139,16 +138,9 @@ export default function DemoCaseDetailPage() {
     load();
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-resume escalation: an L2 who has already accepted this case re-derives a fresh
-  // stateless token on load (idempotent on the backend; no audit-trail noise), so sensitive
-  // fields stay accessible across reloads and into linked entity pages without re-clicking.
-  useEffect(() => {
-    if (role !== 'level2_investigator' || !fraudCase || !token || escalationToken) return;
-    if (fraudCase.caseStatus !== 'escalated' || !fraudCase.escalationAcceptedAt) return;
-    api.fraud.escalateApprove(caseId, {}, token)
-      .then((res) => { setEscalationToken(res.escalationToken); storeEscalationToken(caseId, res.escalationToken); })
-      .catch(() => {});
-  }, [role, fraudCase, token, escalationToken, caseId]);
+  // Sensitive access for this case: reused from this tab, or re-derived when an accepted
+  // escalation exists. `fraudCase` is already loaded here, so the hook does not refetch it.
+  const { escalationToken, adopt: adoptEscalation } = useCaseEscalation({ caseId, role, token, fraudCase });
 
   // Load the aggregated enrichment read-model. Re-runs when the escalation token changes so
   // sensitive KYC unlocks in place. HRP is derived from the real account reference here (no
@@ -245,8 +237,7 @@ export default function DemoCaseDetailPage() {
     setActionMsg(null);
     try {
       const res = await api.fraud.escalateApprove(caseId, {}, token);
-      setEscalationToken(res.escalationToken);
-      storeEscalationToken(caseId, res.escalationToken); // persist so it survives reload/navigation
+      adoptEscalation(caseId, res.escalationToken); // persist so it survives reload/navigation
       await reload(token);
       setActionMsg('Escalation approved. Sensitive fields are now accessible.');
     } catch (err) {

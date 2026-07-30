@@ -1,9 +1,10 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, RawDocumentResponse } from '../../../../lib/api';
 import { getSimTokenForRole } from '../../../../lib/simulatorAuth';
+import { canResumeEscalation } from '../../../../lib/useCaseEscalation';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, formatRiskIndicator } from '../../../../lib/constants';
@@ -82,6 +83,35 @@ export default function SimulatorCaseDetailPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Revisiting a case whose escalation was already accepted: re-derive the escalation token and
+  // load the customer, so the QE:none fields render without approving again (idempotent on the
+  // backend). Without this the L2 step showed the sensitive fields as empty on every revisit.
+  // `escalationToken` is read but deliberately NOT a dependency: setting it mid-flight would re-run
+  // this effect, and its cleanup would cancel the loads still in progress below.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!l2Token || !fraudCase || escalationToken || resumed.current) return;
+    if (!canResumeEscalation('level2_investigator', fraudCase)) return;
+    resumed.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.fraud.escalateApprove(caseId, {}, l2Token);
+        const cust = fraudCase.customerAgreementInstanceReference
+          ? await api.customer.getById(fraudCase.customerAgreementInstanceReference, l2Token, res.escalationToken).catch(() => null)
+          : null;
+        const raw = fraudCase.cardTransactionInstanceReference
+          ? await api.system.rawDocument('cardTransactionLog', fraudCase.cardTransactionInstanceReference, l2Token).catch(() => null)
+          : null;
+        if (cancelled) return;
+        setEscalationToken(res.escalationToken);
+        if (cust) setCustomer(cust);
+        if (raw) setRawDoc(raw);
+      } catch { resumed.current = false; /* escalation no longer resumable */ }
+    })();
+    return () => { cancelled = true; };
+  }, [l2Token, fraudCase, caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Real actions ──────────────────────────────────────────────────────────
   async function run(action: () => Promise<void>) {
     setBusy(true); setMsg(null);
@@ -107,9 +137,11 @@ export default function SimulatorCaseDetailPage() {
       const res = await api.fraud.escalateApprove(caseId, {}, l2);
       setEscalationToken(res.escalationToken);
       const c = await refreshCase(l2);
-      // Load the REAL customer record + raw transaction with elevated access.
+      // Load the REAL customer record + raw transaction with elevated access. The escalation token
+      // is what unlocks the QE:none fields; the L2 JWT alone gets the lookup tier.
       if (c.customerAgreementInstanceReference) {
-        api.customer.getById(c.customerAgreementInstanceReference, l2).then(setCustomer).catch(() => null);
+        api.customer.getById(c.customerAgreementInstanceReference, l2, res.escalationToken)
+          .then(setCustomer).catch(() => null);
       }
       if (c.cardTransactionInstanceReference) {
         api.system.rawDocument('cardTransactionLog', c.cardTransactionInstanceReference, l2)
@@ -428,7 +460,11 @@ function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isE
   l2HasAccepted: boolean; isEscalated: boolean; busy: boolean; onApprove: () => void;
   showRaw: boolean; rawDoc: RawDocumentResponse | null; onToggleRaw: () => void;
 }) {
-  const addr = customer?.customerAgreementResidentialAddress as Addr | undefined;
+  // QE:none values travel inside `sensitive` on the audited escalation path (ADR-052), never at the
+  // top level. The fallback keeps the field working if a role ever receives it unwrapped.
+  const sensitive = customer?.sensitive as Record<string, unknown> | undefined;
+  const addr = (sensitive?.customerAgreementResidentialAddress
+    ?? customer?.customerAgreementResidentialAddress) as Addr | undefined;
   // v32 B4 (ADR-050): the identity document is the structured, searchable field.
   const govId = (customer?.customerAgreementGovernmentID as { number?: unknown } | undefined)?.number as string | undefined;
   const email = customer?.customerEmailAddress as string | undefined;
