@@ -1274,6 +1274,21 @@ encrypted, lookup-tier and exact-searchable.
 | `customerAgreementKycCheck.customerAgreementKycCheckSanctionsResult` | string | equality | contention 8 |
 | `customerAgreementSourceOfFunds` / `customerAgreementPurposeOfRelationship` / `...ScreeningProviderRef` | string | none (L2) | not searchable, retrieval only |
 
+> **Query window + in-memory refinement.** `strMaxQueryLength` (10) caps what the encrypted index
+> can match, but an operator holding a **full** value (e.g. the 11-character government ID
+> `ES123454821`) must still find the record. The registry therefore carries two limits per text
+> field: `maxQueryLength` (the QE window) and `inputMaxLength` (what the operator may type, sized to
+> `strMaxLength`). A longer value is never truncated: `textQueryWindow()` sends the longest slice that
+> cannot lose a match (last N characters for suffix, first N for prefix and substring), so the
+> encrypted query returns a **superset**, and `buildTextRefiner()` re-applies the full predicate over
+> the already-decrypted value to narrow it to an exact answer. The refinement mirrors the index
+> `caseSensitive` / `diacriticSensitive` params (declared on the field def) and runs server-side only;
+> Atlas still receives ciphertext and only the window. Refining discards candidates, so the encrypted
+> query reads a bounded wider page (`limit * 5`, capped at 200) to still fill one result page.
+> Raising `strMaxQueryLength` above 10 instead would need the
+> `fleDisableSubstringPreviewParameterLimits` server parameter plus a full drop and reseed, which is
+> why the window is refined rather than widened.
+
 > **Nested QE paths.** Encrypting `customerAgreementGovernmentID.number` and
 > `customerAgreementKycCheck.*` is allowed because each parent sub-document stays plaintext; only
 > the scalar leaves are QE fields, each with its own unique DEK.
@@ -1286,6 +1301,16 @@ blind single-record lookup (`GET /api/v1/customer?email|phone|accountRef`) and c
 customer base by attribute. In the UI the search lives as an "Advanced search" section on
 `/system/users`, rendered only for L2/auditor; the shared `EncryptedKycSearch` component is reused in
 the demo simulator. Sensitive `QE:none` result fields remain gated by escalation (L2 token) / auditor.
+
+**Result/query correspondence (UI contract).** `EncryptedKycSearch` auto-searches on a 450 ms debounce,
+so several QE queries of very different cost can overlap. Each request carries an `AbortSignal` and a
+sequence number, and only the newest one may write state, so a slow earlier response can never
+overwrite the rows of the query on screen. Rows are rendered only while the query that produced them
+still matches the active one (`committedKey`); otherwise the surface shows the searching state. Text
+inputs are capped at `inputMaxLength`, never at the QE window, and when the value exceeds the window
+the UI states which slice MongoDB is queried with. Empty results are phrased with the field's mode
+("No government ID no. ends with …"), because a directional match returning nothing is an answer, not
+a failure.
 
 ```typescript
 // backend/src/vendors/encryption/encryptedFieldsMaps.ts

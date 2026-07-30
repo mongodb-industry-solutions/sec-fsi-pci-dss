@@ -56,6 +56,34 @@ const MODE_BADGE_COLOR: Record<KycSearchMode, string> = {
 
 const DEBOUNCE_MS = 450;
 
+// Text modes are directional (a suffix field cannot match the START of a value). Spell that out in
+// the label, hint and placeholder, so the operator knows which part of the value is being matched.
+const MODE_INPUT_LABEL: Record<KycSearchMode, string> = {
+  substring: 'Contains',
+  prefix:    'Starts with',
+  suffix:    'Ends with',
+  range:     'Range',
+  equality:  'Value',
+};
+
+function MODE_PLACEHOLDER(field: KycSearchFieldDef): string {
+  const label = field.label.toLowerCase();
+  if (field.mode === 'suffix')    return `Full or last characters of the ${label}…`;
+  if (field.mode === 'prefix')    return `Full or first characters of the ${label}…`;
+  if (field.mode === 'substring') return `Any part of the ${label}…`;
+  return `Exact ${label}…`;
+}
+
+// Wording for an empty result set, so "no matches" reads as an answer and not as a failure.
+function noMatchHint(field: KycSearchFieldDef, value: string): string {
+  const v = value.trim();
+  if (field.mode === 'suffix')    return `No ${field.label.toLowerCase()} ends with "${v}".`;
+  if (field.mode === 'prefix')    return `No ${field.label.toLowerCase()} starts with "${v}".`;
+  if (field.mode === 'substring') return `No ${field.label.toLowerCase()} contains "${v}".`;
+  if (field.mode === 'range')     return `No record falls in this ${field.label.toLowerCase()} range.`;
+  return `No record matches this ${field.label.toLowerCase()}.`;
+}
+
 // Human explanation of each QE query mode, for the debug detail shown to a demo audience.
 const MODE_DESCRIPTION: Record<KycSearchMode, string> = {
   substring: 'Substring match (encStrContains) evaluated over ciphertext',
@@ -134,7 +162,9 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
   const [results, setResults] = useState<KycSearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const [hasSearched, setHasSearched] = useState(false);
+  /** Query that produced the rows currently on screen. Rows are only rendered while it matches the
+   *  active query, so the table can never be read as the answer to a different search. */
+  const [committedKey, setCommittedKey] = useState('');
   const [page, setPage] = useState(1);
 
   const { debugMode } = useDebugMode();
@@ -163,15 +193,27 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
   const field = useMemo(() => fields.find((f) => f.key === selectedKey), [fields, selectedKey]);
 
   // Reset the inputs when the field changes.
-  useEffect(() => { setValue(''); setFrom(''); setTo(''); setResults(null); setHasSearched(false); setSearchError(null); }, [selectedKey]);
+  useEffect(() => { setValue(''); setFrom(''); setTo(''); setResults(null); setCommittedKey(''); setSearchError(null); }, [selectedKey]);
+
+  const isTextMode = !!field && ['substring', 'prefix', 'suffix'].includes(field.mode);
 
   // Inline (UX-only) validation for text modes: block queries shorter than minQueryLength.
   const textTooShort = useMemo(() => {
-    if (!field) return false;
-    if (!['substring', 'prefix', 'suffix'].includes(field.mode)) return false;
+    if (!isTextMode || !field) return false;
     const min = field.minQueryLength ?? 1;
     return value.trim().length > 0 && value.trim().length < min;
-  }, [field, value]);
+  }, [isTextMode, field, value]);
+
+  // The QE index can only match up to maxQueryLength characters. A longer value is still accepted:
+  // the server queries the permitted window over ciphertext and then refines the full value against
+  // the decrypted result. Surface that, so a full document ID never looks like a broken search.
+  const queryWindow = useMemo(() => {
+    if (!isTextMode || !field) return null;
+    const v = value.trim();
+    const max = field.maxQueryLength ?? v.length;
+    if (v.length <= max) return null;
+    return { window: field.mode === 'suffix' ? v.slice(-max) : v.slice(0, max), max };
+  }, [isTextMode, field, value]);
 
   // Build the request body for the active field/mode, or null when there is nothing to run.
   const body = useMemo(() => {
@@ -195,21 +237,34 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
   // manual "Reload" button (which re-fetches even when the query is unchanged, e.g. to pick up
   // provider verdicts written after the last search). Client validation gates the request; the
   // server re-validates.
+  // Only the newest request may write state: QE queries have very different costs per mode and
+  // length, so responses can arrive out of order. Older ones are aborted and, if they still land,
+  // discarded by the sequence guard.
+  const seqRef = useRef(0);
+  const inflightRef = useRef<AbortController | null>(null);
+
   const runSearch = useCallback(async () => {
     if (!token || !body) return;
+    inflightRef.current?.abort();
+    const controller = new AbortController();
+    inflightRef.current = controller;
+    const seq = ++seqRef.current;
+    const key = bodyKey;
     setLoading(true);
     setSearchError(null);
     try {
-      const res = await api.customer.search({ ...body, limit: 100 }, token, escalationToken);
+      const res = await api.customer.search({ ...body, limit: 100 }, token, escalationToken, controller.signal);
+      if (seq !== seqRef.current) return;
       setResults(res.results);
       setPage(1);
-      setHasSearched(true);
+      setCommittedKey(key);
     } catch (e) {
+      if (controller.signal.aborted || seq !== seqRef.current) return;
       setResults([]);
-      setHasSearched(true);
+      setCommittedKey(key);
       setSearchError((e as Error).message || 'Search failed');
     } finally {
-      setLoading(false);
+      if (seq === seqRef.current) setLoading(false);
     }
   }, [token, bodyKey, escalationToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -221,6 +276,9 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
     timer.current = setTimeout(() => { void runSearch(); }, DEBOUNCE_MS);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [runSearch, token]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Drop any in-flight query when the surface unmounts.
+  useEffect(() => () => { inflightRef.current?.abort(); }, []);
 
   if (!authorized) {
     return (
@@ -241,6 +299,8 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
     return <LoadingIndicator inline label="Loading searchable fields…" />;
   }
 
+  // The active query has not produced its own rows yet (typing, debounce or request in flight).
+  const stale = !!body && bodyKey !== committedKey;
   const totalResults = results?.length ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PAGE_SIZE));
   const pageRows = results ? results.slice((page - 1) * RESULTS_PAGE_SIZE, page * RESULTS_PAGE_SIZE) : [];
@@ -388,22 +448,32 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
         ) : field ? (
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
-              {field.mode === 'substring' ? 'Contains' : field.mode === 'prefix' ? 'Starts with' : field.mode === 'suffix' ? 'Ends with' : 'Value'}
+              {MODE_INPUT_LABEL[field.mode]}
             </label>
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={value}
-                maxLength={field.maxQueryLength}
+                maxLength={field.inputMaxLength ?? field.maxQueryLength}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder={`Search ${field.label.toLowerCase()}…`}
+                placeholder={MODE_PLACEHOLDER(field)}
                 className="w-full max-w-md border rounded-lg pl-9 pr-3 py-2 text-sm"
               />
             </div>
             {textTooShort && (
               <p className="mt-1 text-xs text-amber-600">
                 Enter at least {field.minQueryLength} characters to search.
+              </p>
+            )}
+            {/* A value longer than the encrypted index window is NOT truncated: the server queries
+                the window over ciphertext and then refines the full value. Say so, otherwise a full
+                document ID that matches nothing looks like a system error. */}
+            {queryWindow && (
+              <p className="mt-1 text-xs text-gray-500">
+                The encrypted index matches up to {queryWindow.max} characters, so MongoDB is queried
+                with <span className="font-mono text-gray-700">{queryWindow.window}</span> and the full
+                value is then matched exactly on the decrypted result.
               </p>
             )}
           </div>
@@ -441,6 +511,17 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
 
               <dt className="text-gray-500">filter</dt>
               <dd className="text-emerald-300">{body ? JSON.stringify(body) : <span className="text-gray-500">none (enter a value)</span>}</dd>
+
+              {queryWindow && (
+                <>
+                  <dt className="text-gray-500">qe window</dt>
+                  <dd className="text-amber-300">
+                    {queryWindow.window}
+                    <span className="text-gray-500"> (index matches {queryWindow.max} chars; the full
+                    value is refined server-side over the decrypted result)</span>
+                  </dd>
+                </>
+              )}
             </dl>
             <p className="text-gray-500 pt-1 border-t border-white/5">
               The value is encrypted before it reaches Atlas and matched ciphertext-to-ciphertext; the
@@ -451,17 +532,20 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
       </div>
 
       {/* Results */}
-      {loading ? (
+      {loading || stale ? (
         <LoadingIndicator label="Searching over encrypted data…" />
+      ) : !body ? (
+        <div className="rounded-lg border border-dashed bg-gray-50 py-8 text-center text-sm text-gray-400">
+          {textTooShort && field
+            ? `Enter at least ${field.minQueryLength} characters to search encrypted KYC records.`
+            : 'Choose a field and enter a value to search encrypted KYC records.'}
+        </div>
       ) : searchError ? (
         <div className="text-sm text-red-600">{searchError}</div>
-      ) : results == null && !hasSearched ? (
-        <div className="rounded-lg border border-dashed bg-gray-50 py-8 text-center text-sm text-gray-400">
-          Choose a field and enter a value to search encrypted KYC records.
-        </div>
       ) : results && results.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-gray-50 py-8 text-center text-sm text-gray-500">
-          No matches. Encrypted search ran successfully but returned no records.
+          {field ? noMatchHint(field, value) : 'No matches.'}{' '}
+          The encrypted search ran successfully and returned no records.
         </div>
       ) : results ? (
         <div className="space-y-3">

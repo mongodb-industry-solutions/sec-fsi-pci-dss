@@ -1,4 +1,7 @@
 import { FieldMapping, FieldTransform } from '../models/externalProviderArrangement.model';
+import { getNestedValue, setNestedValue } from '../../../shared/services/objectPath';
+
+export { getNestedValue, setNestedValue };
 
 // Cardholder data. Mappable ONLY for a card issuer / card authorization connector, which legitimately
 // receives the PAN/CVV/expiry to authorize (e.g. rename cardNumber -> card_value). Blocked for every
@@ -38,29 +41,6 @@ export function validateMappingRules(rules: FieldMapping[], opts?: { allowCardDa
 const CARD_DATA_TYPES = new Set(['card_issuer', 'card_authorization']);
 export function mayMapCardData(providerType: string | undefined): boolean {
   return providerType !== undefined && CARD_DATA_TYPES.has(providerType);
-}
-
-export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const parts = path.split('.');
-  let current: unknown = obj;
-  for (const part of parts) {
-    if (current == null || typeof current !== 'object') return undefined;
-    current = (current as Record<string, unknown>)[part];
-  }
-  return current;
-}
-
-export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {
-  const parts = path.split('.');
-  let current: Record<string, unknown> = obj;
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts[i];
-    if (current[part] == null || typeof current[part] !== 'object') {
-      current[part] = {};
-    }
-    current = current[part] as Record<string, unknown>;
-  }
-  current[parts[parts.length - 1]] = value;
 }
 
 function deleteNestedValue(obj: Record<string, unknown>, path: string): void {

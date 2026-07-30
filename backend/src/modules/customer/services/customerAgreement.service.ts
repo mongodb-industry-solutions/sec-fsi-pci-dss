@@ -15,6 +15,7 @@ import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { deriveKycCheckStatus, DecisionMode } from '../../../shared/models/onboardingDecision';
+import { getNestedValue } from '../../../shared/services/objectPath';
 import { config } from '../../../config';
 
 /**
@@ -564,7 +565,15 @@ export interface KycSearchFieldDef {
   baseMode: KycSearchMode;      // intended mode (text modes degrade to equality when gated)
   bsonType: 'string' | 'date' | 'int' | 'bool';
   minQueryLength?: number;
+  /** QE query window: the longest value the encrypted index can match (strMaxQueryLength). */
   maxQueryLength?: number;
+  /** Longest value the operator may type. Longer than the QE window: the surplus is refined in
+   *  memory over the decrypted value (see buildTextRefiner), so a full document ID also works. */
+  inputMaxLength?: number;
+  /** Must mirror the QE index params in encryptedFieldsMaps.ts, so the in-memory refinement
+   *  applies the same matching semantics as the encrypted index. */
+  caseSensitive?: boolean;
+  diacriticSensitive?: boolean;
   rangeMin?: number | string;   // ISO date string or int
   rangeMax?: number | string;
   enumValues?: Array<string | boolean>;
@@ -584,15 +593,15 @@ const KYC_SEARCH_FIELDS: KycSearchFieldDef[] = [
   { key: 'email',                label: 'Email',             collection: 'party',     path: 'partyEmailAddress',      baseMode: 'equality', bsonType: 'string' },
   { key: 'phone',                label: 'Phone',             collection: 'party',     path: 'partyMobilePhoneNumber', baseMode: 'equality', bsonType: 'string' },
   { key: 'accountRef',           label: 'Account reference', collection: 'agreement', path: 'customerAgreementReference', baseMode: 'equality', bsonType: 'string' },
-  { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10 },
+  { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 30, caseSensitive: false, diacriticSensitive: false },
   { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2020-01-01' },
   { key: 'partyNationality',     label: 'Nationality',       collection: 'party',     path: 'partyNationality',     baseMode: 'equality',  bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },
   { key: 'partyPlaceOfBirth',    label: 'Place of birth',    collection: 'party',     path: 'partyPlaceOfBirth',    baseMode: 'equality',  bsonType: 'string' },
-  { key: 'govIdNumber',          label: 'Government ID no.', collection: 'agreement', path: 'customerAgreementGovernmentID.number',         baseMode: 'suffix',   bsonType: 'string', minQueryLength: 3, maxQueryLength: 10 },
+  { key: 'govIdNumber',          label: 'Government ID no.', collection: 'agreement', path: 'customerAgreementGovernmentID.number',         baseMode: 'suffix',   bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 20, caseSensitive: true, diacriticSensitive: true },
   { key: 'govIdType',            label: 'Government ID type',collection: 'agreement', path: 'customerAgreementGovernmentID.type',           baseMode: 'equality', bsonType: 'string', enumValues: ['passport','national_id','driver_license'] },
   { key: 'govIdIssuingCountry',  label: 'Issuing country',   collection: 'agreement', path: 'customerAgreementGovernmentID.issuingCountry', baseMode: 'equality', bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },
   { key: 'govIdExpiry',          label: 'ID expiry date',    collection: 'agreement', path: 'customerAgreementGovernmentID.expiryDate',     baseMode: 'range',    bsonType: 'date',   rangeMin: '2000-01-01', rangeMax: '2040-01-01' },
-  { key: 'taxId',                label: 'Tax ID (TIN)',      collection: 'agreement', path: 'customerAgreementTaxIDNumber',                 baseMode: 'prefix',   bsonType: 'string', minQueryLength: 2, maxQueryLength: 10 },
+  { key: 'taxId',                label: 'Tax ID (TIN)',      collection: 'agreement', path: 'customerAgreementTaxIDNumber',                 baseMode: 'prefix',   bsonType: 'string', minQueryLength: 2, maxQueryLength: 10, inputMaxLength: 20, caseSensitive: true, diacriticSensitive: true },
   { key: 'occupation',           label: 'Occupation',        collection: 'agreement', path: 'customerAgreementOccupation',                  baseMode: 'equality', bsonType: 'string' },
   { key: 'riskScore',            label: 'Risk score',        collection: 'agreement', path: 'customerAgreementKycCheck.customerAgreementKycCheckRiskScore',      baseMode: 'range',    bsonType: 'int',  rangeMin: 0, rangeMax: 100 },
   { key: 'riskRating',           label: 'Risk rating',       collection: 'agreement', path: 'customerAgreementKycCheck.customerAgreementKycCheckRiskRating',     baseMode: 'equality', bsonType: 'string', enumValues: ['low','medium','high'] },
@@ -622,6 +631,7 @@ export function getKycSearchRegistry() {
       bsonType: f.bsonType,
       minQueryLength: f.minQueryLength,
       maxQueryLength: f.maxQueryLength,
+      inputMaxLength: f.inputMaxLength ?? f.maxQueryLength,
       rangeMin: f.rangeMin,
       rangeMax: f.rangeMax,
       enumValues: f.enumValues,
@@ -647,16 +657,67 @@ export interface KycSearchRequest {
   to?: string;                     // range upper
 }
 
+const TEXT_MODES = new Set<KycSearchMode>(['substring', 'prefix', 'suffix']);
+
+/**
+ * Validate a text query and return the value plus the slice sent to the encrypted index.
+ *
+ * The QE preview indexes cap the query length (strMaxQueryLength). A longer operator input, e.g.
+ * a full government ID, is queried with the longest permitted slice that still cannot lose a
+ * match: the last N characters for suffix, the first N for prefix or substring. Every match of
+ * the full value is a match of that slice, so the encrypted query returns a superset and
+ * buildTextRefiner narrows it to the exact predicate afterwards. Nothing is truncated silently.
+ */
+function textQueryWindow(def: KycSearchFieldDef, mode: KycSearchMode, raw: string | undefined): { value: string; window: string } {
+  const value = (raw ?? '').trim();
+  const min = def.minQueryLength ?? 3;
+  if (value.length < min) badRequest(`Query must be at least ${min} characters for ${def.key}`);
+  const inputMax = def.inputMaxLength ?? def.maxQueryLength;
+  if (inputMax && value.length > inputMax) badRequest(`Query exceeds ${inputMax} characters for ${def.key}`);
+  const max = def.maxQueryLength ?? value.length;
+  if (value.length <= max) return { value, window: value };
+  return { value, window: mode === 'suffix' ? value.slice(-max) : value.slice(0, max) };
+}
+
+/** Normalize per the field's QE index params, so refinement matches the index semantics. */
+function normalizeForMatch(def: KycSearchFieldDef, s: string): string {
+  let out = s;
+  if (def.diacriticSensitive === false) out = out.normalize('NFD').replace(/\p{M}/gu, '');
+  if (def.caseSensitive === false) out = out.toLowerCase();
+  return out;
+}
+
+/**
+ * Predicate that re-applies the FULL text query over the decrypted field value, for the case where
+ * the encrypted query ran on a shorter window. Returns null when the window was the whole value
+ * (the encrypted result is already exact). The refinement is server-side, over values the QE driver
+ * already decrypted; Atlas still only ever saw ciphertext.
+ */
+function buildTextRefiner(
+  def: KycSearchFieldDef,
+  mode: KycSearchMode,
+  value: string,
+  window: string,
+): ((doc: Record<string, unknown>) => boolean) | null {
+  if (!TEXT_MODES.has(mode) || window === value) return null;
+  const needle = normalizeForMatch(def, value);
+  return (doc) => {
+    const actual = getNestedValue(doc, def.path);
+    if (typeof actual !== 'string') return false;  // still ciphertext for this tier: cannot refine
+    const haystack = normalizeForMatch(def, actual);
+    if (mode === 'prefix') return haystack.startsWith(needle);
+    if (mode === 'suffix') return haystack.endsWith(needle);
+    return haystack.includes(needle);
+  };
+}
+
 /**
  * Build the per-field MongoDB filter for a validated request. Text modes use QE preview
  * aggregation operators via $expr; range/equality use plain filters that the QE driver rewrites.
  */
 function buildKycFilter(def: KycSearchFieldDef, mode: KycSearchMode, req: KycSearchRequest): Record<string, unknown> {
-  if (mode === 'substring' || mode === 'prefix' || mode === 'suffix') {
-    const v = (req.value ?? '').trim();
-    const min = def.minQueryLength ?? 3;
-    if (v.length < min) badRequest(`Query must be at least ${min} characters for ${def.key}`);
-    if (def.maxQueryLength && v.length > def.maxQueryLength) badRequest(`Query exceeds ${def.maxQueryLength} characters for ${def.key}`);
+  if (TEXT_MODES.has(mode)) {
+    const { window: v } = textQueryWindow(def, mode, req.value);
     const input = `$${def.path}`;
     if (mode === 'substring') return { $expr: { [ENC_CONTAINS]: { input, substring: v } } };
     if (mode === 'prefix')    return { $expr: { [ENC_STARTS]:   { input, prefix: v } } };
@@ -708,32 +769,44 @@ export async function searchKyc(
   if (!def) badRequest(`Unknown or non-searchable field: ${req.field}`);
   const mode = effectiveMode(def);
   const filter = buildKycFilter(def, mode, req);
+  // When the operator typed more than the QE query window, the encrypted query returned a superset:
+  // refine it here against the decrypted value so the full value behaves exactly as typed.
+  const refine = TEXT_MODES.has(mode)
+    ? (() => { const w = textQueryWindow(def, mode, req.value); return buildTextRefiner(def, mode, w.value, w.window); })()
+    : null;
 
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
   const cap = Math.min(Math.max(limit, 1), 100);
 
   const results: Record<string, unknown>[] = [];
+  // Refinement discards candidates, so read a wider window from the encrypted query to still be
+  // able to fill one page. Bounded, because every candidate costs a join and an audit event.
+  const fetch = refine ? Math.min(cap * 5, 200) : cap;
 
   if (def.collection === 'party') {
     const parties = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
-      .find(filter as Partial<PartyControlRecord>).limit(cap).toArray();
+      .find(filter as Partial<PartyControlRecord>).limit(fetch).toArray();
     for (const party of parties) {
+      if (refine && !refine(party as unknown as Record<string, unknown>)) continue;
       const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
         .findOne({ partyInstanceReference: party.partyInstanceReference });
       if (!doc) continue;
       await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
       results.push(buildResponse(doc, party, role, canSee, caseId));
+      if (results.length >= cap) break;
     }
   } else {
     const docs = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
-      .find(filter as Partial<CustomerAgreementControlRecord>).limit(cap).toArray();
+      .find(filter as Partial<CustomerAgreementControlRecord>).limit(fetch).toArray();
     for (const doc of docs) {
+      if (refine && !refine(doc as unknown as Record<string, unknown>)) continue;
       const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
         .findOne({ partyInstanceReference: doc.partyInstanceReference });
       if (!party) continue;
       await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
       results.push(buildResponse(doc, party, role, canSee, caseId));
+      if (results.length >= cap) break;
     }
   }
 

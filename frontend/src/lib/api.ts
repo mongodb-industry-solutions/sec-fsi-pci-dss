@@ -597,7 +597,8 @@ export interface KycSearchFieldDef {
   path?: string;                           // dotted document path of the encrypted field (debug detail)
   bsonType: 'string' | 'date' | 'int' | 'bool';
   minQueryLength?: number;
-  maxQueryLength?: number;
+  maxQueryLength?: number;                 // QE query window (strMaxQueryLength)
+  inputMaxLength?: number;                 // longest value the operator may type (server refines the surplus)
   rangeMin?: number | string;
   rangeMax?: number | string;
   enumValues?: Array<string | boolean>;
@@ -915,12 +916,15 @@ export const api = {
     // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
     searchFields: (token: string) =>
       apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
-    search: (body: KycSearchBody, token: string, escalationToken?: string) =>
+    // `signal` lets the caller abort a superseded query, so a stale response can never overwrite
+    // the results of the query the operator is actually looking at.
+    search: (body: KycSearchBody, token: string, escalationToken?: string, signal?: AbortSignal) =>
       apiFetch<KycSearchResponse>(
         '/api/v1/customer/search',
         {
           method: 'POST',
           body: JSON.stringify(body),
+          ...(signal ? { signal } : {}),
           ...(escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}),
         },
         token,
