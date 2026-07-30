@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Bug, ChevronDown, HelpCircle, KeyRound, Layers, LogOut, UserCircle2 } from 'lucide-react';
+import { Bug, ChevronDown, Home, HelpCircle, KeyRound, Layers, LogOut, UserCircle2 } from 'lucide-react';
 import { ROLE_LABELS } from '../lib/constants';
 import { useDebugMode } from '../lib/debugMode';
 import { decodeToken } from '../lib/auth';
@@ -164,6 +164,16 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
             >
               <HelpCircle size={15} className="text-gray-400 shrink-0" />
               <span>Help &amp; Guide</span>
+            </Link>
+
+            <Link
+              href="/"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-200 hover:bg-white/8 hover:text-white transition-colors"
+            >
+              <Home size={15} className="text-gray-400 shrink-0" />
+              <span>PSP portal</span>
             </Link>
 
             <div className="my-1 mx-3 border-t border-white/8" />
