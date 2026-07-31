@@ -11,6 +11,7 @@ import { useEffectivePermissions } from '../../../lib/permissions';
 import { JsonView } from '../../../components/json/JsonView';
 import { DateTimeRangeFilter } from '../../../components/search/DateTimeRangeFilter';
 import { Combobox, type ComboOption } from '../../../components/ui/Combobox';
+import { downloadJsonFile, appliedFilters } from '../../../lib/downloadJson';
 
 type AuditRow = {
   id: string;
@@ -212,7 +213,7 @@ function AuditEventsView() {
       }
       const payload = {
         generatedAt: new Date().toISOString(),
-        filtersApplied: Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined && v !== '' && v !== 'all')),
+        filtersApplied: appliedFilters(filters),
         totalMatching: grandTotal,
         exported: collected.length,
         truncated: collected.length < grandTotal,
@@ -231,15 +232,7 @@ function AuditEventsView() {
           id: e.id,
         })),
       };
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `audit-events-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      downloadJsonFile('audit-events', payload);
     } catch { /* surfaced via the empty download; non-blocking */ }
     finally { setDownloading(false); }
   }, [token, source, typeInput, entityType, outcome, q, ref, minScore, from, to]);

@@ -84,3 +84,31 @@ test.describe('Responsive nav: role bottom bar (dark carousel)', () => {
     await expect(page.locator('aside')).toBeVisible();
   });
 });
+
+test.describe('Responsive header: dropdown panels stay on screen', () => {
+  const VIEWPORT = 360;
+
+  for (const [label, selector] of [
+    ['notifications', 'button[aria-label="Notifications"]'],
+    ['user menu', 'header button[aria-haspopup="menu"]'],
+  ] as const) {
+    test(`@${VIEWPORT}px the ${label} panel is fully inside the viewport`, async ({ page, context }) => {
+      await loginAs(context, 'customer');
+      await page.route('**/api/v1/notifications**', (r) => r.fulfill(json({ items: [], count: 0 })));
+      await page.setViewportSize({ width: VIEWPORT, height: 780 });
+      await page.goto('/system/profile');
+      // Wait for hydration to settle: the header re-renders once the token is decoded.
+      await expect(page.locator('header button[aria-haspopup="menu"]')).toBeVisible({ timeout: 15000 });
+      await page.waitForTimeout(500);
+
+      await page.locator(selector).first().click();
+      const panel = page.locator('[role="menu"]').first();
+      await expect(panel).toBeVisible();
+
+      const box = await panel.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(VIEWPORT);
+    });
+  }
+});

@@ -2282,7 +2282,7 @@ export const api = {
   beneficiaries: {
     list: (
       token: string,
-      params?: { ownerRef?: string; q?: string; status?: 'active' | 'removed'; page?: number; limit?: number },
+      params?: { ownerRef?: string; q?: string; caseRef?: string; status?: 'active' | 'removed'; page?: number; limit?: number },
     ) => {
       const qs = params
         ? '?' + new URLSearchParams(
