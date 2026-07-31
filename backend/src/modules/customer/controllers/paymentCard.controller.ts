@@ -61,7 +61,10 @@ and must NOT be repeated in the request body.
           },
           paymentCardExpirationDate: {
             type: 'string',
-            description: 'Card expiry date in `MM/YY` format. Stored as QE:none (encrypted, not searchable).',
+            // Month must be 01-12: the issuer module derives the per-card CVV from this value and
+            // its expired-card check fails open on an unparseable month.
+            pattern: '^(0[1-9]|1[0-2])/[0-9]{2}$',
+            description: 'Card expiry date in `MM/YY` format (month 01-12). Stored as QE:none (encrypted, not searchable).',
           },
           paymentCardMaskedPanDisplay: {
             type: 'string',
