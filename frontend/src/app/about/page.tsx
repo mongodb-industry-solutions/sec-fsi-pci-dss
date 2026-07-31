@@ -54,7 +54,7 @@ export default function AboutPage() {
           href="/"
           className="inline-flex items-center gap-2 text-sm text-gray-400 transition-colors hover:text-white"
         >
-          <ArrowLeft size={16} /> Back to the demo
+          <ArrowLeft size={16} /> Back to the Portal
         </Link>
 
         <header className="about-rise mt-8 text-center">
@@ -64,12 +64,21 @@ export default function AboutPage() {
           <h1 className="mt-5 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">
             About <span className="text-[#00ED64]">us</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-3xl text-sm leading-relaxed text-gray-400 sm:text-base lg:text-lg">
+          {/* Who IST is comes first, then how to reach us. The intro stays typographically calm
+              so it reads as context rather than a banner. */}
+          <p className="mx-auto mt-5 max-w-3xl text-sm leading-relaxed text-gray-400">
             {teamConfig.intro}
           </p>
-          <p className="mx-auto mt-4 max-w-2xl text-xs text-gray-500 sm:text-sm">
-            Below are the contact points for the <span className="text-gray-300">{BRAND.full}</span> (PSP - PCI DSS)
-            demo, by area. Scan a QR to follow along on LinkedIn.
+          <div className="mt-6 flex items-center justify-center gap-2" aria-hidden="true">
+            <span className="about-divider" />
+            <span className="about-divider-dot" />
+            <span className="about-divider" />
+          </div>
+          <p className="mx-auto mt-6 max-w-3xl text-sm leading-relaxed text-gray-300 sm:text-base">
+            These are the main contact points for the <span className="text-[#00ED64]">{BRAND.full}</span> (PSP - PCI DSS)
+            demo, by area. Reach out through your enterprise account or your usual MongoDB channels to book a deeper
+            technical conversation, a workshop or a tailored deep dive with us, or to get support on anything you see
+            here. You can also scan a QR to connect on LinkedIn and follow the content we publish.
           </p>
         </header>
 
