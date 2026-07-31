@@ -15,7 +15,7 @@ vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
   getEncryptionWriteDb: vi.fn(),
 }));
 
-import { listAllBeneficiaries } from '../../../../backend/src/modules/identity/services/counterpartyArrangement.service';
+import { listAllBeneficiaries, PredicateRequiredError } from '../../../../backend/src/modules/identity/services/counterpartyArrangement.service';
 
 const CASE_REF = 'FD-2026-000123';
 const AGREEMENT = 'agreement-1';
@@ -78,5 +78,20 @@ describe('listAllBeneficiaries — caseRef scoping (ADR-048)', () => {
     const { db, queries } = makeDb();
     await listAllBeneficiaries(db, { ownerRef: 'party-other', caseRef: CASE_REF });
     for (const q of queries) expect(q.ownerPartyReference).toBe('party-other');
+  });
+
+  // A blank owner reference is absent, not an override. Treating it as supplied would clear the
+  // case scope while still satisfying the predicate check, i.e. cross-party enumeration.
+  it.each([['empty', ''], ['blank', '   ']])('ignores a %s owner reference and keeps the case scope', async (_label, ownerRef) => {
+    const { db, queries } = makeDb();
+    await listAllBeneficiaries(db, { ownerRef, caseRef: CASE_REF });
+    expect(queries.length).toBeGreaterThan(0);
+    for (const q of queries) expect(q.ownerPartyReference).toBe(OWNER);
+  });
+
+  it('rejects a blank owner reference that is the only predicate offered', async () => {
+    const { db, queries } = makeDb();
+    await expect(listAllBeneficiaries(db, { ownerRef: '   ' })).rejects.toThrow(PredicateRequiredError);
+    expect(queries).toHaveLength(0); // never reaches the collection
   });
 });

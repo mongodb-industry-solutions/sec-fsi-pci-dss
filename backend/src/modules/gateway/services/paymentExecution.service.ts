@@ -118,7 +118,7 @@ export async function transitionExecution(
   patch?: Partial<Pick<PaymentExecutionProcedure, 'routingNote' | 'failureReason' | 'scheduledAt' | 'initiatedAt' | 'completedAt' | 'paymentExecutionRail' | 'resolvedPayoutAccountReference'>>,
 ): Promise<boolean> {
   const result = await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
-    { paymentExecutionInstanceReference: executionRef },
+    { paymentExecutionInstanceReference: executionRef, paymentExecutionStatus: { $ne: newStatus } },
     {
       $set: {
         paymentExecutionStatus: newStatus,

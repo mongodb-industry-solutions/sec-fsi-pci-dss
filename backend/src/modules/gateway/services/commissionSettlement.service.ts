@@ -35,10 +35,16 @@ export interface PostCommissionInput {
   feeRateApplied?: number;
 }
 
-// Outcome of a posting attempt. The caller needs to tell the cases apart, because only
-// 'no_revenue_account' leaves the fee stranded in the merchant hold and needs compensating:
-// 'already_collected' means a previous run already withheld it.
-export type PostCommissionOutcome = 'posted' | 'zero_fee' | 'already_collected' | 'no_revenue_account';
+// Outcome of a posting attempt. The caller needs to tell the cases apart, because
+// 'no_revenue_account' and 'fx_unavailable' leave the fee stranded in the merchant hold and need
+// compensating: 'already_collected' means a previous run already withheld it.
+export type PostCommissionOutcome = 'posted' | 'zero_fee' | 'already_collected' | 'no_revenue_account' | 'fx_unavailable';
+
+// The outcomes where nothing was withheld and the hold still carries the fee, so the caller must
+// release it to the merchant rather than leave money that belongs to nobody.
+export function requiresFeeRelease(outcome: PostCommissionOutcome): boolean {
+  return outcome === 'no_revenue_account' || outcome === 'fx_unavailable';
+}
 
 export interface PostCommissionResult {
   outcome: PostCommissionOutcome;
@@ -52,21 +58,30 @@ export async function postCommission(db: Db, input: PostCommissionInput): Promis
   // Zero must leave every balance untouched (gross == net) rather than write a no-value ledger entry.
   if (!(input.feeAmount > 0)) return { outcome: 'zero_fee', creditedAmount: 0 };
 
+  // Match the same condition creditDirect applies. A suspended or closed revenue account cannot be
+  // credited, so accepting it here would debit the merchant hold and write the credit log for a leg
+  // that silently never lands.
   const revenueAccount = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
-    .findOne({ payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE });
+    .findOne({ payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE, payoutAccountStatus: 'active' });
   if (!revenueAccount) {
     // Fail loudly in the log but never break the settlement: the merchant still gets its net amount,
     // and the caller releases the fee to it so no balance is left holding an uncollectable amount.
-    console.error('[commission] PSP revenue account is not provisioned, commission not posted');
+    console.error('[commission] PSP revenue account is not provisioned or not active, commission not posted');
     return { outcome: 'no_revenue_account', creditedAmount: 0 };
   }
 
   // Convert into the revenue account currency (same static rate table as the rest of the flow).
+  // A failed conversion is an inability to post, never a reason to fall back to the unconverted
+  // amount: crediting merchant-currency units into a revenue account denominated in another
+  // currency would misstate both the balance and the credit log. The caller compensates.
   let creditAmount = input.feeAmount;
   if (revenueAccount.payoutAccountCurrency && revenueAccount.payoutAccountCurrency !== input.currency) {
     const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
     try { creditAmount = (await resolveAndConvert(db, input.feeAmount, input.currency, revenueAccount.payoutAccountCurrency)).amount; }
-    catch { /* keep original on FX error */ }
+    catch {
+      console.error(`[commission] FX ${input.currency}->${revenueAccount.payoutAccountCurrency} unavailable, commission not posted`);
+      return { outcome: 'fx_unavailable', creditedAmount: 0 };
+    }
   }
 
   const now = new Date();

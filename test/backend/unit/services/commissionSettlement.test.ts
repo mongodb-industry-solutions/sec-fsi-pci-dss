@@ -12,14 +12,21 @@ vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.
   emitProcessEvent: vi.fn(),
 }));
 
+const resolveAndConvert = vi.fn();
+vi.mock('../../../../backend/src/providers/currency-exchange/services/currencyExchange.service', () => ({
+  resolveAndConvert: (...args: unknown[]) => resolveAndConvert(...args),
+}));
+
 import {
   postCommission,
+  requiresFeeRelease,
   PSP_REVENUE_ACCOUNT_REFERENCE,
 } from '../../../../backend/src/modules/gateway/services/commissionSettlement.service';
 
 const REVENUE_ACCOUNT = {
   payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE,
   payoutAccountCurrency: 'EUR',
+  payoutAccountStatus: 'active',
 };
 
 // Minimal Db double: records every $inc on payoutAccountArrangement so both legs can be asserted.
@@ -30,7 +37,13 @@ function makeDb(opts: { revenueAccount?: unknown; alreadyCollected?: boolean } =
     collection: vi.fn((name: string) => {
       if (name === 'payoutAccountArrangement') {
         return {
-          findOne: vi.fn().mockResolvedValue('revenueAccount' in opts ? opts.revenueAccount : REVENUE_ACCOUNT),
+          // Honours the status condition, so "the account exists but cannot be credited" is a real
+          // case here and not just an assertion about the query shape.
+          findOne: vi.fn(async (filter: Record<string, unknown>) => {
+            const account = 'revenueAccount' in opts ? (opts.revenueAccount as any) : REVENUE_ACCOUNT;
+            if (!account) return null;
+            return filter.payoutAccountStatus && account.payoutAccountStatus !== filter.payoutAccountStatus ? null : account;
+          }),
           updateOne: vi.fn(async (filter: Record<string, string>, update: { $inc?: Record<string, number> }) => {
             incs.push({ ref: filter.payoutAccountInstanceReference, inc: update.$inc ?? {} });
             return { modifiedCount: 1 };
@@ -98,5 +111,46 @@ describe('postCommission', () => {
     // being stranded in its pending hold.
     expect(await postCommission(db, input)).toEqual({ outcome: 'no_revenue_account', creditedAmount: 0 });
     expect(incs).toHaveLength(0); // never debit one leg without the other
+  });
+
+  it('posts nothing when the revenue account exists but is not active', async () => {
+    const { db, incs, creditLogUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountStatus: 'suspended' } });
+    // creditDirect only mutates an active account, so accepting a suspended one would debit the
+    // merchant hold and log a credit for a leg that never lands.
+    expect(await postCommission(db, input)).toEqual({ outcome: 'no_revenue_account', creditedAmount: 0 });
+    expect(incs).toHaveLength(0);
+    expect(creditLogUpsert).not.toHaveBeenCalled();
+  });
+
+  it('credits the revenue account in ITS currency when the fee is in another one', async () => {
+    const { db, incs, creditLogUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountCurrency: 'USD' } });
+    resolveAndConvert.mockResolvedValue({ amount: 5.4 });
+
+    expect(await postCommission(db, input)).toEqual({ outcome: 'posted', creditedAmount: 5.4 });
+    // The merchant leg clears the hold in the merchant's currency, the PSP leg lands in USD.
+    expect(incs.find((i) => i.ref === 'pao-1')?.inc['payoutAccountBalance.pendingAmount']).toBe(-5);
+    expect(incs.find((i) => i.ref === PSP_REVENUE_ACCOUNT_REFERENCE)?.inc['payoutAccountBalance.availableAmount']).toBe(5.4);
+    expect(creditLogUpsert.mock.calls[0][1].$setOnInsert).toMatchObject({ amount: 5.4, currency: 'USD' });
+  });
+
+  it('posts nothing when the fee cannot be converted, rather than crediting the wrong units', async () => {
+    const { db, incs, creditLogUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountCurrency: 'USD' } });
+    resolveAndConvert.mockRejectedValue(new Error('no rate'));
+
+    // Falling back to the unconverted amount would credit 5 EUR of value as 5 USD and log it as USD.
+    expect(await postCommission(db, input)).toEqual({ outcome: 'fx_unavailable', creditedAmount: 0 });
+    expect(incs).toHaveLength(0);
+    expect(creditLogUpsert).not.toHaveBeenCalled();
+  });
+});
+
+describe('requiresFeeRelease', () => {
+  it('is true exactly for the outcomes that leave the fee in the merchant hold', () => {
+    expect(requiresFeeRelease('no_revenue_account')).toBe(true);
+    expect(requiresFeeRelease('fx_unavailable')).toBe(true);
+    // A collected fee (now or on an earlier run) must not be handed back a second time.
+    expect(requiresFeeRelease('posted')).toBe(false);
+    expect(requiresFeeRelease('already_collected')).toBe(false);
+    expect(requiresFeeRelease('zero_fee')).toBe(false);
   });
 });

@@ -12,7 +12,7 @@ import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model
 import { createExecution, transitionExecution, appendResolutionStep, getExecution, resolveMerchantFee } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
 import { creditAvailable, debitPending, settleCardDebit, creditDirect, releaseCardHold, releasePendingCredit } from './payoutAccountBalance.service';
-import { postCommission } from './commissionSettlement.service';
+import { postCommission, requiresFeeRelease } from './commissionSettlement.service';
 // ADR-039: AIS + PISP are reached ONLY through dispatchProvider (never a direct builtin import),
 // so an external provider can replace the builtin module without changing this flow.
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
@@ -333,12 +333,12 @@ export class PayoutOrchestrationProcess {
       // The state transition is the idempotency gate for every balance movement below: a redelivered
       // bank.transfer.settled must not credit the same settlement twice.
       const transitioned = await transitionExecution(db, execRef, 'completed', { completedAt: new Date() });
+      if (!transitioned) return;
       await appendResolutionStep(db, execRef, {
         stepName: 'bank.transfer.settled',
         stepOutcome: 'found',
         stepNote: `railRef=${p.railRef} netAmount=${p.netAmount} ${p.currency}`,
       });
-      if (!transitioned) return;
 
       // Credit the recipient. Convert to the recipient account currency (FX). The amounts come from
       // OUR execution record, not from the rail payload, so the ledger always matches what we stored.
@@ -367,11 +367,12 @@ export class PayoutOrchestrationProcess {
               currency: accountCcy ?? execution.currency,
               feeRateApplied: execution.fee?.feeRateApplied,
             });
-            // The commission could not be collected (revenue ledger not provisioned). The hold was
-            // taken on the gross, so leaving it there would strand the fee in pendingAmount forever.
-            // Release it to the merchant instead: the PSP forgoes the fee rather than holding money
-            // that belongs to nobody. 'already_collected' needs nothing — an earlier run withheld it.
-            if (outcome === 'no_revenue_account') {
+            // The commission could not be collected (revenue ledger not provisioned, or no FX rate
+            // into its currency). The hold was taken on the gross, so leaving it there would strand
+            // the fee in pendingAmount forever. Release it to the merchant instead: the PSP forgoes
+            // the fee rather than holding money that belongs to nobody. 'already_collected' needs
+            // nothing, an earlier run withheld it.
+            if (requiresFeeRelease(outcome)) {
               await creditAvailable(db, execution.resolvedPayoutAccountReference, feeInAccountCcy);
             }
           }
@@ -425,12 +426,12 @@ export class PayoutOrchestrationProcess {
       // The state transition is the idempotency gate for the reversal below: a redelivered
       // bank.transfer.failed must not reverse the same reservation twice.
       const transitioned = await transitionExecution(db, execRef, 'failed', { failureReason: `${p.errorCode}: ${p.errorReason}` });
+      if (!transitioned) return;
       await appendResolutionStep(db, execRef, {
         stepName: 'bank.transfer.failed',
         stepOutcome: 'failed',
         stepNote: `errorCode=${p.errorCode} reason=${p.errorReason}`,
       });
-      if (!transitioned) return;
 
       // The rail rejected the payment. Which reversal applies depends on whose funds were reserved:
       // a P2P sender gets its OWN money back (pending -> available), whereas a merchant beneficiary
