@@ -57,7 +57,9 @@ const CUSTOMER = {
 /** `cardResolves: false` reproduces the pre-v33 state: the token matches no stored card. */
 async function stub(page: Page, cardResolves: boolean) {
   await stubPermissions(page, { transactions: ['view'], customers: ['view'], cards: ['view'] });
-  await page.route('**/api/v1/fraud/card-registry/**', (r) =>
+  // The shared-card registry lookup lives on the customer module (GET /api/v1/customer/card-registry/
+  // :token), even though the client helper is named api.fraud.cardRegistry.
+  await page.route('**/api/v1/customer/card-registry/**', (r) =>
     r.fulfill(json({ paymentCardReference: CARD_TOKEN, cardHolderCount: 2 })),
   );
   await page.route('**/api/v1/fraud**', (r) => r.fulfill(json({ results: [], total: 0, page: 1, limit: 20 })));
@@ -66,7 +68,9 @@ async function stub(page: Page, cardResolves: boolean) {
   );
   await page.route('**/api/v1/customer/**', (route) => {
     const p = new URL(route.request().url()).pathname;
-    if (p.includes('/card-by-token/')) return route.fallback();
+    // Playwright matches the most recently registered route first, so the two specific customer
+    // lookups above have to be handed back explicitly.
+    if (p.includes('/card-by-token/') || p.includes('/card-registry/')) return route.fallback();
     return route.fulfill(json(CUSTOMER));
   });
   await page.route('**/api/v1/transactions**', (route) => {
