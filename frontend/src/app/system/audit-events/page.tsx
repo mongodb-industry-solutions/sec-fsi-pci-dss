@@ -10,6 +10,7 @@ import { getToken } from '../../../lib/auth';
 import { useEffectivePermissions } from '../../../lib/permissions';
 import { JsonView } from '../../../components/json/JsonView';
 import { DateTimeRangeFilter } from '../../../components/search/DateTimeRangeFilter';
+import { Combobox, type ComboOption } from '../../../components/ui/Combobox';
 
 type AuditRow = {
   id: string;
@@ -60,6 +61,20 @@ const OUTCOME_GROUPS: Array<{ label: string; values: string[] }> = [
   { label: 'In progress', values: ['pending', 'submitted', 'in_flight', 'settled'] },
   { label: 'Failure', values: ['failed', 'error', 'timeout'] },
   { label: 'Integration delivery', values: ['sent', 'received'] },
+];
+
+const OUTCOME_OPTIONS: ComboOption[] = [
+  { value: '', label: 'All' },
+  ...OUTCOME_GROUPS.flatMap((g) => g.values.map((v) => ({ value: v, label: v.replace(/_/g, ' '), group: g.label }))),
+];
+
+const ENTITY_OPTIONS: ComboOption[] = [
+  { value: '', label: 'All entities' },
+  { value: 'fraud_case', label: 'Investigation case' },
+  { value: 'transaction', label: 'Transaction' },
+  { value: 'customer', label: 'Customer (KYC)' },
+  { value: 'merchant', label: 'Merchant (KYB)' },
+  { value: 'integration', label: 'Integration' },
 ];
 
 const SOURCE_STYLES: Record<string, string> = {
@@ -291,37 +306,32 @@ function AuditEventsView() {
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Event type</label>
-          <input list="audit-event-types" value={typeInput}
-            onChange={(e) => { setTypeInput(e.target.value); resetToFirst(); }}
+          <Combobox
+            value={typeInput}
+            onChange={(v) => { setTypeInput(v); resetToFirst(); }}
+            options={typeOptions.map((t) => ({ value: t, label: t.replace(/_/g, ' ') }))}
             placeholder="Choose or type…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
-          <datalist id="audit-event-types">
-            {typeOptions.map((t) => <option key={t} value={t} />)}
-          </datalist>
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Outcome / status</label>
-          <select value={outcome} onChange={(e) => { setOutcome(e.target.value); resetToFirst(); }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
-            <option value="">All</option>
-            {OUTCOME_GROUPS.map((g) => (
-              <optgroup key={g.label} label={g.label}>
-                {g.values.map((o) => <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>)}
-              </optgroup>
-            ))}
-          </select>
+          <Combobox
+            editable={false}
+            value={outcome}
+            onChange={(v) => { setOutcome(v); resetToFirst(); }}
+            placeholder="All"
+            options={OUTCOME_OPTIONS}
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Related entity</label>
-          <select value={entityType} onChange={(e) => { setEntityType(e.target.value); resetToFirst(); }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
-            <option value="">All entities</option>
-            <option value="fraud_case">Investigation case</option>
-            <option value="transaction">Transaction</option>
-            <option value="customer">Customer (KYC)</option>
-            <option value="merchant">Merchant (KYB)</option>
-            <option value="integration">Integration</option>
-          </select>
+          <Combobox
+            editable={false}
+            value={entityType}
+            onChange={(v) => { setEntityType(v); resetToFirst(); }}
+            placeholder="All entities"
+            options={ENTITY_OPTIONS}
+          />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Min risk score (SDF)</label>

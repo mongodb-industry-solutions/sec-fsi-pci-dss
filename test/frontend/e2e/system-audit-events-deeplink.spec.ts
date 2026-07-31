@@ -74,5 +74,7 @@ test.describe('audit events: query-string filters', () => {
 
     await page.getByRole('button', { name: 'All time' }).click();
     await expect.poll(() => new URL(page.url()).searchParams.get('from')).toBeNull();
+    // No preset may look applied once the window is cleared.
+    await expect(page.getByRole('button', { name: 'Last 3 days' })).not.toHaveClass(/bg-\[#001E2B\]/);
   });
 });

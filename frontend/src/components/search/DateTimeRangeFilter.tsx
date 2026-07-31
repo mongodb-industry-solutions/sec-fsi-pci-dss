@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
+import { Combobox, type ComboOption } from '../ui/Combobox';
 
 // Relative/absolute time-window picker for event streams. Emits the `datetime-local`
 // string format ("YYYY-MM-DDTHH:mm") both inputs and callers already use.
 
 export type TimeUnit = 'minutes' | 'hours' | 'days' | 'months';
-export type RangeMode = 'relative' | 'day' | 'between';
+export type RangeMode = 'all' | 'relative' | 'day' | 'between';
 
 export interface DateTimeRangeValue {
   from: string;
@@ -54,6 +55,13 @@ function todayIso(): string {
   return toLocalInput(new Date()).slice(0, 10);
 }
 
+const MODE_OPTIONS: ComboOption[] = [
+  { value: 'all', label: 'All time' },
+  { value: 'relative', label: 'Last…' },
+  { value: 'day', label: 'A single day' },
+  { value: 'between', label: 'Between two dates' },
+];
+
 const PRESETS: Array<{ label: string; amount: number; unit: TimeUnit }> = [
   { label: 'Last 15 min', amount: 15, unit: 'minutes' },
   { label: 'Last hour', amount: 1, unit: 'hours' },
@@ -64,14 +72,17 @@ const PRESETS: Array<{ label: string; amount: number; unit: TimeUnit }> = [
 ];
 
 export function DateTimeRangeFilter({ value, onChange, className = '' }: Props) {
-  const [mode, setMode] = useState<RangeMode>(() => (value.from && value.to ? 'between' : 'relative'));
+  const [mode, setMode] = useState<RangeMode>(() => {
+    if (!value.from && !value.to) return 'all';
+    return value.from && value.to ? 'between' : 'relative';
+  });
   const [amount, setAmount] = useState('24');
   const [unit, setUnit] = useState<TimeUnit>('hours');
   const [day, setDay] = useState(() => value.from.slice(0, 10) || todayIso());
 
   useEffect(() => {
-    if (!value.from && !value.to && mode !== 'relative') setMode('relative');
-  }, [value.from, value.to]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!value.from && !value.to) setMode('all');
+  }, [value.from, value.to]);
 
   const applyRelative = (rawAmount: string, nextUnit: TimeUnit) => {
     setAmount(rawAmount);
@@ -93,7 +104,8 @@ export function DateTimeRangeFilter({ value, onChange, className = '' }: Props) 
 
   const changeMode = (next: RangeMode) => {
     setMode(next);
-    if (next === 'relative') applyRelative(amount, unit);
+    if (next === 'all') onChange({ from: '', to: '' });
+    else if (next === 'relative') applyRelative(amount, unit);
     else if (next === 'day') applyDay(day || todayIso());
   };
 
@@ -104,18 +116,20 @@ export function DateTimeRangeFilter({ value, onChange, className = '' }: Props) 
     return `Up to ${value.to.replace('T', ' ')}.`;
   }, [value]);
 
-  const field = 'border border-gray-300 rounded-lg px-3 py-1.5 text-sm';
+  const field = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-[#001E2B] transition-colors hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]';
 
   return (
     <div className={`space-y-2 ${className}`}>
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Time window</label>
-          <select value={mode} onChange={(e) => changeMode(e.target.value as RangeMode)} className={`${field} bg-white`}>
-            <option value="relative">Last…</option>
-            <option value="day">A single day</option>
-            <option value="between">Between two dates</option>
-          </select>
+          <Combobox
+            editable={false}
+            className="w-48"
+            value={mode}
+            onChange={(v) => changeMode(v as RangeMode)}
+            options={MODE_OPTIONS}
+          />
         </div>
 
         {mode === 'relative' && (
@@ -130,15 +144,13 @@ export function DateTimeRangeFilter({ value, onChange, className = '' }: Props) 
             </div>
             <div>
               <label className="block text-xs text-gray-500 mb-1">Unit</label>
-              <select
+              <Combobox
+                editable={false}
+                className="w-32"
                 value={unit}
-                onChange={(e) => applyRelative(amount, e.target.value as TimeUnit)}
-                className={`${field} bg-white`}
-              >
-                {(Object.keys(UNIT_LABELS) as TimeUnit[]).map((u) => (
-                  <option key={u} value={u}>{UNIT_LABELS[u]}</option>
-                ))}
-              </select>
+                onChange={(v) => applyRelative(amount, v as TimeUnit)}
+                options={(Object.keys(UNIT_LABELS) as TimeUnit[]).map((u) => ({ value: u, label: UNIT_LABELS[u] }))}
+              />
             </div>
           </>
         )}
@@ -171,17 +183,17 @@ export function DateTimeRangeFilter({ value, onChange, className = '' }: Props) 
           </>
         )}
 
-        {(value.from || value.to) && (
-          <button type="button" onClick={() => onChange({ from: '', to: '' })}
-            className="rounded-lg border border-gray-300 px-2 py-1.5 text-xs text-gray-600 hover:bg-gray-50">
-            All time
-          </button>
-        )}
       </div>
 
       <div className="flex flex-wrap items-center gap-1.5">
+        <button type="button" onClick={() => changeMode('all')}
+          className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+            mode === 'all' ? 'border-[#001E2B] bg-[#001E2B] text-[#00ED64]' : 'text-gray-600 hover:bg-gray-50 hover:border-gray-400'
+          }`}>
+          All time
+        </button>
         {PRESETS.map((p) => {
-          const active = mode === 'relative' && amount === String(p.amount) && unit === p.unit;
+          const active = !!value.from && mode === 'relative' && amount === String(p.amount) && unit === p.unit;
           return (
             <button key={p.label} type="button" onClick={() => applyPreset(p)}
               className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
@@ -192,9 +204,12 @@ export function DateTimeRangeFilter({ value, onChange, className = '' }: Props) 
           );
         })}
         <button type="button" onClick={() => { setMode('day'); applyDay(todayIso()); }}
-          className="rounded-full border px-2.5 py-1 text-xs text-gray-600 hover:bg-gray-50 hover:border-gray-400">
+          className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+            mode === 'day' ? 'border-[#001E2B] bg-[#001E2B] text-[#00ED64]' : 'text-gray-600 hover:bg-gray-50 hover:border-gray-400'
+          }`}>
           Today
         </button>
+
         <span className="text-xs text-gray-400 ml-1">{summary}</span>
       </div>
     </div>
