@@ -4382,7 +4382,7 @@ Config key `cvvMode` in `capabilityModuleConfiguration` for capability `card-iss
 
 | `cvvMode` | Accepted CVV |
 |---|---|
-| `both` (default) | global escape-hatch (`validCvv`, default `'123'`) OR the derived per-card CVV |
+| `both` (default) | global escape-hatch (`validCvv`, seed default `'123'`, editable by `operations_officer` / `manager` with `modules:manage`) OR the derived per-card CVV |
 | `global` | only the global `validCvv` (simple demo) |
 | `per_card` | only the derived per-card CVV (strict / realistic demo) |
 

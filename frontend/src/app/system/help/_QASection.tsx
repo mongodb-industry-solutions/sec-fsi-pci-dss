@@ -542,7 +542,7 @@ const QA_DATA: QAItem[] = [
         <P>The CVV is Sensitive Authentication Data: PCI DSS Req 3.2 forbids storing it after authorization, in cleartext or ciphertext. The built-in issuer therefore <Em>derives</Em> it per card on demand instead of storing a value, exactly as a real issuer recomputes it in an HSM:</P>
         <Callout label="Derivation">cvv = digits( HMAC-SHA256( CVK, cardToken | expiryMMYY | serviceCode ) ) truncated to the network length (3 for Visa/Mastercard, 4 for Amex).</Callout>
         <P>The <Code>CVK</Code> is the issuer key: module-owned key material, provisioned once and stored only wrapped (envelope encryption: KMS/master key → DEK → CVK), with cleartext only in process memory. The CVV appears only in an ephemeral, audited reveal response, never in a collection, log, listing, or validation response.</P>
-        <P>Two demo modes coexist via <Code>cvvMode</Code>: a <Em>global</Em> escape-hatch CVV (default <Code>123</Code>) for fast walkthroughs, and the realistic <Em>per-card</Em> derived CVV. The default <Code>both</Code> accepts either; <Code>global</Code> or <Code>per_card</Code> restrict to one.</P>
+        <P>Two demo modes coexist via <Code>cvvMode</Code>: a <Em>global</Em> escape-hatch CVV for fast walkthroughs, and the realistic <Em>per-card</Em> derived CVV. The default <Code>both</Code> accepts either; <Code>global</Code> or <Code>per_card</Code> restrict to one. The global value is not hardcoded: it seeds as <Code>123</Code> and is edited in the card-issuer module admin by <Em>operations_officer</Em> or <Em>manager</Em> (<Code>modules:manage</Code>).</P>
       </div>
     ),
     tags: ['CVV', 'SAD', 'Req 3.2', 'HMAC', 'CVK', 'envelope encryption', 'derivation', 'cvvMode'],
