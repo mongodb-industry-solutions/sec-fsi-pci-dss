@@ -4,10 +4,10 @@
 // redirects to the hosted checkout or opens the confirmation modal with the result.
 import { useState, useTransition } from 'react';
 import {
-  Coffee, GraduationCap, Repeat, Bean, CreditCard, ExternalLink, Link2, Cpu, Loader2,
+  Coffee, GraduationCap, Repeat, Bean, CreditCard, ExternalLink, Link2, Cpu, Loader2, Info,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Product, PaymentMethod } from '@/config/products';
+import { COMMISSION_HELP, type Product, type PaymentMethod } from '@/config/products';
 import { payForProduct, type ActionResult } from '@/lib/actions';
 import { Chip } from '@/components/ui/Bits';
 import { Tip } from '@/components/ui/Tooltip';
@@ -91,7 +91,14 @@ export default function ProductCard({ product, commission }: { product: Product;
           <b className="text-ink">{fmt(product.price)}</b>
         </div>
         <div className="flex items-center justify-between text-muted">
-          <span><span className="lg:hidden">Merchant </span>Commission</span>
+          <span className="flex items-center gap-1">
+            <span className="lg:hidden">Merchant </span>Commission
+            <Tip label={COMMISSION_HELP}>
+              <span className="inline-flex cursor-help" tabIndex={0} aria-label="How the commission is charged">
+                <Info className="h-3.5 w-3.5" aria-hidden />
+              </span>
+            </Tip>
+          </span>
           <span>{fmt(commission)}</span>
         </div>
       </div>

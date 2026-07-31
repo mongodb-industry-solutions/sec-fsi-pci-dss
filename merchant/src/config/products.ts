@@ -74,3 +74,8 @@ export const MERCHANT_COMMISSION_RATE = parseCommissionRate(process.env.PSP_MERC
 export function computeCommission(amount: number, rate = MERCHANT_COMMISSION_RATE): number {
   return Math.round(amount * rate * 100) / 100;
 }
+
+/** Shared help copy so every commission figure in the merchant app explains itself the same way. */
+export const COMMISSION_HELP =
+  `Not added to the price. The buyer pays the price shown; the PSP keeps ${(MERCHANT_COMMISSION_RATE * 100).toFixed(2)}% `
+  + 'of it as the merchant commission, so the merchant is settled net of that amount.';

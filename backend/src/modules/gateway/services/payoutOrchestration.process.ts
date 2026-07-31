@@ -8,9 +8,10 @@ import { EventBus, DomainEvent } from '../../../vendors/eventbus';
 import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
-import { createExecution, transitionExecution, appendResolutionStep, getExecution } from './paymentExecution.service';
+import { createExecution, transitionExecution, appendResolutionStep, getExecution, resolveMerchantFee } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
 import { creditAvailable, debitPending, settleCardDebit, creditDirect, releaseCardHold } from './payoutAccountBalance.service';
+import { postCommission } from './commissionSettlement.service';
 // ADR-039: AIS + PISP are reached ONLY through dispatchProvider (never a direct builtin import),
 // so an external provider can replace the builtin module without changing this flow.
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
@@ -101,6 +102,11 @@ export class PayoutOrchestrationProcess {
     }
     await debitPending(db, payoutAccount.payoutAccountInstanceReference, amountInAccountCcy);
 
+    // Merchant commission (SD-89): the buyer paid the gross, so the fee is WITHHELD here, not added.
+    // The PSP remits netAmount to the merchant and keeps feeAmount (posted to its revenue account at
+    // settlement). No rate configured yields feeAmount 0 and netAmount == grossAmount.
+    const { feeAmount, netAmount, fee } = await resolveMerchantFee(db, merchantRef, amount, currency);
+
     // Create execution record in 'routing' state
     const execution = await createExecution(db, {
       paymentOrderInstanceReference: txnId,
@@ -108,8 +114,9 @@ export class PayoutOrchestrationProcess {
       beneficiaryType: 'merchant',
       resolvedPayoutAccountReference: payoutAccount.payoutAccountInstanceReference,
       grossAmount: amount,
-      netAmount: amount,
-      feeAmount: 0,
+      netAmount,
+      feeAmount,
+      fee,
       currency,
       paymentExecutionRail: payoutAccount.payoutAccountPreferredRail,
     });
@@ -154,7 +161,8 @@ export class PayoutOrchestrationProcess {
         clientReference: execRef,
         paymentExecutionInstanceReference: execRef,
         railType: payoutAccount.payoutAccountPreferredRail,
-        amount,
+        // The rail moves what the merchant is owed, i.e. the net. The commission never leaves the PSP.
+        amount: netAmount,
         currency,
         settlementSchedule,
         paymentReference: `Merchant settlement ${merchantRef}`,
@@ -188,7 +196,7 @@ export class PayoutOrchestrationProcess {
       processType: 'payment_processing', processAction: 'payout.execution.initiated',
       processOutcome: 'in_flight',
       performedByPartyReference: null, performedByRole: null,
-      eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, currency, railRef },
+      eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, netAmount, feeAmount, currency, railRef },
       bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     });
   }
@@ -209,22 +217,46 @@ export class PayoutOrchestrationProcess {
         stepNote: `railRef=${p.railRef} netAmount=${p.netAmount} ${p.currency}`,
       });
 
-      // Credit the recipient. Convert to the recipient account currency (FX).
+      // Credit the recipient. Convert to the recipient account currency (FX). The amounts come from
+      // OUR execution record, not from the rail payload, so the ledger always matches what we stored.
       if (execution.resolvedPayoutAccountReference) {
         const acct = await db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
           .findOne({ payoutAccountInstanceReference: execution.resolvedPayoutAccountReference }, { projection: { payoutAccountCurrency: 1 } });
-        let creditAmount = p.netAmount;
-        if (acct?.payoutAccountCurrency && acct.payoutAccountCurrency !== p.currency) {
+        const toAccountCcy = async (value: number) => {
+          if (!acct?.payoutAccountCurrency || acct.payoutAccountCurrency === execution.currency) return value;
           const { resolveAndConvert } = await import('../../../providers/currency-exchange/services/currencyExchange.service');
-          try { creditAmount = (await resolveAndConvert(db, p.netAmount, p.currency, acct.payoutAccountCurrency)).amount; } catch { /* keep original on FX error */ }
-        }
+          try { return (await resolveAndConvert(db, value, execution.currency, acct.payoutAccountCurrency)).amount; }
+          catch { return value; /* keep original on FX error */ }
+        };
+        const creditAmount = await toAccountCcy(execution.netAmount);
         if (execution.sourcePayoutAccountReference) {
           // P2P bank transfer: clear the sender's hold (pending -= gross) then credit the recipient.
-          await settleCardDebit(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? p.netAmount);
+          await settleCardDebit(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? execution.netAmount);
           await creditDirect(db, execution.resolvedPayoutAccountReference, creditAmount);
         } else {
           // Merchant settlement: pending was debited at authorization — move pending -> available.
           await creditAvailable(db, execution.resolvedPayoutAccountReference, creditAmount);
+          // Second leg of the commission: withhold the fee from the same hold and credit the PSP.
+          // Derived as grossConverted − netConverted (not converted on its own) so the pending hold,
+          // which was taken on the gross, clears to exactly zero whatever the FX rounding.
+          if ((execution.feeAmount ?? 0) > 0) {
+            const feeInAccountCcy = Math.round(((await toAccountCcy(execution.grossAmount)) - creditAmount) * 100) / 100;
+            const { outcome } = await postCommission(db, {
+              executionRef: execRef,
+              merchantReference: execution.fee?.feeMerchantReference ?? '',
+              merchantAccountRef: execution.resolvedPayoutAccountReference,
+              feeAmount: feeInAccountCcy,
+              currency: acct?.payoutAccountCurrency ?? execution.currency,
+              feeRateApplied: execution.fee?.feeRateApplied,
+            });
+            // The commission could not be collected (revenue ledger not provisioned). The hold was
+            // taken on the gross, so leaving it there would strand the fee in pendingAmount forever.
+            // Release it to the merchant instead: the PSP forgoes the fee rather than holding money
+            // that belongs to nobody. 'already_collected' needs nothing — an earlier run withheld it.
+            if (outcome === 'no_revenue_account') {
+              await creditAvailable(db, execution.resolvedPayoutAccountReference, feeInAccountCcy);
+            }
+          }
         }
       }
 
@@ -234,8 +266,9 @@ export class PayoutOrchestrationProcess {
           { cardTransactionInstanceReference: execution.cardTransactionInstanceReference },
           { $set: { cardTransactionStatus: 'settled', recordUpdatedDateTime: new Date() } },
         );
-        // Clear the pending hold on the cardholder's funding account now that settlement is confirmed
-        void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, p.netAmount, p.currency);
+        // Clear the pending hold on the cardholder's funding account now that settlement is confirmed.
+        // The buyer was held the GROSS amount, so the commission must not shrink what is released.
+        void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, execution.grossAmount, execution.currency);
       }
 
       // Mark the linked payment order as settled (if any)
@@ -252,7 +285,7 @@ export class PayoutOrchestrationProcess {
         processType: 'payment_processing', processAction: 'payout.execution.completed',
         processOutcome: 'settled',
         performedByPartyReference: null, performedByRole: null,
-        eventSummary: { execRef, railRef: p.railRef, netAmount: p.netAmount, currency: p.currency },
+        eventSummary: { execRef, railRef: p.railRef, grossAmount: execution.grossAmount, netAmount: execution.netAmount, feeAmount: execution.feeAmount ?? 0, currency: execution.currency },
         bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
       });
     } catch (err) {

@@ -1121,6 +1121,11 @@ export interface PaymentExecutionProcedure {
   destinationAccountMasked?: string;   // masked IBAN / account, e.g. "ES12••••5477"
   destinationCountry?:       string;   // ISO 3166-1 alpha-2 destination banking country
 
+  // v34: the commission is WITHHELD from the gross, never added to it. The buyer is charged
+  // grossAmount; the rail moves netAmount to the merchant; feeAmount stays with the PSP and is
+  // credited to its revenue ledger at settlement (see "Commission settlement" below). All three are
+  // set in the SAME insert (resolveMerchantFee) so no record ever claims a fee no balance matches.
+  // Invariant: netAmount == grossAmount − feeAmount, and feeAmount defaults to 0 (gross == net).
   grossAmount: number;
   netAmount:   number;
   feeAmount:   number;  // commission/processing amount (numeric source of truth)
@@ -1153,6 +1158,59 @@ export interface PaymentExecutionProcedure {
   schemaVersion:         number;
 }
 ```
+
+---
+
+#### Commission settlement (v34 — SD-89 pricing → SD-66 balances)
+
+Where a collected merchant commission actually goes. Without this leg `feeAmount` would be a one-sided
+annotation: the merchant would be credited the gross while an event claimed a commission was collected.
+
+**PSP revenue ledger.** The PSP holds its commissions in an ordinary SD-66 account owned by an SD-13
+party, so no new collection or model is needed. Deterministic references, seeded by
+`vendors/seed/seedPspRevenueAccount.ts` (runs before `seedBalanceCredits`, opens at zero so no opening
+deposit is invented for it). Nothing here changes a collection, QE encryptedFields, DEK or index, so
+`setup:seed` alone applies v34: no drop or `--reset` is required. The commission credit in
+`seedPaymentExecutions` is gated by its own credit-log entry rather than by the execution being newly
+inserted, so it backfills an existing database exactly once:
+
+| Constant | Value | Notes |
+|---|---|---|
+| `PSP_REVENUE_PARTY_REFERENCE` | `psp00001-0000-4000-8000-000000000001` | SD-13 party, `partyType: 'service_account'` (system-owned, never a customer) |
+| `PSP_REVENUE_ACCOUNT_REFERENCE` | `paop0001-0000-4000-8000-000000000001` | SD-66 `internal_ledger`, EUR, no IBAN (not a bank account → nothing for QE here) |
+
+Both live in `modules/gateway/services/commissionSettlement.service.ts`, imported by the seeders so the
+reference exists in exactly one place.
+
+**Posting (`postCommission`).** Double entry over the existing balance primitives, at settlement:
+
+```
+merchant  payoutAccountBalance.pendingAmount   -= feeAmount   (settleCardDebit)
+PSP       payoutAccountBalance.availableAmount += feeAmount   (creditDirect)
+```
+
+- The authorization hold was taken on the **gross**, so the fee leg is derived as
+  `grossConverted − netConverted` in the merchant account currency, never converted on its own.
+  Otherwise FX rounding would strand a cent in `pendingAmount` permanently.
+- `feeAmount <= 0` moves nothing and writes nothing: gross == net stays balanced.
+- Idempotent through the credit id `commission-{executionRef}`: the `balanceCreditLog` upsert is the
+  gate, so a replayed `bank.transfer.settled` posts nothing further.
+- Never blocks settlement, and never strands funds. `postCommission` returns an outcome
+  (`posted` / `zero_fee` / `already_collected` / `no_revenue_account`). On `no_revenue_account` the
+  caller releases the fee to the merchant (`creditAvailable`), because the hold was taken on the gross
+  and would otherwise keep it in `pendingAmount` forever: the PSP forgoes the fee rather than holding
+  money belonging to nobody. `already_collected` needs no compensation, an earlier run withheld it.
+
+**Audit (PCI DSS Req 10).** Each posting writes one `balanceCreditLog` entry plus one
+`businessProcessEvent` with `processAction: 'merchant.commission.settled'`.
+
+`CreditType` (`models/balanceCreditLog.model.ts`) gains `'commission'`. It is intentionally **absent**
+from the admin credit endpoint's enum (`POST /api/v1/accounts/:accountRef/credit`): commissions are
+system-posted only, never issued by hand.
+
+**Revenue counting.** A card-originated execution carries the same fee as its acquiring record, so
+`getMerchantStats` restricts the execution source of `commissionRevenue` to executions with no
+acquiring counterpart (`cardTransactionInstanceReference` absent). Otherwise the figure would double.
 
 ---
 
@@ -4517,8 +4575,8 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 | Module | Owns (RW) | Reads (RO) | Core-data touch (PCI/GDPR) |
 |---|---|---|---|
 | `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
-| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents` | `party`, `payoutAccountArrangement`, `customerAgreementProcedure` (owner KYC compose), `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD) |
-| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers) |
+| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balances), `balanceCreditLog` | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
+| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34) |
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
 | `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
 | `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
@@ -4536,7 +4594,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 
 ## 16. Team contacts page (`/about`): demo metadata, no BIAN service domain
 
-Event/expo support surface: an "About us and contact us to learn more" entry on the landing page
+Event/expo support surface: an "About us and Contact us to learn more" entry on the landing page
 (full width under Wiki / API Reference) opens `/about`, which explains the MongoDB Industry Solutions
 Team and lists the demo contact points per area with avatar, name, role, area of interest and a
 LinkedIn follow QR. Responsive from phone to TV; on `lg+` the roster can be switched between one

@@ -1924,8 +1924,8 @@ activity is attributed without a new collection.
    `paymentExecutionProcedure.feeAmount` (SD-65); a new attribution sub-doc `fee { feeMerchantReference,
    feeRateApplied, feeCollectedDateTime }` records who was charged, at what rate, and when. The rate lives
    on SD-89 as `merchantCommissionRate` (editable in merchant settings, audited). Aggregate
-   `commissionRevenue` is **derived**, not stored. *(Runtime fee-wiring — A-06 — is deferred; revenue is
-   seed-driven for now.)*
+   `commissionRevenue` is **derived**, not stored. *(Runtime fee-wiring, A-06, was deferred here and is
+   closed in ADR-056: the fee is withheld from the gross and credited to a PSP revenue ledger.)*
 3. **Activity attribution — no new collection.** The existing `businessProcessEvent` gains `clientId`,
    `merchantAgreementReference`, `actingPartyReference`, and `actingChannel`, so PSP events can be filtered
    per merchant / per connected app without a parallel event store.
@@ -1936,9 +1936,8 @@ activity is attributed without a new collection.
 
 **Consequences:** BIAN-pure (SD-65 fee, SD-89 agreement, SD-13 acting party) with no new collections. PCI
 SAQ A holds — no CHD ever reaches the merchant app; IBAN is masked-only in merchant views (GDPR Art. 32 /
-PSD2). Least-privilege scopes + separation of duties are enforced at the token boundary. Trade-off:
-commission revenue is not yet computed at authorization time (A-06 follow-up) and the API-driven payment
-OAuth path remains a follow-up.
+PSD2). Least-privilege scopes + separation of duties are enforced at the token boundary. Trade-off: the
+API-driven payment OAuth path remains a follow-up.
 
 *Added 2026-07-06 (v18; doc + code together per repo rules).*
 
@@ -2284,3 +2283,56 @@ holder (repointing a transaction to its card, v33 F3), it prefers a token unique
 transaction surfaces stay unambiguous while the shared-card demo keeps its population.
 
 *Added 2026-07-29 (v33; doc + code together per repo rules).*
+
+### ADR-056: the commission is withheld from the gross and credited to a PSP revenue ledger (v34)
+
+**Status.** Accepted.
+
+**Context.** ADR-041 modelled the commission (SD-65 `feeAmount` + `fee` attribution, SD-89
+`merchantCommissionRate`) and deferred the runtime wiring as A-06. Half of it later landed: the
+acquiring path persisted `feeAmount` at authorization and emitted `merchant.commission.collected`.
+The other half never did. The payout path created every execution with `feeAmount: 0`, so
+`netAmount == grossAmount`, and settlement credited the merchant the full gross. The only
+`gross − fee` formula in the repo had no caller. The result was a one-sided ledger: an event and an
+aggregation claimed revenue while no account was debited and none was credited, and the merchant UI
+displayed a commission figure that changed no amount.
+
+**Decision.**
+
+1. **Withheld, not added.** The buyer is charged the gross, which is what a PSP does: the fee is taken
+   out of the merchant's proceeds. `resolveMerchantFee` turns the merchant's current rate into the
+   gross/net/fee triple *before* the execution is inserted, so the record is correct at birth rather
+   than corrected by a second write. The replaced `applyMerchantFee` (post-hoc patch, never called) is
+   removed. The rail is asked to move `netAmount`; the commission never leaves the PSP.
+2. **Zero is the safe default.** No configured rate, or one outside 0..1, yields `feeAmount 0`, no
+   `fee` sub-document and `netAmount == grossAmount`, with no balance movement at all. Callers can
+   apply the result unconditionally, so an operation that states no fee can never unbalance a ledger.
+3. **The fee has a holder.** A PSP revenue ledger receives it: an SD-13 party of type
+   `service_account` holding an SD-66 `internal_ledger` account, seeded deterministically. No new
+   collection and no new model, because the PSP is a party like any other holder. `postCommission`
+   makes the posting double entry (merchant `pendingAmount −= fee`, PSP `availableAmount += fee`)
+   composing the existing balance primitives, and mirrors it into `balanceCreditLog` with a new
+   `commission` credit type plus a `merchant.commission.settled` event (PCI DSS Req 10). The credit id
+   is derived from the execution, so it is also the idempotency gate. `commission` is deliberately
+   absent from the admin credit endpoint's enum: it is system-posted only.
+4. **The hold clears exactly.** The authorization hold is taken on the gross, so the fee leg is
+   derived as `grossConverted − netConverted` in the merchant account currency instead of being
+   converted on its own. Otherwise FX rounding would strand a cent in `pendingAmount` forever.
+   For the same reason the buyer's funding hold is released against `grossAmount`, not the settled net.
+5. **Revenue counted once.** A card-originated execution now carries the same fee as its acquiring
+   record, so the execution source of `commissionRevenue` is restricted to fees with no acquiring
+   counterpart. Settlement amounts are read from our own execution record rather than from the rail
+   payload, so the ledger cannot drift from what we stored.
+
+**Consequences.** BIAN-pure (SD-65 execution, SD-66 balances, SD-89 pricing, SD-13 party) with no new
+collection. The demo can now show the full picture: the buyer pays the price, the merchant receives
+the net, the PSP holds the commission, and `balanceCreditLog` explains every cent of that balance.
+Accounting never blocks a payment and never strands an amount: `postCommission` returns a typed
+outcome, and on a missing revenue ledger the caller releases the fee to the merchant, since the hold
+was taken on the gross and would otherwise keep it in `pendingAmount` forever. The PSP forgoes the fee
+rather than holding money belonging to nobody; a replay needs no compensation. Trade-off: the two legs are
+separate single-document `$inc` operations rather than one transaction, consistent with the rest of
+the ledger in this demo, so a crash between them is repaired by the credit-log reconciliation rather
+than rolled back.
+
+*Added 2026-07-30 (v34; doc + code together per repo rules).*

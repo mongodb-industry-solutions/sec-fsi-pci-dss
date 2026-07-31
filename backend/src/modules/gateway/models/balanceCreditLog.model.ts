@@ -9,6 +9,7 @@ export type CreditType =
   | 'bank_deposit'      // incoming bank transfer from external institution
   | 'admin_credit'      // PSP admin / operational credit
   | 'return'            // returned / reversed debit
+  | 'commission'        // merchant commission (SD-89) collected into the PSP revenue account
   | 'interest';         // earned interest (future)
 
 export interface BalanceCreditLogEntry {

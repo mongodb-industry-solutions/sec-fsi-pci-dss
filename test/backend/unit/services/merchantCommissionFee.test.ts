@@ -1,13 +1,14 @@
 /**
  * Unit tests (v18 Item 1 — A-06/A-07): merchant commission fee.
- * Source: backend/src/modules/gateway/services/paymentExecution.service.ts (computeFee, applyMerchantFee)
+ * Source: backend/src/modules/gateway/services/paymentExecution.service.ts (computeFee, resolveMerchantFee)
  *
  * computeFee is the single source of the commission calculation (DRY) reused by BOTH the payout
- * execution path (SD-65) and the runtime acquiring card-payment path (SD-254). applyMerchantFee is
- * the idempotent execution-side application: a second call for the same merchant is a no-op.
+ * execution path (SD-65) and the runtime acquiring card-payment path (SD-254). resolveMerchantFee
+ * turns the merchant's CURRENT rate into the gross/net/fee triple an execution is born with, so the
+ * stored amounts and the balance movements can never disagree.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { computeFee, applyMerchantFee } from '../../../../backend/src/modules/gateway/services/paymentExecution.service';
+import { computeFee, resolveMerchantFee } from '../../../../backend/src/modules/gateway/services/paymentExecution.service';
 
 describe('computeFee', () => {
   it('applies rate·amount rounded to 2 decimals and records attribution', () => {
@@ -27,36 +28,35 @@ describe('computeFee', () => {
   });
 });
 
-describe('applyMerchantFee (idempotent)', () => {
-  const makeDb = (exec: Record<string, unknown>, rate?: number) => {
-    const updateOne = vi.fn().mockResolvedValue({ modifiedCount: 1 });
-    const collection = vi.fn((name: string) => {
-      if (name === 'paymentExecutionProcedure') {
-        return { findOne: vi.fn().mockResolvedValue(exec), updateOne };
-      }
-      // merchantAgreementProcedure
-      return { findOne: vi.fn().mockResolvedValue(rate === undefined ? null : { merchantCommissionRate: rate }) };
-    });
-    return { db: { collection } as any, updateOne };
-  };
+describe('resolveMerchantFee', () => {
+  const makeDb = (rate?: number) => ({
+    collection: vi.fn(() => ({
+      findOne: vi.fn().mockResolvedValue(rate === undefined ? null : { merchantCommissionRate: rate }),
+    })),
+  }) as any;
 
-  it('computes and persists the fee from the merchant CURRENT rate', async () => {
-    const { db, updateOne } = makeDb({ paymentExecutionInstanceReference: 'e-1', grossAmount: 200, currency: 'GBP' }, 0.025);
-    const fee = await applyMerchantFee(db, 'e-1', 'm-1');
-    expect(fee?.feeRateApplied).toBe(0.025);
-    expect(updateOne).toHaveBeenCalledTimes(1);
-    const setArg = updateOne.mock.calls[0][1].$set;
-    expect(setArg.feeAmount).toBe(5); // 200 * 0.025
-    expect(setArg.netAmount).toBe(195);
+  it('withholds the fee from the gross: net = gross − fee', async () => {
+    const res = await resolveMerchantFee(makeDb(0.025), 'm-1', 200, 'GBP');
+    expect(res.feeAmount).toBe(5); // 200 * 0.025
+    expect(res.netAmount).toBe(195);
+    expect(res.fee?.feeRateApplied).toBe(0.025);
   });
 
-  it('is a no-op when the same merchant fee is already attributed', async () => {
-    const { db, updateOne } = makeDb(
-      { paymentExecutionInstanceReference: 'e-1', grossAmount: 200, currency: 'GBP', fee: { feeMerchantReference: 'm-1' } },
-      0.025,
-    );
-    const fee = await applyMerchantFee(db, 'e-1', 'm-1');
-    expect(fee).toEqual({ feeMerchantReference: 'm-1' });
-    expect(updateOne).not.toHaveBeenCalled(); // idempotent → not charged twice
+  it('never inflates the gross (the buyer is not charged the commission)', async () => {
+    const res = await resolveMerchantFee(makeDb(0.03), 'm-1', 50, 'EUR');
+    expect(res.feeAmount + res.netAmount).toBe(50);
+  });
+
+  it('defaults to a zero fee with no attribution when the merchant has no rate', async () => {
+    const res = await resolveMerchantFee(makeDb(undefined), 'm-1', 200, 'GBP');
+    expect(res.feeAmount).toBe(0);
+    expect(res.netAmount).toBe(200); // gross == net keeps the ledger balanced
+    expect(res.fee).toBeUndefined();  // sparse: zero-fee executions are not counted as revenue
+  });
+
+  it('rounds net to 2 decimals so no float artifact reaches a balance', async () => {
+    const res = await resolveMerchantFee(makeDb(0.025), 'm-1', 10.1, 'EUR');
+    expect(res.feeAmount).toBe(0.25);
+    expect(res.netAmount).toBe(9.85);
   });
 });

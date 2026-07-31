@@ -20,6 +20,7 @@ import { seedCreditRatings } from './seedCreditRatings';
 import { seedIntegrations } from './seedIntegrations';
 import { seedCapabilityModules } from './seedCapabilityModules';
 import { seedPayoutAccounts } from './seedPayoutAccounts';
+import { seedPspRevenueAccount } from './seedPspRevenueAccount';
 import { seedPaymentExecutions } from './seedPaymentExecutions';
 import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
 import { seedRtpRequests } from './seedRtpRequests';
@@ -123,6 +124,11 @@ export async function runSeed() {
 
     console.log('Seeding payoutAccountArrangement (SD-66, v17)...');
     await seedPayoutAccounts(db);
+
+    // Before the credit log: it opens at zero, so no opening deposit is logged for it and its
+    // balance is explained purely by the commission entries added with the demo executions.
+    console.log('Seeding PSP revenue ledger (SD-13 party + SD-66 account, commission destination)...');
+    await seedPspRevenueAccount(db);
 
     console.log('Seeding counterpartyArrangement (SD-54, v17)...');
     await seedCounterpartyArrangements(db);
