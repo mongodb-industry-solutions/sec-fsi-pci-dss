@@ -4522,6 +4522,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
 | `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
 | `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
+| `system` (demo support, no BIAN SD) | `demoTeamContact` (IST contact points for `/about`) | - | NO CHD, no customer PII (demo metadata only) |
 
 - Q1 (switch internal to external engine): only the module `capabilityModuleConfiguration` row is
   superseded by the `externalProviderArrangement` record; control records + party + audit stay in use, nothing orphaned.
@@ -4530,3 +4531,37 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 - Q3 (detect orphans): a collection is a decommission candidate iff no module lists it under Owns/Reads.
 
 *Added 2026-07-24 (v31). Version 2.5.0.*
+
+---
+
+## 16. Team contacts page (`/about`): demo metadata, no BIAN service domain
+
+Event/expo support surface: an "About us and contact us to learn more" entry on the landing page
+(full width under Wiki / API Reference) opens `/about`, which explains the MongoDB Industry Solutions
+Team and lists the demo contact points per area with avatar, name, role, area of interest and a
+LinkedIn follow QR. Responsive from phone to TV; on `lg+` the roster can be switched between one
+column (default) and two columns (choice persisted in `localStorage`, key `psp.about.layout`).
+
+**Collection `demoTeamContact`** (plaintext, created in `createCollections.ts`, indexed in
+`createIndexes.ts`). Demo-only: it is deliberately outside the PSP business model, holds no CHD and
+no customer PII, and therefore maps to no BIAN service domain. Documents are inserted directly (no
+seeder). Model: `backend/src/modules/system/models/demoTeamContact.model.ts`.
+
+| Field | Type | Notes |
+|---|---|---|
+| `demoTeamContactInstanceReference` | string | Deterministic id, unique index (e.g. `IST-CONTACT-001`) |
+| `name`, `role`, `ask` | string | Display name, job title, areas of interest |
+| `area` | string? | Short track label rendered as a badge |
+| `linkedin` | string | Username only; the URL is composed in the frontend |
+| `avatarUrl`, `qrUrl` | string | Public frontend asset paths (`frontend/public/*`) |
+| `active` | boolean | Filter for the endpoint |
+| `displayOrder` | number | Ascending display order |
+
+Indexes: `{ demoTeamContactInstanceReference: 1 }` unique, `{ active: 1, displayOrder: 1 }`.
+
+**API**: `GET /api/v1/system/team` (public, no JWT) returns `{ contacts: [{ id, name, role, ask, area,
+linkedin, avatarUrl, qrUrl }] }`, active only, sorted by `displayOrder`. The frontend prefers the API
+and falls back to the bundled roster in `frontend/src/config/team.json` when the API is unreachable or
+the collection is empty, so the page still works at a booth with no backend.
+
+*Added 2026-07-30.*

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
+import { LoadingIndicator } from '../../../components/LoadingIndicator';
 import { EncryptionBadge } from '../../../components/EncryptionBadge';
 import { Tooltip } from '../../../components/Tooltip';
 import { Eye, EyeOff } from 'lucide-react';
@@ -335,11 +336,7 @@ export default function PaymentPage() {
 
   // ── Route to non-api-card flows ──────────────────────────────────────────
   if (!methodReady) {
-    return (
-      <div className="max-w-xl mx-auto text-center py-16 text-gray-400 text-sm">
-        Loading…
-      </div>
-    );
+    return <LoadingIndicator label="Loading the payment flow…" className="py-16" size={20} />;
   }
 
   if (simMethod === 'redirection') {

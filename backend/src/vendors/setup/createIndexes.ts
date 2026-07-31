@@ -11,6 +11,7 @@ import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/ident
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
+import { DEMO_TEAM_CONTACT_COLLECTION } from '../../modules/system/models/demoTeamContact.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -301,6 +302,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantAgreementInstanceReference: 1 } },
     { key: { checkoutSessionMerchantReference: 1, merchantAgreementInstanceReference: 1 } },
     { key: { checkoutSessionExpiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // Demo-only: IST team contacts for the public "About us" page (single sorted read)
+  await ensureIndexes(db, DEMO_TEAM_CONTACT_COLLECTION, [
+    { key: { demoTeamContactInstanceReference: 1 }, unique: true },
+    { key: { active: 1, displayOrder: 1 } },
   ]);
 
   // SD-64: Payment Link Record

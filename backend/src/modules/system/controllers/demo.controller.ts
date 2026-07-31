@@ -8,6 +8,7 @@ import { getDemoUsers } from '../../identity/services/auth.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { authorizeRawDocumentAccess, RAW_COLLECTION_RESOURCE } from '../services/rawDocumentAccess.service';
+import { DEMO_TEAM_CONTACT_COLLECTION, DemoTeamContact } from '../models/demoTeamContact.model';
 import { config } from '../../../config';
 
 // ── Health check helpers (IETF draft-inadarei-api-health-check) ─────────────
@@ -398,6 +399,67 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
     } catch (err) {
       fastify.log.error(err);
       return reply.status(500).send({ error: 'Failed to fetch raw document' });
+    }
+  });
+
+  // GET /api/v1/system/team
+  fastify.get('/team', {
+    schema: {
+      tags: ['system'],
+      summary: 'IST team contact points for this demo',
+      description: `Returns the active demo team contacts (name, role, area of interest, LinkedIn handle,
+avatar and follow-QR asset paths) used by the public "About us" page at events and expos.
+**Public  -  no JWT required.** Demo metadata only: no CHD, no customer PII, outside the PSP business model.
+When the collection is empty the frontend falls back to its bundled roster.`,
+      response: {
+        200: {
+          description: 'Active contacts in display order.',
+          type: 'object',
+          properties: {
+            contacts: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', description: 'demoTeamContactInstanceReference.' },
+                  name: { type: 'string' },
+                  role: { type: 'string', description: 'Job title.' },
+                  ask: { type: 'string', description: 'What to ask this person about.' },
+                  area: { type: 'string', nullable: true, description: 'Short area/track label.' },
+                  linkedin: { type: 'string', description: 'LinkedIn username (not the URL).' },
+                  avatarUrl: { type: 'string', description: 'Public frontend asset path.' },
+                  qrUrl: { type: 'string', description: 'Public frontend asset path of the follow QR.' },
+                },
+              },
+            },
+          },
+        },
+        500: { $ref: 'Error#' },
+      },
+    },
+  }, async (_request, reply) => {
+    try {
+      const db = (fastify as FastifyInstance & { db?: Db }).db as Db;
+      const docs = await db
+        .collection<DemoTeamContact>(DEMO_TEAM_CONTACT_COLLECTION)
+        .find({ active: true })
+        .sort({ displayOrder: 1, name: 1 })
+        .toArray();
+      return reply.send({
+        contacts: docs.map((c) => ({
+          id: c.demoTeamContactInstanceReference,
+          name: c.name,
+          role: c.role,
+          ask: c.ask,
+          area: c.area ?? null,
+          linkedin: c.linkedin,
+          avatarUrl: c.avatarUrl,
+          qrUrl: c.qrUrl,
+        })),
+      });
+    } catch (err) {
+      fastify.log.error(err);
+      return reply.status(500).send({ error: 'Failed to load team contacts' });
     }
   });
 }

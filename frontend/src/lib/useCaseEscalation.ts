@@ -47,6 +47,7 @@ export function useCaseEscalation({ caseId, role, token, fraudCase }: Options): 
   const [resolving, setResolving] = useState(false);
   // Resume once per case, so a 422 (never accepted) is not retried on every render.
   const resumedFor = useRef<string | null>(null);
+  const resolveSeq = useRef(0);
 
   const adopt = useCallback((id: string, value: string) => {
     storeEscalationToken(id, value);
@@ -66,21 +67,23 @@ export function useCaseEscalation({ caseId, role, token, fraudCase }: Options): 
     if (resumedFor.current === caseId) return;
     resumedFor.current = caseId;
 
-    let cancelled = false;
+    // The pending state is owned by a sequence number, not by the effect's cleanup: a torn-down
+    // effect (dependency change, or the double invoke in development) must not leave the caller
+    // waiting on a resume that did finish.
+    const seq = ++resolveSeq.current;
     setResolving(true);
     (async () => {
       try {
         const c = fraudCase ?? await api.fraud.getById(caseId, token);
-        if (cancelled || !canResumeEscalation(role, c)) return;
+        if (!canResumeEscalation(role, c)) return;
         const res = await api.fraud.escalateApprove(caseId, {}, token);
-        if (cancelled) return;
+        if (seq !== resolveSeq.current) return;
         storeEscalationToken(caseId, res.escalationToken);
         setEscalationToken(res.escalationToken);
       } catch { /* not entitled, or the case is not in an accepted escalation */ } finally {
-        if (!cancelled) setResolving(false);
+        if (seq === resolveSeq.current) setResolving(false);
       }
     })();
-    return () => { cancelled = true; };
   }, [caseId, role, token, escalationToken, fraudCase]);
 
   return { escalationToken, resolving, adopt };
