@@ -9,6 +9,7 @@ import { api } from '../../../lib/api';
 import { getToken } from '../../../lib/auth';
 import { useEffectivePermissions } from '../../../lib/permissions';
 import { JsonView } from '../../../components/json/JsonView';
+import { DateTimeRangeFilter } from '../../../components/search/DateTimeRangeFilter';
 
 type AuditRow = {
   id: string;
@@ -290,15 +291,11 @@ function AuditEventsView() {
             placeholder="e.g. 70"
             className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
         </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">From</label>
-          <input type="datetime-local" value={from} onChange={(e) => { setFrom(e.target.value); resetToFirst(); }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">To</label>
-          <input type="datetime-local" value={to} onChange={(e) => { setTo(e.target.value); resetToFirst(); }}
-            className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm" />
+        <div className="sm:col-span-2 lg:col-span-3">
+          <DateTimeRangeFilter
+            value={{ from, to }}
+            onChange={(next) => { setFrom(next.from); setTo(next.to); resetToFirst(); }}
+          />
         </div>
         <div className="flex items-end gap-2">
           {(q || ref || typeInput || entityType || outcome || minScore || from || to) && (

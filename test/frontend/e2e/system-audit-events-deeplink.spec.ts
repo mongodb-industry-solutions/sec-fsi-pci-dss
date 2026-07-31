@@ -59,4 +59,20 @@ test.describe('audit events: query-string filters', () => {
     await expect(page.getByText('Scoped to events referencing')).toBeHidden();
     await expect.poll(() => new URL(page.url()).searchParams.get('ref')).toBeNull();
   });
+
+  test('a relative preset narrows the window and survives in the URL', async ({ page, context }) => {
+    const seen: string[] = [];
+    await stub(page, seen);
+    await loginAs(context, 'security_auditor');
+
+    await page.goto('/system/audit-events');
+    await expect(page.getByRole('heading', { name: 'Audit Events' })).toBeVisible({ timeout: 15000 });
+
+    await page.getByRole('button', { name: 'Last 3 days' }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('from')).not.toBeNull();
+    await expect.poll(() => seen.some((u) => u.includes('from='))).toBe(true);
+
+    await page.getByRole('button', { name: 'All time' }).click();
+    await expect.poll(() => new URL(page.url()).searchParams.get('from')).toBeNull();
+  });
 });
