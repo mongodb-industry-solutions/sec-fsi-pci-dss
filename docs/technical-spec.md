@@ -1335,7 +1335,7 @@ encrypted, lookup-tier and exact-searchable.
 | Field | bsonType | Query type | Params |
 |---|---|---|---|
 | `party.partyName` | string | substring | strMaxLength 30, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive false, diacriticSensitive false (sized within cluster default substringPreview limits) |
-| `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2020-01-01, sparsity 1, trimFactor 4 |
+| `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2035-01-01, sparsity 1, trimFactor 4 (upper bound in the future so minors and newborns stay searchable) |
 | `party.partyNationality` | string | equality | contention 8 |
 | `party.partyPlaceOfBirth` | string | equality | contention 8 |
 | `party.partySex` | string | equality | contention 8 |

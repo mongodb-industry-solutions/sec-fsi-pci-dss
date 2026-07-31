@@ -4,12 +4,46 @@ import * as fs from 'fs';
 import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
 import { rebuildCardRegistry } from '../../modules/customer/services/paymentCard.service';
 
+/** Deterministic per-card seed so a reseed yields the same data. */
+function hash(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i++) h = (h * 31 + value.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+/**
+ * Card expiry is derived from the seed run date, never hardcoded: a fixture value like
+ * "12/28" silently rots (a card the demo calls active drifts into the past) and it can
+ * contradict the card status. So the generator keeps MM/YY consistent with the status:
+ * an expired card sits in the past, an active/blocked one in the future, and about one
+ * in eight actives expires within 90 days for the renewal/expiry demo.
+ * An explicit fixture value still wins, for cards a scenario pins on purpose.
+ */
+function cardExpiry(reference: string, status: string, now: Date): string {
+  const seed = hash(reference);
+  const monthsFromNow = status === 'expired'
+    ? -(1 + (seed % 24))                       // 1 to 24 months in the past
+    : seed % 8 === 0
+      ? 1 + (seed % 3)                         // expires within the next 3 months
+      : 12 + (seed % 48);                      // 1 to 5 years out
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + monthsFromNow, 1));
+  return `${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCFullYear() % 100).padStart(2, '0')}`;
+}
+
 export async function seedCards(db: Db) {
   const records = JSON.parse(
     fs.readFileSync(path.join(__dirname, '../../../data/paymentCards.json'), 'utf-8')
   );
 
+  const now = new Date();
   for (const record of records) {
+    if (!record.paymentCardExpirationDate) {
+      record.paymentCardExpirationDate = cardExpiry(
+        record.paymentCardInstanceReference,
+        record.paymentCardStatus,
+        now
+      );
+    }
     await db.collection(PAYMENT_CARD_COLLECTION).updateOne(
       { paymentCardInstanceReference: record.paymentCardInstanceReference },
       { $set: record },

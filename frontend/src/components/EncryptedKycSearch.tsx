@@ -9,6 +9,7 @@ import {
   KycSearchResult,
 } from '../lib/api';
 import { Pagination } from './Pagination';
+import { DateRangeFilter } from './search/DateRangeFilter';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RawMongoPanel } from './RawMongoPanel';
 import { useDebugMode } from '../lib/debugMode';
@@ -55,6 +56,13 @@ const MODE_BADGE_COLOR: Record<KycSearchMode, string> = {
 };
 
 const DEBOUNCE_MS = 450;
+
+// Date fields get the presets that match their meaning: age cohorts for a date of
+// birth, validity windows for a document expiry.
+const DATE_VARIANTS: Record<string, 'birth' | 'expiry'> = {
+  partyDateOfBirth: 'birth',
+  govIdExpiry: 'expiry',
+};
 
 // Text modes are directional: the label, placeholder and empty-result wording say which part of the
 // value is matched.
@@ -392,32 +400,16 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
 
         {/* Control */}
         {field && field.mode === 'range' ? (
-          <div className="flex flex-wrap items-end gap-3">
+          <div className={field.bsonType === 'date' ? '' : 'flex flex-wrap items-end gap-3'}>
             {field.bsonType === 'date' ? (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">From</label>
-                  <input
-                    type="date"
-                    value={from}
-                    min={dateBound(field.rangeMin)}
-                    max={dateBound(field.rangeMax)}
-                    onChange={(e) => setFrom(e.target.value)}
-                    className="border rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">To</label>
-                  <input
-                    type="date"
-                    value={to}
-                    min={dateBound(field.rangeMin)}
-                    max={dateBound(field.rangeMax)}
-                    onChange={(e) => setTo(e.target.value)}
-                    className="border rounded-lg px-3 py-2 text-sm"
-                  />
-                </div>
-              </>
+              <DateRangeFilter
+                value={{ from, to }}
+                onChange={(next) => { setFrom(next.from); setTo(next.to); }}
+                min={dateBound(field.rangeMin)}
+                max={dateBound(field.rangeMax)}
+                variant={DATE_VARIANTS[field.key] ?? 'generic'}
+                fieldLabel={field.label}
+              />
             ) : (
               <>
                 <div>
@@ -444,7 +436,7 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
                 </div>
               </>
             )}
-            {(field.rangeMin != null || field.rangeMax != null) && (
+            {field.bsonType !== 'date' && (field.rangeMin != null || field.rangeMax != null) && (
               <span className="text-xs text-gray-400 pb-2">
                 allowed {String(field.rangeMin ?? '·')} – {String(field.rangeMax ?? '·')}
               </span>
