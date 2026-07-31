@@ -46,6 +46,31 @@ export async function creditAvailable(
 }
 
 /**
+ * Drop an expected incoming credit that will never arrive: the exact inverse of debitPending.
+ * Used when a payout is rejected before or by the rail (beneficiary validation failed, submission
+ * refused, rail returned the transfer).
+ *
+ * pendingAmount -= amount and availableAmount is deliberately NOT credited: the funds never landed,
+ * so crediting them would invent money. That is what separates this from releaseCardHold, which
+ * returns a SENDER's own funds. Leaving the amount in pending instead would show the beneficiary an
+ * incoming credit that can never settle.
+ */
+export async function releasePendingCredit(
+  db: Db,
+  payoutAccountRef: string,
+  amount: number,
+): Promise<boolean> {
+  const result = await db.collection(PAYOUT_ACCOUNT_COLLECTION).updateOne(
+    { payoutAccountInstanceReference: payoutAccountRef, payoutAccountStatus: 'active' },
+    {
+      $inc: { 'payoutAccountBalance.pendingAmount': -amount },
+      $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date(), recordUpdatedDateTime: new Date() },
+    },
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
  * Reserve funds for a dispute hold (debit available, credit reserved).
  */
 export async function reserveFunds(

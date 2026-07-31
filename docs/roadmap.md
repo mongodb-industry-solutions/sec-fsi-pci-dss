@@ -1036,6 +1036,11 @@ credited to a PSP revenue ledger at settlement.
 | FR-v34-05 | The cardholder is released the gross | clearing the buyer's funding hold uses `execution.grossAmount`, not the settled net, so the commission never shrinks what is released to the payer |
 | FR-v34-06 | Collection is auditable and collected once | every posting writes a `balanceCreditLog` entry of `creditType: 'commission'` keyed `commission-{executionRef}` plus a `merchant.commission.settled` business process event; a replayed settlement event posts nothing further (PCI DSS Req 10) |
 | FR-v34-07 | Revenue is not double counted | the dashboard `commissionRevenue` counts a card-originated commission once: the execution source contributes only fees with no acquiring counterpart (`cardTransactionInstanceReference` absent) |
+| FR-v34-09 | A payout that never settles releases its reservation | every terminal path after the authorization reservation gives it back: beneficiary validation refused (`exception`), rail submission refused (`failed`), rail rejection after `in_flight` (`failed`), and any unexpected error in the pipeline (`exception`); after each one the merchant `pendingAmount` returns to its pre-authorization value |
+| FR-v34-10 | The reversal does not invent money | releasing a beneficiary reservation decrements `pendingAmount` only and never credits `availableAmount`, because the funds never landed; a P2P sender keeps the existing `releaseCardHold` (pending to available) since those are its own funds |
+| FR-v34-11 | Balance movements survive event redelivery | the SD-65 state transition is the idempotency gate for every balance movement in the settled and failed handlers, so a redelivered `bank.transfer.settled` or `.failed` cannot credit or reverse the same execution twice |
+| FR-v34-12 | Every AIS and PISP action is auditable by transaction id | the SD-65 execution is linked to the acquiring record as soon as it is created (not after the rail accepts), each dispatch payload carries `cardTransactionInstanceReference` as the end-to-end reference, and the settled / failed / commission / hold-release events all carry `txnId`; so the audit trail's reference search returns the whole payout leg (wire I/O included, success and failure alike) from the transaction id alone |
+| FR-v34-13 | A transfer already with the rail is never compensated locally | once the PISP accepts the submission the reservation belongs to the rail outcome: an error after that point annotates the record and leaves the reservation, so `bank.transfer.settled` / `.failed` remains the only thing that resolves it and `pendingAmount` cannot be double-reversed |
 | FR-v34-08 | The merchant UI explains the commission | the `/products` price/commission block and the payment-result modal carry an info tooltip stating the fee is retained from the price rather than added to it, with the applied percentage |
 
 ### NFR
@@ -1046,14 +1051,15 @@ credited to a PSP revenue ledger at settlement.
 | NFR-v34-02 | Setup and seed remain the only source of truth (P7) | the PSP revenue party and account are created by `vendors/seed/seedPspRevenueAccount.ts`; seeded commission executions credit that ledger and log it; no ad-hoc migration |
 | NFR-v34-03 | A plain reseed converges (no drop required) | no collection, QE encryptedFields, DEK or index changed, so `setup:seed` alone is sufficient: the party and account upsert, and the commission credit is gated by its own credit-log entry rather than by the execution being newly inserted, so it backfills an existing database exactly once |
 | NFR-v34-04 | No standards deviation | no new collection and no new model: the PSP is an SD-13 party holding an SD-66 account; SD-65 keeps `feeAmount` as the numeric source of truth with `fee` as attribution only; `commission` is not an admin-issuable credit type (system-posted only); the ledger never touches CHD |
+| NFR-v34-06 | The compensation is provider-indifferent | the reversal is driven by the OUTCOME of a `dispatchProvider` call, never by which provider answered, so replacing the builtin AIS or PISP module with an external service (ADR-039) cannot leave the ledger inconsistent; a refusal, a transport error and a timeout all reach the same compensating action |
 | NFR-v34-05 | Settlement is never blocked, and no amount is stranded | a missing revenue account or a lost idempotency race moves neither leg and never blocks the payout; the merchant is still credited its net; on a missing revenue ledger the fee is released to the merchant so `pendingAmount` still clears to zero, the PSP forgoing the fee rather than holding an uncollectable amount |
 
 ### Definition of Done
 
-- [x] `test:unit` green (598 tests, 65 files), including a new `commissionSettlement.test.ts` covering both legs, the zero-fee case, idempotency and the missing-account case.
+- [x] `test:unit` green (602 tests, 66 files), including `commissionSettlement.test.ts` (both legs, zero fee, idempotency, missing account) and `payoutHoldRelease.test.ts` (the reversal is the inverse of the reservation and credits nothing).
 - [x] Both type-checks clean (backend and merchant app).
 - [x] `technical-spec.md` §1 (SD-65 fee semantics, credit types, PSP revenue ledger) and §10 (ownership matrix) updated with the code.
-- [x] ADR-056 recorded in `engineering-proposal.md`; ADR-041's deferred A-06 note closed.
+- [x] ADR-056 and ADR-057 (including the audit-correlation decision) recorded in `engineering-proposal.md`; ADR-041's deferred A-06 note closed.
 - [ ] `setup:seed` (no drop needed): performed by the user. Historical executions written before v34 keep `netAmount == grossAmount`; they are past records, not corrected by a reseed.
 - [ ] E2E: a merchant payment settles, the merchant balance grows by the net and the PSP revenue ledger by the fee. Pending the reseed.
 

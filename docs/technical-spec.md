@@ -1204,6 +1204,25 @@ PSP       payoutAccountBalance.availableAmount += feeAmount   (creditDirect)
 **Audit (PCI DSS Req 10).** Each posting writes one `balanceCreditLog` entry plus one
 `businessProcessEvent` with `processAction: 'merchant.commission.settled'`.
 
+**Audit correlation of the payout leg (ADR-057 addendum).** `dispatchProvider` logs every AIS/PISP call
+in `externalProviderArrangementActionLog` with sanitized request/response (PCI DSS Req 10.7), on
+success, error and timeout, builtin or external. Correlation to the originating transaction relies on
+three things: the SD-65 execution is linked onto `cardTransactionLog.paymentExecutionInstanceReference`
+as soon as it is created (not after the rail accepts, or a failed payout would be unreachable); each
+dispatch payload carries `cardTransactionInstanceReference` as the end-to-end reference (ISO 20022
+`EndToEndId` in a real rail), which the audit trail's deep reference match finds in the payload
+snapshot; and every payout event summary (`payout.execution.initiated` / `.completed` / `.failed` /
+`.exception`, `payout.hold.released`, `merchant.commission.settled`) carries `txnId`.
+
+**Reversal (ADR-057).** The reservation taken at authorization (`debitPending`) is released by
+`releasePendingCredit`, the exact inverse: `pendingAmount -= amount`, `availableAmount` untouched. It
+is NOT `releaseCardHold`, which credits available and is only correct for a P2P sender recovering its
+own funds. The compensating action `abortPayout` covers every terminal path (beneficiary validation
+refused, rail submission refused, rail rejection, unexpected error), moves the SD-65 record to
+`exception` or `failed`, and emits `payout.hold.released`. The state transition is the idempotency gate
+for every balance movement in both the settled and failed handlers, so event redelivery cannot credit
+or reverse twice.
+
 `CreditType` (`models/balanceCreditLog.model.ts`) gains `'commission'`. It is intentionally **absent**
 from the admin credit endpoint's enum (`POST /api/v1/accounts/:accountRef/credit`): commissions are
 system-posted only, never issued by hand.

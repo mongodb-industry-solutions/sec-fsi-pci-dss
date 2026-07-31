@@ -23,6 +23,9 @@ export const PSP_REVENUE_ACCOUNT_REFERENCE = 'paop0001-0000-4000-8000-0000000000
 
 export interface PostCommissionInput {
   executionRef: string;
+  // Originating acquiring transaction, carried into the audit event so the collection is findable by
+  // transaction id and not only by execution reference.
+  cardTransactionRef?: string;
   merchantReference: string;
   // Merchant account the commission is withheld from, and the fee expressed in THAT account's currency
   // (the caller derives it as grossConverted − netConverted so the pending hold always clears exactly).
@@ -102,6 +105,7 @@ export async function postCommission(db: Db, input: PostCommissionInput): Promis
     performedByPartyReference: null, performedByRole: null,
     eventSummary: {
       executionRef: input.executionRef,
+      txnId: input.cardTransactionRef,
       merchantAgreementInstanceReference: input.merchantReference,
       merchantAccountRef: input.merchantAccountRef,
       feeAmount: input.feeAmount, feeCurrency: input.currency,

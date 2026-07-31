@@ -2336,3 +2336,70 @@ the ledger in this demo, so a crash between them is repaired by the credit-log r
 than rolled back.
 
 *Added 2026-07-30 (v34; doc + code together per repo rules).*
+
+### ADR-057: a payout that will not settle must release its reservation, and release it as a reservation (v34)
+
+**Status.** Accepted.
+
+**Context.** At authorization the payout process reserves the merchant's incoming amount
+(`debitPending`, `pendingAmount += gross`), and settlement moves that reservation to available. Four
+terminal paths never gave it back: beneficiary validation refused (AIS not verified), rail submission
+refused (PISP not submitted), rail rejection after `in_flight` (`bank.transfer.failed` released only a
+P2P sender's hold), and any unexpected throw in the pipeline (swallowed by the subscriber's logger).
+The merchant was left showing an incoming credit that could never arrive, permanently. The last two
+paths are exactly the ones an external provider makes likely: a timeout or a 5xx from a real AIS or
+PISP service, rather than the builtin module's happy path.
+
+**Decision.**
+
+1. **Release it as a reservation, not as a refund.** A new SD-66 primitive `releasePendingCredit` is
+   the exact inverse of `debitPending`: `pendingAmount -= amount` and `availableAmount` deliberately
+   untouched. Reusing `releaseCardHold` here would have been wrong, not merely imprecise: it credits
+   available, which is correct for a P2P **sender** getting its own funds back, but for a payout
+   **beneficiary** it would credit money the rail never moved. The two reversals are different
+   operations because the reserved funds belong to different parties.
+2. **One compensating action for the saga.** `abortPayout` moves the SD-65 control record to its
+   terminal BIAN state (`exception` for an unusable beneficiary, `failed` for a rail refusal),
+   releases the reservation, and records both in the append-only `resolutionLog` and on the event
+   stream as `payout.hold.released` (PCI DSS Req 10). The BIAN state is carried in the event summary
+   rather than forced into `ProcessEventOutcome`, whose taxonomy stays as it was: an unusable
+   beneficiary is reported as `rejected`.
+3. **The state transition is the idempotency gate.** `transitionExecution` reports whether *this* call
+   performed the change, so a redelivered event or a retry cannot reverse (or credit) the same
+   execution twice. The same gate is now applied to the settled handler, where a redelivered
+   `bank.transfer.settled` could previously have credited a settlement twice.
+4. **Provider-indifferent by construction.** The compensation is driven by the *outcome* of a
+   `dispatchProvider` call, never by which provider produced it, and the whole post-reservation
+   pipeline is wrapped so a throwing or timing-out provider lands in the same place as a clean
+   refusal. That is what makes ADR-039's substitution property real for money movement: swapping the
+   builtin `account_information` or `payment_initiation` module for an external service cannot leave
+   the ledger inconsistent, whatever the external service does.
+
+**Consequences.** After any terminal payout path the merchant's `pendingAmount` returns to its
+pre-authorization value, so balances stay exact without a reconciliation job. The FX conversion used
+by every balance movement in the process is now a single entry point (`convert` + `accountCurrency`),
+removing three copies of the same conversion block. The payment itself is never rolled back by a
+payout failure: the compensation runs and the error is rethrown for the subscriber to log, leaving the
+authorized card transaction untouched. Trade-off: the compensation is a sequence of single-document
+`$inc` operations rather than one transaction, consistent with the rest of this ledger, so the
+idempotency gate rather than atomicity is what guarantees it happens exactly once.
+
+*Added 2026-07-31 (v34; doc + code together per repo rules).*
+
+**Addendum (audit correlation, v34).** Two gaps surfaced while verifying that every AIS/PISP action is
+auditable from the transaction id. The wire log itself was already complete: `dispatchProvider` records
+every call through `logEvent` with sanitized request/response (PCI DSS Req 10.7) on success, error and
+timeout, for builtin and external providers alike. What was missing was correlation. First, the payout
+gates pass `businessContext.entityId = executionRef`, and the execution was only linked to the
+acquiring record *after* the rail accepted, so a payout that died at AIS or PISP left no path from the
+transaction to its provider calls. The link now happens as soon as the execution is created, and each
+dispatch payload carries `cardTransactionInstanceReference` (the end-to-end reference a real rail would
+receive as ISO 20022 `EndToEndId`), which the audit trail's deep reference match reads out of the
+payload snapshot. Second, `payout.execution.completed` / `.failed` and the commission and hold-release
+events now carry `txnId` in their summaries, and the no-payout-account path emits
+`payout.execution.exception` instead of resolving silently.
+
+A third finding was in the compensation itself: once the PISP has accepted the submission the
+reservation belongs to the rail outcome, so an unexpected error after that point must NOT release it.
+It annotates the record and leaves `bank.transfer.settled` / `.failed` to resolve it; otherwise a later
+settlement would credit against a reservation already reversed and drive `pendingAmount` negative.
