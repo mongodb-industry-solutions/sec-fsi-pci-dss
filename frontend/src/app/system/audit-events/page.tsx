@@ -1,6 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink, Download } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
@@ -61,8 +61,12 @@ const ENTITY_LABEL: Record<string, string> = {
   merchant: 'merchant', customer: 'customer', integration: 'integration',
 };
 
-export default function AuditEventsPage() {
+// Filters live in the query string, so a prefiltered link (e.g. from a transaction detail page)
+// opens the trail already scoped, and any view an operator reaches is shareable and bookmarkable.
+function AuditEventsView() {
   const router = useRouter();
+  const params = useSearchParams();
+  const param = (key: string, fallback = '') => params.get(key) ?? fallback;
   const { loading: permsLoading, can } = useEffectivePermissions();
   const [token, setToken] = useState('');
   const [authorized, setAuthorized] = useState<boolean | null>(null);
@@ -74,17 +78,17 @@ export default function AuditEventsPage() {
   const [downloading, setDownloading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const [source, setSource] = useState('all');
-  const [typeInput, setTypeInput] = useState('');
-  const [entityType, setEntityType] = useState('');
-  const [outcome, setOutcome] = useState('');
-  const [q, setQ] = useState('');
-  const [ref, setRef] = useState('');
-  const [minScore, setMinScore] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [source, setSource] = useState(() => param('source', 'all'));
+  const [typeInput, setTypeInput] = useState(() => param('type'));
+  const [entityType, setEntityType] = useState(() => param('entityType'));
+  const [outcome, setOutcome] = useState(() => param('outcome'));
+  const [q, setQ] = useState(() => param('q'));
+  const [ref, setRef] = useState(() => param('ref'));
+  const [minScore, setMinScore] = useState(() => param('minScore'));
+  const [from, setFrom] = useState(() => param('from'));
+  const [to, setTo] = useState(() => param('to'));
+  const [page, setPage] = useState(() => Math.max(1, parseInt(param('page', '1'), 10) || 1));
+  const [pageSize, setPageSize] = useState(() => Math.max(1, parseInt(param('limit', '10'), 10) || 10));
 
   useEffect(() => { setToken(getToken() ?? ''); }, []);
 
@@ -117,6 +121,29 @@ export default function AuditEventsPage() {
   }, [token, source, typeInput, entityType, outcome, q, ref, minScore, from, to, page, pageSize]);
 
   useEffect(() => { if (authorized) load(); }, [authorized, load]);
+
+  // Mirror the active filters into the URL (replace, so filtering does not pile up history
+  // entries). Only non-default values are written, keeping shared links short.
+  const lastQuery = useRef<string | null>(null);
+  useEffect(() => {
+    if (!authorized) return;
+    const next = new URLSearchParams();
+    if (source !== 'all') next.set('source', source);
+    if (typeInput) next.set('type', typeInput);
+    if (entityType) next.set('entityType', entityType);
+    if (outcome) next.set('outcome', outcome);
+    if (q) next.set('q', q);
+    if (ref) next.set('ref', ref);
+    if (minScore) next.set('minScore', minScore);
+    if (from) next.set('from', from);
+    if (to) next.set('to', to);
+    if (page > 1) next.set('page', String(page));
+    if (pageSize !== 10) next.set('limit', String(pageSize));
+    const qs = next.toString();
+    if (lastQuery.current === qs) return;
+    lastQuery.current = qs;
+    router.replace(qs ? `/system/audit-events?${qs}` : '/system/audit-events', { scroll: false });
+  }, [authorized, router, source, typeInput, entityType, outcome, q, ref, minScore, from, to, page, pageSize]);
 
   // Export the events matching the CURRENTLY APPLIED filters as a JSON file, so a reviewer can work
   // from a bounded, scoped extract instead of the whole stream. Walks the paginated API (100/page,
@@ -284,6 +311,18 @@ export default function AuditEventsPage() {
         </div>
       </div>
 
+      {/* Arriving from a record's "View audit trail" link: say what the stream is scoped to. */}
+      {ref && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+          <span>Scoped to events referencing</span>
+          <code className="font-mono bg-white/70 border border-blue-200 rounded px-1.5 py-0.5">{ref}</code>
+          <button onClick={() => { setRef(''); resetToFirst(); }}
+            className="ml-auto rounded border border-blue-300 px-2 py-0.5 hover:bg-white/70">
+            Remove this filter
+          </button>
+        </div>
+      )}
+
       {capped && (
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
           Showing a bounded window of the most recent events per source. Narrow the date range or filters to see older events.
@@ -359,5 +398,13 @@ export default function AuditEventsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AuditEventsPage() {
+  return (
+    <Suspense fallback={<div className="px-5 py-8 text-sm text-gray-400">Loading audit events…</div>}>
+      <AuditEventsView />
+    </Suspense>
   );
 }
