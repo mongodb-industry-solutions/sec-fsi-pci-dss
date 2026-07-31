@@ -38,6 +38,30 @@ const OUTCOME_STYLES: Record<string, string> = {
   rejected: 'bg-red-100 text-red-700', failed: 'bg-red-100 text-red-700', error: 'bg-red-100 text-red-700', timeout: 'bg-red-100 text-red-700',
   pending: 'bg-yellow-100 text-yellow-700', escalated: 'bg-purple-100 text-purple-700',
 };
+// Known event types per source: business/compliance processType unions and the integration
+// event kinds. The field stays free text, since a custom provider can emit its own type.
+const EVENT_TYPES: Record<string, string[]> = {
+  business: [
+    'payment_processing', 'fraud_evaluation', 'aml_screening', 'card_authorization',
+    'credit_assessment', 'sanctions_check', 'consent_management', 'checkout',
+  ],
+  compliance: [
+    'kyc_verification', 'kyb_verification', 'customer_onboarding', 'merchant_onboarding',
+    'card_management', 'payment_processing', 'authentication',
+  ],
+  integration: ['dispatch', 'callback', 'health_check', 'test'],
+};
+
+// The row's `outcome` merges two fields: processOutcome on business/compliance events (a verdict
+// plus the SD-65 payout lifecycle states) and integrationEventStatus on integration events (call
+// delivery). Grouping them says which vocabulary belongs to which stream.
+const OUTCOME_GROUPS: Array<{ label: string; values: string[] }> = [
+  { label: 'Verdict', values: ['approved', 'rejected', 'escalated', 'verified'] },
+  { label: 'In progress', values: ['pending', 'submitted', 'in_flight', 'settled'] },
+  { label: 'Failure', values: ['failed', 'error', 'timeout'] },
+  { label: 'Integration delivery', values: ['sent', 'received'] },
+];
+
 const SOURCE_STYLES: Record<string, string> = {
   business: 'bg-blue-50 text-blue-700 border-blue-200',
   compliance: 'bg-teal-50 text-teal-700 border-teal-200',
@@ -205,6 +229,13 @@ function AuditEventsView() {
     finally { setDownloading(false); }
   }, [token, source, typeInput, entityType, outcome, q, ref, minScore, from, to]);
 
+  // Suggestions follow the selected source, plus any type present in the loaded page so a
+  // provider-specific value is one click away once it has been seen.
+  const typeOptions = Array.from(new Set([
+    ...(source === 'all' ? Object.values(EVENT_TYPES).flat() : EVENT_TYPES[source] ?? []),
+    ...events.map((e) => e.type).filter(Boolean),
+  ])).sort();
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   function resetToFirst() { setPage(1); }
 
@@ -260,16 +291,24 @@ function AuditEventsView() {
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Event type</label>
-          <input value={typeInput} onChange={(e) => { setTypeInput(e.target.value); resetToFirst(); }}
-            placeholder="e.g. fraud_evaluation, test"
+          <input list="audit-event-types" value={typeInput}
+            onChange={(e) => { setTypeInput(e.target.value); resetToFirst(); }}
+            placeholder="Choose or type…"
             className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+          <datalist id="audit-event-types">
+            {typeOptions.map((t) => <option key={t} value={t} />)}
+          </datalist>
         </div>
         <div>
-          <label className="block text-xs text-gray-500 mb-1">Outcome</label>
+          <label className="block text-xs text-gray-500 mb-1">Outcome / status</label>
           <select value={outcome} onChange={(e) => { setOutcome(e.target.value); resetToFirst(); }}
             className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white">
             <option value="">All</option>
-            {['approved', 'rejected', 'pending', 'failed', 'escalated', 'received', 'sent', 'error', 'timeout'].map((o) => <option key={o} value={o}>{o}</option>)}
+            {OUTCOME_GROUPS.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.values.map((o) => <option key={o} value={o}>{o.replace(/_/g, ' ')}</option>)}
+              </optgroup>
+            ))}
           </select>
         </div>
         <div>
