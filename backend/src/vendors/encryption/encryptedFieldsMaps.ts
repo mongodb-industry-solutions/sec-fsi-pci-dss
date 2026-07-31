@@ -72,7 +72,9 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'date',
           queries: {
             queryType: 'range',
-            min: new Date('1900-01-01'), max: new Date('2020-01-01'),
+            // Upper bound is in the future on purpose: the index must cover minors (a KYC
+            // exception an auditor looks for) and any newborn onboarded later.
+            min: new Date('1900-01-01'), max: new Date('2035-01-01'),
             sparsity: 1, trimFactor: 4,
           },
         },

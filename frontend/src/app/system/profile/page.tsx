@@ -9,6 +9,7 @@ import { DisplayMask } from '../../../components/record/DisplayMask';
 import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight, Info, IdCard } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
+import { DebugChip } from '../../../components/DebugChip';
 import { PasswordFields, passwordFieldsValid } from '../../../components/PasswordFields';
 
 type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
@@ -147,12 +148,8 @@ function KycStatusBadge({ kyc, debugMode }: { kyc: CustomerAgreementKycCheck; de
       </span>
       {debugMode && (
         <>
-          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200">
-            SD-53 · BQ:Step · KycCheck
-          </span>
-          <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-slate-50 text-slate-600 border-slate-200">
-            PCI Req 8.1
-          </span>
+          <DebugChip label="SD-53 · BQ:Step · KycCheck" />
+          <DebugChip label="PCI Req 8.1" tone="standard" />
         </>
       )}
     </div>
@@ -187,11 +184,7 @@ function InfoHint({ text }: { text: string }) {
 }
 
 function CollectionChip({ name }: { name: string }) {
-  return (
-    <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-[#001E2B]/5 text-amber-600 border-amber-200/60 shrink-0">
-      {name}
-    </span>
-  );
+  return <DebugChip label={name} tone="collection" />;
 }
 
 // Copy-to-clipboard for a protected field's plaintext value. Mirrors the account-detail affordance.
@@ -692,16 +685,14 @@ export default function ProfilePage() {
           "Government ID no." when the document is e.g. a driver license. */}
       {ag && govId?.number && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
               <IdCard size={16} className="text-gray-500 shrink-0" />
               <h2 className="font-semibold text-gray-800 text-sm">Identity document</h2>
               <InfoHint text="The government-issued identity document you provided at onboarding (KYC). Each field is encrypted at rest in MongoDB with Queryable Encryption." />
             </div>
             {debugMode && (
-              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
-                SD-53 · customerAgreementGovernmentID
-              </span>
+              <DebugChip label="SD-53 · customerAgreementGovernmentID" />
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm items-start">
@@ -757,15 +748,13 @@ export default function ProfilePage() {
       {/* KYC Compliance Status, visible when agreement data is present */}
       {ag?.customerAgreementKycCheck && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
               <ShieldCheck size={16} className="text-gray-500 shrink-0" />
               <h2 className="font-semibold text-gray-800 text-sm">Identity Verification (KYC)</h2>
             </div>
             {debugMode && (
-              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
-                SD-53 · BQ:Step · KycCheck · PCI Req 8.1
-              </span>
+              <DebugChip label="SD-53 · BQ:Step · KycCheck · PCI Req 8.1" />
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-start">
@@ -816,8 +805,8 @@ export default function ProfilePage() {
       {/* Change password — local accounts only (remote IdP accounts manage their own credentials) */}
       {profile.domain === 'local' && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
               <KeyRound size={16} className="text-gray-500 shrink-0" />
               <h2 className="font-semibold text-gray-800 text-sm">Password</h2>
             </div>
@@ -890,15 +879,13 @@ export default function ProfilePage() {
       {/* OAuth Authorized Apps — visible to any user; shows granted consent via OIDC */}
       {(grants.length > 0 || grantsLoading) && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
               <Layers size={16} className="text-gray-500 shrink-0" />
               <h2 className="font-semibold text-gray-800 text-sm">Authorized Applications</h2>
             </div>
             {debugMode && (
-              <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
-                SD-16 · ConsentGrant · OAuth 2.0 · OIDC
-              </span>
+              <DebugChip label="SD-16 · ConsentGrant · OAuth 2.0 · OIDC" />
             )}
           </div>
           <p className="text-xs text-gray-500">Apps and merchants you have authorized to access your account via OIDC. You can revoke access at any time.</p>
@@ -953,9 +940,9 @@ export default function ProfilePage() {
             <KeyRound size={18} />
           </span>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-semibold text-gray-800 text-sm">Credentials</h2>
-              {debugMode && (<span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">SD-91/SD-16 · partyEnrolledCredential · CIBA · PCI DSS Req 8</span>)}
+              {debugMode && <DebugChip label="SD-91/SD-16 · partyEnrolledCredential · CIBA · PCI DSS Req 8" />}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Security keys for passwordless sign-in. Enroll, rotate and revoke your devices.</p>
           </div>

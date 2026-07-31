@@ -146,7 +146,7 @@ function CardIssuerConfigPanel() {
               className={`w-32 border rounded-lg px-3 py-2 text-sm font-mono ${cvvInvalid ? 'border-red-400' : ''}`}
               placeholder="123"
             />
-            <p className="text-xs text-gray-500 mt-1">The single CVV the simulator accepts. Fixed demo value; never a real card secret and never stored.</p>
+            <p className="text-xs text-gray-500 mt-1">The global CVV this module accepts. Set here (not hardcoded): the value you save applies to every card until changed. A demo value, never a real card secret and never stored.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">CVV acceptance mode (demo)</label>
@@ -160,7 +160,7 @@ function CardIssuerConfigPanel() {
               <option value="per_card">per_card (real per-card CVV only)</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              both: accepts the global {validCvv || '123'} or the real per-card CVV. global: only the fixed demo CVV. per_card: only the card&apos;s own CVV.
+              both: accepts the global CVV configured above ({validCvv || '123'}) or the card&apos;s own derived CVV. global: only the configured value. per_card: only the card&apos;s own CVV.
             </p>
           </div>
           <div>

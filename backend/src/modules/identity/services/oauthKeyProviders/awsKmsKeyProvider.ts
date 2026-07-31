@@ -63,7 +63,7 @@ export class AwsKmsKeyProvider implements OAuthKeyProvider {
 
   private async getPublicKeyPemInternal(): Promise<string> {
     await this.getPublicKeyJwk(); // ensures kid + jwk cached
-    const pubKey = crypto.createPublicKey({ key: this.cachedJwk as crypto.JsonWebKey, format: 'jwk' });
+    const pubKey = crypto.createPublicKey({ key: this.cachedJwk as JsonWebKey, format: 'jwk' });
     return pubKey.export({ type: 'spki', format: 'pem' }) as string;
   }
 

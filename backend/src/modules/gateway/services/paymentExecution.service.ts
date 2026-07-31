@@ -26,6 +26,8 @@ export interface CreateExecutionInput {
   grossAmount: number;
   netAmount: number;
   feeAmount?: number;
+  // Attribution for a fee-bearing execution (SD-89). Omitted when feeAmount is 0.
+  fee?: PaymentExecutionFee;
   currency: string;
   paymentExecutionRail?: PayoutRail;
 }
@@ -54,32 +56,29 @@ export function computeFee(
   };
 }
 
-// Apply the merchant's CURRENT commission rate (SD-89) to a finalized execution (SD-65) and persist
-// feeAmount + fee attribution. Idempotent: skips if a fee is already attributed to this merchant.
-export async function applyMerchantFee(
+// Resolve the merchant's CURRENT commission rate (SD-89) into the amounts an execution is born with,
+// so gross/net/fee are consistent from the first insert (no second write, no window where the record
+// claims a fee that no balance movement matches).
+//
+// Zero is the safe default: a merchant with no rate configured (or an out-of-range one) yields
+// feeAmount 0, no `fee` attribution, and netAmount == grossAmount. Callers can therefore apply the
+// result unconditionally without risking an unbalanced ledger.
+export async function resolveMerchantFee(
   db: Db,
-  executionRef: string,
   merchantReference: string,
-): Promise<PaymentExecutionFee | null> {
-  const exec = await getExecution(db, executionRef);
-  if (!exec) return null;
-  if (exec.fee?.feeMerchantReference === merchantReference) return exec.fee; // idempotent
+  grossAmount: number,
+  currency: string,
+): Promise<{ feeAmount: number; netAmount: number; fee?: PaymentExecutionFee }> {
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne({ merchantAgreementInstanceReference: merchantReference }, { projection: { merchantCommissionRate: 1 } });
-  const { feeAmount, fee } = computeFee(exec.grossAmount, merchant?.merchantCommissionRate, exec.currency, merchantReference);
-  // Sparse: only fee-bearing executions carry a `fee` sub-document. A zero commission (no rate
-  // configured, or rate ≤ 0) attributes nothing — otherwise commission counts/revenue would be
-  // inflated by zero-fee executions. Mirrors the acquiring path (applyMerchantCommissionToCardTxn).
-  if (feeAmount <= 0) return null;
+  const { feeAmount, fee } = computeFee(grossAmount, merchant?.merchantCommissionRate, currency, merchantReference);
+  // Sparse: only fee-bearing executions carry a `fee` sub-document. A zero commission attributes
+  // nothing, otherwise commission counts/revenue would be inflated by zero-fee executions.
+  if (feeAmount <= 0) return { feeAmount: 0, netAmount: grossAmount };
   // Round netAmount to 2 decimals like feeAmount, so gross − fee cannot leak float artifacts
   // (e.g. 10.1 − 0.3 → 9.799999999) into the persisted balance-affecting figure.
-  const netAmount = Math.round((exec.grossAmount - feeAmount) * 100) / 100;
-  await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
-    { paymentExecutionInstanceReference: executionRef },
-    { $set: { feeAmount, netAmount, fee, recordUpdatedDateTime: new Date() } },
-  );
-  return fee;
+  return { feeAmount, netAmount: Math.round((grossAmount - feeAmount) * 100) / 100, fee };
 }
 
 export async function createExecution(
@@ -97,6 +96,7 @@ export async function createExecution(
     grossAmount: input.grossAmount,
     netAmount: input.netAmount,
     feeAmount: input.feeAmount ?? 0,
+    ...(input.fee ? { fee: input.fee } : {}),
     currency: input.currency,
     paymentExecutionRail: input.paymentExecutionRail,
     paymentExecutionStatus: 'routing',
@@ -118,7 +118,7 @@ export async function transitionExecution(
   patch?: Partial<Pick<PaymentExecutionProcedure, 'routingNote' | 'failureReason' | 'scheduledAt' | 'initiatedAt' | 'completedAt' | 'paymentExecutionRail' | 'resolvedPayoutAccountReference'>>,
 ): Promise<boolean> {
   const result = await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
-    { paymentExecutionInstanceReference: executionRef },
+    { paymentExecutionInstanceReference: executionRef, paymentExecutionStatus: { $ne: newStatus } },
     {
       $set: {
         paymentExecutionStatus: newStatus,

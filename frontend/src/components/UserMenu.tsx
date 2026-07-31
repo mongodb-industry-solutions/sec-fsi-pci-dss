@@ -111,7 +111,7 @@ export function UserMenu({ user, onSignOut }: UserMenuProps) {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full mt-2 w-64 rounded-xl border border-white/10 bg-[#0d2a38] shadow-2xl shadow-black/40 overflow-hidden z-50"
+          className="fixed inset-x-2 top-14 w-auto sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64 rounded-xl border border-white/10 bg-[#0d2a38] shadow-2xl shadow-black/40 overflow-hidden z-50"
         >
           <div className="px-4 py-3.5 flex items-center gap-3 border-b border-white/8">
             <span className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${avatar.bg} ${avatar.text}`}>

@@ -852,6 +852,10 @@ export async function getMerchantStats(db: Db, merchantId: string) {
   // payments (SD-254, A-06) count, with no double-counting (a payment lives in exactly one source).
   const execColl = db.collection(PAYMENT_EXECUTION_COLLECTION);
   const commissionMatch = { 'fee.feeMerchantReference': merchantId };
+  // A card-originated payout execution now carries the same fee as its acquiring record (the payout
+  // is where the money actually moves). Counting it here too would double the revenue, so the
+  // execution source only contributes fees with no acquiring counterpart (e.g. seeded history).
+  const execCommissionMatch = { ...commissionMatch, cardTransactionInstanceReference: { $exists: false } };
 
   const [totalsAgg, byStatus, byMonth, byCurrency, execCommissionAgg, execCommissionByMonth, cardCommissionAgg, cardCommissionByMonth] = await Promise.all([
     coll.aggregate([
@@ -874,11 +878,11 @@ export async function getMerchantStats(db: Db, merchantId: string) {
       { $sort: { amount: -1 } },
     ]).toArray(),
     execColl.aggregate([
-      { $match: commissionMatch },
+      { $match: execCommissionMatch },
       { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$feeAmount' } } },
     ]).toArray(),
     execColl.aggregate([
-      { $match: commissionMatch },
+      { $match: execCommissionMatch },
       { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
       { $sort: { '_id.y': 1, '_id.m': 1 } },
     ]).toArray(),

@@ -979,12 +979,14 @@ Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission *
 | Role | transactions | customers | cards | fraudCases | merchants | providers | modules | authDomains | roles | auditEvents | consents |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | **customer** (own) | view | — | view·manage | — | view | — | — | — | — | — | view |
-| **level1_analyst** | view | view | view | view·investigate | view | — | — | — | — | view | — |
+| **level1_analyst** | view | view | view | view·investigate | view | — | — | — | — | **—** | — |
 | **level2_investigator** | view·**viewSensitive** | view·**viewSensitive** | view·**viewSensitive** | view·investigate | view | — | — | — | — | view | — |
 | **security_auditor** | view·viewSensitive | view·viewSensitive | view·viewSensitive | view·viewSensitive | view | view | view | — | — | view | — |
-| **merchant_officer** | — | — | — | — | view·manage | — | — | — | — | view | — |
+| **merchant_officer** | — | — | — | — | view·manage | — | — | — | — | **—** | — |
 | **operations_officer** | — | — | view·manage | — | — | view | view·manage | — | — | view | — |
 | **manager** | **—** | **—** | **—** | **—** | — | view·manage | view | view·manage | view·manage | view | — |
+
+> `auditEvents:view` (the platform-wide event stream, ADR-025) is held by `level2_investigator`, `security_auditor`, `operations_officer` and `manager` only. `level1_analyst` and `merchant_officer` are excluded: the stream is cross-entity, and neither first-line triage nor KYB review has a job-related need for it (PCI DSS Req 10.5.1 "limit viewing of audit log files to those with a job-related need" + Req 7.2.2, NIST SP 800-53 AU-9, ISO/IEC 27001:2022 A.8.15). L1 keeps the per-case trail through `fraudCases:investigate`; a merchant officer sees the KYB decision history on the merchant record.
 
 > The `operations_officer` (v29, BIAN SD-88 PaymentCardManagement + SD-66 PayoutAccountArrangement, department "Operations") also holds **`accounts: view·manage`** (SD-66; the `accounts` resource is not a column above). It is the global back-office administrator of the card inventory and payout accounts exposed by the built-in modules (§6.13). Scope `all`; permissions `cards:[view,manage]`, `accounts:[view,manage]`, `modules:[view,manage]`, `providers:[view]`, `auditEvents:[view]`. Via `modules:[view,manage]` it is the sole role that **manages** the configuration and policies of **all internal modules** (fds, aml, hrp, kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation, vop). `providers:[view]` is **read-only**: its administration landing shows which provider serves each capability (internal vs external / `managed_externally`), but provider CRUD stays with `manager`. This reflects the confirmed role philosophy: **`operations_officer` owns internal business logic and financial processes** (cards SD-88, accounts SD-66, the internal engines FDS/AML/HRP/card-issuer/AIS/PISP, audit, plus read-only provider visibility), whereas **`manager` owns system and platform** (integrations/providers, auth domains, roles, general config, security), never business or cardholder data. By separation of duties (PCI DSS Req 7) it is **distinct from `manager`**: `operations_officer` has **no** `providers:manage`, `authDomains` or `roles`; auth (SD-16, resource `authDomains`) stays exclusive to `manager`; `modules` no longer overlaps at the `manage` level (only `manager` retains `modules:view` for system/security oversight, editing of module config is exclusive to `operations_officer`). It is also distinct from `customer` (scope `own`, self-service).
 
@@ -1121,6 +1123,11 @@ export interface PaymentExecutionProcedure {
   destinationAccountMasked?: string;   // masked IBAN / account, e.g. "ES12••••5477"
   destinationCountry?:       string;   // ISO 3166-1 alpha-2 destination banking country
 
+  // v34: the commission is WITHHELD from the gross, never added to it. The buyer is charged
+  // grossAmount; the rail moves netAmount to the merchant; feeAmount stays with the PSP and is
+  // credited to its revenue ledger at settlement (see "Commission settlement" below). All three are
+  // set in the SAME insert (resolveMerchantFee) so no record ever claims a fee no balance matches.
+  // Invariant: netAmount == grossAmount − feeAmount, and feeAmount defaults to 0 (gross == net).
   grossAmount: number;
   netAmount:   number;
   feeAmount:   number;  // commission/processing amount (numeric source of truth)
@@ -1153,6 +1160,78 @@ export interface PaymentExecutionProcedure {
   schemaVersion:         number;
 }
 ```
+
+---
+
+#### Commission settlement (v34 — SD-89 pricing → SD-66 balances)
+
+Where a collected merchant commission actually goes. Without this leg `feeAmount` would be a one-sided
+annotation: the merchant would be credited the gross while an event claimed a commission was collected.
+
+**PSP revenue ledger.** The PSP holds its commissions in an ordinary SD-66 account owned by an SD-13
+party, so no new collection or model is needed. Deterministic references, seeded by
+`vendors/seed/seedPspRevenueAccount.ts` (runs before `seedBalanceCredits`, opens at zero so no opening
+deposit is invented for it). Nothing here changes a collection, QE encryptedFields, DEK or index, so
+`setup:seed` alone applies v34: no drop or `--reset` is required. The commission credit in
+`seedPaymentExecutions` is gated by its own credit-log entry rather than by the execution being newly
+inserted, so it backfills an existing database exactly once:
+
+| Constant | Value | Notes |
+|---|---|---|
+| `PSP_REVENUE_PARTY_REFERENCE` | `psp00001-0000-4000-8000-000000000001` | SD-13 party, `partyType: 'service_account'` (system-owned, never a customer) |
+| `PSP_REVENUE_ACCOUNT_REFERENCE` | `paop0001-0000-4000-8000-000000000001` | SD-66 `internal_ledger`, EUR, no IBAN (not a bank account → nothing for QE here) |
+
+Both live in `modules/gateway/services/commissionSettlement.service.ts`, imported by the seeders so the
+reference exists in exactly one place.
+
+**Posting (`postCommission`).** Double entry over the existing balance primitives, at settlement:
+
+```
+merchant  payoutAccountBalance.pendingAmount   -= feeAmount   (settleCardDebit)
+PSP       payoutAccountBalance.availableAmount += feeAmount   (creditDirect)
+```
+
+- The authorization hold was taken on the **gross**, so the fee leg is derived as
+  `grossConverted − netConverted` in the merchant account currency, never converted on its own.
+  Otherwise FX rounding would strand a cent in `pendingAmount` permanently.
+- `feeAmount <= 0` moves nothing and writes nothing: gross == net stays balanced.
+- Idempotent through the credit id `commission-{executionRef}`: the `balanceCreditLog` upsert is the
+  gate, so a replayed `bank.transfer.settled` posts nothing further.
+- Never blocks settlement, and never strands funds. `postCommission` returns an outcome
+  (`posted` / `zero_fee` / `already_collected` / `no_revenue_account`). On `no_revenue_account` the
+  caller releases the fee to the merchant (`creditAvailable`), because the hold was taken on the gross
+  and would otherwise keep it in `pendingAmount` forever: the PSP forgoes the fee rather than holding
+  money belonging to nobody. `already_collected` needs no compensation, an earlier run withheld it.
+
+**Audit (PCI DSS Req 10).** Each posting writes one `balanceCreditLog` entry plus one
+`businessProcessEvent` with `processAction: 'merchant.commission.settled'`.
+
+**Audit correlation of the payout leg (ADR-057 addendum).** `dispatchProvider` logs every AIS/PISP call
+in `externalProviderArrangementActionLog` with sanitized request/response (PCI DSS Req 10.7), on
+success, error and timeout, builtin or external. Correlation to the originating transaction relies on
+three things: the SD-65 execution is linked onto `cardTransactionLog.paymentExecutionInstanceReference`
+as soon as it is created (not after the rail accepts, or a failed payout would be unreachable); each
+dispatch payload carries `cardTransactionInstanceReference` as the end-to-end reference (ISO 20022
+`EndToEndId` in a real rail), which the audit trail's deep reference match finds in the payload
+snapshot; and every payout event summary (`payout.execution.initiated` / `.completed` / `.failed` /
+`.exception`, `payout.hold.released`, `merchant.commission.settled`) carries `txnId`.
+
+**Reversal (ADR-057).** The reservation taken at authorization (`debitPending`) is released by
+`releasePendingCredit`, the exact inverse: `pendingAmount -= amount`, `availableAmount` untouched. It
+is NOT `releaseCardHold`, which credits available and is only correct for a P2P sender recovering its
+own funds. The compensating action `abortPayout` covers every terminal path (beneficiary validation
+refused, rail submission refused, rail rejection, unexpected error), moves the SD-65 record to
+`exception` or `failed`, and emits `payout.hold.released`. The state transition is the idempotency gate
+for every balance movement in both the settled and failed handlers, so event redelivery cannot credit
+or reverse twice.
+
+`CreditType` (`models/balanceCreditLog.model.ts`) gains `'commission'`. It is intentionally **absent**
+from the admin credit endpoint's enum (`POST /api/v1/accounts/:accountRef/credit`): commissions are
+system-posted only, never issued by hand.
+
+**Revenue counting.** A card-originated execution carries the same fee as its acquiring record, so
+`getMerchantStats` restricts the execution source of `commissionRevenue` to executions with no
+acquiring counterpart (`cardTransactionInstanceReference` absent). Otherwise the figure would double.
 
 ---
 
@@ -1258,7 +1337,7 @@ encrypted, lookup-tier and exact-searchable.
 | Field | bsonType | Query type | Params |
 |---|---|---|---|
 | `party.partyName` | string | substring | strMaxLength 30, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive false, diacriticSensitive false (sized within cluster default substringPreview limits) |
-| `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2020-01-01, sparsity 1, trimFactor 4 |
+| `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2035-01-01, sparsity 1, trimFactor 4 (upper bound in the future so minors and newborns stay searchable) |
 | `party.partyNationality` | string | equality | contention 8 |
 | `party.partyPlaceOfBirth` | string | equality | contention 8 |
 | `party.partySex` | string | equality | contention 8 |
@@ -4305,7 +4384,7 @@ Config key `cvvMode` in `capabilityModuleConfiguration` for capability `card-iss
 
 | `cvvMode` | Accepted CVV |
 |---|---|
-| `both` (default) | global escape-hatch (`validCvv`, default `'123'`) OR the derived per-card CVV |
+| `both` (default) | global escape-hatch (`validCvv`, seed default `'123'`, editable by `operations_officer` / `manager` with `modules:manage`) OR the derived per-card CVV |
 | `global` | only the global `validCvv` (simple demo) |
 | `per_card` | only the derived per-card CVV (strict / realistic demo) |
 
@@ -4517,8 +4596,8 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 | Module | Owns (RW) | Reads (RO) | Core-data touch (PCI/GDPR) |
 |---|---|---|---|
 | `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
-| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents` | `party`, `payoutAccountArrangement`, `customerAgreementProcedure` (owner KYC compose), `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD) |
-| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers) |
+| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balances), `balanceCreditLog` | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
+| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34) |
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
 | `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
 | `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
@@ -4536,7 +4615,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 
 ## 16. Team contacts page (`/about`): demo metadata, no BIAN service domain
 
-Event/expo support surface: an "About us and contact us to learn more" entry on the landing page
+Event/expo support surface: an "About us and Contact us to learn more" entry on the landing page
 (full width under Wiki / API Reference) opens `/about`, which explains the MongoDB Industry Solutions
 Team and lists the demo contact points per area with avatar, name, role, area of interest and a
 LinkedIn follow QR. Responsive from phone to TV; on `lg+` the roster can be switched between one

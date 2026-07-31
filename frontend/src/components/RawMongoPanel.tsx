@@ -219,7 +219,14 @@ export function RawMongoPanel({
                 {/* Content */}
                 {data != null && !s.loading && (
                   <div className="bg-[#001E2B] px-2 py-2">
-                    <JsonView data={data} theme="dark" maxHeight="16rem" />
+                    <JsonView
+                      data={data}
+                      theme="dark"
+                      maxHeight="16rem"
+                      fullscreenTitle={section.kind === 'mongo'
+                        ? `${title} - ${section.collection}`
+                        : `${title} - ${section.label}`}
+                    />
                   </div>
                 )}
 

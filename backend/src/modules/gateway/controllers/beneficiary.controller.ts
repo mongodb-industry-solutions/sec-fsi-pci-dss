@@ -57,6 +57,35 @@ async function resolveSourcePayoutAccountRef(db: Db, partyRef: string): Promise<
 
 export async function beneficiaryController(fastify: FastifyInstance) {
 
+  // Payee standing data is a payment-diversion fraud vector, so every change to it is auditable:
+  // who, when, through which channel, on whose list (PSD2 Art. 13 RTS trusted beneficiaries,
+  // AMLD Art. 40 record keeping, PCI DSS Req 10.2.1). Values stay masked.
+  const emitLifecycle = (
+    action: 'beneficiary.registered' | 'beneficiary.relabelled' | 'beneficiary.removed',
+    args: {
+      request: FastifyRequest;
+      beneficiaryRef: string;
+      ownerPartyReference: string;
+      channel: string;
+      summary?: Record<string, unknown>;
+    },
+  ) => {
+    const user = getUser(args.request);
+    emitComplianceEvent(fastify.db, {
+      entityType: 'beneficiary', entityId: args.beneficiaryRef,
+      processType: 'payment_processing', processAction: action,
+      processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: {
+        channel: args.channel,
+        ownerPartyReference: args.ownerPartyReference,
+        ...(args.summary ?? {}),
+      },
+      bianServiceDomain: 'SD-54 Counterparty Administration',
+      bianControlRecordType: 'CounterpartyArrangement',
+    });
+  };
+
   // ── GET /beneficiaries (+ /:ownerRef) — list a party's beneficiaries ──────────────────────────
   // Session: staff list all (optional filters), customer auto-scoped to own; full records.
   // OAuth: owner from token.sub, display-safe projection. Scope read:beneficiaries.
@@ -260,6 +289,10 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     const { counterpartyLabel } = request.body as { counterpartyLabel: string };
     const updated = await updateBeneficiaryLabel(fastify.db, beneficiaryRef, counterpartyLabel);
     if (!updated) return reply.status(404).send({ error: 'Beneficiary not found or already removed' });
+    emitLifecycle('beneficiary.relabelled', {
+      request, beneficiaryRef, ownerPartyReference: ownerRef, channel: 'session',
+      summary: { newLabel: updated.counterpartyLabel },
+    });
     return reply.send(updated);
   });
 
@@ -281,6 +314,14 @@ export async function beneficiaryController(fastify: FastifyInstance) {
         lookupValue: body.lookupValue,
         label: body.label,
       });
+      if (result.counterpartyArrangementReference) {
+        emitLifecycle('beneficiary.registered', {
+          request, beneficiaryRef: result.counterpartyArrangementReference,
+          ownerPartyReference: owner.ownerPartyRef!,
+          channel: oauth ? 'oauth_merchant' : 'session',
+          summary: { lookupType: body.lookupType, lookupHint: result.counterpartyLookupHint ?? null },
+        });
+      }
       return reply.send(result);
     } catch (err: unknown) {
       const e = err as Error & { statusCode?: number };
@@ -325,6 +366,10 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     if (!owner.ownerPartyRef) return reply.status(404).send({ error: 'Beneficiary not found' });
     const ok = await removeBeneficiary(fastify.db, owner.ownerPartyRef, beneficiaryRef);
     if (!ok) return reply.status(404).send({ error: 'Beneficiary not found' });
+    emitLifecycle('beneficiary.removed', {
+      request, beneficiaryRef, ownerPartyReference: owner.ownerPartyRef,
+      channel: owner.channel === 'oauth' ? 'oauth_merchant' : 'session',
+    });
     return reply.send({ counterpartyArrangementReference: beneficiaryRef, counterpartyArrangementStatus: 'removed' });
   };
 

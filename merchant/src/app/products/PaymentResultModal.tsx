@@ -5,13 +5,14 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  CheckCircle2, XCircle, ExternalLink, Link2, RotateCcw, History, X, ArrowLeft,
+  CheckCircle2, XCircle, ExternalLink, Link2, RotateCcw, History, X, ArrowLeft, Info,
 } from 'lucide-react';
 import Link from 'next/link';
 import type { ActionResult } from '@/lib/actions';
-import type { Product } from '@/config/products';
+import { COMMISSION_HELP, type Product } from '@/config/products';
 import { BRAND } from '@/lib/brand';
 import { Chip } from '@/components/ui/Bits';
+import { Tip } from '@/components/ui/Tooltip';
 import CopyButton from '@/components/ui/CopyButton';
 
 // Map a PSP status string to a chip tone (kept consistent with the history view).
@@ -23,10 +24,19 @@ function statusTone(s?: string): 'ok' | 'warn' | 'err' | 'neutral' {
   return 'neutral';
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5 text-sm">
-      <span className="text-muted">{label}</span>
+      <span className="flex items-center gap-1 text-muted">
+        {label}
+        {help && (
+          <Tip label={help}>
+            <span className="inline-flex cursor-help" tabIndex={0} aria-label={`About ${label}`}>
+              <Info className="h-3.5 w-3.5" aria-hidden />
+            </span>
+          </Tip>
+        )}
+      </span>
       <span className="text-right font-medium text-ink">{children}</span>
     </div>
   );
@@ -132,7 +142,7 @@ export default function PaymentResultModal({
           <Row label="Payment method">
             <span className="inline-flex items-center gap-1.5">{product.methodLabel}</span>
           </Row>
-          <Row label="Merchant commission">{fmt(commission)}</Row>
+          <Row label="Merchant commission" help={COMMISSION_HELP}>{fmt(commission)}</Row>
         </div>
 
         {ok ? (

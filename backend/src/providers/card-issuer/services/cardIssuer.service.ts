@@ -32,7 +32,11 @@ export interface CardNetworkRule {
 export type CvvMode = 'both' | 'global' | 'per_card';
 
 export interface CardIssuerSimulatorConfig {
-  /** The single global CVV the simulator accepts (escape hatch). A fixed demo value, never a real card secret. */
+  /**
+   * The global CVV the simulator accepts (escape hatch). NOT hardcoded: it is part of the
+   * card-issuer module configuration, edited at runtime by `operations_officer` or `manager`
+   * (`modules:manage`) via PUT /config. A demo value, never a real card secret and never stored.
+   */
   validCvv: string;
   /** CVV acceptance mode (see CvvMode). Defaults to `both` so existing v29 demos keep working. */
   cvvMode: CvvMode;
@@ -48,8 +52,10 @@ export interface CardIssuerSimulatorConfig {
   networks: CardNetworkRule[];
 }
 
-// Built-in defaults. The admin can override any of these via the module config; missing keys fall
-// back here, so the simulator always has a working rule set.
+// Seed defaults only, NOT the acceptance rule: every key here is overridden by the stored
+// card-issuer module configuration, which `operations_officer` (or `manager`) edits at runtime with
+// `modules:manage`. They apply while a key has never been configured, so the module always has a
+// working rule set. Change the accepted CVV in the module admin, never in this constant.
 export const DEFAULT_CARD_ISSUER_CONFIG: CardIssuerSimulatorConfig = {
   validCvv: '123',
   cvvMode: 'both',

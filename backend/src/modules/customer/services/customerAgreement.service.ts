@@ -592,7 +592,7 @@ const KYC_SEARCH_FIELDS: KycSearchFieldDef[] = [
   { key: 'phone',                label: 'Phone',             collection: 'party',     path: 'partyMobilePhoneNumber', baseMode: 'equality', bsonType: 'string' },
   { key: 'accountRef',           label: 'Account reference', collection: 'agreement', path: 'customerAgreementReference', baseMode: 'equality', bsonType: 'string' },
   { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 30, caseSensitive: false, diacriticSensitive: false },
-  { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2020-01-01' },
+  { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2035-01-01' },
   { key: 'partyNationality',     label: 'Nationality',       collection: 'party',     path: 'partyNationality',     baseMode: 'equality',  bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },
   { key: 'partyPlaceOfBirth',    label: 'Place of birth',    collection: 'party',     path: 'partyPlaceOfBirth',    baseMode: 'equality',  bsonType: 'string' },
   { key: 'govIdNumber',          label: 'Government ID no.', collection: 'agreement', path: 'customerAgreementGovernmentID.number',         baseMode: 'suffix',   bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 20, caseSensitive: true, diacriticSensitive: true },
@@ -719,17 +719,34 @@ function buildKycFilter(def: KycSearchFieldDef, mode: KycSearchMode, req: KycSea
 
   if (mode === 'range') {
     const cond: Record<string, unknown> = {};
-    const coerce = (s: string): Date | number => def.bsonType === 'date' ? new Date(s) : Number(s);
+    const isDate = def.bsonType === 'date';
+    // A date-only bound names a whole calendar day: the lower bound starts at 00:00:00 and the
+    // upper one ends at 23:59:59.999, so from == to matches everything stored on that day
+    // (expiry dates carry a time of day). Both ends are inclusive.
+    const coerce = (v: string, end: boolean): Date | number => {
+      if (!isDate) return Number(v);
+      const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(v);
+      return new Date(dateOnly ? `${v}T${end ? '23:59:59.999' : '00:00:00.000'}Z` : v);
+    };
+    // The QE range index only covers [min, max]; querying outside it is rejected by the driver,
+    // so clamp instead of failing the operator's search.
+    const clamp = (v: Date | number): Date | number => {
+      const lo = def.rangeMin != null ? coerce(String(def.rangeMin), false) : null;
+      const hi = def.rangeMax != null ? coerce(String(def.rangeMax), true) : null;
+      if (lo != null && v < lo) return lo;
+      if (hi != null && v > hi) return hi;
+      return v;
+    };
     if (req.from == null && req.to == null) badRequest(`Range search on ${def.key} needs from and/or to`);
     if (req.from != null) {
-      const lo = coerce(req.from);
-      if (def.bsonType === 'date' ? isNaN((lo as Date).getTime()) : isNaN(lo as number)) badRequest(`Invalid from value for ${def.key}`);
-      cond.$gte = lo;
+      const lo = coerce(req.from, false);
+      if (isDate ? isNaN((lo as Date).getTime()) : isNaN(lo as number)) badRequest(`Invalid from value for ${def.key}`);
+      cond.$gte = clamp(lo);
     }
     if (req.to != null) {
-      const hi = coerce(req.to);
-      if (def.bsonType === 'date' ? isNaN((hi as Date).getTime()) : isNaN(hi as number)) badRequest(`Invalid to value for ${def.key}`);
-      cond.$lte = hi;
+      const hi = coerce(req.to, true);
+      if (isDate ? isNaN((hi as Date).getTime()) : isNaN(hi as number)) badRequest(`Invalid to value for ${def.key}`);
+      cond.$lte = clamp(hi);
     }
     return { [def.path]: cond };
   }

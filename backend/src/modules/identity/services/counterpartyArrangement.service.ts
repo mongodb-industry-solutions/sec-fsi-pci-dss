@@ -180,6 +180,29 @@ export async function removeBeneficiary(
   return result.modifiedCount === 1;
 }
 
+/** Sentinel owner reference for a predicate that resolves to no customer: matches no document. */
+const NO_MATCH = '__no_such_owner__';
+
+/** Owner party behind an investigation case (SD-83 case -> SD-53 agreement -> SD-13 party). */
+async function resolveCaseOwner(db: Db, caseRef: string): Promise<string | undefined> {
+  const [{ FRAUD_DIAGNOSIS_COLLECTION }, { CUSTOMER_AGREEMENT_COLLECTION }] = await Promise.all([
+    import('../../fraud/models/fraudDiagnosis.model'),
+    import('../../customer/models/customerAgreement.model'),
+  ]);
+  const kase = await db.collection<{ customerAgreementInstanceReference?: string }>(FRAUD_DIAGNOSIS_COLLECTION)
+    .findOne(
+      { $or: [{ fraudDiagnosisCaseReference: caseRef }, { fraudDiagnosisInstanceReference: caseRef }] },
+      { projection: { customerAgreementInstanceReference: 1 } },
+    );
+  if (!kase?.customerAgreementInstanceReference) return undefined;
+  const agreement = await db.collection<{ partyInstanceReference?: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne(
+      { customerAgreementInstanceReference: kase.customerAgreementInstanceReference },
+      { projection: { partyInstanceReference: 1 } },
+    );
+  return agreement?.partyInstanceReference;
+}
+
 /** Minimum length of a free-text beneficiary predicate, aligned with the QE text-search minimums. */
 export const BENEFICIARY_MIN_QUERY_LENGTH = 3;
 
@@ -220,12 +243,23 @@ export async function listAllBeneficiaries(
     skipPredicateCheck?: boolean;
   },
 ): Promise<{ results: CounterpartyArrangement[]; total: number }> {
-  if (!opts?.skipPredicateCheck) assertBeneficiaryPredicate(opts);
+  // Normalize before anything else, so the predicate check and the query can never disagree about
+  // what counts as supplied. A blank hint is absent, not a value: left as-is, a caller passing
+  // ownerRef='' with a caseRef would clear the case scope (`'' ?? x` keeps '') yet still pass the
+  // check, turning a case-scoped read into an unscoped one (the enumeration ADR-048 forbids).
+  const ownerHint = opts?.ownerRef?.trim() || undefined;
+  const caseHint = opts?.caseRef?.trim() || undefined;
+  const qHint = opts?.q?.trim() || undefined;
+  if (!opts?.skipPredicateCheck) assertBeneficiaryPredicate({ ownerRef: ownerHint, caseRef: caseHint, q: qHint });
   const query: Record<string, unknown> = {};
-  if (opts?.ownerRef) query.ownerPartyReference = opts.ownerRef;
+  // A case reference is a predicate only because it identifies ONE customer: resolve it to that
+  // party and scope the read, otherwise it would satisfy the check while returning the whole
+  // collection. An unresolvable case matches nothing.
+  const ownerRef = ownerHint ?? (caseHint ? await resolveCaseOwner(db, caseHint) ?? NO_MATCH : undefined);
+  if (ownerRef) query.ownerPartyReference = ownerRef;
   query.counterpartyArrangementStatus = opts?.status ?? 'active';
-  if (opts?.q) {
-    const safe = opts.q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (qHint) {
+    const safe = qHint.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(safe, 'i');
     query.$or = [
       { counterpartyLabel: { $regex: re } },

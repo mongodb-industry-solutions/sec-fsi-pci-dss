@@ -128,7 +128,8 @@ the Merchant Name selector. No authentication required (public, simulator mode).
           },
           paymentCardExpirationDate: {
             type: 'string',
-            description: 'Card expiry (MM/YY). Optional; supplied for a NEW card so the PSP auto-registers it as a card-on-file (SD-88) after payment. Never required for an already-saved card.',
+            pattern: '^(0[1-9]|1[0-2])/[0-9]{2}$',
+            description: 'Card expiry (MM/YY, month 01-12). Optional; supplied for a NEW card so the PSP auto-registers it as a card-on-file (SD-88) after payment. Never required for an already-saved card.',
           },
           paymentCardNetwork: {
             type: 'string',

@@ -12,6 +12,7 @@ import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
 import { useEffectivePermissions } from '../../../../lib/permissions';
+import { AuditTrailLink } from '../../../../components/AuditTrailLink';
 import { AccessDenied } from '../../../../components/AccessDenied';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { Tooltip } from '../../../../components/Tooltip';
@@ -306,6 +307,10 @@ export default function TransactionDetailPage() {
             <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[txn.cardTransactionStatus ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
               {txn.cardTransactionStatus}
             </span>
+            {/* Oversight roles jump straight to every event that references this transaction. */}
+            <div className="mt-2 flex justify-end">
+              <AuditTrailLink reference={txn.cardTransactionInstanceReference ?? txnId} label="View audit trail" />
+            </div>
           </div>
         </div>
 

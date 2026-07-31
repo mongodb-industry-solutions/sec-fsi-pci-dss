@@ -128,8 +128,9 @@ test.describe('v32 test 30 + A4: the beneficiary search surface at every viewpor
     expect(listCalls).toBe(0);
     await expectNoHorizontalScroll(page);
 
-    // The predicate input is reachable at every viewport.
-    const search = page.getByPlaceholder(/Search by name or contact/i);
+    // The predicate input is reachable at every viewport. Staff get the search-first surface
+    // (alias or masked contact, with an explicit minimum), not the customer's plain search box.
+    const search = page.getByPlaceholder(/min \d+ characters/i);
     await expect(search).toBeVisible();
   });
 
@@ -140,7 +141,7 @@ test.describe('v32 test 30 + A4: the beneficiary search surface at every viewpor
     await page.goto('/system/beneficiaries');
     await expect(page.getByText(/Search for a beneficiary to begin/i)).toBeVisible({ timeout: 15000 });
 
-    const search = page.getByPlaceholder(/Search by name or contact/i);
+    const search = page.getByPlaceholder(/min \d+ characters/i);
     await search.fill('ab');           // below the minimum: still no request
     await page.waitForTimeout(600);
     expect(listCalls).toBe(0);
