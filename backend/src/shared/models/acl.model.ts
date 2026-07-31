@@ -82,7 +82,10 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       cards: ['view'],
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
-      auditEvents: ['view'],
+      // No `auditEvents`: the platform-wide event stream is cross-entity (every customer, merchant
+      // and integration payload), which first-line triage has no job-related need for
+      // (PCI DSS Req 10.5.1 / 7.2.2, NIST AU-9, ISO 27001 A.8.15). It would also contradict the
+      // no-enumeration rule below. L1 still gets the per-case trail via fraudCases:investigate.
       // v32 A2 (ADR-048): `view` is drill-down for a KNOWN owner party reference. Cross-party SEARCH
       // needs `investigate`, which L1 deliberately does NOT hold: first-line triage has no need to
       // enumerate counterparties across the whole customer base (PCI DSS 7.2.2, EBA §31(a)).
@@ -152,7 +155,8 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     bianControlRecordType: 'MerchantAgreement',
     rolePermissions: {
       merchants: ['view', 'manage'],
-      auditEvents: ['view'],
+      // No `auditEvents`: a KYB officer would otherwise read events for merchants and customers
+      // unrelated to any file under review (PCI DSS Req 10.5.1, need-to-know).
       accounts: ['view'],
     },
   },

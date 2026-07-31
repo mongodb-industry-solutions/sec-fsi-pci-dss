@@ -8,12 +8,27 @@
     "bianServiceDomain": "Customer Agreement",
     "bianControlRecordType": "CustomerAgreement",
     "rolePermissions": {
-      "transactions": ["view"],
-      "cards": ["view", "manage"],
-      "merchants": ["view"],
-      "consents": ["view"],
-      "accounts": ["view", "manage"],
-      "beneficiaries": ["view", "manage"]
+      "transactions": [
+        "view"
+      ],
+      "cards": [
+        "view",
+        "manage"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "consents": [
+        "view"
+      ],
+      "accounts": [
+        "view",
+        "manage"
+      ],
+      "beneficiaries": [
+        "view",
+        "manage"
+      ]
     }
   },
   {
@@ -25,13 +40,25 @@
     "bianServiceDomain": "Fraud Diagnosis",
     "bianControlRecordType": "FraudDiagnosisCase",
     "rolePermissions": {
-      "transactions": ["view"],
-      "customers": ["view"],
-      "cards": ["view"],
-      "merchants": ["view"],
-      "fraudCases": ["view", "investigate"],
-      "auditEvents": ["view"],
-      "beneficiaries": ["view"]
+      "transactions": [
+        "view"
+      ],
+      "customers": [
+        "view"
+      ],
+      "cards": [
+        "view"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "fraudCases": [
+        "view",
+        "investigate"
+      ],
+      "beneficiaries": [
+        "view"
+      ]
     }
   },
   {
@@ -43,13 +70,32 @@
     "bianServiceDomain": "Fraud Diagnosis",
     "bianControlRecordType": "FraudDiagnosisCase",
     "rolePermissions": {
-      "transactions": ["view", "viewSensitive"],
-      "customers": ["view", "viewSensitive"],
-      "cards": ["view", "viewSensitive"],
-      "merchants": ["view"],
-      "fraudCases": ["view", "investigate"],
-      "auditEvents": ["view"],
-      "beneficiaries": ["view", "manage"]
+      "transactions": [
+        "view",
+        "viewSensitive"
+      ],
+      "customers": [
+        "view",
+        "viewSensitive"
+      ],
+      "cards": [
+        "view",
+        "viewSensitive"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "fraudCases": [
+        "view",
+        "investigate"
+      ],
+      "auditEvents": [
+        "view"
+      ],
+      "beneficiaries": [
+        "view",
+        "manage"
+      ]
     }
   },
   {
@@ -61,16 +107,42 @@
     "bianServiceDomain": "Party Authentication",
     "bianControlRecordType": "PartyAuthenticationAssessment",
     "rolePermissions": {
-      "transactions": ["view", "viewSensitive"],
-      "customers": ["view", "viewSensitive"],
-      "cards": ["view", "viewSensitive"],
-      "fraudCases": ["view", "viewSensitive"],
-      "merchants": ["view"],
-      "providers": ["view"],
-      "modules": ["view"],
-      "auditEvents": ["view"],
-      "accounts": ["view", "viewSensitive"],
-      "beneficiaries": ["view", "manage"]
+      "transactions": [
+        "view",
+        "viewSensitive"
+      ],
+      "customers": [
+        "view",
+        "viewSensitive"
+      ],
+      "cards": [
+        "view",
+        "viewSensitive"
+      ],
+      "fraudCases": [
+        "view",
+        "viewSensitive"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "providers": [
+        "view"
+      ],
+      "modules": [
+        "view"
+      ],
+      "auditEvents": [
+        "view"
+      ],
+      "accounts": [
+        "view",
+        "viewSensitive"
+      ],
+      "beneficiaries": [
+        "view",
+        "manage"
+      ]
     }
   },
   {
@@ -82,9 +154,13 @@
     "bianServiceDomain": "Merchant Relations",
     "bianControlRecordType": "MerchantAgreement",
     "rolePermissions": {
-      "merchants": ["view", "manage"],
-      "auditEvents": ["view"],
-      "accounts": ["view"]
+      "merchants": [
+        "view",
+        "manage"
+      ],
+      "accounts": [
+        "view"
+      ]
     }
   },
   {
@@ -96,13 +172,32 @@
     "bianServiceDomain": "Payment Card / Payout Account Arrangement",
     "bianControlRecordType": "PaymentCardManagement / PayoutAccountArrangement",
     "rolePermissions": {
-      "cards": ["view", "manage"],
-      "accounts": ["view", "manage"],
-      "customers": ["view", "manage"],
-      "merchants": ["view", "manage"],
-      "modules": ["view", "manage"],
-      "providers": ["view"],
-      "auditEvents": ["view"]
+      "cards": [
+        "view",
+        "manage"
+      ],
+      "accounts": [
+        "view",
+        "manage"
+      ],
+      "customers": [
+        "view",
+        "manage"
+      ],
+      "merchants": [
+        "view",
+        "manage"
+      ],
+      "modules": [
+        "view",
+        "manage"
+      ],
+      "providers": [
+        "view"
+      ],
+      "auditEvents": [
+        "view"
+      ]
     }
   },
   {
@@ -114,11 +209,24 @@
     "bianServiceDomain": "External Provider Arrangements",
     "bianControlRecordType": "ExternalProviderArrangement",
     "rolePermissions": {
-      "providers": ["view", "manage"],
-      "modules": ["view"],
-      "authDomains": ["view", "manage"],
-      "roles": ["view", "manage"],
-      "auditEvents": ["view"]
+      "providers": [
+        "view",
+        "manage"
+      ],
+      "modules": [
+        "view"
+      ],
+      "authDomains": [
+        "view",
+        "manage"
+      ],
+      "roles": [
+        "view",
+        "manage"
+      ],
+      "auditEvents": [
+        "view"
+      ]
     }
   }
 ]
