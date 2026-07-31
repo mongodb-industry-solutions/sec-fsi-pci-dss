@@ -12,7 +12,12 @@ const h = vi.hoisted(() => {
   const qeDb = { collection: vi.fn(() => ({ insertOne, findOne, updateOne })) };
   return { qeDb, getDbForRole: vi.fn().mockResolvedValue(qeDb), dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received' }) };
 });
-vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({ getDbForRole: h.getDbForRole }));
+vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
+  getDbForRole: h.getDbForRole,
+  // v32 C6: the sensitive-tier / encryption-write clients are the same double here.
+  getSensitiveTierDb: h.getDbForRole,
+  getEncryptionWriteDb: h.getDbForRole,
+}));
 vi.mock('../../../../backend/src/vendors/security/escalationTokens', () => ({ validateToken: vi.fn().mockReturnValue({ valid: false }) }));
 vi.mock('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service', () => ({ createFraudCase: vi.fn().mockResolvedValue({ fraudDiagnosisInstanceReference: 'f' }) }));
 vi.mock('../../../../backend/src/modules/customer/services/paymentCard.service', () => ({

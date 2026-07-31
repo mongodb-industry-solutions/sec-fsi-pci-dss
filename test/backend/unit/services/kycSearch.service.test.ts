@@ -17,6 +17,9 @@ const h = vi.hoisted(() => ({
 
 vi.mock('../../../../backend/src/vendors/encryption/roleClients', () => ({
   getDbForRole: h.getDbForRole,
+  // v32 C6: the sensitive-tier / encryption-write clients are the same double here.
+  getSensitiveTierDb: h.getDbForRole,
+  getEncryptionWriteDb: h.getDbForRole,
 }));
 vi.mock('../../../../backend/src/vendors/security/escalationTokens', () => ({
   validateToken: h.validateToken,
@@ -44,8 +47,15 @@ const agreement = {
   customerAgreementStatus: 'active',
   // decrypted sensitive value present so the L2 path attaches the sensitive block
   customerAgreementResidentialAddress: { streetAddress: '1 St', city: 'Madrid', postalCode: '28001', countryCode: 'ES' },
-  governmentIdentificationReference: 'ID-4821',
+  // v32: the deprecated field is still on the fixture on purpose, so the tests prove it is never
+  // surfaced even when a pre-v32 document still carries it.
+  governmentIdentificationReference: 'SYNTH-AG-4821',
   customerAgreementRiskNotes: 'none',
+  // v27 structured identity document (lookup tier, the searchable source of truth).
+  customerAgreementGovernmentID: {
+    type: 'driver_license', number: 'ES123454821', issuingCountry: 'ES', expiryDate: '2031-12-24',
+  },
+  customerAgreementTaxIDNumber: 'ES12345678',
 };
 
 /** Records the last filter passed to find() per collection, returns fixed docs. */
@@ -178,12 +188,75 @@ describe('searchKyc validation (reject, not silently drop)', () => {
   });
 });
 
+// The QE preview indexes cap the query length (strMaxQueryLength). A full document ID is longer
+// than that cap, and an operator holding the full ID must still get the record instead of an empty
+// result that reads as a broken system. The encrypted query runs on the permitted window and the
+// full value is refined against the decrypted result. The db double ignores the filter and always
+// returns the fixture, so these tests assert the refinement, not the driver.
+describe('searchKyc query window beyond the QE index limit', () => {
+  const full = agreement.customerAgreementGovernmentID.number;  // 'ES123454821', longer than 10
+
+  beforeEach(() => h.getDbForRole.mockResolvedValue(makeDb()));
+
+  it('queries the last permitted characters for a suffix field and still returns the record', async () => {
+    const db = makeDb();
+    h.getDbForRole.mockResolvedValue(db);
+    const rows = await searchKyc({ field: 'govIdNumber', value: full }, AUTH);
+    const sent = JSON.stringify(db.calls[CUSTOMER_AGREEMENT_COLLECTION]);
+    expect(sent).toContain(full.slice(-10));
+    expect(sent).not.toContain(full);        // the surplus never reaches the encrypted index
+    expect(rows).toHaveLength(1);
+  });
+
+  it('refines away a candidate that matches the window but not the full value', async () => {
+    const rows = await searchKyc({ field: 'govIdNumber', value: `X${full}` }, AUTH);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('keeps exact-window queries unrefined (the encrypted result is already exact)', async () => {
+    const rows = await searchKyc({ field: 'govIdNumber', value: '4821' }, AUTH);
+    expect(rows).toHaveLength(1);
+  });
+
+  it('rejects a value longer than the field input limit', async () => {
+    const reg = getKycSearchRegistry();
+    const def = reg.fields.find((f) => f.key === 'govIdNumber')!;
+    const max = def.inputMaxLength ?? def.maxQueryLength ?? 10;
+    await expect(searchKyc({ field: 'govIdNumber', value: 'X'.repeat(max + 1) }, AUTH))
+      .rejects.toMatchObject({ statusCode: 400 });
+  });
+
+  it('exposes an input limit at least as large as the QE window for every text field', () => {
+    for (const f of getKycSearchRegistry().fields) {
+      if (!['substring', 'prefix', 'suffix'].includes(f.mode)) continue;
+      expect(f.inputMaxLength).toBeGreaterThanOrEqual(f.maxQueryLength ?? 0);
+    }
+  });
+});
+
 describe('searchKyc tier gate on result fields', () => {
-  it('security auditor gets the sensitive block and contact PII', async () => {
+  // v32 C2/D-3: a search result never carries QE:none plaintext. The auditor is told the
+  // sensitive tier is available and must call the reveal endpoint, which emits one compliance
+  // event per disclosure (PCI DSS Req 10.2.2). Contact PII is lookup tier and still travels.
+  it('security auditor gets sensitiveAvailable (not plaintext) and contact PII', async () => {
     h.getDbForRole.mockResolvedValue(makeDb());
     const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'security_auditor');
-    expect(rows[0].sensitive).toBeDefined();
+    expect(rows[0].sensitive).toBeUndefined();
+    expect(rows[0].sensitiveAvailable).toBe(true);
     expect(rows[0].customerEmailAddress).toBe('ana@example.com');
+  });
+
+  // v32 B1: the identity document is lookup tier, so every role that reaches the record sees the
+  // same searchable value (plan §4.1). This is what makes a suffix search on the displayed
+  // number possible, and it is the regression guard for the SYNTH-* defect.
+  it('returns the structured identity document to every role that can search', async () => {
+    h.getDbForRole.mockResolvedValue(makeDb());
+    for (const role of ['security_auditor', 'level2_investigator'] as const) {
+      const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, role);
+      expect(rows[0].customerAgreementGovernmentID).toEqual(agreement.customerAgreementGovernmentID);
+      expect(rows[0].customerAgreementTaxIDNumber).toBe(agreement.customerAgreementTaxIDNumber);
+      expect(JSON.stringify(rows[0])).not.toContain('SYNTH-');
+    }
   });
 
   it('L2 investigator sees sensitive fields only with a valid escalation token', async () => {

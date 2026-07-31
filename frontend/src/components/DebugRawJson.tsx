@@ -1,4 +1,6 @@
 'use client';
+// v32 C4: never render a payload verbatim; ciphertext is previewed and sensitive keys redacted.
+import { redactForDisplay } from './record/redactPayload';
 import { useState } from 'react';
 import { JsonView } from './json/JsonView';
 
@@ -34,7 +36,7 @@ export function DebugRawJson({ sections }: { sections: Section[] }) {
               <pre className="bg-[#001E2B] text-gray-500 text-xs font-mono px-4 py-3 italic">null - data not yet loaded</pre>
             ) : (
               <div className="bg-[#001E2B] px-2 py-2">
-                <JsonView data={section.data} theme="dark" maxHeight="16rem" />
+                <JsonView data={redactForDisplay(section.data)} theme="dark" maxHeight="16rem" />
               </div>
             )
           )}

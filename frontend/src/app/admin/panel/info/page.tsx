@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
-import { getAdminToken, downloadText } from '../../../../lib/adminHelpers';
+import { getAdminToken, downloadText, readJsonSafe, isUpstreamUnavailable } from '../../../../lib/adminHelpers';
 import { Download, Pencil, X, Check, RotateCcw, Plus, RefreshCw } from 'lucide-react';
 
 interface HealthResult {
@@ -86,7 +86,17 @@ export default function InfoPage() {
     const t0 = Date.now();
     try {
       const res = await fetch(HEALTH_URL);
-      const data = await res.json() as Record<string, unknown>;
+      // The body is not JSON while the backend is down (proxy error page); do not parse blindly.
+      const { data, text } = await readJsonSafe<Record<string, unknown>>(res);
+      if (!data) {
+        setHealth({
+          label: '/api/v1/system/health', url: HEALTH_URL, httpStatus: res.status,
+          status: isUpstreamUnavailable(res) ? 'restarting' : 'error',
+          error: text.trim().slice(0, 120) || res.statusText,
+          responseMs: Date.now() - t0,
+        });
+        return;
+      }
       setHealth({ label: '/api/v1/system/health', url: HEALTH_URL, httpStatus: res.status, responseMs: Date.now() - t0, ...data } as HealthResult);
     } catch (err) {
       setHealth({ label: '/api/v1/system/health', url: HEALTH_URL, httpStatus: 0, status: 'error', error: (err as Error).message, responseMs: Date.now() - t0 });
@@ -102,8 +112,13 @@ export default function InfoPage() {
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/system`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) throw new Error((await res.json() as { error?: string }).error ?? res.statusText);
-      setSysInfo(await res.json() as SystemInfo);
+      const { data, text } = await readJsonSafe<SystemInfo & { error?: string }>(res);
+      if (!res.ok) {
+        if (isUpstreamUnavailable(res)) throw new Error('Backend unavailable (restarting)');
+        throw new Error(data?.error ?? (text.trim().slice(0, 120) || res.statusText));
+      }
+      if (!data) throw new Error('Unexpected non-JSON response from the backend');
+      setSysInfo(data);
     } catch (err) {
       setSysError((err as Error).message);
     } finally {
@@ -146,20 +161,29 @@ export default function InfoPage() {
 
     if (target === 'backend') {
       setRestartStatus({ ok: false, msg: 'Backend restarting - reconnecting...' });
+      let attempts = 0;
       pollRef.current = setInterval(async () => {
+        attempts += 1;
         try {
           const res = await fetch(`${API_BASE_URL}/api/v1/admin/system`, {
             headers: { Authorization: `Bearer ${getAdminToken() ?? ''}` },
           });
-          // Any HTTP response (200 or 401) means the server is back up
-          if (res.status > 0) {
+          // An app-level response (200 or 401) means the server is back. A 502/503/504 comes from
+          // the proxy while no pod is reachable, so it must NOT be read as "back online".
+          if (isUpstreamUnavailable(res)) throw new Error('upstream down');
+          clearInterval(pollRef.current!);
+          setRestarting(null);
+          setRestartStatus({ ok: true, msg: 'Backend is back online' });
+          fetchSysInfo();
+          setTimeout(() => setRestartStatus(null), 4000);
+        } catch {
+          // Still restarting. Give up after ~60s instead of polling forever.
+          if (attempts >= 30) {
             clearInterval(pollRef.current!);
             setRestarting(null);
-            setRestartStatus({ ok: true, msg: 'Backend is back online' });
-            fetchSysInfo();
-            setTimeout(() => setRestartStatus(null), 4000);
+            setRestartStatus({ ok: false, msg: 'Backend did not come back after 60s - check the pod logs' });
           }
-        } catch { /* still restarting */ }
+        }
       }, 2000);
     }
 

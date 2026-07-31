@@ -261,7 +261,7 @@ const QA_DATA: QAItem[] = [
     answer: (
       <div>
         <P>The expiry date is different from the token. Under PCI DSS v4.0, the expiration date is classified as <Em>Cardholder Data (CHD)</Em> when stored in conjunction with a PAN. In this system it is stored alongside <Code>paymentCardReference</Code> (the token), <Code>paymentCardBin</Code> and <Code>paymentCardLast4</Code>. The masked PAN is no longer a persisted field: it is derived on the fly from BIN + last4 + network. The expiry date co-located with card account data is a conservative but correct classification, and the cost of protecting it with QE:none is negligible.</P>
-        <P>QE:none also serves an illustrative purpose: it shows the &ldquo;non-searchable sensitive field&rdquo; pattern; data is encrypted but not queryable, visible only after decryption with the correct DEK. This is the same pattern used for <Code>residentialAddressFull</Code> and <Code>governmentIdentificationReference</Code> in the escalation workflow.</P>
+        <P>QE:none also serves an illustrative purpose: it shows the &ldquo;non-searchable sensitive field&rdquo; pattern; data is encrypted but not queryable, visible only after decryption with the correct DEK. This is the same pattern used for <Code>customerAgreementResidentialAddress</Code> and <Code>customerAgreementRiskNotes</Code> in the escalation workflow.</P>
       </div>
     ),
     tags: ['expiration date', 'QE:none', 'CHD', 'DEK', 'non-searchable'],

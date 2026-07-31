@@ -323,7 +323,9 @@ export interface ExternalProviderArrangement {
 
 // ── Business Context Correlation (ADR-025) ────────────────────────────────────
 
-export type BusinessEntityType = 'transaction' | 'p2p_transfer' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account' | 'payment_request';
+// v32: 'beneficiary' added for SD-54 CounterpartyArrangement, so a per-record beneficiary
+// disclosure can be attributed to its own control record (PCI DSS Req 10.2.2 names the affected data).
+export type BusinessEntityType = 'transaction' | 'p2p_transfer' | 'fraud_case' | 'customer' | 'merchant' | 'payment_link' | 'card' | 'execution' | 'account' | 'payment_request' | 'beneficiary';
 
 export type BusinessProcessType =
   | 'payment_processing'

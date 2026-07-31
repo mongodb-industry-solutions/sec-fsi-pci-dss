@@ -5,8 +5,9 @@
  * validates the request against the backend, and renders the consent form.
  */
 import { headers } from 'next/headers';
-import OAuthConsentForm, { MerchantAvatar } from './OAuthConsentForm';
+import OAuthConsentForm, { MerchantAvatar, DebugModeToggle } from './OAuthConsentForm';
 import { BRAND } from '../../../config/brand';
+import { DebugModeProvider } from '../../../lib/debugMode';
 
 interface AuthorizePageProps {
   // Next.js 15+/16: searchParams is a Promise and must be awaited.
@@ -115,12 +116,18 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
   const autoLogin = oidcAutoAllowed && autoLoginRequested && Boolean(prefillEmail && prefillPassword);
 
   return (
+    <DebugModeProvider>
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
       <div className="max-w-md w-full">
         {/* Header */}
         <div className="text-center mb-8">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/app-logo.png" alt={BRAND.full} className="h-14 w-auto mx-auto mb-3" />
+          <div className="relative mb-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/app-logo.png" alt={BRAND.full} className="h-14 w-auto mx-auto" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <DebugModeToggle hintDisabled={Boolean(prefillEmail && prefillPassword)} />
+            </div>
+          </div>
           <p className="text-sm text-gray-500 mt-1">Payments made effortless and secure</p>
         </div>
 
@@ -157,5 +164,6 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         </p>
       </div>
     </div>
+    </DebugModeProvider>
   );
 }

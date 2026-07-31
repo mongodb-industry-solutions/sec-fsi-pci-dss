@@ -9,9 +9,13 @@ import Link from 'next/link';
 import { UserCheck, Save, RefreshCw, History, ShieldCheck, Lock, Pencil, X, IdCard, Mail, FileText } from 'lucide-react';
 import { SectionHeader } from '../../../../../../components/SectionHeader';
 import { Breadcrumb } from '../../../../../../components/Breadcrumb';
+import { LoadingIndicator } from '../../../../../../components/LoadingIndicator';
 import { Tooltip } from '../../../../../../components/Tooltip';
 import { EncryptionBadge } from '../../../../../../components/EncryptionBadge';
 import { SensitiveReveal } from '../../../../../../components/SensitiveReveal';
+import { IdentityDocumentBlock } from '../../../../../../components/record/IdentityDocumentBlock';
+import { RecordField } from '../../../../../../components/record/RecordField';
+import { humanize, fmtAddress } from '../../../../../../components/record/format';
 import { api } from '../../../../../../lib/api';
 import { getToken } from '../../../../../../lib/auth';
 import { useNotify } from '../../../../../../components/ui/ConfirmProvider';
@@ -23,34 +27,7 @@ function Badge({ label, tone }: { label: string; tone: 'green' | 'amber' | 'red'
   return <span className={`text-[11px] px-1.5 py-0.5 rounded border ${cls}`}>{label}</span>;
 }
 
-// A profile field row: label + info tooltip (what the field means, incl. its encryption tier) + value.
-// No inline encryption badge — the tier is explained in the tooltip to keep the card uncluttered.
-function ProfileRow({ label, value, info }: { label: string; value: string; info?: string }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <span className="flex items-center gap-1.5 text-gray-500 shrink-0">{label}{info && <Tooltip text={info} />}</span>
-      <span className="text-gray-800 text-right truncate">{value || <span className="text-gray-400">n/a</span>}</span>
-    </div>
-  );
-}
 
-// Humanize an enum/snake_case value for display, e.g. 'personal_banking' → 'Personal Banking',
-// 'service_account' → 'Service Account', 'sme' → 'SME'. Known short acronyms stay upper-case.
-const ACRONYMS = new Set(['sme', 'id', 'vat', 'ssn', 'kyc', 'kyb', 'ubo', 'pep', 'usd', 'eur', 'gbp', 'us', 'uk', 'eu']);
-function humanize(v: unknown): string {
-  const s = v == null ? '' : String(v).trim();
-  if (!s) return '';
-  return s.split(/[_\-\s]+/).filter(Boolean)
-    .map((w) => (ACRONYMS.has(w.toLowerCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
-    .join(' ');
-}
-
-function fmtAddress(a: unknown): string {
-  if (!a || typeof a !== 'object') return '';
-  const o = a as Record<string, unknown>;
-  return [o.streetAddress ?? o.line1, o.line2, o.city, o.postalCode, o.countryCode]
-    .map((v) => (v == null ? '' : String(v))).filter(Boolean).join(', ');
-}
 
 export default function KycDetailPage() {
   const params = useParams();
@@ -66,7 +43,9 @@ export default function KycDetailPage() {
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState<{ customerAgreementOccupation?: string; customerAgreementSourceOfFunds?: string; customerAgreementPurposeOfRelationship?: string }>({});
 
+  const [loading, setLoading] = useState(true);
   const load = useCallback(async (t: string) => {
+    setLoading(true);
     try {
       const d = await api.customer.kycDetail(partyRef, t) as Record<string, unknown>;
       setRec(d);
@@ -74,6 +53,7 @@ export default function KycDetailPage() {
       const tl = await api.customer.kycProcess(partyRef, t) as { results?: Record<string, unknown>[] };
       setTimeline(tl.results ?? []);
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not load KYC detail', 'error'); }
+    finally { setLoading(false); }
   }, [partyRef, notify]);
 
   useEffect(() => { const t = getToken() ?? ''; setToken(t); if (t) void load(t); }, [load]);
@@ -102,6 +82,25 @@ export default function KycDetailPage() {
     return revealCache.current;
   }, [partyRef, token]);
 
+  const crumbs = [
+    { label: 'Home', href: '/system' },
+    { label: 'Modules', href: '/system/admin/modules' },
+    { label: 'KYC', href: '/system/admin/modules/kyc' },
+  ];
+  if (loading || !rec) {
+    return (
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+        <Breadcrumb items={[...crumbs, { label: 'Loading…' }]} />
+        {loading
+          ? <LoadingIndicator label="Loading KYC record…" />
+          : <div className="bg-white rounded-xl border border-gray-200 p-6 text-sm text-gray-600">
+              This KYC record could not be loaded. It may not exist, or your role may not reach it.
+              <Link href="/system/admin/modules/kyc" className="ml-1 text-[#016BF8] hover:underline">Back to KYC administration</Link>
+            </div>}
+      </div>
+    );
+  }
+
   const r = rec ?? {};
   const kyc = (r.kycCheck ?? r.customerAgreementKycCheck ?? {}) as Record<string, unknown>;
   const status = String(kyc.customerAgreementKycCheckStatus ?? r.customerAgreementKycCheckStatus ?? 'n/a');
@@ -125,36 +124,26 @@ export default function KycDetailPage() {
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><UserCheck size={15} /> Personal details
             <Tooltip text="SD-13 Party demographics. QE-searchable fields are encrypted at rest in Atlas (Queryable Encryption) and decrypted in-process for a role with need-to-know." /></h3>
           <dl className="text-sm">
-            <ProfileRow label="Full name" value={String(r.customerName ?? '')} info="Legal name of the party (SD-13). Encrypted at rest with QE substring search so it can be found without decrypting server-side." />
-            <ProfileRow label="Date of birth" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} info="Party date of birth (SD-13). Encrypted at rest with QE range so it is searchable by range without exposing the value." />
-            <ProfileRow label="Sex" value={humanize(r.partySex)} info="Party sex (SD-13). QE:equality encrypted at rest." />
-            <ProfileRow label="Nationality" value={humanize(r.partyNationality)} info="Declared nationality. QE:equality encrypted (searchable by exact match)." />
-            <ProfileRow label="Place of birth" value={humanize(r.partyPlaceOfBirth)} info="Declared place of birth. QE:equality encrypted at rest." />
+            <RecordField label="Full name" value={String(r.customerName ?? '')} info="Legal name of the party (SD-13). Encrypted at rest with QE substring search so it can be found without decrypting server-side." />
+            <RecordField label="Date of birth" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} info="Party date of birth (SD-13). Encrypted at rest with QE range so it is searchable by range without exposing the value." />
+            <RecordField label="Sex" value={humanize(r.partySex)} info="Party sex (SD-13). QE:equality encrypted at rest." />
+            <RecordField label="Nationality" value={humanize(r.partyNationality)} info="Declared nationality. QE:equality encrypted (searchable by exact match)." />
+            <RecordField label="Place of birth" value={humanize(r.partyPlaceOfBirth)} info="Declared place of birth. QE:equality encrypted at rest." />
           </dl>
         </div>
 
-        {/* Identity document (SD-53) — one of the fundamental KYC data points, broken down per leaf.
-            Placed next to Personal details: both have 5 rows, so they balance side by side. */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><IdCard size={15} /> Identity document
-            <Tooltip text="The government-issued identity document verified at KYC (SD-53). Each leaf is QE-encrypted at rest: number by suffix search, type / issuing country by equality, expiry by range. The tax ID is a separate QE:prefix field." /></h3>
-          <dl className="text-sm">
-            <ProfileRow label="Document type" value={humanize(govId.type)} info="Kind of identity document (passport, national ID, driver licence …). QE:equality encrypted at rest." />
-            <ProfileRow label="Document number" value={String(govId.number ?? '')} info="Identity document number. QE:suffix encrypted (suffix-searchable while encrypted at rest)." />
-            <ProfileRow label="Issuing country" value={humanize(govId.issuingCountry)} info="Country that issued the document (ISO). QE:equality encrypted at rest." />
-            <ProfileRow label="Expiry date" value={govId.expiryDate ? String(govId.expiryDate).slice(0, 10) : ''} info="Document expiry date. QE:range encrypted (searchable by range, e.g. expiring soon), value not exposed." />
-            <ProfileRow label="Tax ID" value={String(r.customerAgreementTaxIDNumber ?? '')} info="Taxpayer identification number. QE:prefix encrypted (prefix-searchable while encrypted at rest)." />
-          </dl>
-        </div>
+        {/* Identity document (SD-53): rendered by the shared block (v32 B4), so this page and every
+            other customer surface show the same fields from the same source of truth. */}
+        <IdentityDocumentBlock governmentId={govId} taxIdNumber={r.customerAgreementTaxIDNumber} />
 
         {/* Contact & preferences (SD-13) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><Mail size={15} /> Contact &amp; preferences
             <Tooltip text="How the customer is reached (SD-13). Email and phone are QE:equality (encrypted at rest, exact-match searchable), decrypted for the KYC admin's need-to-know. Residential/postal address is under Protected details (audited reveal)." /></h3>
           <dl className="text-sm">
-            <ProfileRow label="Email" value={String(r.customerEmailAddress ?? '')} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-            <ProfileRow label="Phone" value={String(r.customerMobilePhoneNumber ?? '')} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-            <ProfileRow label="Preferred language" value={humanize(r.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
+            <RecordField label="Email" value={String(r.customerEmailAddress ?? '')} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
+            <RecordField label="Phone" value={String(r.customerMobilePhoneNumber ?? '')} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
+            <RecordField label="Preferred language" value={humanize(r.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
           </dl>
         </div>
 
@@ -163,11 +152,11 @@ export default function KycDetailPage() {
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><FileText size={15} /> Customer agreement
             <Tooltip text="SD-53 customer-agreement classification & lifecycle: party type, commercial segment, declared occupation, lifecycle status, enrolment date and the internal agreement reference." /></h3>
           <dl className="text-sm">
-            <ProfileRow label="Party type" value={humanize(r.partyType)} info="Classification of the party: customer, employee or service account. Not PII; stored in plaintext." />
-            <ProfileRow label="Segment" value={humanize(r.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
-            <ProfileRow label="Occupation" value={humanize(r.customerAgreementOccupation)} info="Declared occupation (KYC/AML risk signal). QE:equality encrypted at rest." />
-            <ProfileRow label="Agreement status" value={humanize(r.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status (initiated / active / suspended / closed …). Plaintext." />
-            <ProfileRow label="Enrolled" value={r.customerAgreementEnrollmentDate ? String(r.customerAgreementEnrollmentDate).slice(0, 10) : ''} info="Date the customer agreement was enrolled. Plaintext business metadata." />
+            <RecordField label="Party type" value={humanize(r.partyType)} info="Classification of the party: customer, employee or service account. Not PII; stored in plaintext." />
+            <RecordField label="Segment" value={humanize(r.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
+            <RecordField label="Occupation" value={humanize(r.customerAgreementOccupation)} info="Declared occupation (KYC/AML risk signal). QE:equality encrypted at rest." />
+            <RecordField label="Agreement status" value={humanize(r.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status (initiated / active / suspended / closed …). Plaintext." />
+            <RecordField label="Enrolled" value={r.customerAgreementEnrollmentDate ? String(r.customerAgreementEnrollmentDate).slice(0, 10) : ''} info="Date the customer agreement was enrolled. Plaintext business metadata." />
             <div className="flex items-center justify-between gap-3 py-2.5">
               <span className="flex items-center gap-1.5 text-gray-500 shrink-0">Agreement reference<Tooltip text="Internal reference for the customer agreement (SD-53), used for lookups. QE:equality encrypted at rest." /></span>
               <span className="text-gray-800 text-right font-mono text-xs break-all">{String(r.customerAgreementReference ?? partyRef)}</span>
@@ -213,7 +202,7 @@ export default function KycDetailPage() {
         {sensitiveMasked && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <Lock size={13} className="mt-0.5 shrink-0" />
-            <span>Source of funds, purpose, government ID and address are QE:none (L2-only) and are <strong>masked</strong> for your access tier. They appear blank because they require an escalation token (viewSensitive), not because they are empty. Occupation is shown (QE:equality).{editing && <> Editing a masked field will overwrite it.</>}</span>
+            <span>Source of funds, purpose, risk notes and address are QE:none (L2-only) and are <strong>masked</strong> for your access tier. They appear blank because they require an escalation token (viewSensitive), not because they are empty. The identity document (number QE:suffix, type and country QE:equality, expiry QE:range), tax ID (QE:prefix) and occupation (QE:equality) are lookup tier and ARE shown.{editing && <> Editing a masked field will overwrite it.</>}</span>
           </div>
         )}
 

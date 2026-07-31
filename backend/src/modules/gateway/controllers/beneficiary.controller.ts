@@ -10,9 +10,11 @@
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
-import { requirePermission } from '../../../vendors/middleware/acl';
+import { requirePermission, can } from '../../../vendors/middleware/acl';
 import { dualPermission, resolveOwner } from '../../../vendors/middleware/dualAuth';
 import {
+  PredicateRequiredError,
+  getBeneficiaryAggregates,
   listAllBeneficiaries,
   listBeneficiaries,
   getOneBeneficiary,
@@ -22,7 +24,7 @@ import {
 } from '../../identity/services/counterpartyArrangement.service';
 import { executeP2PTransfer } from '../services/p2pTransfer.service';
 import { getDefaultPayoutAccount, listPayoutAccounts } from '../services/payoutAccount.service';
-import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
+import { emitProcessEvent, emitComplianceEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
 import type { CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
 import type { Db } from 'mongodb';
 
@@ -60,7 +62,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
   // OAuth: owner from token.sub, display-safe projection. Scope read:beneficiaries.
   const listHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const { ownerRef } = request.params as { ownerRef?: string };
-    const q = request.query as { ownerRef?: string; q?: string; status?: 'active' | 'removed'; page?: number; limit?: number };
+    const q = request.query as { ownerRef?: string; q?: string; caseRef?: string; status?: 'active' | 'removed'; page?: number; limit?: number };
 
     if (request.merchantContext) {
       const owner = await resolveOwner(request, reply, ownerRef);
@@ -70,33 +72,83 @@ export async function beneficiaryController(fastify: FastifyInstance) {
       return reply.send({ results: results.map(safeBeneficiary), total, page: q.page ?? 1, limit: q.limit ?? 20 });
     }
 
-    // Session channel: preserve existing staff/customer behavior.
+    // Session channel.
     const user = getUser(request);
-    if (ownerRef !== undefined) {
-      if (user?.role === 'customer' && user.partyRef !== ownerRef) {
+    const isCustomer = user?.role === 'customer';
+
+    // Own scope: forced to the caller's own party reference, whatever the request asked for.
+    if (isCustomer) {
+      if (ownerRef !== undefined && user?.partyRef !== ownerRef) {
         return reply.status(403).send({ error: 'Access denied.' });
       }
-      const { results, total } = await listAllBeneficiaries(fastify.db, { ownerRef, page: q.page, limit: q.limit });
-      return reply.send({ results, total, page: q.page ?? 1, limit: q.limit ?? 20 });
+      const { results, total } = await listAllBeneficiaries(fastify.db, {
+        ownerRef: user?.partyRef, status: q.status, page: q.page, limit: q.limit, skipPredicateCheck: true,
+      });
+      // The display-safe projection applies to every channel.
+      return reply.send({ results: results.map(safeBeneficiary), total, page: q.page ?? 1, limit: q.limit ?? 20 });
     }
-    // Customer scope: ignore any ownerRef in query, force to own partyRef.
-    const effectiveOwner = user?.role === 'customer' ? user.partyRef : q.ownerRef;
-    const { results, total } = await listAllBeneficiaries(fastify.db, {
-      ownerRef: effectiveOwner, q: q.q, status: q.status, page: q.page, limit: q.limit,
-    });
-    return reply.send({ results, total, page: q.page ?? 1, limit: q.limit ?? 20 });
+
+    // beneficiaries:view is drill-down for a known owner; a cross-party read needs
+    // beneficiaries:investigate. ADR-048.
+    const effectiveOwner = ownerRef ?? q.ownerRef;
+    if (!effectiveOwner) {
+      const maySearch = await can(fastify.db, user?.role, 'beneficiaries', 'investigate');
+      if (!maySearch) {
+        return reply.status(403).send({
+          error: 'Cross-party beneficiary search requires the investigate capability; provide an owner party reference instead.',
+          code: 'ACL_DENIED', resource: 'beneficiaries', action: 'investigate', role: user?.role ?? null,
+        });
+      }
+    }
+
+    try {
+      const { results, total } = await listAllBeneficiaries(fastify.db, {
+        ...(effectiveOwner ? { ownerRef: effectiveOwner } : {}),
+        ...(q.q ? { q: q.q } : {}),
+        ...(q.caseRef ? { caseRef: q.caseRef } : {}),
+        status: q.status, page: q.page, limit: q.limit,
+      });
+      // One compliance event per record surfaced (PCI DSS Req 10.2.2).
+      for (const b of results) {
+        emitComplianceEvent(fastify.db, {
+          entityType: 'beneficiary', entityId: b.counterpartyArrangementReference,
+          processType: 'payment_processing', processAction: 'beneficiary.record.disclosed',
+          processOutcome: 'approved',
+          performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+          eventSummary: {
+            channel: 'staff_search',
+            ownerPartyReference: b.ownerPartyReference,
+            predicate: effectiveOwner ? 'ownerRef' : q.caseRef ? 'caseRef' : 'q',
+          },
+          bianServiceDomain: 'SD-54 Counterparty Administration',
+          bianControlRecordType: 'CounterpartyArrangement',
+        });
+      }
+      return reply.send({ results: results.map(safeBeneficiary), total, page: q.page ?? 1, limit: q.limit ?? 20 });
+    } catch (err) {
+      if (err instanceof PredicateRequiredError) {
+        return reply.status(400).send({ error: err.message, code: 'PREDICATE_REQUIRED' });
+      }
+      throw err;
+    }
   };
 
   const listSchema = (withOwner: boolean) => ({
     tags: ['beneficiaries'],
-    summary: "List beneficiary arrangements (SD-54, session RBAC or OAuth read:beneficiaries)",
+    summary: 'Search beneficiary arrangements (SD-54, session RBAC or OAuth read:beneficiaries)',
+    description: 'v32 (ADR-048): a search surface, not an enumeration surface. A discriminating predicate is '
+      + 'required (`ownerRef`, `caseRef`, or `q` of at least 3 characters) and a cross-party read additionally '
+      + 'requires `beneficiaries:investigate`. Responses use the display-safe projection on every channel: the '
+      + 'counterparty party reference and the raw lookup value are never returned. One compliance event is '
+      + 'emitted per record disclosed (PCI DSS Req 10.2.2).',
     security: [{ bearerAuth: [] }],
     ...(withOwner ? { params: { type: 'object', required: ['ownerRef'], properties: { ownerRef: { type: 'string' } } } } : {}),
     querystring: {
       type: 'object',
       properties: {
-        ownerRef: { type: 'string' },
-        q: { type: 'string' },
+        ownerRef: { type: 'string', description: 'Owner party reference. Required for a drill-down read (beneficiaries:view).' },
+        q: { type: 'string', description: 'Search term, minimum 3 characters. Cross-party search requires beneficiaries:investigate.' },
+        caseRef: { type: 'string', description: 'Investigation case reference, an alternative discriminating predicate.' },
         status: { type: 'string', enum: ['active', 'removed'] },
         page: { type: 'number', default: 1 },
         limit: { type: 'number', default: 20, maximum: 100 },
@@ -109,6 +161,27 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     preHandler: dualPermission({ resource: 'beneficiaries', action: 'view', scope: 'read:beneficiaries' }),
     schema: listSchema(false),
   }, listHandler);
+
+  // GET /api/v1/beneficiaries/aggregates — counts and distributions, no identifiers. ADR-048.
+  fastify.get('/aggregates', {
+    preHandler: requirePermission('beneficiaries', 'view'),
+    schema: {
+      tags: ['beneficiaries'],
+      summary: 'Beneficiary aggregate metrics, no identifiers (SD-54, v32)',
+      description: 'Totals and distributions only. Emits no disclosure event because no record is disclosed.',
+      security: [{ bearerAuth: [] }],
+      response: {
+        200: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            byStatus: { type: 'object', additionalProperties: true },
+            byLookupType: { type: 'object', additionalProperties: true },
+          },
+        },
+      },
+    },
+  }, async (_request, reply) => reply.send(await getBeneficiaryAggregates(fastify.db)));
 
   // GET /api/v1/beneficiaries/by-ref/:beneficiaryRef — staff single-record lookup (must precede /:ownerRef).
   fastify.get('/by-ref/:beneficiaryRef', {

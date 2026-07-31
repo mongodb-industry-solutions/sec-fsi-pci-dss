@@ -153,7 +153,14 @@ async function _runCommand(commandId: string) {
         _pushLog({ type: type as LogEntry['type'], text });
       },
       (s) => _update({ summary: s }),
+      // 60s of silence means the stream was dropped (the server heartbeats every 15s).
+      60_000,
     );
+    // A stream that ends without a `done` frame was cut mid-run; do not leave it as "running".
+    if (_state.commandStatus === null) {
+      _pushLog({ type: 'error', text: 'Stream ended before the command reported an exit code. Check the Logs panel for the final result.' });
+      _update({ commandStatus: 'failure' });
+    }
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === 'AbortError') {
       _pushLog({ type: 'error', text: 'Stopped by user' });

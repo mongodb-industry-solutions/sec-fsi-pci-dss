@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { BookOpen, Code2 } from 'lucide-react';
+import { BookOpen, Code2, Users } from 'lucide-react';
 import { BACKEND_PUBLIC_URL } from '../lib/constants';
 import { BRAND } from '../config/brand';
 
@@ -67,6 +67,14 @@ export default function LandingPage() {
           >
             <Code2 size={15} /> API Reference
           </a>
+
+          <Link
+            href="/about"
+            className="md:col-span-2 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-[#00ED64]/30 bg-[#00ED64]/5 hover:border-[#00ED64]/60 hover:bg-[#00ED64]/10 text-gray-300 hover:text-white text-sm font-medium transition-all text-center"
+          >
+            <Users size={15} className="shrink-0 text-[#00ED64]" />
+            <span>Take the Next Step: Connect with Our Sector Experts</span>
+          </Link>
         </div>
 
         <p className="mt-3 text-gray-600 text-xs">

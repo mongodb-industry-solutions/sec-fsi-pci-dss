@@ -40,22 +40,65 @@ export function stripAnsi(text: string): string {
   return text.replace(ANSI_RE, '');
 }
 
+/**
+ * Parse a response body as JSON without throwing on non-JSON payloads. While the backend
+ * is restarting, the ingress/proxy answers with plain text ("no healthy upstream", HTML
+ * error pages), which would otherwise surface as "Unexpected token 'o' ... is not valid JSON".
+ * Returns the parsed object, or null plus the raw text when it is not JSON.
+ */
+export async function readJsonSafe<T>(res: Response): Promise<{ data: T | null; text: string }> {
+  const text = await res.text().catch(() => '');
+  if (!text) return { data: null, text: '' };
+  try {
+    return { data: JSON.parse(text) as T, text };
+  } catch {
+    return { data: null, text };
+  }
+}
+
+/** True while a proxy/ingress reports no reachable backend (pod restarting, not an app error). */
+export function isUpstreamUnavailable(res: Response): boolean {
+  return res.status === 502 || res.status === 503 || res.status === 504;
+}
+
 export function getAdminToken(): string | null {
   if (typeof window === 'undefined') return null;
   return sessionStorage.getItem(ADMIN_TOKEN_KEY);
 }
 
+/**
+ * Reads an SSE stream. `idleTimeoutMs` guards against a proxy that keeps the connection open but
+ * stops forwarding bytes: without it a dropped stream leaves the caller awaiting read() forever
+ * (the admin panel would spin with no way to finish). The server sends `: ping` comment frames
+ * every 15s, so any silence longer than the timeout means the stream is really gone.
+ */
 export async function readSSE(
   res: Response,
   onEntry: (type: string, text: string) => void,
   onSummary?: (summary: TestSummary) => void,
+  idleTimeoutMs = 0,
 ): Promise<void> {
   if (!res.body) return;
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  const STALLED = Symbol('stalled');
   let buf = '';
   while (true) {
-    const { done, value } = await reader.read();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const next = idleTimeoutMs > 0
+      ? await Promise.race([
+          reader.read(),
+          new Promise<typeof STALLED>((r) => { timer = setTimeout(() => r(STALLED), idleTimeoutMs); }),
+        ])
+      : await reader.read();
+    if (timer) clearTimeout(timer);
+    if (next === STALLED) {
+      await reader.cancel().catch(() => { /* already gone */ });
+      throw new Error(
+        `Stream stalled: no output for ${Math.round(idleTimeoutMs / 1000)}s. The command may still be running on the server, check the Logs panel.`,
+      );
+    }
+    const { done, value } = next;
     if (done) break;
     buf += decoder.decode(value, { stream: true });
     const parts = buf.split('\n\n');

@@ -10,8 +10,10 @@ import { CaseQuestionsPanel } from '../../../../components/CaseQuestionsPanel';
 import { useCaseStream } from '../../../../lib/useCaseStream';
 import { SEVERITY_COLORS, STATUS_COLORS, ROLE_LABELS, formatRiskIndicator } from '../../../../lib/constants';
 import { useDebugMode } from '../../../../lib/debugMode';
+import { SensitiveReveal } from '../../../../components/SensitiveReveal';
+import { humanize, fmtAddress } from '../../../../components/record/format';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
-import { storeEscalationToken } from '../../../../lib/escalation';
+import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight, RotateCcw } from 'lucide-react';
 import { useConfirm } from '../../../../components/ui/ConfirmProvider';
 
@@ -80,7 +82,6 @@ export default function DemoCaseDetailPage() {
   // Action state
   const [actionBusy, setActionBusy] = useState(false);
   const [actionMsg, setActionMsg] = useState<string | null>(null);
-  const [escalationToken, setEscalationToken] = useState<string | null>(null);
   const [liveSignal, setLiveSignal] = useState(0);
 
   // ADR-031: live updates via SSE — when the customer answers a question, refresh the case + panel.
@@ -137,16 +138,9 @@ export default function DemoCaseDetailPage() {
     load();
   }, [caseId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-resume escalation: an L2 who has already accepted this case re-derives a fresh
-  // stateless token on load (idempotent on the backend; no audit-trail noise), so sensitive
-  // fields stay accessible across reloads and into linked entity pages without re-clicking.
-  useEffect(() => {
-    if (role !== 'level2_investigator' || !fraudCase || !token || escalationToken) return;
-    if (fraudCase.caseStatus !== 'escalated' || !fraudCase.escalationAcceptedAt) return;
-    api.fraud.escalateApprove(caseId, {}, token)
-      .then((res) => { setEscalationToken(res.escalationToken); storeEscalationToken(caseId, res.escalationToken); })
-      .catch(() => {});
-  }, [role, fraudCase, token, escalationToken, caseId]);
+  // Sensitive access for this case: reused from this tab, or re-derived when an accepted
+  // escalation exists. `fraudCase` is already loaded here, so the hook does not refetch it.
+  const { escalationToken, adopt: adoptEscalation } = useCaseEscalation({ caseId, role, token, fraudCase });
 
   // Load the aggregated enrichment read-model. Re-runs when the escalation token changes so
   // sensitive KYC unlocks in place. HRP is derived from the real account reference here (no
@@ -243,8 +237,7 @@ export default function DemoCaseDetailPage() {
     setActionMsg(null);
     try {
       const res = await api.fraud.escalateApprove(caseId, {}, token);
-      setEscalationToken(res.escalationToken);
-      storeEscalationToken(caseId, res.escalationToken); // persist so it survives reload/navigation
+      adoptEscalation(caseId, res.escalationToken); // persist so it survives reload/navigation
       await reload(token);
       setActionMsg('Escalation approved. Sensitive fields are now accessible.');
     } catch (err) {
@@ -510,24 +503,49 @@ export default function DemoCaseDetailPage() {
                 {enrichment.kyc.contactRestricted && (
                   <p className="mt-2 text-xs text-gray-400 italic">Contact PII (email, phone) is restricted at L1 (need-to-know); available to L2 and auditor.</p>
                 )}
+                {/* v32 B4/C1: the identity document is LOOKUP tier (searchable), so it is shown
+                    directly; the QE:none values are masked for every role and revealed one at a
+                    time through the shared affordance, instead of being printed in the clear as
+                    soon as escalation was accepted (ADR-052). */}
+                {(() => {
+                  const gid = (enrichment.kyc as { customerAgreementGovernmentID?: { number?: unknown; type?: unknown } }).customerAgreementGovernmentID;
+                  return gid?.number ? (
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <span className="text-gray-500">Gov ID ({humanize(gid.type)}):</span>
+                      <span className="font-mono text-xs">{String(gid.number)}</span>
+                    </div>
+                  ) : null;
+                })()}
                 {enrichment.kyc.sensitive ? (
-                  <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
+                  <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3 divide-y divide-purple-100 text-sm">
                     {(() => {
-                      const s = enrichment.kyc.sensitive as { customerAgreementResidentialAddress?: { streetAddress?: string; city?: string; postalCode?: string; countryCode?: string }; governmentIdentificationReference?: string; customerAgreementRiskNotes?: string };
-                      const addr = s.customerAgreementResidentialAddress;
+                      const s = enrichment.kyc.sensitive as { customerAgreementResidentialAddress?: Record<string, unknown>; customerAgreementRiskNotes?: string };
                       return (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                          {addr && (<><span className="text-gray-500">Address:</span><span className="font-mono text-xs break-all">{[addr.streetAddress, addr.city, addr.postalCode, addr.countryCode].filter(Boolean).join(', ')}</span></>)}
-                          {s.governmentIdentificationReference && (<><span className="text-gray-500">Gov ID:</span><span className="font-mono text-xs">{s.governmentIdentificationReference}</span></>)}
-                          {s.customerAgreementRiskNotes && (<><span className="text-gray-500">Risk notes:</span><span className="text-xs">{s.customerAgreementRiskNotes}</span></>)}
-                        </div>
+                        <>
+                          {s.customerAgreementResidentialAddress ? (
+                            <SensitiveReveal
+                              label="Address"
+                              masked="•••• (masked)"
+                              info="Residential address (SD-53). QE:none: encrypted at rest and not searchable."
+                              fetchValue={async () => fmtAddress(s.customerAgreementResidentialAddress) || 'n/a'}
+                            />
+                          ) : null}
+                          {s.customerAgreementRiskNotes ? (
+                            <SensitiveReveal
+                              label="Risk notes"
+                              masked="•••• (masked)"
+                              info="Internal analyst risk notes. QE:none: encrypted at rest, never exposed to L1."
+                              fetchValue={async () => String(s.customerAgreementRiskNotes ?? 'n/a')}
+                            />
+                          ) : null}
+                        </>
                       );
                     })()}
                   </div>
                 ) : (
-                  <p className="mt-3 text-xs text-gray-400 italic">Sensitive PII (address, government ID, risk notes) requires {isAuditor ? 'auditor access' : 'L2 escalation acceptance'}.</p>
+                  <p className="mt-3 text-xs text-gray-400 italic">Sensitive PII (address, risk notes) requires {isAuditor ? 'auditor access' : 'L2 escalation acceptance'}.</p>
                 )}
-                {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-53 · QE:equality (email/phone) · QE:none (address, gov ID, risk notes)</p>}
+                {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-53 · QE:equality (email/phone) · QE:suffix (gov ID number) · QE:none (address, risk notes)</p>}
               </div>
             )}
           </div>

@@ -16,6 +16,7 @@ import { DEMO_PASSWORD, ROLE_LABELS } from '../../lib/constants';
 import demoRoster from '../../config/demoRoster.json';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
+import { useDebugHint } from '../../lib/debugHint';
 import { UserMenu } from '../../components/UserMenu';
 import { NotificationBell } from '../../components/NotificationBell';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
@@ -122,6 +123,8 @@ const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: str
 
 function LoginForm({ onLogin }: { onLogin: () => void }) {
   const { debugMode, toggleDebug } = useDebugMode();
+  const { pulsing, dismissHint } = useDebugHint();
+  const showPulse = pulsing && !debugMode;
   const [users, setUsers]       = useState<AuthUser[]>([]);
   const [domains, setDomains]   = useState<AuthDomain[]>([]);
   const [selectedDomain, setSelectedDomain] = useState('local');
@@ -180,11 +183,19 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
         <div className="relative text-center mb-6">
-          <button type="button" onClick={toggleDebug}
-            title={debugMode ? 'Debug mode on - click to disable' : 'Enable debug mode'}
-            className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
-            <Bug size={14} />
-          </button>
+          <Tooltip text={debugMode
+            ? 'Debug mode is on: a ready-made user is offered for each role so you can sign in with one click, and some screens show extra notes explaining what you are looking at. Click to turn it off.'
+            : 'Turn on debug mode. It offers a ready-made user for each role, so you can sign in with one click instead of typing credentials, and it adds short explanations on some screens to help you understand what each part of the system does.'}>
+            <button type="button" onClick={() => { dismissHint(); toggleDebug(); }}
+              aria-label={debugMode ? 'Disable debug mode' : 'Enable debug mode'}
+              className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${
+                debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+                : showPulse ? 'debug-hint-pulse'
+                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
+              <Bug size={14} />
+            </button>
+          </Tooltip>
+
           <div className="text-4xl mb-2"> <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-20 h-20 mx-auto" /> </div>
           <h1 className="text-2xl font-bold">{BRAND.primary} {BRAND.secondary}</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
@@ -196,7 +207,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
             <div className="flex items-center justify-between mb-1">
               <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
                 Authentication Domain
-                <Tooltip text="Select the identity provider. client_credentials domains show a login form; OIDC/SAML domains redirect to the external provider." />
+                <Tooltip text="The domain decides how you are signed in and who manages the accounts. Pick the one your account belongs to." />
               </label>
               {flowType && (
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${FLOW_TYPE_COLORS[flowType] ?? 'bg-gray-100 text-gray-600'}`}>
@@ -221,7 +232,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                 <strong>{currentDomain.displayName}</strong> uses <strong>{FLOW_TYPE_LABELS[flowType ?? ''] ?? flowType}</strong>. You will be redirected to the provider to complete login.
               </p>
               <button type="button" className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                onClick={() => setError('External SSO redirect is not active in this demo build.')}>
+                onClick={() => setError('External SSO redirect is not active in this build.')}>
                 Sign in with {currentDomain.displayName} →
               </button>
             </div>
@@ -234,7 +245,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                 <div>
                   <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
                     Select User
-                    <Tooltip text="Pre-seeded demo users for the local domain. Select one to auto-fill credentials. Passwords are bcrypt-hashed in the database, never stored in plaintext." />
+                    <Tooltip text="Ready-made accounts, one per role, so you can see the platform through different eyes. Pick one and its credentials are filled in for you." />
                   </label>
                   {users.length === 0 ? (
                     <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">Loading users…</div>
@@ -255,7 +266,12 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                 <div>
                   <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
                     Email
-                    {debugMode && <Tooltip text="Select a user above to auto-fill, or type a custom email address." />}
+                    <Tooltip text={<>
+                      Your email address is also your username: it is what identifies your account.
+                      {' '}Short on time? Turn on debug mode
+                      {' '}<Bug size={11} className="mx-0.5 inline align-[-1px] text-amber-400" />
+                      {' '}and pick a ready-made user for any role instead of typing credentials.
+                    </>} />
                   </label>
                   <input type="email" value={selectedEmail}
                     onChange={(e) => { setSelectedEmail(e.target.value); if (users.some((u) => u.email === e.target.value)) setPassword(DEMO_PASSWORD); setError(null); }}
@@ -265,7 +281,10 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
 
               {!isLocalDomain && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
+                    Email
+                    <Tooltip text="Your email address is also your username: it is what identifies your account." />
+                  </label>
                   <input type="email" value={selectedEmail} onChange={(e) => { setSelectedEmail(e.target.value); setError(null); }} placeholder="user@example.com" className="w-full border rounded-lg px-3 py-2 text-sm" required />
                 </div>
               )}
@@ -273,7 +292,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
               <div>
                 <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
                   Password
-                  <Tooltip text="Auto-filled from the demo credential store for local users. The actual password is hashed (bcrypt, 12 rounds) in MongoDB. Atlas never sees the plaintext." />
+                  <Tooltip text="Your secret key. Never share it with anyone." />
                 </label>
                 <div className="relative">
                   <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
@@ -308,9 +327,9 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
         )}
 
         <p className="mt-4 text-xs text-gray-400 text-center">
-          {isLocalDomain && debugMode ? 'Select a user to auto-fill credentials. All local demo accounts share the same demo password.'
+          {isLocalDomain && debugMode ? 'Select a user to fill in their credentials. Every preloaded account shares the same password.'
             : isLocalDomain ? 'Enter your credentials to sign in.'
-            : isCredentialFlow ? 'Enter credentials for the selected identity provider.'
+            : isCredentialFlow ? 'Enter the credentials managed by the selected domain.'
             : 'You will be redirected to complete authentication.'}
         </p>
         <div className="mt-4 text-center">

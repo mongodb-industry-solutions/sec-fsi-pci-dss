@@ -1,25 +1,20 @@
 'use client';
+import { redactForDisplay, SENSITIVE_PAYLOAD_KEYS, REDACTED_MARKER, CIPHERTEXT_MARKER } from './record/redactPayload';
 
 interface Props {
   document: Record<string, unknown>;
   collection: string;
 }
 
+// v32 C4: the ciphertext preview and the sensitive-key redaction now live in one shared module
+// (components/record/redactPayload.ts) so every raw/debug surface behaves identically.
 function formatValue(key: string, val: unknown): { display: string; isCipher: boolean } {
-  if (val !== null && typeof val === 'object') {
-    const obj = val as Record<string, unknown>;
-    // BSON Binary (ciphertext) has $binary.subType === '06'
-    if (obj['$binary'] && (obj['$binary'] as Record<string, unknown>)['subType'] === '06') {
-      const b64 = (obj['$binary'] as Record<string, unknown>)['base64'] as string;
-      const hex = Buffer.from(b64 ?? '', 'base64')
-        .subarray(0, 8)
-        .toString('hex')
-        .replace(/../g, '\\x$&');
-      return { display: `"${hex}..." 🔒 QE ciphertext`, isCipher: true };
-    }
-    return { display: JSON.stringify(val, null, 2), isCipher: false };
+  if (SENSITIVE_PAYLOAD_KEYS.has(key)) return { display: `"${REDACTED_MARKER}"`, isCipher: true };
+  const redacted = redactForDisplay(val);
+  if (typeof redacted === 'string' && redacted.includes(CIPHERTEXT_MARKER)) {
+    return { display: `"${redacted}"`, isCipher: true };
   }
-  return { display: JSON.stringify(val), isCipher: false };
+  return { display: JSON.stringify(redacted, null, 2), isCipher: false };
 }
 
 export function RawDocumentPanel({ document: doc, collection }: Props) {

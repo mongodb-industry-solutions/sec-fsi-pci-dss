@@ -5,7 +5,8 @@
 
 import { FastifyInstance } from 'fastify';
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
-import { requirePermission } from '../../../vendors/middleware/acl';
+import { requirePermission, loadRolePermissions } from '../../../vendors/middleware/acl';
+import { hasPermission } from '../../../shared/models/acl.model';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { listAuditEvents } from '../../provider/services/businessProcessEvent.service';
 import { listKycAdmin, getKycByPartyRef, patchKycData, revealKycSensitive } from '../services/customerAgreement.service';
@@ -20,6 +21,16 @@ function actor(request: unknown) {
 export async function customerKycController(fastify: FastifyInstance) {
   const canView = requirePermission('customers', 'view');
   const canManage = requirePermission('customers', 'manage');
+
+  // The audited reveal is reachable with customers:manage (administration) or
+  // customers:viewSensitive (oversight, where requirePermission also enforces escalation).
+  const canReveal = async (request: Parameters<typeof canManage>[0], reply: Parameters<typeof canManage>[1]) => {
+    const role = (request as unknown as { userRole?: string }).userRole;
+    const perms = await loadRolePermissions(fastify.db, role);
+    if (hasPermission(perms, 'customers', 'manage')) return;            // administration path
+    return canSensitive(request, reply);                                // oversight path (+escalation)
+  };
+  const canSensitive = requirePermission('customers', 'viewSensitive');
 
   // GET /customer/kyc — paged list of KYC-completed parties (L1 masked). requirePermission customers:view.
   fastify.get('/kyc', {
@@ -119,15 +130,25 @@ export async function customerKycController(fastify: FastifyInstance) {
     schema: {
       tags: ['customer'],
       summary: 'Reveal QE:none KYC fields on demand (SD-53, v31)',
-      description: 'Returns the decrypted L2-only KYC fields for display (never persisted). Emits `kyc.sensitive.revealed` (field names only, no values). Requires `customers:manage`.',
+      description: 'Returns the decrypted QE:none KYC fields for display (never persisted). Emits `kyc.sensitive.revealed` (field names only, no values). Requires `customers:manage` (KYC administration) or `customers:viewSensitive` (oversight: auditor directly, L2 with an escalation token).',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['partyInstanceReference'], properties: { partyInstanceReference: { type: 'string' } } },
       response: { 200: { type: 'object', additionalProperties: true }, 401: E, 403: E, 404: E },
     },
-    preHandler: canManage,
+    preHandler: canReveal,
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
-      const result = await revealKycSensitive(fastify.db, partyInstanceReference, actor(request));
+      const req = request as unknown as { userRole?: string; escalationToken?: string };
+      const result = await revealKycSensitive(fastify.db, partyInstanceReference, actor(request), {
+        ...(req.userRole ? { callerRole: req.userRole as never } : {}),
+        hasValidToken: !!req.escalationToken,
+      });
+      if (result.status === 'forbidden') {
+        return reply.status(403).send({
+          error: 'Access denied: revealing QE:none KYC fields requires the KYC administration or audit capability.',
+          code: 'ACL_DENIED',
+        });
+      }
       if (result.status === 'not_found') return reply.status(404).send({ error: 'KYC record not found' });
       return reply.send(result.fields);
     },

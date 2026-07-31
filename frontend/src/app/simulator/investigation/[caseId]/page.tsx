@@ -1,10 +1,12 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, FraudCase, RawDocumentResponse } from '../../../../lib/api';
 import { getSimTokenForRole } from '../../../../lib/simulatorAuth';
+import { canResumeEscalation } from '../../../../lib/useCaseEscalation';
 import { EncryptionBadge } from '../../../../components/EncryptionBadge';
+import { LoadingIndicator } from '../../../../components/LoadingIndicator';
 import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, formatRiskIndicator } from '../../../../lib/constants';
 
@@ -56,6 +58,9 @@ export default function SimulatorCaseDetailPage() {
   const [escalationToken, setEscalationToken] = useState<string | null>(null);
 
   const [busy, setBusy] = useState(false);
+  // The elevated (QE:none) record is fetched after the escalation token exists, so the L2 panel
+  // needs its own indicator: without it the sensitive fields read as empty while in flight.
+  const [recordLoading, setRecordLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const refreshCase = useCallback(async (token: string) => {
@@ -82,6 +87,47 @@ export default function SimulatorCaseDetailPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // Load the QE:none record with elevated access. `prepare` yields the references and the escalation
+  // token; only the newest call owns the indicator, so it can never stay on.
+  const loadSeq = useRef(0);
+  const loadElevatedRecord = useCallback(async (
+    prepare: () => Promise<{ agreementRef?: string; txnRef?: string; token: string; escalation: string }>,
+  ) => {
+    const seq = ++loadSeq.current;
+    setRecordLoading(true);
+    try {
+      const { agreementRef, txnRef, token, escalation } = await prepare();
+      const [cust, raw] = await Promise.all([
+        agreementRef ? api.customer.getById(agreementRef, token, escalation).catch(() => null) : null,
+        txnRef ? api.system.rawDocument('cardTransactionLog', txnRef, token).catch(() => null) : null,
+      ]);
+      if (seq !== loadSeq.current) return;
+      if (cust) setCustomer(cust);
+      if (raw) setRawDoc(raw);
+    } finally {
+      if (seq === loadSeq.current) setRecordLoading(false);
+    }
+  }, []);
+
+  // Revisiting a case whose escalation was already accepted: re-derive the escalation token and
+  // load the customer, so the QE:none fields render without approving again (idempotent on the
+  // backend). Without this the L2 step showed the sensitive fields as empty on every revisit.
+  // `escalationToken` is read but deliberately NOT a dependency: setting it mid-flight would re-run
+  // this effect. Ownership of the indicator is a sequence number, not the effect's cleanup: an
+  // effect that is torn down (dependency change, or the double invoke in development) must not
+  // leave the spinner on for a load that did finish.
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (!l2Token || !fraudCase || escalationToken || resumed.current) return;
+    if (!canResumeEscalation('level2_investigator', fraudCase)) return;
+    resumed.current = true;
+    void loadElevatedRecord(async () => {
+      const res = await api.fraud.escalateApprove(caseId, {}, l2Token);
+      setEscalationToken(res.escalationToken);
+      return { agreementRef: fraudCase.customerAgreementInstanceReference, txnRef: fraudCase.cardTransactionInstanceReference, token: l2Token, escalation: res.escalationToken };
+    }).catch(() => { resumed.current = false; });
+  }, [l2Token, fraudCase, caseId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Real actions ──────────────────────────────────────────────────────────
   async function run(action: () => Promise<void>) {
     setBusy(true); setMsg(null);
@@ -107,14 +153,14 @@ export default function SimulatorCaseDetailPage() {
       const res = await api.fraud.escalateApprove(caseId, {}, l2);
       setEscalationToken(res.escalationToken);
       const c = await refreshCase(l2);
-      // Load the REAL customer record + raw transaction with elevated access.
-      if (c.customerAgreementInstanceReference) {
-        api.customer.getById(c.customerAgreementInstanceReference, l2).then(setCustomer).catch(() => null);
-      }
-      if (c.cardTransactionInstanceReference) {
-        api.system.rawDocument('cardTransactionLog', c.cardTransactionInstanceReference, l2)
-          .then(setRawDoc).catch(() => null);
-      }
+      // The escalation token is what unlocks the QE:none fields; the L2 JWT alone gets the lookup tier.
+      resumed.current = true;   // the resume effect must not repeat this load
+      void loadElevatedRecord(async () => ({
+        agreementRef: c.customerAgreementInstanceReference,
+        txnRef: c.cardTransactionInstanceReference,
+        token: l2,
+        escalation: res.escalationToken,
+      }));
       setMsg('Escalation approved. Escalation token issued, sensitive fields unlocked.');
       // When triggered from the "Next" button, advance to the resolution step after approving.
       if (advance) setCurrentStep('l2-resolve');
@@ -191,7 +237,7 @@ export default function SimulatorCaseDetailPage() {
     : nextBlocked ? 'Decide to continue'
     : 'Next Step';
 
-  if (loading) return <div className="text-center py-12 text-gray-400">Loading case…</div>;
+  if (loading) return <LoadingIndicator label="Loading case…" className="py-12" />;
   if (!fraudCase) return <div className="text-center py-12 text-gray-500">Case not found.</div>;
   if (tokenError) return (
     <div className="text-center py-12">
@@ -200,10 +246,7 @@ export default function SimulatorCaseDetailPage() {
     </div>
   );
   if (!tokensReady) return (
-    <div className="flex flex-col items-center justify-center py-16 text-gray-500">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-[#001E2B]" />
-      <p className="mt-4 text-sm">Waiting for the server to load the required L1/L2 tokens…</p>
-    </div>
+    <LoadingIndicator label="Waiting for the server to load the required L1/L2 tokens…" className="py-16" size={24} />
   );
 
   const snap = fraudCase.transactionSnapshot;
@@ -289,6 +332,7 @@ export default function SimulatorCaseDetailPage() {
           l2HasAccepted={l2HasAccepted}
           isEscalated={isEscalated}
           busy={busy}
+          recordLoading={recordLoading}
           onApprove={() => handleApprove(false)}
           showRaw={showRaw}
           rawDoc={rawDoc}
@@ -423,13 +467,18 @@ function L1EscalateView({ fraudCase, busy, isEscalated, onEscalate }: {
   );
 }
 
-function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isEscalated, busy, onApprove, showRaw, rawDoc, onToggleRaw }: {
+function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isEscalated, busy, recordLoading, onApprove, showRaw, rawDoc, onToggleRaw }: {
   fraudCase: FraudCase; customer: Record<string, unknown> | null; escalationToken: string | null;
-  l2HasAccepted: boolean; isEscalated: boolean; busy: boolean; onApprove: () => void;
+  l2HasAccepted: boolean; isEscalated: boolean; busy: boolean; recordLoading: boolean; onApprove: () => void;
   showRaw: boolean; rawDoc: RawDocumentResponse | null; onToggleRaw: () => void;
 }) {
-  const addr = customer?.customerAgreementResidentialAddress as Addr | undefined;
-  const govId = customer?.governmentIdentificationReference as string | undefined;
+  // QE:none values travel inside `sensitive` on the audited escalation path (ADR-052), never at the
+  // top level. The fallback keeps the field working if a role ever receives it unwrapped.
+  const sensitive = customer?.sensitive as Record<string, unknown> | undefined;
+  const addr = (sensitive?.customerAgreementResidentialAddress
+    ?? customer?.customerAgreementResidentialAddress) as Addr | undefined;
+  // v32 B4 (ADR-050): the identity document is the structured, searchable field.
+  const govId = (customer?.customerAgreementGovernmentID as { number?: unknown } | undefined)?.number as string | undefined;
   const email = customer?.customerEmailAddress as string | undefined;
   const phone = customer?.customerMobilePhoneNumber as string | undefined;
   const accountRef = customer?.customerAgreementReference as string | undefined;
@@ -465,6 +514,11 @@ function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isE
         )}
 
         <h3 className="font-semibold text-sm text-gray-700">Customer Profile (live record)</h3>
+        {recordLoading ? (
+          <div className="rounded-lg border text-sm">
+            <LoadingIndicator label="Decrypting the elevated record…" className="py-6" />
+          </div>
+        ) : (
         <div className="rounded-lg border divide-y text-sm">
           <div className="px-3 py-2 bg-blue-50 space-y-2">
             <p className="text-xs font-semibold text-blue-700 uppercase">QE:equality (L1 + L2)</p>
@@ -483,6 +537,7 @@ function L2ReviewView({ fraudCase, customer, escalationToken, l2HasAccepted, isE
             <Field label="Government ID" value={govId} type="qe-none" locked={!l2HasAccepted} />
           </div>
         </div>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border p-5">

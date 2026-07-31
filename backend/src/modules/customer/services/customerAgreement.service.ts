@@ -7,14 +7,15 @@ import {
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
 import { CUSTOMER_AUTHENTICATION_COLLECTION } from '../../identity/models/customerAuthentication.model';
 import type { UserRole } from '../../../shared/models/identity.model';
-import { getDbForRole } from '../../../vendors/encryption/roleClients';
+import { getDbForRole, getSensitiveTierDb, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { phoneDigest } from '../../../vendors/encryption/digest';
-import { canReadSensitive } from '../../../vendors/middleware/rbac';
+import { canReadSensitive, canRevealKycSensitive } from '../../../vendors/middleware/rbac';
 import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { deriveKycCheckStatus, DecisionMode } from '../../../shared/models/onboardingDecision';
+import { getNestedValue } from '../../../shared/services/objectPath';
 import { config } from '../../../config';
 
 /**
@@ -51,6 +52,11 @@ function buildResponse(
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
     customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
+    // Lookup tier (govId .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate
+    // QE:range, taxId QE:prefix): decrypted by the L1 client, same fields for every role.
+    customerAgreementGovernmentID:      doc.customerAgreementGovernmentID ?? null,
+    customerAgreementTaxIDNumber:       doc.customerAgreementTaxIDNumber ?? null,
+    customerAgreementOccupation:        doc.customerAgreementOccupation ?? null,
     contactPiiRestricted:               !canSeeContactPii,
     bianServiceDomain:                  doc.bianServiceDomain,
     bianControlRecordType:              doc.bianControlRecordType,
@@ -60,12 +66,18 @@ function buildResponse(
   // (auditor, or L2 with a valid escalation token) — never merely because the bytes came
   // back decrypted. This is fail-closed: if the demo DB stores these fields in plaintext
   // (QE not active), an unauthorized role still does NOT receive them. PCI DSS Req 7.
+  // QE:none values travel in the payload only on the audited escalation path (a caseId, which
+  // means maybeAudit emitted field_accessed); otherwise the reveal endpoint is used. ADR-052.
   if (canSeeSensitive && isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) {
-    base.sensitive = {
-      customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
-      governmentIdentificationReference:   doc.governmentIdentificationReference,
-      customerAgreementRiskNotes:          doc.customerAgreementRiskNotes,
-    };
+    if (caseId) {
+      base.sensitive = {
+        customerAgreementResidentialAddress: doc.customerAgreementResidentialAddress,
+        customerAgreementRiskNotes:          doc.customerAgreementRiskNotes,
+      };
+    } else {
+      // Obtained through the reveal endpoint instead.
+      base.sensitiveAvailable = true;
+    }
   }
 
   return base;
@@ -97,7 +109,13 @@ async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, do
   if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited (Req 10)
   if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
   await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
-    fields: ['customerAgreementResidentialAddress', 'governmentIdentificationReference', 'customerAgreementRiskNotes'],
+    // The fields actually disclosed (PCI DSS Req 10.2.2).
+    fields: [
+      'customerAgreementResidentialAddress',
+      'customerAgreementRiskNotes',
+      'customerAgreementGovernmentID',
+      'customerAgreementTaxIDNumber',
+    ],
     customerAgreementInstanceReference: doc.customerAgreementInstanceReference,
   }, actor);
 }
@@ -211,8 +229,14 @@ export async function revealKycSensitive(
   db: Db,
   partyRef: string,
   actor: { performedByPartyReference?: string; performedByRole?: string },
-): Promise<{ status: 'not_found' } | { status: 'ok'; fields: Record<string, unknown> }> {
-  const roleDb = await getDbForRole('security_auditor', false); // L2 QE client (decrypts QE:none)
+  options: { callerRole?: UserRole; hasValidToken?: boolean } = {},
+): Promise<{ status: 'not_found' } | { status: 'forbidden' } | { status: 'ok'; fields: Record<string, unknown> }> {
+  // Independent service-layer capability check; the route also gates it.
+  const callerRole = options.callerRole;
+  if (callerRole && !canRevealKycSensitive(callerRole, options.hasValidToken ?? false)) {
+    return { status: 'forbidden' };
+  }
+  const roleDb = await getSensitiveTierDb('canRevealKycSensitive'); // L2 QE client (decrypts QE:none)
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ partyInstanceReference: partyRef });
   if (!doc) return { status: 'not_found' };
@@ -352,7 +376,7 @@ export async function patchKycData(
   if (changedFields.length === 0) return { status: 'invalid', error: 'No editable fields supplied.' };
   set.recordUpdatedDateTime = new Date();
 
-  const roleDb = await getDbForRole('security_auditor', false); // L2 QE client (encrypt on write)
+  const roleDb = await getEncryptionWriteDb('kyc.data.correction'); // full map: encrypt QE:none on write
   const res = await roleDb.collection(CUSTOMER_AGREEMENT_COLLECTION).updateOne({ partyInstanceReference: partyRef }, { $set: set });
   if (res.matchedCount === 0) return { status: 'not_found' };
 
@@ -372,8 +396,9 @@ export async function patchKycData(
 }
 
 export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
-  // Self-profile always uses L2 db so the customer can see their own address
-  const roleDb = await getDbForRole('security_auditor', false);
+  // Self-profile: the data subject reads its OWN sensitive record (GDPR Art. 15), so the
+  // sensitive tier is granted by the self-service capability, not by a role string.
+  const roleDb = await getSensitiveTierDb('customer.selfProfile');
   const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!result) return null;
   const { doc, party } = result;
@@ -400,9 +425,10 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     partyNationality:                   party.partyNationality,
     partyPlaceOfBirth:                  party.partyPlaceOfBirth,
     partySex:                           party.partySex,
+    // v32 B2: the deprecated governmentIdentificationReference is gone; the structured
+    // customerAgreementGovernmentID above is the single source of truth (ADR-050).
     sensitive: isSensitiveDecrypted(doc.customerAgreementResidentialAddress) ? {
       customerAgreementResidentialAddress:    doc.customerAgreementResidentialAddress,
-      governmentIdentificationReference:      doc.governmentIdentificationReference,
       customerAgreementSourceOfFunds:         doc.customerAgreementSourceOfFunds,
       customerAgreementPurposeOfRelationship: doc.customerAgreementPurposeOfRelationship,
     } : null,
@@ -419,8 +445,8 @@ export async function updateSelfProfile(
     customerMobilePhoneNumber?: string;
   }
 ): Promise<boolean> {
-  // Write operations always use L2 db so QE:none fields are encrypted on write
-  const roleDb = await getDbForRole('security_auditor', false);
+  // Write: the full map is needed to encrypt QE:none fields (not a disclosure).
+  const roleDb = await getEncryptionWriteDb('customer.selfProfile.update');
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
     .findOne({ partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!party) return false;
@@ -539,7 +565,13 @@ export interface KycSearchFieldDef {
   baseMode: KycSearchMode;      // intended mode (text modes degrade to equality when gated)
   bsonType: 'string' | 'date' | 'int' | 'bool';
   minQueryLength?: number;
+  /** QE query window: the longest value the encrypted index can match (strMaxQueryLength). */
   maxQueryLength?: number;
+  /** Longest value the operator may type; the surplus over the window is refined in memory. */
+  inputMaxLength?: number;
+  /** Mirrors the QE index params in encryptedFieldsMaps.ts. */
+  caseSensitive?: boolean;
+  diacriticSensitive?: boolean;
   rangeMin?: number | string;   // ISO date string or int
   rangeMax?: number | string;
   enumValues?: Array<string | boolean>;
@@ -559,15 +591,15 @@ const KYC_SEARCH_FIELDS: KycSearchFieldDef[] = [
   { key: 'email',                label: 'Email',             collection: 'party',     path: 'partyEmailAddress',      baseMode: 'equality', bsonType: 'string' },
   { key: 'phone',                label: 'Phone',             collection: 'party',     path: 'partyMobilePhoneNumber', baseMode: 'equality', bsonType: 'string' },
   { key: 'accountRef',           label: 'Account reference', collection: 'agreement', path: 'customerAgreementReference', baseMode: 'equality', bsonType: 'string' },
-  { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10 },
+  { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 30, caseSensitive: false, diacriticSensitive: false },
   { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2020-01-01' },
   { key: 'partyNationality',     label: 'Nationality',       collection: 'party',     path: 'partyNationality',     baseMode: 'equality',  bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },
   { key: 'partyPlaceOfBirth',    label: 'Place of birth',    collection: 'party',     path: 'partyPlaceOfBirth',    baseMode: 'equality',  bsonType: 'string' },
-  { key: 'govIdNumber',          label: 'Government ID no.', collection: 'agreement', path: 'customerAgreementGovernmentID.number',         baseMode: 'suffix',   bsonType: 'string', minQueryLength: 3, maxQueryLength: 10 },
+  { key: 'govIdNumber',          label: 'Government ID no.', collection: 'agreement', path: 'customerAgreementGovernmentID.number',         baseMode: 'suffix',   bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 20, caseSensitive: true, diacriticSensitive: true },
   { key: 'govIdType',            label: 'Government ID type',collection: 'agreement', path: 'customerAgreementGovernmentID.type',           baseMode: 'equality', bsonType: 'string', enumValues: ['passport','national_id','driver_license'] },
   { key: 'govIdIssuingCountry',  label: 'Issuing country',   collection: 'agreement', path: 'customerAgreementGovernmentID.issuingCountry', baseMode: 'equality', bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },
   { key: 'govIdExpiry',          label: 'ID expiry date',    collection: 'agreement', path: 'customerAgreementGovernmentID.expiryDate',     baseMode: 'range',    bsonType: 'date',   rangeMin: '2000-01-01', rangeMax: '2040-01-01' },
-  { key: 'taxId',                label: 'Tax ID (TIN)',      collection: 'agreement', path: 'customerAgreementTaxIDNumber',                 baseMode: 'prefix',   bsonType: 'string', minQueryLength: 2, maxQueryLength: 10 },
+  { key: 'taxId',                label: 'Tax ID (TIN)',      collection: 'agreement', path: 'customerAgreementTaxIDNumber',                 baseMode: 'prefix',   bsonType: 'string', minQueryLength: 2, maxQueryLength: 10, inputMaxLength: 20, caseSensitive: true, diacriticSensitive: true },
   { key: 'occupation',           label: 'Occupation',        collection: 'agreement', path: 'customerAgreementOccupation',                  baseMode: 'equality', bsonType: 'string' },
   { key: 'riskScore',            label: 'Risk score',        collection: 'agreement', path: 'customerAgreementKycCheck.customerAgreementKycCheckRiskScore',      baseMode: 'range',    bsonType: 'int',  rangeMin: 0, rangeMax: 100 },
   { key: 'riskRating',           label: 'Risk rating',       collection: 'agreement', path: 'customerAgreementKycCheck.customerAgreementKycCheckRiskRating',     baseMode: 'equality', bsonType: 'string', enumValues: ['low','medium','high'] },
@@ -597,6 +629,7 @@ export function getKycSearchRegistry() {
       bsonType: f.bsonType,
       minQueryLength: f.minQueryLength,
       maxQueryLength: f.maxQueryLength,
+      inputMaxLength: f.inputMaxLength ?? f.maxQueryLength,
       rangeMin: f.rangeMin,
       rangeMax: f.rangeMax,
       enumValues: f.enumValues,
@@ -604,7 +637,6 @@ export function getKycSearchRegistry() {
     // QE:none fields: returnable only to L2 investigator / auditor, never searchable.
     sensitiveResultFields: [
       'customerAgreementResidentialAddress',
-      'governmentIdentificationReference',
       'customerAgreementRiskNotes',
       'customerAgreementSourceOfFunds',
       'customerAgreementPurposeOfRelationship',
@@ -623,16 +655,62 @@ export interface KycSearchRequest {
   to?: string;                     // range upper
 }
 
+const TEXT_MODES = new Set<KycSearchMode>(['substring', 'prefix', 'suffix']);
+
+/**
+ * Validate a text query and return the value plus the slice sent to the encrypted index. A value
+ * longer than strMaxQueryLength is queried with the longest slice that cannot lose a match (last N
+ * for suffix, first N for prefix/substring), so the encrypted query returns a superset that
+ * buildTextRefiner narrows to the exact predicate.
+ */
+function textQueryWindow(def: KycSearchFieldDef, mode: KycSearchMode, raw: string | undefined): { value: string; window: string } {
+  const value = (raw ?? '').trim();
+  const min = def.minQueryLength ?? 3;
+  if (value.length < min) badRequest(`Query must be at least ${min} characters for ${def.key}`);
+  const inputMax = def.inputMaxLength ?? def.maxQueryLength;
+  if (inputMax && value.length > inputMax) badRequest(`Query exceeds ${inputMax} characters for ${def.key}`);
+  const max = def.maxQueryLength ?? value.length;
+  if (value.length <= max) return { value, window: value };
+  return { value, window: mode === 'suffix' ? value.slice(-max) : value.slice(0, max) };
+}
+
+/** Normalize per the field's QE index params, so refinement matches the index semantics. */
+function normalizeForMatch(def: KycSearchFieldDef, s: string): string {
+  let out = s;
+  if (def.diacriticSensitive === false) out = out.normalize('NFD').replace(/\p{M}/gu, '');
+  if (def.caseSensitive === false) out = out.toLowerCase();
+  return out;
+}
+
+/**
+ * Predicate that re-applies the full text query over the decrypted field value when the encrypted
+ * query ran on a shorter window. Null when the window was the whole value (already exact).
+ */
+function buildTextRefiner(
+  def: KycSearchFieldDef,
+  mode: KycSearchMode,
+  value: string,
+  window: string,
+): ((doc: Record<string, unknown>) => boolean) | null {
+  if (!TEXT_MODES.has(mode) || window === value) return null;
+  const needle = normalizeForMatch(def, value);
+  return (doc) => {
+    const actual = getNestedValue(doc, def.path);
+    if (typeof actual !== 'string') return false;  // still ciphertext: cannot refine
+    const haystack = normalizeForMatch(def, actual);
+    if (mode === 'prefix') return haystack.startsWith(needle);
+    if (mode === 'suffix') return haystack.endsWith(needle);
+    return haystack.includes(needle);
+  };
+}
+
 /**
  * Build the per-field MongoDB filter for a validated request. Text modes use QE preview
  * aggregation operators via $expr; range/equality use plain filters that the QE driver rewrites.
  */
 function buildKycFilter(def: KycSearchFieldDef, mode: KycSearchMode, req: KycSearchRequest): Record<string, unknown> {
-  if (mode === 'substring' || mode === 'prefix' || mode === 'suffix') {
-    const v = (req.value ?? '').trim();
-    const min = def.minQueryLength ?? 3;
-    if (v.length < min) badRequest(`Query must be at least ${min} characters for ${def.key}`);
-    if (def.maxQueryLength && v.length > def.maxQueryLength) badRequest(`Query exceeds ${def.maxQueryLength} characters for ${def.key}`);
+  if (TEXT_MODES.has(mode)) {
+    const { window: v } = textQueryWindow(def, mode, req.value);
     const input = `$${def.path}`;
     if (mode === 'substring') return { $expr: { [ENC_CONTAINS]: { input, substring: v } } };
     if (mode === 'prefix')    return { $expr: { [ENC_STARTS]:   { input, prefix: v } } };
@@ -684,32 +762,42 @@ export async function searchKyc(
   if (!def) badRequest(`Unknown or non-searchable field: ${req.field}`);
   const mode = effectiveMode(def);
   const filter = buildKycFilter(def, mode, req);
+  // Narrow the superset returned when the value exceeded the QE query window.
+  const refine = TEXT_MODES.has(mode)
+    ? (() => { const w = textQueryWindow(def, mode, req.value); return buildTextRefiner(def, mode, w.value, w.window); })()
+    : null;
 
   const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
   const canSee = canReadSensitive(role, hasValidToken);
   const cap = Math.min(Math.max(limit, 1), 100);
 
   const results: Record<string, unknown>[] = [];
+  // Refinement discards candidates, so read a bounded wider page to still fill one result page.
+  const fetch = refine ? Math.min(cap * 5, 200) : cap;
 
   if (def.collection === 'party') {
     const parties = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
-      .find(filter as Partial<PartyControlRecord>).limit(cap).toArray();
+      .find(filter as Partial<PartyControlRecord>).limit(fetch).toArray();
     for (const party of parties) {
+      if (refine && !refine(party as unknown as Record<string, unknown>)) continue;
       const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
         .findOne({ partyInstanceReference: party.partyInstanceReference });
       if (!doc) continue;
       await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
       results.push(buildResponse(doc, party, role, canSee, caseId));
+      if (results.length >= cap) break;
     }
   } else {
     const docs = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
-      .find(filter as Partial<CustomerAgreementControlRecord>).limit(cap).toArray();
+      .find(filter as Partial<CustomerAgreementControlRecord>).limit(fetch).toArray();
     for (const doc of docs) {
+      if (refine && !refine(doc as unknown as Record<string, unknown>)) continue;
       const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
         .findOne({ partyInstanceReference: doc.partyInstanceReference });
       if (!party) continue;
       await maybeAudit(roleDb, caseId, role, doc, canSee, actor);
       results.push(buildResponse(doc, party, role, canSee, caseId));
+      if (results.length >= cap) break;
     }
   }
 
@@ -733,7 +821,8 @@ export async function applyKycScreeningVerdict(
   },
   mode: DecisionMode = 'automated',
 ): Promise<boolean> {
-  const roleDb = await getDbForRole('security_auditor', false);
+  // Write: the full map is needed to encrypt the QE:none screening reference.
+  const roleDb = await getEncryptionWriteDb('kyc.screening.verdict.write');
   // v31 §3.7: derive the BQ:Step status from the verdict with the shared mapper and write it in the SAME
   // atomic update as the verdict fields (no drift between the risk verdict and the lifecycle status).
   const status = deriveKycCheckStatus(

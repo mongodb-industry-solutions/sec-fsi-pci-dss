@@ -31,6 +31,9 @@ export function useCaseStream(caseId: string | undefined, token: string, onEvent
           headers: { Authorization: `Bearer ${token}` },
           signal: ctrl.signal,
         });
+        // Permanent for this token/case (logged out elsewhere, or no access): stop instead of
+        // retrying every 3s for as long as the view stays open.
+        if (res.status === 401 || res.status === 403) { stopped = true; return; }
         if (!res.ok || !res.body) { scheduleRetry(); return; }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();

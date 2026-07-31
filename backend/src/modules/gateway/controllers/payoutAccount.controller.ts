@@ -26,7 +26,7 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry, CreditType } from '../models/balanceCreditLog.model';
 import { creditDirect } from '../services/payoutAccountBalance.service';
-import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
+import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { v4 as uuidv4 } from 'uuid';
 
 function safeAccount(doc: unknown) {
@@ -396,6 +396,18 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     if (!account.payoutAccountIban) {
       return reply.status(404).send({ error: 'No IBAN registered for this account' });
     }
+    // Disclosure event, same shape as the account-information module twin. Field names only.
+    emitComplianceEvent(fastify.db, {
+      entityType: 'account', entityId: accountRef,
+      processType: 'payment_processing', processAction: 'account.iban.revealed', processOutcome: 'approved',
+      performedByPartyReference: user?.partyRef ?? null, performedByRole: user?.role ?? null,
+      eventSummary: {
+        channel: isOwner ? 'self_service' : 'investigation',
+        partyInstanceReference: account.partyInstanceReference,
+        revealedFields: ['payoutAccountIban'],
+      },
+      bianServiceDomain: 'SD-66 Payout Account Arrangement', bianControlRecordType: 'PayoutAccountArrangement',
+    });
     return reply.send({ payoutAccountIban: account.payoutAccountIban });
   });
 

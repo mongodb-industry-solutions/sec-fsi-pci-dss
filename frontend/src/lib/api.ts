@@ -53,6 +53,18 @@ export interface AuthUser {
   merchant?: { id: string; name: string; mcc?: string };
 }
 
+/** IST team contact point shown on /about (see config/team.json for the bundled fallback). */
+export interface TeamContact {
+  id: string;
+  name: string;
+  role: string;
+  ask: string;
+  area?: string | null;
+  linkedin: string;
+  avatarUrl: string;
+  qrUrl: string;
+}
+
 /** Declarative filters for the shared demo roster (see config/demoRoster.json). */
 export interface DemoUserFilters {
   featured?: boolean;
@@ -597,7 +609,8 @@ export interface KycSearchFieldDef {
   path?: string;                           // dotted document path of the encrypted field (debug detail)
   bsonType: 'string' | 'date' | 'int' | 'bool';
   minQueryLength?: number;
-  maxQueryLength?: number;
+  maxQueryLength?: number;                 // QE query window (strMaxQueryLength)
+  inputMaxLength?: number;                 // longest value the operator may type (server refines the surplus)
   rangeMin?: number | string;
   rangeMax?: number | string;
   enumValues?: Array<string | boolean>;
@@ -619,10 +632,19 @@ export interface KycSearchResult {
   customerSegment?: string;
   customerAgreementStatus?: string;
   customerAgreementKycCheck?: Record<string, unknown> | null;
+  // v32 B1: lookup tier (QE suffix/equality/range/prefix), returned to every role that can search,
+  // so a displayed value is always a searchable value.
+  customerAgreementGovernmentID?: {
+    type?: unknown; number?: unknown; issuingCountry?: unknown; expiryDate?: unknown;
+  } | null;
+  customerAgreementTaxIDNumber?: unknown;
   contactPiiRestricted: boolean;
+  /** Present only on the audited escalation path (a case reference); otherwise use the reveal endpoint. */
+  sensitiveAvailable?: boolean;
   sensitive?: {
     customerAgreementResidentialAddress?: unknown;
-    governmentIdentificationReference?: unknown;
+    // v32 (ADR-050): governmentIdentificationReference is gone. The identity document is the
+    // structured, searchable customerAgreementGovernmentID on the base record.
     customerAgreementRiskNotes?: unknown;
   };
 }
@@ -906,12 +928,14 @@ export const api = {
     // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
     searchFields: (token: string) =>
       apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
-    search: (body: KycSearchBody, token: string, escalationToken?: string) =>
+    // `signal` lets the caller abort a superseded query.
+    search: (body: KycSearchBody, token: string, escalationToken?: string, signal?: AbortSignal) =>
       apiFetch<KycSearchResponse>(
         '/api/v1/customer/search',
         {
           method: 'POST',
           body: JSON.stringify(body),
+          ...(signal ? { signal } : {}),
           ...(escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {}),
         },
         token,
@@ -1222,6 +1246,8 @@ export const api = {
       apiFetch<RawDocumentResponse>(
         `/api/v1/system/raw/${collection}/${id}`, {}, token
       ),
+    /** Demo metadata: IST contact points shown on /about (public, no JWT). */
+    team: () => apiFetch<{ contacts: TeamContact[] }>('/api/v1/system/team'),
   },
 
   health: (detail?: 'server' | 'db' | 'all') =>

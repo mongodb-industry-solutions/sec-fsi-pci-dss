@@ -8,7 +8,7 @@ import corsPlugin from '../src/plugins/cors';
 import mongodbPlugin from '../src/plugins/mongodb';
 import { swaggerPlugin } from '../src/plugins/swagger';
 import { authMiddleware } from '../src/vendors/middleware/auth';
-import { appendLog }          from '../src/shared/services/logBuffer';
+import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from '../src/shared/services/logBuffer';
 import { identityModule }     from '../src/modules/identity';
 import { customerModule }     from '../src/modules/customer';
 import { transactionsModule } from '../src/modules/transaction';
@@ -34,8 +34,22 @@ import { oidcDiscoveryController } from '../src/modules/identity/controllers/oid
 import { initOidcKeys } from '../src/modules/identity/services/oidcKeys.service';
 
 export async function buildApp(): Promise<FastifyInstance> {
+  // Background subsystems report through console.*; mirror them before anything can log.
+  mirrorConsoleToLogBuffer();
+
   const fastify = Fastify({
-    logger: true,
+    logger: {
+      // Mirror every warn/error/fatal into the admin ring buffer, whatever the call site
+      // (fastify.log, request.log, plugin internals). A catch block that logs and answers 500
+      // without throwing skips the onError hook, so the panel used to show a bare "-> 500".
+      // One numeric comparison per log call; info/debug lines are untouched.
+      hooks: {
+        logMethod(args: unknown[], method: (...a: unknown[]) => void, level: number) {
+          if (level >= 40) appendLogEntry(levelLabel(level), args);
+          return method.apply(this, args);
+        },
+      },
+    },
     pluginTimeout: 60000,
     ajv: {
       customOptions: {
@@ -103,9 +117,11 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // Populate the admin log buffer with request/response summaries
+  // Populate the admin log buffer with request/response summaries. The elapsed time is included
+  // so a slow endpoint is investigable from the panel without extra tooling.
   fastify.addHook('onResponse', (request, reply, done) => {
-    const line = `[${new Date().toISOString()}] ${request.method} ${request.url} -> ${reply.statusCode}`;
+    const line = `[${new Date().toISOString()}] ${request.method} ${request.url} -> ${reply.statusCode}`
+      + ` (${reply.elapsedTime.toFixed(0)}ms)`;
     appendLog(line);
     done();
   });

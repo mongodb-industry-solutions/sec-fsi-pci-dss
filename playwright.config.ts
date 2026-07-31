@@ -24,6 +24,21 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       // Inherits the top-level testMatch (**/*.spec.ts) scoped to testDir (./test/frontend/e2e).
     },
+    // v32 P8: every page the plan touches must be usable at small, medium and large viewports.
+    // The responsive specs opt in by name (*.responsive.spec.ts) so the full suite is not run three
+    // times; a spec that needs cross-viewport coverage is named accordingly.
+    {
+      // Tablet width on Chromium rather than the iPad preset, which is WebKit: `npm run setup:tools`
+      // installs chromium only, so a WebKit project would fail on a fresh checkout.
+      name: 'tablet',
+      use: { ...devices['Desktop Chrome'], viewport: { width: 834, height: 1112 } },
+      testMatch: '**/*.responsive.spec.ts',
+    },
+    {
+      name: 'mobile',
+      use: { ...devices['Pixel 5'] },
+      testMatch: '**/*.responsive.spec.ts',
+    },
   ],
   // Auto-start dev server when running locally
   webServer: {

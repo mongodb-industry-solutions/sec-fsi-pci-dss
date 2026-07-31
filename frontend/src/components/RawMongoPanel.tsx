@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { api } from '../lib/api';
+import { redactForDisplay } from './record/redactPayload';
 import { JsonView } from './json/JsonView';
 
 /**
@@ -142,7 +143,12 @@ export function RawMongoPanel({
       {sections.map(section => {
         const k = key(section);
         const s = state[k] ?? EMPTY_SECTION_STATE;
-        const data = section.kind === 'static' ? section.data : s.doc;
+        // v32 C4: a raw/debug panel is never a disclosure channel. Ciphertext is previewed as hex
+        // and sensitive-tier keys are redacted by name, for BOTH section kinds: a `static` section
+        // renders whatever the page passed, which on the investigation page was the decrypted
+        // customer profile (QE:none PII) dumped verbatim and unaudited.
+        const rawData = section.kind === 'static' ? section.data : s.doc;
+        const data = rawData == null ? rawData : redactForDisplay(rawData);
 
         return (
           <div key={k} className="border-t border-[#00ED64]/60">

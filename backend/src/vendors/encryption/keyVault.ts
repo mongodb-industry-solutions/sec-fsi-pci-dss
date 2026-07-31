@@ -44,7 +44,8 @@ export interface DEKs {
   txRawPayload: Binary;           // cardTransactionLogSensitive.rawGatewayPayload
   txProcessorMeta: Binary;        // cardTransactionLogSensitive.processorTransactionMetadata
   customerAddress: Binary;        // customerAgreementProcedureSensitive.customerAgreementResidentialAddress
-  customerGovId: Binary;          // customerAgreementProcedureSensitive.governmentIdentificationReference (deprecated)
+  customerGovId: Binary;          // legacy DEK for the deprecated governmentIdentificationReference (v32:
+                                  // no longer written or read; the DEK stays so pre-v32 documents remain decryptable)
   customerRiskNotes: Binary;      // customerAgreementProcedureSensitive.customerAgreementRiskNotes (deprecated)
   // v27 QE:none KYC fields - sensitive tier, L2 only
   caSourceOfFunds: Binary;        // customerAgreementSourceOfFunds

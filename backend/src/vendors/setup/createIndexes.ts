@@ -11,6 +11,7 @@ import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/ident
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
+import { DEMO_TEAM_CONTACT_COLLECTION } from '../../modules/system/models/demoTeamContact.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -303,6 +304,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { checkoutSessionExpiresAt: 1 }, expireAfterSeconds: 0 },
   ]);
 
+  // Demo-only: IST team contacts for the public "About us" page (single sorted read)
+  await ensureIndexes(db, DEMO_TEAM_CONTACT_COLLECTION, [
+    { key: { demoTeamContactInstanceReference: 1 }, unique: true },
+    { key: { active: 1, displayOrder: 1 } },
+  ]);
+
   // SD-64: Payment Link Record
   await ensureIndexes(db, 'paymentLinkRecord', [
     { key: { paymentLinkInstanceReference: 1 }, unique: true },
@@ -359,8 +366,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
-    // v18: "user × merchant × action" activity view (SD-16 audit). Sparse — only OAuth-attributed events.
-    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
+    // v18: "user x merchant x action" activity view (SD-16 audit).
+    // Not sparse: timeseries collections reject the sparse option.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
   // ADR-025: Compliance Process Events — timeseries
