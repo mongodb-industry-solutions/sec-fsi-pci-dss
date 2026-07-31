@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarDays } from 'lucide-react';
+import { Combobox } from '../ui/Combobox';
 
 // Reusable date-range filter for encrypted range queries (QE:range) and any other
 // from/to date filter. Two native date inputs alone are not usable: it is unclear
@@ -178,15 +179,15 @@ export function DateRangeFilter({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-end gap-3">
-        <div>
+        <div className="w-52">
           <label className="block text-xs font-medium text-gray-600 mb-1">Condition</label>
-          <select
+          <Combobox
+            editable={false}
             value={operator}
-            onChange={(e) => changeOperator(e.target.value as DateRangeOperator)}
-            className={`${inputClass} bg-white`}
-          >
-            {operators.map((op) => <option key={op} value={op}>{OPERATOR_LABELS[op]}</option>)}
-          </select>
+            onChange={(v) => changeOperator(v as DateRangeOperator)}
+            inputClassName="py-2"
+            options={operators.map((op) => ({ value: op, label: OPERATOR_LABELS[op] }))}
+          />
         </div>
 
         {operator === 'age' ? (

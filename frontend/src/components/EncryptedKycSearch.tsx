@@ -12,6 +12,7 @@ import { Pagination } from './Pagination';
 import { DateRangeFilter } from './search/DateRangeFilter';
 import { LoadingIndicator } from './LoadingIndicator';
 import { RawMongoPanel } from './RawMongoPanel';
+import { Combobox } from './ui/Combobox';
 import { useDebugMode } from '../lib/debugMode';
 
 // v27 Phase 5: ONE shared encrypted-KYC search surface, mounted in both the production
@@ -344,25 +345,24 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
       {/* Field selector + mode-specific control */}
       <div className="rounded-xl border bg-white p-4 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
-          <div>
+          <div className="w-64">
             <label className="block text-xs font-medium text-gray-600 mb-1">Search field</label>
-            <select
+            {/* Debug mode annotates each option with its QE query type, so the operator
+                can see which fields support contains / starts-with / range, etc. */}
+            <Combobox
+              editable={false}
               value={selectedKey}
-              onChange={(e) => setSelectedKey(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm bg-white"
-            >
-              {fields.map((f) => (
-                <option key={f.key} value={f.key}>
-                  {/* Debug mode annotates each option with its QE query type, so the operator
-                      can see which fields support contains / starts-with / range, etc. */}
-                  {debugMode ? `${f.label} (${MODE_BADGE[f.mode]})` : f.label}
-                </option>
-              ))}
-            </select>
+              onChange={setSelectedKey}
+              inputClassName="py-2"
+              options={fields.map((f) => ({
+                value: f.key,
+                label: debugMode ? `${f.label} (${MODE_BADGE[f.mode]})` : f.label,
+              }))}
+            />
           </div>
 
           {field && (
-            // Invisible label spacer keeps the badge's top edge aligned with the select input
+            // Invisible label spacer keeps the badge's top edge aligned with the field selector
             // (not the "Search field" label above it).
             <div>
               <label className="block text-xs font-medium mb-1 invisible" aria-hidden="true">Mode</label>
@@ -443,18 +443,19 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
             )}
           </div>
         ) : field && field.mode === 'equality' && field.enumValues && field.enumValues.length ? (
-          <div>
+          <div className="w-64">
             <label className="block text-xs font-medium text-gray-600 mb-1">Value</label>
-            <select
+            <Combobox
+              editable={false}
               value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="border rounded-lg px-3 py-2 text-sm bg-white"
-            >
-              <option value="">Select…</option>
-              {field.enumValues.map((v) => (
-                <option key={String(v)} value={enumOptionValue(v)}>{enumOptionLabel(field, v)}</option>
-              ))}
-            </select>
+              onChange={setValue}
+              placeholder="Select…"
+              inputClassName="py-2"
+              options={[
+                { value: '', label: 'Select…' },
+                ...field.enumValues.map((v) => ({ value: enumOptionValue(v), label: enumOptionLabel(field, v) })),
+              ]}
+            />
           </div>
         ) : field ? (
           <div>
