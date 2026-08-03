@@ -978,9 +978,17 @@ export function HelpContent({ tab }: { tab: Tab }) {
                 ['QSA',  'Qualified Security Assessor; individual certified by PCI SSC to produce ROC/AOC.'],
                 ['ASV',  'Approved Scanning Vendor; certified to perform external vulnerability scans. Required quarterly.'],
                 ['ROC',  'Report on Compliance; the assessment document produced by a QSA for Level 1 entities.'],
+                ['AOC',  'Attestation of Compliance; signed declaration of the assessment result, submitted with the ROC or SAQ.'],
                 ['SAQ',  'Self-Assessment Questionnaire; validation tool for eligible merchants/SPs. 10 types available.'],
                 ['TRA',  'Targeted Risk Analysis; formal risk analysis introduced in v4.0 for periodic activity frequencies.'],
                 ['P2PE', 'Point-to-Point Encryption; can reduce merchant scope to SAQ P2PE (approx. 33 requirements).'],
+                ['CVV',  'Card Verification Value; the 3 digit card validation code (CVV2 on Visa, CVC2 on Mastercard). SAD, never stored.'],
+                ['CID',  'Card Identification Number; the card validation code used by Amex (4 digits) and Discover (3 digits). SAD, never stored.'],
+                ['PIN',  'Personal Identification Number; cardholder authentication code. SAD, never stored; PIN blocks travel encrypted only.'],
+                ['CMK',  'Customer Master Key; the KMS-held key that wraps the DEKs. Never leaves the KMS (Req. 3.6, 3.7).'],
+                ['DEK',  'Data Encryption Key; the key that actually encrypts the field data, stored wrapped by the CMK in the key vault.'],
+                ['KMS',  'Key Management Service; the external system that stores and rotates the CMK (AWS KMS, Azure Key Vault, GCP KMS).'],
+                ['SIEM', 'Security Information and Event Management; centralizes and correlates audit logs for daily review (Req. 10.4).'],
               ].map(([term, def]) => (
                 <div key={term} className="flex gap-2.5 p-def-row">
                   <span className="font-bold text-[#00ED64] text-xs shrink-0 w-12 p-def-term">{term}</span>
