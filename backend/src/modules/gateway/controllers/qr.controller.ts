@@ -5,7 +5,7 @@
 import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { dualPermission } from '../../../vendors/middleware/dualAuth';
-import { issueQr, resolveQr } from '../services/qrRepresentation.service';
+import { issueQr, resolveQr, QrPayloadError } from '../services/qrRepresentation.service';
 import { QrSubjectType, QrPayloadFormat } from '../models/qrRepresentation.model';
 
 function getUser(request: unknown): JwtUserPayload | undefined {
@@ -29,33 +29,34 @@ export async function qrController(fastify: FastifyInstance) {
     },
     schema: {
       tags: ['qr'], summary: 'Issue a QR representation for a payable subject', security: [{ bearerAuth: [] }],
+      // v35 CH-1: no iban/payeeName/amount inputs. The EPC payload is derived from the subject.
       body: {
         type: 'object', required: ['subjectType', 'subjectReference'],
         properties: {
           subjectType: { type: 'string', enum: ['rtp_request', 'payment_link', 'checkout_session'] },
           subjectReference: { type: 'string' },
-          payloadFormat: { type: 'string', enum: ['url', 'emvco', 'sepa_epc'] },
-          amount: { type: 'number' }, currency: { type: 'string' },
-          payeeName: { type: 'string' }, iban: { type: 'string' }, remittance: { type: 'string' },
+          payloadFormat: { type: 'string', enum: ['url', 'sepa_epc'] },
           singleUse: { type: 'boolean' }, expiresAt: { type: 'string', format: 'date-time' },
         },
       },
     },
   }, async (request, reply) => {
     const b = request.body as Record<string, unknown>;
-    const qr = await issueQr(fastify.db, {
-      subjectType: b.subjectType as QrSubjectType,
-      subjectReference: b.subjectReference as string,
-      payloadFormat: b.payloadFormat as QrPayloadFormat | undefined,
-      amount: b.amount as number | undefined,
-      currency: b.currency as string | undefined,
-      payeeName: b.payeeName as string | undefined,
-      iban: b.iban as string | undefined,
-      remittance: b.remittance as string | undefined,
-      singleUse: b.singleUse as boolean | undefined,
-      expiresAt: b.expiresAt ? new Date(b.expiresAt as string) : undefined,
-    });
-    return reply.send(qr);
+    try {
+      const qr = await issueQr(fastify.db, {
+        subjectType: b.subjectType as QrSubjectType,
+        subjectReference: b.subjectReference as string,
+        payloadFormat: b.payloadFormat as QrPayloadFormat | undefined,
+        singleUse: b.singleUse as boolean | undefined,
+        expiresAt: b.expiresAt ? new Date(b.expiresAt as string) : undefined,
+      });
+      return reply.send(qr);
+    } catch (err) {
+      if (err instanceof QrPayloadError) {
+        return reply.code(err.httpStatus).send({ error: err.code, error_description: err.message });
+      }
+      throw err;
+    }
   });
 
   // GET /:ref — resolve a QR payload (marks single-use consumed). Session or merchant OAuth.

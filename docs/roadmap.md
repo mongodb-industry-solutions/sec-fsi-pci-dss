@@ -1064,3 +1064,42 @@ credited to a PSP revenue ledger at settlement.
 - [ ] E2E: a merchant payment settles, the merchant balance grows by the net and the PSP revenue ledger by the fee. Pending the reseed.
 
 *Added 2026-07-30 (v34).*
+
+## v35: QR surface corrections (corrective, no new capability)
+
+Driver: the v34 analysis (`.agents/specs/dev.v34.plan.md`) evaluated the MongoDB QR payment
+architecture material against the platform and concluded the capability already exists (v28: canonical
+rail-agnostic `paymentRequestProcedure` + `qrPaymentRepresentation` + `RailResolver` + provider routing),
+so nothing new should be built. What it did find were defects on the existing QR surface, in exactly the
+controls area the source material never covers: a cleartext EPC payload carrying the creditor IBAN and
+payee name on the only payment collection with neither QE nor tests, a `payloadFormat` value the API
+accepted but never implemented, a state-changing route guarded at read level, and a dead unencrypted
+free-shape field inviting a raw-payload store. Decisions recorded in ADR-058.
+
+Rejected as no value (do not implement): QR ingestion engine as a separate module (would duplicate the
+RTP create path), UPI/Pix/SGQR parsers, compound shard key for the static-merchant-QR hotspot
+(undemonstrable on a single deployment, documented as a design only), ISO 8583 bitmap encoder, full
+ISO 20022 pain.013 serialization, CPM merchant-scans-consumer flow (deferred, needs a new persona).
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v35-01 | The creditor PII never lands in the QR record | `encodedPayload` is durable only for `'url'`; a `'sepa_epc'` record is stored with no payload and the EPC form is derived on read from `paymentRequestProcedure` + `payoutAccountArrangement`; the stored document contains no IBAN; the issue endpoint accepts no `iban`/`payeeName`/`amount`. The collection stays plaintext with its TTL intact (QE is impossible: TTL indexes are forbidden on encrypted collections, err 6346501) |
+| FR-v35-02 | An unbuildable payload format is refused, never downgraded | `payloadFormat` is `'url'` or `'sepa_epc'`; an unsupported value raises `QrPayloadError` → 400 `unsupported_payload_format`; `'sepa_epc'` on a subject other than `rtp_request` → 400 `unsupported_subject_for_format`; an unresolvable creditor account → 409 `epc_source_unavailable`; in the 400 cases no record is inserted |
+| FR-v35-03 | The EPC069-12 payload stays to spec | service tag `BCD`, version `002`, charset `1`, type `SCT`, correct field order, payee name capped at 70 chars, remittance at 140, amount as `<CCY><2dp>` |
+| FR-v35-04 | Issuing a QR is write-level | `POST /rtp/requests/:ref/qr` requires `paymentRequests:manage` / `write:rtp`; `level1_analyst` and `security_auditor` get 403; a customer requester passes the guard; `GET /gateway/qr/:ref` stays read-level |
+| FR-v35-05 | No raw ingestion payload is retained | `paymentRequestProcedure.originalPayload` is removed; the canonical record plus `paymentRequestEvent` remain the audit history |
+| FR-v35-06 | The QR lifecycle is covered by tests | `issueQr` is idempotent per `(subjectType, subjectReference)`, does not reuse an expired QR, and scopes the lookup to unconsumed records; `resolveQr` returns null for missing/consumed/expired and marks a single-use QR consumed exactly once while never consuming a reusable one |
+
+### Definition of Done
+
+- [x] `test:unit` green, including the new `qrRepresentation.test.ts` (16 cases) and `qrCollectionShape.test.ts` (2 cases, pinning that the collection stays unencrypted and keeps its TTL). The CH-1/CH-2 assertions were written first and confirmed failing against the pre-v35 code.
+- [x] Backend and frontend type-checks clean.
+- [x] Integration spec `test/backend/integration/routes/qr.test.ts` added for the permission guards (skips without `TEST_MONGODB_URI`, as the rest of the suite does).
+- [x] `technical-spec.md` §14.1 (QR payload derived on read, `originalPayload` removed), §14.5 (write-level issue) and §10 (SD-65 RTP + QR ownership row, previously missing) updated with the code.
+- [x] ADR-058 recorded in `engineering-proposal.md`, including the rejected QE alternative and why the TTL constraint rules it out.
+- [x] **No schema change**: no new collection, field, index, DEK or QE map entry. `vendors/setup/*` and `vendors/encryption/*` change by comment only, so `setup:db` needs no reset for this iteration and no seeder changes (there is no QR seeder; QRs are issued on demand).
+- [ ] E2E: a QR renders on all three consumers (RTP page, request page, `RequestMoneyModal`) and `encodedPayload` survives the response schema; a `sepa_epc` QR on a seeded RTP request renders a valid EPC payload.
+
+*Added 2026-08-05 (v35).*

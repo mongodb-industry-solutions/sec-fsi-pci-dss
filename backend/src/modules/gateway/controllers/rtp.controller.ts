@@ -292,15 +292,14 @@ export async function rtpController(fastify: FastifyInstance) {
   });
 
   // POST /requests/:ref/qr — issue/get a QR for this request (shared QR capability).
-  fastify.post('/requests/:ref/qr', { config: { dualAuth: true }, preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }), schema: { tags: ['rtp'], summary: 'Issue/get a QR for this request', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } }, async (request, reply) => {
+  // v35 CH-3: state-changing → write-level, as POST /gateway/qr/represent (PCI DSS Req 7).
+  fastify.post('/requests/:ref/qr', { config: { dualAuth: true }, preHandler: dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' }), schema: { tags: ['rtp'], summary: 'Issue/get a QR for this request', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } }, async (request, reply) => {
     const actor = await resolveActor(request, reply); if (!actor) return;
     const { ref } = request.params as { ref: string };
     const req = await getRtpRequest(fastify.db, ref);
     if (!req) return reply.code(404).send({ error: 'not_found' });
     const qr = await issueQr(fastify.db, {
-      subjectType: 'rtp_request', subjectReference: ref,
-      amount: req.amount, currency: req.currency, payeeName: req.payeeName,
-      remittance: req.structuredRemittance?.reference ?? req.purpose, expiresAt: req.expiresAt,
+      subjectType: 'rtp_request', subjectReference: ref, expiresAt: req.expiresAt,
     });
     // Persist the QR link back on the request (best-effort; not on the write path so failures are non-fatal).
     await fastify.db.collection(PAYMENT_REQUEST_COLLECTION).updateOne(

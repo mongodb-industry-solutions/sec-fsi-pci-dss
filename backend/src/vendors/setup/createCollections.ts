@@ -69,7 +69,21 @@ export async function createCollections(
     ),
   ];
 
-  const existingList = await db.listCollections().toArray();
+  let existingList = await db.listCollections().toArray();
+
+  // Self-healing: an encrypted collection the code now wants plaintext breaks its TTL index (6346501).
+  const wantsQe = new Set(qeCollections.map((c) => c.name));
+  for (const c of existingList) {
+    const isEncrypted = Boolean((c as { options?: { encryptedFields?: unknown } }).options?.encryptedFields);
+    if (wantsQe.has(c.name) || !isEncrypted) continue;
+    await db.collection(c.name).drop();
+    for (const suffix of ['esc', 'ecoc']) {
+      await db.collection(`enxcol_.${c.name}.${suffix}`).drop().catch(() => { /* absent */ });
+    }
+    console.log(`  dropped: ${c.name} (was encrypted, code wants plaintext)`);
+  }
+  existingList = await db.listCollections().toArray();
+
   const existingNames = new Set(existingList.map((c) => c.name));
 
   for (const { name, map } of qeCollections) {
@@ -478,7 +492,7 @@ export async function createCollections(
     console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
   }
 
-  // SD-65 (v28): QR Payment Representation — plaintext (signed deep link / EMVCo / EPC string, no PII)
+  // SD-65 (v28): QR Payment Representation — plaintext. No QE: TTL forbids it (v35 CH-1).
   if (!existingNames.has(QR_REPRESENTATION_COLLECTION) || reset) {
     if (existingNames.has(QR_REPRESENTATION_COLLECTION) && reset) {
       await db.collection(QR_REPRESENTATION_COLLECTION).drop();

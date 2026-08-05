@@ -368,6 +368,8 @@ export function buildEncryptedFieldsMaps(
         ],
       },
     } : {}),
+
+    // qrPaymentRepresentation: no QE by design, TTL forbids it (6346501). Payload derived on read (CH-1).
   };
 }
 

@@ -4315,9 +4315,30 @@ can classify card payments by method (Payment Link / Redirect vs plain Card). Se
   (5 DEKs: `DEK-rtp-payee-name/-payee-alias/-payer-alias/-rtp-remittance/-rtp-address`). Aliases also
   stored as a non-reversible SHA-256 `*AliasHash` (plaintext, indexed) for directory lookups (GDPR
   minimization). QE cannot encrypt `null` (err 31041): omitted encrypted fields are stripped before insert.
+  v35 CH-4: `originalPayload` (free-shape raw ingestion payload) was removed. It was never written or
+  read, and an unencrypted arbitrary-shape field here is a minimization risk (PCI DSS Req 3, GDPR
+  Art. 5(1)(c)). The canonical record + `paymentRequestEvent` provide the audit history; reintroducing
+  a raw payload store requires a QE decision and a spec update first.
 - **`paymentRequestEvent`** (timeseries, TTL 365d, meta=`paymentRequestInstanceReference`): per-request trail.
-- **`qrPaymentRepresentation`** (plaintext): shared QR capability (RTP / payment_link / checkout). Stores
-  only the encoded payload (signed deep link / EPC / EMVCo), never the image. Single-use + TTL.
+- **`qrPaymentRepresentation`** (plaintext, no QE): shared QR capability (RTP / payment_link /
+  checkout). Never stores the image. Single-use + TTL. `payloadFormat` is `'url'` or `'sepa_epc'`.
+  - **No QE, by design (v35 CH-1).** MongoDB forbids TTL indexes on encrypted collections
+    (err 6346501) and the `expiresAt` TTL is what expires the payment intent, so the collection
+    cannot be encrypted. The creditor PII is kept out instead of encrypted: `encodedPayload` is
+    durable **only** for `'url'` (a signed deep link). The `'sepa_epc'` EPC069-12 form embeds the
+    creditor IBAN and payee name, so it is **derived on read** by `hydrate()` from
+    `paymentRequestProcedure` + `payoutAccountArrangement`, whose PII is already QE:none
+    (GDPR Art. 32 / PSD2; account/alias based, NOT PCI scope). The field is therefore optional.
+  - `'sepa_epc'` is available only for `subjectType: 'rtp_request'`, the only subject with a
+    resolvable creditor account; other subjects get 400 `unsupported_subject_for_format`. An
+    unsupported format gets 400 `unsupported_payload_format`, never a silent downgrade to `'url'`.
+    A `'sepa_epc'` record whose account cannot be resolved gets 409 `epc_source_unavailable`.
+  - The issue endpoint accepts **no** `iban`/`payeeName`/`amount` inputs: they are derived, so
+    creditor PII cannot be injected into this record from the API.
+  - `createCollections.ts` self-heals the inverse case: a collection that exists **encrypted** while
+    the code wants it plaintext is dropped and recreated (with its `enxcol_.*` state collections),
+    because `setup:db` otherwise skips it and the TTL index then fails with 6346501. This is what
+    unblocks a DB left encrypted by an earlier run, without a full `--reset`.
 - **`rtpAliasDirectoryCache`** (plaintext): `aliasHash` (unique) → party/counterparty, TTL.
 - Indexes: see `createIndexes.ts` (inbox/outbox, expiry sweeper `{status,expiresAt}`, linkage, idempotency).
 - `BusinessEntityType` gains `'payment_request'`; `NotificationType` gains `'payment_request'`.
@@ -4351,7 +4372,11 @@ the wire contract. Admin dashboard `/system/admin/modules/vop`. Config: `PSP_RTP
 `POST/GET /requests`, `GET /requests/:ref`, `/present`, `/view`, `/verify-payee`, `/accept`, `/reject`,
 `/cancel`, `/events`, `/qr`; shared `POST /gateway/qr/represent`, `GET /gateway/qr/:ref`. All mutating routes
 use `dualPermission` (session RBAC `paymentRequests:view/manage` OR merchant OAuth `read:rtp`/`write:rtp`)
-+ idempotency keys. ACL resource `paymentRequests` (SD-65); OAuth scopes `read:rtp`/`write:rtp` (SCOPE_CATALOG
++ idempotency keys. v35 CH-3: **issuing** a QR is write-level on both surfaces
+(`POST /requests/:ref/qr` and `POST /gateway/qr/represent` → `paymentRequests:manage` / `write:rtp`),
+since it inserts a QR record and sets `qrRepresentationReference`; **resolving** (`GET /gateway/qr/:ref`)
+stays read-level. Read-only oversight roles (`level1_analyst`, `security_auditor`) hold
+`paymentRequests:['view']` only and are therefore refused on issue (PCI DSS Req 7 least privilege). ACL resource `paymentRequests` (SD-65); OAuth scopes `read:rtp`/`write:rtp` (SCOPE_CATALOG
 + merchant client seed + REQUESTED_SCOPES). Config gate `PSP_RTP_ENABLED`. ISO 20022 mapper: `rtpIso20022.mapper.ts`.
 
 *Added 2026-07-17 (v28).*
@@ -4597,6 +4622,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 |---|---|---|---|
 | `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
 | `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balances), `balanceCreditLog` | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
+| `gateway` (SD-65 RTP + QR) | `paymentRequestProcedure`, `paymentRequestEvent`, `qrPaymentRepresentation`, `rtpAliasDirectoryCache` | `party`, `payoutAccountArrangement`, `counterpartyArrangement`, `complianceProcessEvent` | Account/alias based, NOT PCI scope (no PAN/CHD). QE:none on the request (payee name, aliases, remittance, address); the QR record holds no PII at all, its EPC form is derived on read (GDPR Art. 32 / PSD2). Aliases indexed by SHA-256 hash only |
 | `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34) |
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
 | `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |

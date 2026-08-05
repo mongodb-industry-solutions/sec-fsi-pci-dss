@@ -119,7 +119,7 @@ export interface PaymentRequestProcedure {
   qrRepresentationReference?: string;            // FK → qrPaymentRepresentation (§3.4)
   linkedPaymentExecutionReference?: string;      // set on accept, immutable once set
 
-  originalPayload?: Record<string, unknown>;     // polymorphic raw ingestion payload
+  // v35 CH-4: `originalPayload` removed (unused free-shape field, minimization risk. GDPR Art. 5(1)(c)).
 
   idempotencyKey?: string;
 

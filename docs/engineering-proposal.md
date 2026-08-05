@@ -2403,3 +2403,63 @@ A third finding was in the compensation itself: once the PISP has accepted the s
 reservation belongs to the rail outcome, so an unexpected error after that point must NOT release it.
 It annotates the record and leaves `bank.transfer.settled` / `.failed` to resolve it; otherwise a later
 settlement would credit against a reservation already reversed and drive `pendingAmount` negative.
+
+### ADR-058: a QR payload is protected wherever it lands, and an unbuildable format is refused (v35)
+
+**Status.** Accepted.
+
+**Context.** v28 shipped the shared QR capability (`qrPaymentRepresentation`) as a deliberately
+plaintext collection, on the stated grounds that it holds "no sensitive plaintext, only a signed deep
+link / EMVCo / EPC string". The v34 analysis of the MongoDB QR payment architecture material tested
+that claim against the code and found it false for one branch: for `payloadFormat: 'sepa_epc'`,
+`buildPayload` writes an EPC069-12 payload embedding the creditor IBAN and the payee name into
+`encodedPayload`. The same payee name is QE-encrypted on `paymentRequestProcedure`, so the QR record
+was a cleartext side channel around the platform's own field protection, on the only payment
+collection with neither QE nor tests.
+
+Two adjacent defects surfaced with it. `payloadFormat: 'emvco'` was an accepted enum value with no
+implementation, so the service silently produced a `url` deep link and stored a record that misreported
+its own content; and `paymentRequestProcedure.originalPayload`, a free-shape unencrypted field added to
+hold a raw ingestion payload, was never written or read. The source article recommends storing the raw
+polymorphic payload beside the canonical one, which is precisely what that field would have enabled.
+
+**Decision.**
+
+1. **Do not store what must be protected.** QE on this collection was attempted and is **not
+   possible**: MongoDB forbids TTL indexes on encrypted collections (err 6346501), and the `expiresAt`
+   TTL is what expires the payment intent. Encrypting the field would have meant trading a working
+   expiry mechanism for a key, so the payload is kept out of the record instead. `encodedPayload` is
+   durable only for `'url'`; the EPC069-12 form is derived on read from `paymentRequestProcedure` +
+   `payoutAccountArrangement`, already QE:none. The encoding is unchanged, its lifetime is not.
+   Consequences: no schema change, no new DEK, no `--reset`, TTL intact, and the issue endpoint stops
+   accepting `iban`/`payeeName`/`amount` so creditor PII cannot be injected from the API. The cost is
+   that `'sepa_epc'` is limited to `subjectType: 'rtp_request'`, the only subject with a resolvable
+   creditor account, and that a QR whose account has since disappeared returns 409 rather than a
+   stale payload. Both are correct: a payment QR whose creditor cannot be resolved should not render.
+2. **Refuse what cannot be built.** An unsupported `payloadFormat`, and `sepa_epc` on a subject with
+   no derivable creditor account, raise `QrPayloadError` → 400. Silent degradation to `url` is a
+   data-integrity defect: the stored record and the API response both claimed a format never produced.
+3. **No card-proxy QR.** `emvco` is removed rather than implemented. An EMVCo card-proxy QR would pull
+   CHD into an account/alias-based record that PRD and spec both place outside PCI scope; extending
+   PCI scope into the request domain is a product decision, not a code change.
+4. **Do not retain the raw payload.** `originalPayload` is removed. This is a deliberate departure
+   from the source article's side-by-side pattern, on PCI DSS Req 3 and GDPR Art. 5(1)(c) grounds: the
+   canonical record plus the `paymentRequestEvent` timeseries already provide the audit history, and an
+   arbitrary-shape unencrypted field beside QE-protected PII is a minimization risk with no caller.
+   Reintroducing it requires a QE decision and a spec update first.
+5. **Issuing a QR is a write.** `POST /rtp/requests/:ref/qr` moves to `paymentRequests:manage` /
+   `write:rtp`, matching the rule `POST /gateway/qr/represent` already documented. Resolving stays
+   read-level. Read-only oversight roles are consequently refused on issue, consistent with the
+   ADR-048 line (v32 A8) that a read-only auditor holding a mutating permission is an SoD finding.
+
+**Consequences.** The demo keeps its one standards-compliance artifact on this surface (the EPC069-12
+encoder) and keeps its TTL, while the creditor data the payload embeds never lands in the record. No
+schema, DEK or seed change, so no `--reset` is needed. The QR surface gains its first tests. Sharding
+for the static-merchant-QR write hotspot is documented as a design, not implemented: a
+single-deployment demo cannot demonstrate a compound shard key, so it would be setup cost with no
+on-screen value.
+
+**Note on the rejected alternative.** QE was the first choice and was implemented before the TTL
+constraint surfaced during `setup:db`. It is recorded here because the reasoning is not obvious: on a
+collection whose expiry is enforced by a TTL index, "encrypt the sensitive field" is unavailable, and
+the correct move is to stop persisting the field rather than to weaken the lifecycle.
