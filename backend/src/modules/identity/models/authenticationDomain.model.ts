@@ -1,4 +1,4 @@
-// BIAN SD-16: Party Authentication - Authentication Domain configuration records
+// Party Authentication - Authentication Domain configuration records
 
 export const AUTHENTICATION_DOMAIN_COLLECTION = 'authenticationDomain';
 

@@ -1,5 +1,5 @@
 /**
- * P1 (dev.v8) — SDD contract test for the §7 bus payload + wire contracts.
+ * P1 (dev.v8): SDD contract test for the §7 bus payload + wire contracts.
  * Pure type-binding + structural checks: every §7 interface exists, binds to the DomainEvent
  * envelope, and carries no raw CHD keys. No runtime/DB.
  */

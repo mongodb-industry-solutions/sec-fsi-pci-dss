@@ -23,7 +23,7 @@ vi.mock('../../../../backend/src/modules/notification/notifications.service', ()
 
 import { createFraudCase, getCases, getCaseById, openCaseFromExecution } from '../../../../backend/src/modules/fraud/services/fraudDiagnosis.service';
 
-// Minimal transaction snapshot embedded in every fraud case (BIAN SD-254).
+// Minimal transaction snapshot embedded in every fraud case .
 const snapshot = {
   cardTransactionAmount: { amount: 850, currency: 'USD' },
   cardTransactionMerchantName: 'Test Merchant',

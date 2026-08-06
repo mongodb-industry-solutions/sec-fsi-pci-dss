@@ -1,7 +1,7 @@
-// BIAN SD-83 (Fraud Diagnosis): structured customer questions raised by L1/L2 investigators on a
+// (Fraud Diagnosis): structured customer questions raised by L1/L2 investigators on a
 // case, answered by the customer on the related transaction. Append-only / immutable once answered
-// (PCI DSS Req 10 traceability; no edit after submission). The QUESTION and the customer's RESPONSE
-// carry no cardholder data (CHD) — only free text the customer chooses to provide.
+// (PCI DSS traceability; no edit after submission). The QUESTION and the customer's RESPONSE
+// carry no cardholder data (CHD), only free text the customer chooses to provide.
 import type { AnalystRole } from '../../../shared/models/identity.model';
 
 export const CUSTOMER_QUESTION_COLLECTION = 'fraudDiagnosisCustomerQuestion';
@@ -10,11 +10,11 @@ export type CustomerQuestionStatus = 'pending' | 'closed';
 
 export interface CustomerQuestionRecord {
   customerQuestionInstanceReference: string;     // PK, UUID
-  fraudDiagnosisInstanceReference: string;       // FK → fraudDiagnosisCase (SD-83)
+  fraudDiagnosisInstanceReference: string;       // FK → fraudDiagnosisCase 
   fraudDiagnosisCaseReference: string;           // human-readable case ref (display only)
-  cardTransactionInstanceReference: string;      // FK → cardTransaction (SD-254); customer entry point
-  customerAgreementInstanceReference: string;    // FK → customerAgreement (SD-53)
-  partyInstanceReference: string;                // FK → party (SD-13); used for ownership checks
+  cardTransactionInstanceReference: string;      // FK → cardTransaction ; customer entry point
+  customerAgreementInstanceReference: string;    // FK → customerAgreement 
+  partyInstanceReference: string;                // FK → party ; used for ownership checks
   questionText: string;
   questionOptions: string[];                     // predefined selectable responses (e.g. ['Yes','No'])
   allowOther: boolean;                           // whether a free-text "Other" answer is permitted
@@ -36,7 +36,7 @@ export interface CustomerQuestionRecord {
 }
 
 // Client-facing shape. Deliberately omits internal refs (case/agreement/party instance references)
-// the caller does not need — data minimization (PCI DSS Req 7).
+// the caller does not need: data minimization (PCI DSS).
 export interface CustomerQuestionDTO {
   questionId: string;
   caseReference: string;

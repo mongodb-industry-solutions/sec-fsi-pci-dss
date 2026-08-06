@@ -13,7 +13,7 @@ export const NEW_CARD = 'new';
 // BROWSER-TOKEN ONLY: cards are surfaced ONLY for the AUTHENTICATED viewer of THIS browser,
 // identified by the PSP portal session token (cookie `demo_token`, same origin as /gateway/*).
 // Opening a checkout/link URL WITHOUT being logged in shows NO cards (new-card-only). There is NO
-// fallback to the session/link's stored acting party — doing so would reveal that user's cards to
+// fallback to the session/link's stored acting party: doing so would reveal that user's cards to
 // anyone who opens the URL (a security/PCI/GDPR leak). If the payer authenticated only via merchant
 // SSO (no PSP portal token on this origin), they simply enter a new card.
 //

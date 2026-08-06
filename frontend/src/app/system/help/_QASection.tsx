@@ -303,16 +303,16 @@ const QA_DATA: QAItem[] = [
         <P><Em>Partially.</Em> The MongoDB Atlas AOC covers the certified PCI DSS scope of the platform: storage, network, and infrastructure. It does not cover your application&apos;s implementation of QE, key management practices, or how you handle the Data Encryption Keys (DEKs) and Customer Master Key (CMK).</P>
         <P>Your QSA will still need to assess:</P>
         <Ul items={[
-          <><Em>Req 3.6:</Em> How the CMK is managed in AWS KMS, DEK rotation schedules, and the KMS key policy.</>,
+          <><Em>:</Em> How the CMK is managed in AWS KMS, DEK rotation schedules, and the KMS key policy.</>,
           'How DEKs are provisioned and rotated.',
           'How the application client (backend service) holds and uses the KMS credentials.',
-          <><Em>Req 7:</Em> Whether access to the decryption capability is role-restricted.</>,
-          <><Em>Req 10:</Em> Whether every field-access event is audited.</>,
+          <><Em>:</Em> Whether access to the decryption capability is role-restricted.</>,
+          <><Em>:</Em> Whether every field-access event is audited.</>,
         ]} />
         <P>The MongoDB AOC reduces the burden of assessing the platform layer; your assessor applies their judgment to the application layer.</P>
       </div>
     ),
-    tags: ['QSA', 'AOC', 'CMK', 'DEK', 'KMS', 'key management', 'Req 3.6'],
+    tags: ['QSA', 'AOC', 'CMK', 'DEK', 'KMS', 'key management', ''],
   },
   {
     id: 16, category: 2,
@@ -348,12 +348,12 @@ const QA_DATA: QAItem[] = [
         <Table
           headers={['PCI DSS Requirement', 'Atlas Feature']}
           rows={[
-            ['Req 1–2 (Network security)', 'IP Access Lists, VPC Peering, Private Endpoints, tenant isolation between clusters'],
-            ['Req 3.4 (CHD unreadable at rest)', 'AES-256 encryption at rest on all storage volumes and backup media'],
-            ['Req 4 (Encryption in transit)', 'TLS 1.2+ enforced on all client connections; cannot be disabled'],
-            ['Req 7–8 (Access control & auth)', 'Atlas RBAC, MFA on Atlas console, LDAP integration, privileged access management'],
-            ['Req 10 (Audit logging)', 'Atlas Audit Log infrastructure, maintained and secured by MongoDB'],
-            ['Req 11–12 (Vuln. management)', 'MongoDB patching program, security scanning, and information security policies'],
+            ['–2 (Network security)', 'IP Access Lists, VPC Peering, Private Endpoints, tenant isolation between clusters'],
+            ['(CHD unreadable at rest)', 'AES-256 encryption at rest on all storage volumes and backup media'],
+            ['(Encryption in transit)', 'TLS 1.2+ enforced on all client connections; cannot be disabled'],
+            ['–8 (Access control & auth)', 'Atlas RBAC, MFA on Atlas console, LDAP integration, privileged access management'],
+            ['(Audit logging)', 'Atlas Audit Log infrastructure, maintained and secured by MongoDB'],
+            ['–12 (Vuln. management)', 'MongoDB patching program, security scanning, and information security policies'],
           ]}
         />
         <P><Em>What the AOC does NOT cover (Layer 2):</Em></P>
@@ -388,15 +388,15 @@ const QA_DATA: QAItem[] = [
         />
         <P><Em>QE directly addresses specific PCI DSS v4.0 requirements:</Em></P>
         <Ul items={[
-          <><Em>Req 3.4:</Em> CHD field is encrypted before the BSON document leaves the application server. MongoDB never receives plaintext, so it cannot appear in any server-side log, memory snapshot, or diagnostic tool.</>,
-          <><Em>Req 3.6:</Em> The CMK is held exclusively by the customer in AWS KMS. Revoking the CMK immediately renders all QE-encrypted data unreadable from every system, including Atlas itself.</>,
-          <><Em>Req 7:</Em> A user with full Atlas admin credentials querying without the QE client receives only opaque binary ciphertext. The restriction is <em>mathematical</em>, not policy-based, and cannot be bypassed by any administrative action inside Atlas.</>,
-          <><Em>Req 10:</Em> Every decryption event occurs in the application layer, where it can be logged with full business context: user, role, fraud case, fields accessed, and timestamp.</>,
+          <><Em>:</Em> CHD field is encrypted before the BSON document leaves the application server. MongoDB never receives plaintext, so it cannot appear in any server-side log, memory snapshot, or diagnostic tool.</>,
+          <><Em>:</Em> The CMK is held exclusively by the customer in AWS KMS. Revoking the CMK immediately renders all QE-encrypted data unreadable from every system, including Atlas itself.</>,
+          <><Em>:</Em> A user with full Atlas admin credentials querying without the QE client receives only opaque binary ciphertext. The restriction is <em>mathematical</em>, not policy-based, and cannot be bypassed by any administrative action inside Atlas.</>,
+          <><Em>:</Em> Every decryption event occurs in the application layer, where it can be logged with full business context: user, role, fraud case, fields accessed, and timestamp.</>,
         ]} />
         <Callout label="Key Principle">Atlas certification covers the infrastructure contract. QE covers the data contract. A complete PCI DSS posture requires both.</Callout>
       </div>
     ),
-    tags: ['QE', 'PCI DSS', 'Req 3.4', 'Req 3.6', 'Req 7', 'Req 10', 'threat model', 'certification'],
+    tags: ['QE', 'PCI DSS', '', '', '', '', 'threat model', 'certification'],
   },
   {
     id: 19, category: 3,
@@ -451,7 +451,7 @@ const QA_DATA: QAItem[] = [
         <P>With an external issuer provider, no PAN is stored by this system at all: the PAN is then held by that provider or the network token vault (e.g., Visa Token Service or Mastercard MDES), a separately PCI DSS certified environment.</P>
       </div>
     ),
-    tags: ['Req 3.4', 'PAN', 'tokenization', 'non-storage', 'maskedPan', 'Visa Token Service'],
+    tags: ['', 'PAN', 'tokenization', 'non-storage', 'maskedPan', 'Visa Token Service'],
   },
   {
     id: 21, category: 4,
@@ -466,36 +466,36 @@ const QA_DATA: QAItem[] = [
             [<Code>paymentCardReference</Code>, 'Not CHD; plaintext storage is correct (see Q9)'],
             [<Code>maskedPanDisplay</Code>, 'Permitted for UI display'],
             [<><Code>cardExpirationDate</Code> [ciphertext]</>, 'CHD; QE:none already correct'],
-            [<Code>cardholderConsentTimestamp</Code>, 'Required: Req 3.1 + network rules'],
-            [<><Code>mandateStatus</Code> (active / cancelled / expired)</>, 'Required for Req 3.7 purge logic'],
+            [<Code>cardholderConsentTimestamp</Code>, 'Required: + network rules'],
+            [<><Code>mandateStatus</Code> (active / cancelled / expired)</>, 'Required for purge logic'],
           ]}
         />
         <P><Em>⛔ CVV on file is always prohibited (Requirement 3.3).</Em> Recurring transactions are merchant-initiated and do not require CVV re-entry; the stored consent replaces it.</P>
         <P><Em>Four requirements specific to recurring payment:</Em></P>
         <Ul items={[
-          <><Em>Explicit cardholder consent (Req 3.1 + network rules):</Em> The save-card step must present an explicit consent checkbox and record the <Code>cardholderConsentTimestamp</Code>. Without documented consent, storing card data for future charges violates both PCI DSS and payment network rules.</>,
-          <><Em>Scope-limited access to the charge trigger (Req 7):</Em> Only the payment processing service should be able to initiate a new charge. Fraud investigation and analytics roles must not have access to the recurring charge endpoint.</>,
-          <><Em>Periodic purge of unused stored cards (Req 3.7):</Em> Stored card data must be deleted when the customer cancels the mandate, when the card expires with no replacement token, or when the agreed retention period ends.</>,
+          <><Em>Explicit cardholder consent ( + network rules):</Em> The save-card step must present an explicit consent checkbox and record the <Code>cardholderConsentTimestamp</Code>. Without documented consent, storing card data for future charges violates both PCI DSS and payment network rules.</>,
+          <><Em>Scope-limited access to the charge trigger:</Em> Only the payment processing service should be able to initiate a new charge. Fraud investigation and analytics roles must not have access to the recurring charge endpoint.</>,
+          <><Em>Periodic purge of unused stored cards:</Em> Stored card data must be deleted when the customer cancels the mandate, when the card expires with no replacement token, or when the agreed retention period ends.</>,
           <><Em>Token lifecycle and automatic card update:</Em> Network tokens issued by Visa Token Service or Mastercard MDES can auto-update when the physical card is reissued via Visa Account Updater (VAU) or Mastercard Automatic Billing Updater (ABU).</>,
         ]} />
       </div>
     ),
-    tags: ['recurring payment', 'save card', 'v4', 'consent', 'mandate', 'CVV', 'Req 3.3', 'Req 3.7'],
+    tags: ['recurring payment', 'save card', 'v4', 'consent', 'mandate', 'CVV', '', ''],
   },
   {
     id: 22, category: 4,
     question: 'Why can\'t a Level 2 Investigator see sensitive customer data just by having the Level 2 role? What is the escalation token and why is it required?',
     answer: (
       <div>
-        <P>This is one of the most important design decisions in the v2 architecture. The short answer is: <Em>a job title is not a justification</Em>. PCI DSS Req 7.1 requires that access to cardholder data must be granted on a <Em>need-to-know</Em> basis. A Level 2 Investigator has the <em>capability</em> to see sensitive data, but that capability must only be exercised when there is an active, documented reason: specifically, a case that has been flagged as requiring deeper investigation.</P>
+        <P>This is one of the most important design decisions in the v2 architecture. The short answer is: <Em>a job title is not a justification</Em>. PCI DSS requires that access to cardholder data must be granted on a <Em>need-to-know</Em> basis. A Level 2 Investigator has the <em>capability</em> to see sensitive data, but that capability must only be exercised when there is an active, documented reason: specifically, a case that has been flagged as requiring deeper investigation.</P>
         <P><Em>How the escalation token satisfies PCI DSS:</Em></P>
         <Table
           headers={['Requirement', 'How the escalation token satisfies it']}
           rows={[
-            ['Req 7.1: Restrict access by business need', 'The token proves the business need: a specific case, at a specific time, approved by the L2 investigator. Without the token, access is blocked regardless of role.'],
-            ['Req 7.2: Access control based on need to know', 'Access requires role + valid token + case match. This is two-factor access control on sensitive data; role alone is not sufficient.'],
-            ['Req 10.2: Audit trail for access to CHD', 'Every sensitive field access writes a field_accessed audit event with: timestamp, role, caseId, and the exact field names accessed, linked to the case that justified the access.'],
-            ['Req 10.3: Protect audit logs from destruction', 'Audit events are written to fraudDiagnosisCaseEvents with no delete API exposed.'],
+            [': Restrict access by business need', 'The token proves the business need: a specific case, at a specific time, approved by the L2 investigator. Without the token, access is blocked regardless of role.'],
+            [': Access control based on need to know', 'Access requires role + valid token + case match. This is two-factor access control on sensitive data; role alone is not sufficient.'],
+            [': Audit trail for access to CHD', 'Every sensitive field access writes a field_accessed audit event with: timestamp, role, caseId, and the exact field names accessed, linked to the case that justified the access.'],
+            [': Protect audit logs from destruction', 'Audit events are written to fraudDiagnosisCaseEvents with no delete API exposed.'],
           ]}
         />
         <P><Em>Role decision matrix:</Em></P>
@@ -512,40 +512,40 @@ const QA_DATA: QAItem[] = [
         <P><Em>Implementation:</Em> Token store at <Code>backend/src/vendors/security/escalationTokens.ts</Code>; access gate at <Code>backend/src/modules/customer/services/customerAgreement.service.ts</Code>.</P>
       </div>
     ),
-    tags: ['RBAC', 'escalation token', 'Req 7', 'Req 10', 'need-to-know', 'audit', 'level2_investigator'],
+    tags: ['RBAC', 'escalation token', '', '', 'need-to-know', 'audit', 'level2_investigator'],
   },
   {
     id: 23, category: 4,
     question: 'How does the save card / recurring payment feature align with BIAN Service Domains?',
     answer: (
       <div>
-        <P>The save card feature does not require a new BIAN Service Domain. A customer&apos;s authorization to charge a card for future payments is a behavioral capability of the <Em>Customer Agreement (SD-53)</Em>, not a standalone entity.</P>
+        <P>The save card feature does not require a new BIAN Service Domain. A customer&apos;s authorization to charge a card for future payments is a behavioral capability of the <Em>Customer Agreement</Em>, not a standalone entity.</P>
         <Table
           headers={['Action', 'BIAN Service Domain', 'Collection', 'Field additions']}
           rows={[
-            ['Customer saves a card as preferred payment method', 'Payment Card (SD-88)', <Code>paymentCardQE</Code>, 'isPreferredPaymentMethod, mandateStatus, cardholderConsentTimestamp, mandateExpiryDate'],
-            ['Customer grants consent for future charges', 'Customer Agreement (SD-53)', <Code>customerAgreementQE</Code>, 'preferredPaymentCardReference (link to the saved card)'],
-            ['Recurring charge is executed', 'Card Transaction (SD-254)', <Code>cardTransactionQE</Code>, 'cardTransactionInitiationType (customerInitiated / merchantInitiated)'],
+            ['Customer saves a card as preferred payment method', 'Payment Card', <Code>paymentCardQE</Code>, 'isPreferredPaymentMethod, mandateStatus, cardholderConsentTimestamp, mandateExpiryDate'],
+            ['Customer grants consent for future charges', 'Customer Agreement', <Code>customerAgreementQE</Code>, 'preferredPaymentCardReference (link to the saved card)'],
+            ['Recurring charge is executed', 'Card Transaction', <Code>cardTransactionQE</Code>, 'cardTransactionInitiationType (customerInitiated / merchantInitiated)'],
           ]}
         />
         <P>This means v4 save card is <Em>three field extensions across existing collections</Em> with no new collection needed. The mandate is expressed through the link between <Code>customerAgreementQE.preferredPaymentCardReference</Code> and <Code>paymentCardQE.mandateStatus</Code>.</P>
         <P>Under Visa and Mastercard rules, merchant-initiated transactions have a different authorization flow: they do not require CVV re-entry, they carry a specific network flag affecting interchange rates and chargeback rules, and they reference the stored consent instead. Storing <Code>cardTransactionInitiationType</Code> makes the transaction type explicit to any downstream compliance or dispute resolution system.</P>
       </div>
     ),
-    tags: ['BIAN', 'SD-88', 'SD-53', 'SD-254', 'recurring payment', 'mandate', 'merchant-initiated'],
+    tags: ['BIAN', 'payment card', 'customer agreement', 'card transaction', 'recurring payment', 'mandate', 'merchant-initiated'],
   },
   {
     id: 24, category: 4,
     question: 'How is the CVV handled realistically without ever storing it?',
     answer: (
       <div>
-        <P>The CVV is Sensitive Authentication Data: PCI DSS Req 3.2 forbids storing it after authorization, in cleartext or ciphertext. The built-in issuer therefore <Em>derives</Em> it per card on demand instead of storing a value, exactly as a real issuer recomputes it in an HSM:</P>
+        <P>The CVV is Sensitive Authentication Data: PCI DSS forbids storing it after authorization, in cleartext or ciphertext. The built-in issuer therefore <Em>derives</Em> it per card on demand instead of storing a value, exactly as a real issuer recomputes it in an HSM:</P>
         <Callout label="Derivation">cvv = digits( HMAC-SHA256( CVK, cardToken | expiryMMYY | serviceCode ) ) truncated to the network length (3 for Visa/Mastercard, 4 for Amex).</Callout>
         <P>The <Code>CVK</Code> is the issuer key: module-owned key material, provisioned once and stored only wrapped (envelope encryption: KMS/master key → DEK → CVK), with cleartext only in process memory. The CVV appears only in an ephemeral, audited reveal response, never in a collection, log, listing, or validation response.</P>
         <P>Two demo modes coexist via <Code>cvvMode</Code>: a <Em>global</Em> escape-hatch CVV for fast walkthroughs, and the realistic <Em>per-card</Em> derived CVV. The default <Code>both</Code> accepts either; <Code>global</Code> or <Code>per_card</Code> restrict to one. The global value is not hardcoded: it seeds as <Code>123</Code> and is edited in the card-issuer module admin by <Em>operations_officer</Em> or <Em>manager</Em> (<Code>modules:manage</Code>).</P>
       </div>
     ),
-    tags: ['CVV', 'SAD', 'Req 3.2', 'HMAC', 'CVK', 'envelope encryption', 'derivation', 'cvvMode'],
+    tags: ['CVV', 'SAD', '', 'HMAC', 'CVK', 'envelope encryption', 'derivation', 'cvvMode'],
   },
   {
     id: 25, category: 4,

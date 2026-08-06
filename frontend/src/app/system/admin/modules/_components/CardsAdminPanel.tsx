@@ -9,10 +9,10 @@ import { useNotify, useConfirm } from '../../../../../components/ui/ConfirmProvi
 import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { ModalShell, Field, ModalActions } from './AdminModal';
 
-// v29 SD-88 global card administration panel (built-in card-issuer module). Rendered as the "Cards"
+// v29 global card administration panel (built-in card-issuer module). Rendered as the "Cards"
 // tab of the card-issuer module page. Display-safe only: masked PAN, surrogate token, network, status.
 // Full PAN / CVV / PIN are never accepted or shown; expiry only in per-card detail (need-to-know).
-// PCI DSS Req 3.2/3.3, Req 7, Req 10. Receives 409 managed_externally → static banner.
+// PCI DSS. Receives 409 managed_externally → static banner.
 
 const NETWORKS = ['VISA', 'MASTERCARD', 'AMEX', 'ELO'] as const;
 const STATUSES = ['issued', 'active', 'pending_activation', 'blocked', 'suspended', 'revoked', 'expired'] as const;
@@ -307,7 +307,7 @@ function CreateCardModal({ token, onClose, onCreated, notify }: {
           <input value={form.paymentCardAlias} onChange={(e) => setForm({ ...form, paymentCardAlias: e.target.value })}
             maxLength={40} className="w-full border rounded-lg px-3 py-2 text-sm" placeholder="e.g. Corporate travel card" />
         </Field>
-        <p className="text-xs text-gray-400">CVV and PIN are never accepted or stored (PCI DSS Req 3.2). PAN is display-safe (masked) only.</p>
+        <p className="text-xs text-gray-400">CVV and PIN are never accepted or stored (PCI DSS). PAN is display-safe (masked) only.</p>
       </div>
       <ModalActions onClose={onClose} onConfirm={submit} confirmLabel={saving ? 'Saving…' : 'Register'} disabled={saving || !valid} />
     </ModalShell>

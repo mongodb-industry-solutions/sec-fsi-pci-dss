@@ -6,7 +6,6 @@ export default function FraudDetectionPage() {
       type: 'fraud_detection',
       label: 'Fraud Detection',
       description: 'Real-time transaction scoring and fraud signals',
-      bianSd: 'SD-63',
     }} />
   );
 }

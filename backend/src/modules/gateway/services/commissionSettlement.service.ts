@@ -1,4 +1,4 @@
-// BIAN SD-89 (pricing) + SD-66 (balances): merchant-commission collection.
+// (pricing) + (balances): merchant-commission collection.
 //
 // The commission is never added on top of what the buyer pays. The buyer is charged the gross amount;
 // at settlement the PSP remits `netAmount` to the merchant and moves `feeAmount` into its own revenue
@@ -7,7 +7,7 @@
 //   PSP revenue avail += feeAmount
 // Without it the merchant would be credited the gross while `feeAmount` claimed a collected commission.
 //
-// PCI DSS Req 10: every credit is mirrored in balanceCreditLog and in a businessProcessEvent.
+// PCI DSS: every credit is mirrored in balanceCreditLog and in a businessProcessEvent.
 // Operates only on PSP-internal UUID references, never on CHD.
 
 import { Db } from 'mongodb';
@@ -17,7 +17,7 @@ import { creditDirect, settleCardDebit } from './payoutAccountBalance.service';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 
 // Deterministic references for the PSP's own revenue ledger (seeded by seedPspRevenueAccount).
-// The PSP is a party (SD-13) like any other holder, so the account needs no special-case model.
+// The PSP is a party like any other holder, so the account needs no special-case model.
 export const PSP_REVENUE_PARTY_REFERENCE = 'psp00001-0000-4000-8000-000000000001';
 export const PSP_REVENUE_ACCOUNT_REFERENCE = 'paop0001-0000-4000-8000-000000000001';
 

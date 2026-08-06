@@ -1,4 +1,4 @@
-// GET /api/auth/callback — validate state, exchange code→tokens, verify id_token, persist session.
+// GET /api/auth/callback: validate state, exchange code→tokens, verify id_token, persist session.
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCode, verifyIdToken, fetchUserinfo } from '@/lib/oauth';
 import { attachSession, clearLoginStateOn, readLoginState } from '@/lib/session';
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
       const claims = await verifyIdToken(tokens.id_token, login.nonce);
       sub = claims.sub;
       idName = claims.name;
-      // Only trust an email claim if the `email` scope was actually granted — never store
+      // Only trust an email claim if the `email` scope was actually granted, never store
       // an address the user did not consent to share (GDPR data minimization / scope binding).
       email = grantedScopes.includes('email') ? claims.email : undefined;
     }
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest) {
     return res;
   } catch (e) {
     // The real cause (from exchangeCode / verifyIdToken): invalid_grant, invalid_client, PKCE mismatch,
-    // redirect_uri mismatch, discovery unreachable, id_token nonce mismatch, … — no secret is logged.
+    // redirect_uri mismatch, discovery unreachable, id_token nonce mismatch, …, no secret is logged.
     const err = e as { code?: string; description?: string; message?: string };
     oauthLog.error('callback.failed', {
       flowId,

@@ -8,7 +8,7 @@
 export type DecisionMode = 'manual' | 'automated' | 'assisted';
 
 // Decision-mode config, stored per capability in capabilityModuleConfiguration.moduleConfig (kyc/kyb),
-// edited from the Configuration tab. The PROVIDER never sets these — it returns evidence; the PSP
+// edited from the Configuration tab. The PROVIDER never sets these: it returns evidence; the PSP
 // decides how evidence resolves. Unknown/unset decisionMode → default `manual` (fail-safe).
 export interface DecisionModeConfig {
   decisionMode?: DecisionMode;

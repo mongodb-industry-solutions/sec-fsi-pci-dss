@@ -38,19 +38,19 @@ All five capabilities are designed to be **100% BIAN SD-193 compatible** and **P
 
 ### Identified gaps
 
-**Gap 1 — Fixed payload contract**  
+**Gap 1: Fixed payload contract**  
 The dispatch service sends internal field names directly to the external endpoint. If a legacy fraud detection system expects `risk_level` instead of `fraudScore`, the integration fails silently or requires a code-level adapter. There is no UI-based way to configure field name translation.
 
-**Gap 2 — Auth credentials not configurable at runtime**  
+**Gap 2: Auth credentials not configurable at runtime**  
 The admin can register a new provider with a type (bearer/api_key/hmac/oauth2_cc) but cannot configure WHERE the API key goes (which header, query param, or body field), cannot configure OAuth2 token endpoint/scopes, and cannot configure outbound HMAC parameters. These are hardcoded.
 
-**Gap 3 — No category-specific operational parameters**  
-A KYC provider has verification levels, document types, and re-verification periods. An AML provider has screening lists, jurisdictions, and SAR thresholds. The current schema has no place for these — all categories share the same flat configuration.
+**Gap 3, No category-specific operational parameters**  
+A KYC provider has verification levels, document types, and re-verification periods. An AML provider has screening lists, jurisdictions, and SAR thresholds. The current schema has no place for these: all categories share the same flat configuration.
 
-**Gap 4 — Single active provider per type**  
+**Gap 4: Single active provider per type**  
 `getActiveProviderForType()` returns exactly one provider. An organization running two fraud detection engines (one real-time, one ML batch) cannot configure both. There is no fallback, no load balancing, and no parallel enrichment.
 
-**Gap 5 — No generic integration type**  
+**Gap 5, No generic integration type**  
 Some business events (contract signing, notification dispatch, document archival) require external calls but don't belong to the 6 compliance domains. Today they must be hardcoded outside the registry.
 
 ---
@@ -94,7 +94,7 @@ Callback Service (enhanced)
 
 ### 3.2 Field Mapping Engine
 
-The field mapping engine is a **pure data transformation layer** — it never touches cardholder data, encryption keys, or PCI DSS in-scope fields (see §7 for PCI DSS analysis).
+The field mapping engine is a **pure data transformation layer**: it never touches cardholder data, encryption keys, or PCI DSS in-scope fields (see §7 for PCI DSS analysis).
 
 **Supported transformation types:**
 
@@ -147,7 +147,7 @@ Multiple `ExternalProviderArrangement` records can belong to the same **routing 
 
 Each integration type exposes a typed `categoryConfig` sub-document. The UI renders a different form per type. The backend validates the config shape against the type.
 
-#### fraud_detection — FraudDetectionConfig
+#### fraud_detection: FraudDetectionConfig
 
 ```typescript
 interface FraudDetectionConfig {
@@ -160,13 +160,13 @@ interface FraudDetectionConfig {
   realTimeRequired: boolean        // false = batch OK
   batchSupported: boolean
   modelVersion?: string            // track which ML model version
-  scoreScaleMax: number            // 100 or 1.0 — for UI display normalization
+  scoreScaleMax: number            // 100 or 1.0, for UI display normalization
 }
 ```
 
-**BIAN alignment**: SD-63 Fraud Evaluation BQ:FraudEvaluationAssessment — `scoreThresholds` maps to `FraudEvaluationAssessmentPreconditions`.
+**BIAN alignment**: SD-63 Fraud Evaluation BQ:FraudEvaluationAssessment, `scoreThresholds` maps to `FraudEvaluationAssessmentPreconditions`.
 
-#### aml_monitoring — AmlMonitoringConfig
+#### aml_monitoring: AmlMonitoringConfig
 
 ```typescript
 interface AmlMonitoringConfig {
@@ -184,7 +184,7 @@ interface AmlMonitoringConfig {
 
 **PCI DSS alignment**: AML events are audit-logged (Req 10.2.1). SAR thresholds are stored but not processed in the demo (reference architecture only).
 
-#### kyc_identity — KycIdentityConfig
+#### kyc_identity: KycIdentityConfig
 
 ```typescript
 interface KycIdentityConfig {
@@ -201,7 +201,7 @@ interface KycIdentityConfig {
 
 **PCI DSS alignment**: Req 8.1 (identify and authenticate users). `dataRetentionDays` documents the retention policy per Req 12.3.
 
-#### kyb_business — KybBusinessConfig
+#### kyb_business: KybBusinessConfig
 
 ```typescript
 interface KybBusinessConfig {
@@ -217,7 +217,7 @@ interface KybBusinessConfig {
 
 **BIAN alignment**: SD-89 Merchant Relations BQ:MerchantAgreementKybCheck. `uboDisclosureThreshold` aligns with FATF Recommendation 24.
 
-#### hrp_sanctions — HrpSanctionsConfig
+#### hrp_sanctions: HrpSanctionsConfig
 
 ```typescript
 interface HrpSanctionsConfig {
@@ -234,7 +234,7 @@ interface HrpSanctionsConfig {
 
 **BIAN alignment**: SD-13 Party Reference Data. `matchThreshold` is the configurable equivalent of `PartyReferenceDataDirectoryEntry.partyMatchQualityThreshold`.
 
-#### credit_bureau — CreditBureauConfig
+#### credit_bureau: CreditBureauConfig
 
 ```typescript
 interface CreditBureauConfig {
@@ -254,7 +254,7 @@ interface CreditBureauConfig {
 
 **PCI DSS alignment**: Req 12.8.1 (listed as TPSP). `consentRequired` supports Req 3 (data minimization) by ensuring credit pulls have legal basis.
 
-#### generic — GenericIntegrationConfig
+#### generic: GenericIntegrationConfig
 
 ```typescript
 interface GenericIntegrationConfig {
@@ -272,7 +272,7 @@ interface GenericIntegrationConfig {
 
 The current `externalProviderAuthScheme` enum is extended with a typed `authConfig` sub-document that provides all parameters needed to build auth headers at dispatch time.
 
-**Security model**: Auth credentials are stored **encrypted** using MongoDB Queryable Encryption (QE) equality fields with a dedicated `integrationCredentialsDEK`. This is a new DEK added to the QE key management hierarchy (see §6 for QE changes). The plaintext is only accessible server-side via the QE driver — never returned in API responses.
+**Security model**: Auth credentials are stored **encrypted** using MongoDB Queryable Encryption (QE) equality fields with a dedicated `integrationCredentialsDEK`. This is a new DEK added to the QE key management hierarchy (see §6 for QE changes). The plaintext is only accessible server-side via the QE driver, never returned in API responses.
 
 ```typescript
 interface IntegrationAuthConfig {
@@ -282,7 +282,7 @@ interface IntegrationAuthConfig {
   bearer?: {
     tokenHeaderName: string          // Default: "Authorization"
     tokenPrefix: string              // Default: "Bearer"
-    tokenExpiresAt?: string          // ISO 8601 — for rotation reminder
+    tokenExpiresAt?: string          // ISO 8601, for rotation reminder
     // Actual token stored as QE-encrypted field (separate: authTokenEncrypted)
   }
 
@@ -295,7 +295,7 @@ interface IntegrationAuthConfig {
     // Actual key stored as QE-encrypted field (separate: authApiKeyEncrypted)
   }
 
-  // HMAC (outbound — we sign our requests)
+  // HMAC (outbound: we sign our requests)
   hmacOutbound?: {
     algorithm: 'sha256' | 'sha512'
     signatureHeaderName: string      // e.g., "X-Signature"
@@ -306,7 +306,7 @@ interface IntegrationAuthConfig {
     // Actual secret stored as QE-encrypted field (separate: authHmacSecretEncrypted)
   }
 
-  // HMAC (inbound webhook validation — they sign their responses to us)
+  // HMAC (inbound webhook validation: they sign their responses to us)
   hmacInbound?: {
     algorithm: 'sha256' | 'sha512'
     signatureHeaderName: string      // e.g., "X-Webhook-Signature"
@@ -318,7 +318,7 @@ interface IntegrationAuthConfig {
 
   // OAuth2 Client Credentials
   oauth2?: {
-    clientId: string                 // Not secret — can be plaintext
+    clientId: string                 // Not secret, can be plaintext
     tokenEndpoint: string
     scopes: string[]
     tokenCachingEnabled: boolean
@@ -330,11 +330,11 @@ interface IntegrationAuthConfig {
 
 **QE-encrypted credential fields** (added to `integrationRegistry` encrypted fields map):
 ```
-authTokenEncrypted          — bearer token value (QE equality)
-authApiKeyEncrypted         — API key value (QE equality)  
-authHmacSecretEncrypted     — outbound HMAC signing secret (QE equality)
-callbackHmacSecretEncrypted — inbound HMAC validation secret (QE equality)
-authOauth2SecretEncrypted   — OAuth2 client secret (QE equality)
+authTokenEncrypted: bearer token value (QE equality)
+authApiKeyEncrypted: API key value (QE equality)  
+authHmacSecretEncrypted: outbound HMAC signing secret (QE equality)
+callbackHmacSecretEncrypted: inbound HMAC validation secret (QE equality)
+authOauth2SecretEncrypted: OAuth2 client secret (QE equality)
 ```
 
 These replace the existing `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` bcrypt fields, which are retained for backward compatibility during migration.
@@ -446,7 +446,7 @@ export type IntegrationProviderType =
 ```
 { routingGroupInstanceReference: 1 }  (unique)
 { routingGroupProviderType: 1, routingGroupStatus: 1 }
-{ memberIds: 1 }  (multikey — for reverse lookup by provider ID)
+{ memberIds: 1 }  (multikey, for reverse lookup by provider ID)
 ```
 
 ### 4.4 Updated `integrationRegistry` Indexes
@@ -523,7 +523,7 @@ Response: {
 }
 ```
 
-This endpoint allows the admin to validate field mapping configuration with a sample payload before going live — critical for testing against legacy systems without real transactions.
+This endpoint allows the admin to validate field mapping configuration with a sample payload before going live: critical for testing against legacy systems without real transactions.
 
 ---
 
@@ -565,7 +565,7 @@ This endpoint allows the admin to validate field mapping configuration with a sa
 ```
 
 **Why a separate DEK for integration credentials?**  
-Integration credentials are rotated independently of cardholder data. Rotating the `integrationCredentialsDEK` (e.g., after a provider key compromise) does not require re-encryption of QE cardholder fields. The blast radius of a credential DEK compromise is limited to integration auth — not to PANs or cardholder data.
+Integration credentials are rotated independently of cardholder data. Rotating the `integrationCredentialsDEK` (e.g., after a provider key compromise) does not require re-encryption of QE cardholder fields. The blast radius of a credential DEK compromise is limited to integration auth, not to PANs or cardholder data.
 
 **PCI DSS Req 3.6 compliance**: The `integrationCredentialsDEK` is managed under the same AWS KMS CMK hierarchy as other DEKs (see ADR-002), with its own rotation schedule (90 days recommended for credential material per NIST 800-57).
 
@@ -575,11 +575,11 @@ Integration credentials are rotated independently of cardholder data. Rotating t
 
 ### Scope of the field mapping engine
 
-The mapping engine operates on **event payload data** — transaction references, risk scores, verification statuses. It does NOT operate on:
-- Primary Account Numbers (PAN) — never present in integration payloads
-- CVV/CVC — never present in integration payloads  
-- Cardholder name — not needed for compliance service calls
-- Full card expiry — not needed for fraud scoring input
+The mapping engine operates on **event payload data**: transaction references, risk scores, verification statuses. It does NOT operate on:
+- Primary Account Numbers (PAN), never present in integration payloads
+- CVV/CVC, never present in integration payloads  
+- Cardholder name, not needed for compliance service calls
+- Full card expiry, not needed for fraud scoring input
 
 **Runtime enforcement**: The field mapping engine validates every mapping rule at save time against a PCI DSS blocklist. Any rule that attempts to read, write, or transform PAN/CVV/cardholder fields raises a validation error.
 
@@ -587,13 +587,13 @@ The mapping engine operates on **event payload data** — transaction references
 
 | Requirement | New Capability | How it's addressed |
 |---|---|---|
-| **Req 12.8.1** — List all TPSPs | Multi-provider support | Each provider in a routing group is a separate record with full TPSP documentation |
-| **Req 12.8.3** — Due diligence before engagement | Category config | `categoryConfig` documents operational requirements; provider must satisfy them before activation |
-| **Req 12.8.5** — Monitor compliance status | Routing group test | `POST /integration-groups/:id/test` runs health checks on all members and records results |
-| **Req 3.6** — Key management | Auth credentials QE | `integrationCredentialsDEK` encrypts all auth credentials at rest with QE |
-| **Req 10.2.1** — Audit trail | Field mapping log | Dispatch events now include `fieldMappingApplied: boolean` and `mappingRulesCount: number` |
-| **Req 6.3.2** — Inventory of bespoke software | Generic integration | `GenericIntegrationConfig.customEventTypes` documents which events flow through generic integrations |
-| **Req 12.3.4** — Review hardware/software annually | Auth config expiry | `bearer.tokenExpiresAt` field triggers a UI warning when credentials approach expiry |
+| **Req 12.8.1**: List all TPSPs | Multi-provider support | Each provider in a routing group is a separate record with full TPSP documentation |
+| **Req 12.8.3**: Due diligence before engagement | Category config | `categoryConfig` documents operational requirements; provider must satisfy them before activation |
+| **Req 12.8.5**: Monitor compliance status | Routing group test | `POST /integration-groups/:id/test` runs health checks on all members and records results |
+| **Req 3.6**: Key management | Auth credentials QE | `integrationCredentialsDEK` encrypts all auth credentials at rest with QE |
+| **Req 10.2.1**: Audit trail | Field mapping log | Dispatch events now include `fieldMappingApplied: boolean` and `mappingRulesCount: number` |
+| **Req 6.3.2**: Inventory of bespoke software | Generic integration | `GenericIntegrationConfig.customEventTypes` documents which events flow through generic integrations |
+| **Req 12.3.4**: Review hardware/software annually | Auth config expiry | `bearer.tokenExpiresAt` field triggers a UI warning when credentials approach expiry |
 
 ---
 
@@ -603,12 +603,12 @@ The proposed enhancements remain within BIAN SD-193 (External Provider Arrangeme
 
 | Enhancement | BIAN Mapping |
 |---|---|
-| `categoryConfig` | `ExternalProviderArrangement.ExternalProviderArrangementRecord` — extends the arrangement with domain-specific terms |
-| `fieldMappingConfig` | `ExternalProviderArrangement.ExternalProviderArrangementSpecification` — defines the technical specification of the arrangement |
-| `authConfig` | `ExternalProviderArrangement.ExternalProviderArrangementOperationalTerms` — authentication terms are part of operational arrangement |
-| `routingGroupId` | `ExternalProviderArrangementPortfolio` — BIAN SD-193 defines a Portfolio behavior qualifier for managing collections of arrangements |
-| `generic` type | `ExternalProviderArrangement` — the BIAN standard does not restrict arrangement types; generic is a valid arrangement |
-| `IntegrationRoutingGroup` | `ExternalProviderArrangementPortfolio.ExternalProviderArrangementPortfolioFulfillment` — managing a portfolio of providers of the same type |
+| `categoryConfig` | `ExternalProviderArrangement.ExternalProviderArrangementRecord`: extends the arrangement with domain-specific terms |
+| `fieldMappingConfig` | `ExternalProviderArrangement.ExternalProviderArrangementSpecification`: defines the technical specification of the arrangement |
+| `authConfig` | `ExternalProviderArrangement.ExternalProviderArrangementOperationalTerms`: authentication terms are part of operational arrangement |
+| `routingGroupId` | `ExternalProviderArrangementPortfolio`: BIAN SD-193 defines a Portfolio behavior qualifier for managing collections of arrangements |
+| `generic` type | `ExternalProviderArrangement`: the BIAN standard does not restrict arrangement types; generic is a valid arrangement |
+| `IntegrationRoutingGroup` | `ExternalProviderArrangementPortfolio.ExternalProviderArrangementPortfolioFulfillment`: managing a portfolio of providers of the same type |
 
 For the **generic** integration category, `bianServiceDomain` should be set to `"External Provider Arrangements"` (i.e., the management domain itself), and `bianControlRecordType` should be `"ExternalProviderArrangementPortfolio"`.
 
@@ -633,9 +633,9 @@ For the **generic** integration category, `bianServiceDomain` should be set to `
 └──────────┴──────────┴────────┴────────┴─────────┴──────────┴────────────┘
 ```
 
-New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicating the provider's role in multi-provider setups.
+New column "Routing" shows: Single / Primary / Fallback / Group(N), indicating the provider's role in multi-provider setups.
 
-### 9.2 Integration Detail — Tabbed Layout
+### 9.2 Integration Detail: Tabbed Layout
 
 ```
 ┌─ Acme Fraud Detection Service ─────────── [Active] ──────────────────────┐
@@ -671,7 +671,7 @@ New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicatin
 │  │ caseId           │ reference_id     │ rename         │ [×]   │       │
 │  │ transactionAmt   │ amount_cents     │ scale ×100     │ [×]   │       │
 │  │ merchantId       │ merchant_ref     │ rename         │ [×]   │       │
-│  │ — — —            │ source           │ constant: "LB" │ [×]   │       │
+│  │ - - -            │ source           │ constant: "LB" │ [×]   │       │
 │  └──────────────────┴──────────────────┴────────────────┴───────┘       │
 │                                               [+ Add outbound rule]      │
 │                                                                          │
@@ -693,7 +693,7 @@ New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicatin
 ### 9.4 Category Config Tab (example: Fraud Detection)
 
 ```
-┌─ Category Configuration — Fraud Detection (SD-63) ─────────────────────┐
+┌─ Category Configuration: Fraud Detection (SD-63) ─────────────────────┐
 │                                                                          │
 │  Score Thresholds ────────────────────────────────────────────────────  │
 │  Low risk:    below  [30  ]   Medium risk: below  [70  ]                │
@@ -715,7 +715,7 @@ New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicatin
 
 ## 10. Implementation Plan
 
-### Phase 1 — Data Model and Backend (2 sessions)
+### Phase 1: Data Model and Backend (2 sessions)
 
 1. Add `categoryConfig`, `authConfig`, `fieldMappingConfig`, `routingGroupId` fields to `ExternalProviderArrangement` model
 2. Add new type definitions: `FieldMapping`, `FieldMappingConfig`, `IntegrationAuthConfig`, all `CategoryConfig` types, `IntegrationRoutingGroup`
@@ -724,12 +724,12 @@ New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicatin
 5. Update `integrationRegistry` indexes (remove unique constraint on type+endpoint)
 6. Add `integrationCredentialsDEK` to QE setup (technical-spec.md §2 update)
 7. Implement `FieldMappingEngine` service (apply outbound/inbound transforms)
-8. Update `integrationDispatch.service.ts` — apply outbound mapping, route through group strategy
-9. Update `integrationCallback.service.ts` — apply inbound mapping
-10. Update `integrationRegistry.service.ts` — CRUD for new fields, routing group management
+8. Update `integrationDispatch.service.ts`: apply outbound mapping, route through group strategy
+9. Update `integrationCallback.service.ts`: apply inbound mapping
+10. Update `integrationRegistry.service.ts`: CRUD for new fields, routing group management
 11. Add new API endpoints (routing groups, test-mapping)
 
-### Phase 2 — Frontend (2 sessions)
+### Phase 2: Frontend (2 sessions)
 
 1. Refactor integration detail page to tab-based layout
 2. Implement Authentication Config tab (schema-driven form per auth type)
@@ -739,7 +739,7 @@ New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicatin
 6. Update registration wizard to 5-step flow
 7. Update integration list: add Routing column, Generic category filter
 
-### Phase 3 — Docs and ADRs (1 session)
+### Phase 3: Docs and ADRs (1 session)
 
 1. Add ADR-013 through ADR-017 to engineering-proposal.md
 2. Update technical-spec.md §1.13 (updated data model) and §2 (new DEK)
@@ -752,9 +752,9 @@ New column "Routing" shows: Single / Primary / Fallback / Group(N) — indicatin
 
 | # | Question | Recommended Answer |
 |---|---|---|
-| OQ-1 | Should routing groups be a separate collection or embedded in the registry? | Separate collection — groups have their own lifecycle independent of individual providers |
+| OQ-1 | Should routing groups be a separate collection or embedded in the registry? | Separate collection: groups have their own lifecycle independent of individual providers |
 | OQ-2 | Should the field mapping engine support JSONPath or only dot-notation? | Start with dot-notation; JSONPath adds complexity and is rarely needed for compliance payloads |
-| OQ-3 | Should the `parallel/majority_vote` aggregation support custom tiebreak logic? | No — keep it simple for the demo; tiebreak = first alphabetical `externalProviderArrangementInstanceReference` |
-| OQ-4 | Should `generic` integrations appear in the BIAN mapping panel? | Yes — mapped to "External Provider Arrangements" (SD-193 itself) as catch-all |
-| OQ-5 | Should field mapping rules be exportable/importable (e.g., JSON template)? | Yes — useful for demo presentations; implement as download/upload JSON in the UI |
+| OQ-3 | Should the `parallel/majority_vote` aggregation support custom tiebreak logic? | No: keep it simple for the demo; tiebreak = first alphabetical `externalProviderArrangementInstanceReference` |
+| OQ-4 | Should `generic` integrations appear in the BIAN mapping panel? | Yes: mapped to "External Provider Arrangements" (SD-193 itself) as catch-all |
+| OQ-5 | Should field mapping rules be exportable/importable (e.g., JSON template)? | Yes: useful for demo presentations; implement as download/upload JSON in the UI |
 | OQ-6 | Should the QE change to `integrationRegistry` require a collection migration? | Only new records use the new QE fields; existing records continue using bcrypt hash fields (coexistence) |

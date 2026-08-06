@@ -158,7 +158,7 @@ export default function TransactionsPage() {
         icon={CreditCard}
         title="Transactions"
         description="Search and review card transactions."
-        debugInfo="BIAN SD-254 Card Transaction · PCI DSS Req 10.2 · QE:none fields decrypt only for L2/auditor"
+        debugInfo="Card Transaction · PCI DSS · QE:none fields decrypt only for L2/auditor"
       />
 
       {/* Search + filters */}

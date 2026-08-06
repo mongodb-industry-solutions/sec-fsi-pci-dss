@@ -8,6 +8,7 @@ import { useDebugMode } from '../../../../../../../lib/debugMode';
 import { byProviderType } from '../../../../../../../config/capabilities';
 import { BACKEND_PUBLIC_URL } from '../../../../../../../lib/constants';
 
+import { serviceDomainLabel } from '../../../../../../../lib/serviceDomain';
 // ── Type descriptions ────────────────────────────────────────────────────────
 
 const TYPE_PURPOSE: Record<string, string> = {
@@ -85,7 +86,7 @@ export default function OverviewPage() {
             {TYPE_LABEL[integration.externalProviderArrangementType] ?? integration.externalProviderArrangementType}
           </span>
           <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-medium border">
-            {integration.bianServiceDomain}
+            {serviceDomainLabel(integration.bianServiceDomain)}
           </span>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
             integration.externalProviderMode === 'sync' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
@@ -95,7 +96,7 @@ export default function OverviewPage() {
         </div>
       </Card>
 
-      {/* Vendor-global info — §2.4: identity, status, metadata only. NO vendor base URL / callback /
+      {/* Vendor-global info: §2.4: identity, status, metadata only. NO vendor base URL / callback /
           auth here: those are configured PER EVENT (see below + the Outbound / Inbound tabs). */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <Card title="Provider">
@@ -121,7 +122,7 @@ export default function OverviewPage() {
             <div>
               <dt className="text-xs text-gray-500">Configuration scope</dt>
               <dd className="text-sm text-gray-700 mt-0.5">
-                Per event (§2.4) — endpoints, mapping, auth, retries and timeout are set per event below.
+                Per event (§2.4): endpoints, mapping, auth, retries and timeout are set per event below.
                 <span className="text-gray-400"> There is no vendor base URL.</span>
               </dd>
             </div>
@@ -195,18 +196,12 @@ export default function OverviewPage() {
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-xs text-gray-500">BIAN Service Domain</dt>
-              <dd className="font-mono text-gray-800 mt-0.5">{integration.bianServiceDomain}</dd>
+              <dd className="font-mono text-gray-800 mt-0.5">{serviceDomainLabel(integration.bianServiceDomain)}</dd>
             </div>
             <div>
               <dt className="text-xs text-gray-500">Control Record Type</dt>
               <dd className="text-gray-800 mt-0.5">{integration.bianControlRecordType}</dd>
             </div>
-            {integration.pciDssRequirements?.length > 0 && (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-gray-500">PCI DSS Requirements</dt>
-                <dd className="font-mono text-gray-700 mt-0.5 text-xs">{integration.pciDssRequirements.join(', ')}</dd>
-              </div>
-            )}
           </dl>
         </Card>
       )}

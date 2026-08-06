@@ -1,5 +1,5 @@
 'use client';
-// The identity document (SD-53) from customerAgreementGovernmentID. All leaves are lookup tier:
+// The identity document from customerAgreementGovernmentID. All leaves are lookup tier:
 // number QE:suffix, type and issuing country QE:equality, expiry QE:range, tax ID QE:prefix.
 import { IdCard } from 'lucide-react';
 import { RecordGroup } from './RecordGroup';
@@ -14,7 +14,7 @@ export interface GovernmentIdView {
 }
 
 export const IDENTITY_DOCUMENT_INFO =
-  'The government-issued identity document verified at KYC (SD-53). Each leaf is QE-encrypted at rest: '
+  'The government-issued identity document verified at KYC. Each leaf is QE-encrypted at rest: '
   + 'number by suffix search, type and issuing country by equality, expiry by range. The Tax ID (TIN) is a '
   + 'separate QE:prefix field.';
 

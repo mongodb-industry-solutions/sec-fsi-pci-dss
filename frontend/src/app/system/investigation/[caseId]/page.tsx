@@ -84,7 +84,7 @@ export default function DemoCaseDetailPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [liveSignal, setLiveSignal] = useState(0);
 
-  // ADR-031: live updates via SSE — when the customer answers a question, refresh the case + panel.
+  // ADR-031: live updates via SSE, when the customer answers a question, refresh the case + panel.
   useCaseStream(caseId, token, () => { if (token) reload(token); setLiveSignal((s) => s + 1); });
 
   async function reload(resolvedToken: string) {
@@ -179,7 +179,7 @@ export default function DemoCaseDetailPage() {
   }
 
   // Reopen a resolved/closed case (L1/L2 only; auditor is read-only). Confirm, set status back to
-  // 'open', then reload. The backend records a 'reopened' audit event (SD-83, PCI DSS Req 10).
+  // 'open', then reload. The backend records a 'reopened' audit event (PCI DSS).
   async function handleReopen() {
     const ok = await confirm({
       title: 'Reopen this case?',
@@ -428,7 +428,7 @@ export default function DemoCaseDetailPage() {
                   ))}
                 </ul>
               )}
-              {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-83 · processType fraud_evaluation · asOf {new Date(enrichment.asOf).toLocaleTimeString()}</p>}
+              {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">processType fraud_evaluation · asOf {new Date(enrichment.asOf).toLocaleTimeString()}</p>}
             </div>
 
             {/* Merchant; acquired (KYB record) or external (descriptor only, no KYB) */}
@@ -466,7 +466,7 @@ export default function DemoCaseDetailPage() {
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
                     External merchant: not acquired by this PSP, so there is no KYB record. Only the card-network
-                    descriptor (name + MCC) is available. This is expected for issuer-side transactions{debugMode ? ' (BIAN SD-89 applies only to acquired merchants).' : '.'}
+                    descriptor (name + MCC) is available. This is expected for issuer-side transactions{debugMode ? ' (applies only to acquired merchants).' : '.'}
                   </div>
                 </div>
               )}
@@ -526,7 +526,7 @@ export default function DemoCaseDetailPage() {
                             <SensitiveReveal
                               label="Address"
                               masked="•••• (masked)"
-                              info="Residential address (SD-53). QE:none: encrypted at rest and not searchable."
+                              info="Residential address. QE:none: encrypted at rest and not searchable."
                               fetchValue={async () => fmtAddress(s.customerAgreementResidentialAddress) || 'n/a'}
                             />
                           ) : null}
@@ -545,7 +545,7 @@ export default function DemoCaseDetailPage() {
                 ) : (
                   <p className="mt-3 text-xs text-gray-400 italic">Sensitive PII (address, risk notes) requires {isAuditor ? 'auditor access' : 'L2 escalation acceptance'}.</p>
                 )}
-                {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-53 · QE:equality (email/phone) · QE:suffix (gov ID number) · QE:none (address, risk notes)</p>}
+                {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">QE:equality (email/phone) · QE:suffix (gov ID number) · QE:none (address, risk notes)</p>}
               </div>
             )}
           </div>
@@ -804,7 +804,7 @@ export default function DemoCaseDetailPage() {
                 collection: 'fraudDiagnosisCase',
                 id: caseId,
                 label: 'fraudDiagnosisCase',
-                description: 'Raw fraud case document as stored in Atlas (SD-83)',
+                description: 'Raw fraud case document as stored in Atlas',
               },
               {
                 kind: 'mongo',

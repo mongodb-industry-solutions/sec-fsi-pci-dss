@@ -1,4 +1,4 @@
-// BIAN SD-89: Merchant Relations  -  REST controller
+// Merchant Relations  -  REST controller
 // Routes mounted at /merchants → /api/v1/merchants
 
 import { FastifyInstance } from 'fastify';
@@ -16,8 +16,8 @@ import { isMerchantOwner } from '../services/merchantBeneficialOwner';
 
 // Roles allowed to READ a merchant's business detail (profile, payments, analytics, audit trail).
 // PSP staff: `merchant_officer` and `security_auditor`. Fraud-investigation roles
-// (`level1_analyst`, `level2_investigator`) need this in the context of a case (SD-89 Merchant
-// Relations is referenced from SD-83 Fraud Diagnosis) — PCI DSS Req 7 still excludes the
+// (`level1_analyst`, `level2_investigator`) need this in the context of a case (Merchant
+// Relations is referenced from Fraud Diagnosis): PCI DSS still excludes the
 // administrative `manager` role, which has no business need-to-know. Credential routes (API keys)
 // keep the stricter officer/auditor/owner set and are NOT widened here.
 const MERCHANT_DETAIL_READ_ROLES = new Set([
@@ -191,7 +191,7 @@ The \`merchantApiKeyHash\` field is **never** included in any GET response (PCI 
       tags: ['merchants'],
       summary: 'Merchant picker list for payment forms (SD-89)',
       description: `Returns active merchant agreements (name + MCC + risk only) for use in payment-form dropdowns.
-Accessible to any authenticated user — returns only non-sensitive business-public fields.
+Accessible to any authenticated user: returns only non-sensitive business-public fields.
 Supports optional name search and limit for progressive disclosure UX.`,
       security: [{ bearerAuth: [] }],
       querystring: {
@@ -229,7 +229,7 @@ Supports optional name search and limit for progressive disclosure UX.`,
     return reply.send(result);
   });
 
-  // GET /api/v1/merchants/me  — Ch-05: customer fetches their own merchant by JWT partyRef
+  // GET /api/v1/merchants/me: Ch-05: customer fetches their own merchant by JWT partyRef
   // MUST be registered before /:id to prevent "me" being matched as a UUID param
   fastify.get('/me', {
     schema: {
@@ -253,7 +253,7 @@ Used by customers to detect their onboarding state: no application / under_revie
                   type: 'object',
                   nullable: true,
                   additionalProperties: true,
-                  description: 'BQ:Step — KYB check result (BIAN SD-89). PCI DSS Req 12.8.',
+                  description: 'BQ:Step, KYB check result (BIAN SD-89). PCI DSS Req 12.8.',
                 },
               },
             },
@@ -302,7 +302,7 @@ Used by customers to detect their onboarding state: no application / under_revie
               type: 'object',
               nullable: true,
               additionalProperties: true,
-              description: 'BQ:Step — KYB check result (BIAN SD-89). PCI DSS Req 12.8.',
+              description: 'BQ:Step, KYB check result (BIAN SD-89). PCI DSS Req 12.8.',
             },
           },
         },
@@ -317,9 +317,9 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(merchant);
   });
 
-  // GET /api/v1/merchants/:id/transactions  — Acquiring-side view (BIAN SD-89)
-  // Lists payments the merchant RECEIVED. PCI DSS Req 3/7: the payer's PII
-  // (account reference / email / raw gateway payload) is never returned — only
+  // GET /api/v1/merchants/:id/transactions, Acquiring-side view 
+  // Lists payments the merchant RECEIVED. PCI DSS: the payer's PII
+  // (account reference / email / raw gateway payload) is never returned, only
   // masked PAN, amount, status, type, channel, descriptor and timestamp.
   fastify.get('/:id/transactions', {
     schema: {
@@ -329,7 +329,7 @@ Used by customers to detect their onboarding state: no application / under_revie
 
 **Authorization:** the merchant **owner** (JWT \`partyRef\` matches \`merchantOwnerPartyReference\`), a \`merchant_officer\`, or a \`security_auditor\`. Any other caller receives 403.
 
-**PCI DSS Req 3 / Req 7 (data minimization):** the payer's PII is **never** included — no account reference, email, or raw gateway payload. Only acquiring essentials (masked PAN, amount, status, type, channel, descriptor, timestamp).`,
+**PCI DSS (data minimization):** the payer's PII is **never** included, no account reference, email, or raw gateway payload. Only acquiring essentials (masked PAN, amount, status, type, channel, descriptor, timestamp).`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', description: '`merchantAgreementInstanceReference` UUID.' } } },
       querystring: {
@@ -399,17 +399,17 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(result);
   });
 
-  // GET /api/v1/merchants/:id/transactions/:tid  — Single transaction detail (acquiring-side)
-  // PCI DSS Req 3/7: same data-minimization projection as the list — no payer PII.
+  // GET /api/v1/merchants/:id/transactions/:tid, Single transaction detail (acquiring-side)
+  // PCI DSS: same data-minimization projection as the list, no payer PII.
   fastify.get('/:id/transactions/:tid', {
     schema: {
       tags: ['merchants'],
       summary: 'Single merchant transaction detail (acquiring view, SD-89)',
       description: `Returns a single card transaction where this merchant was the payee.
 
-**Authorization:** same as the list endpoint — merchant owner, \`merchant_officer\`, or \`security_auditor\`.
+**Authorization:** same as the list endpoint, merchant owner, \`merchant_officer\`, or \`security_auditor\`.
 
-**PCI DSS Req 3 / Req 7 (data minimization):** the payer's PII is **never** included.`,
+**PCI DSS (data minimization):** the payer's PII is **never** included.`,
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -463,14 +463,14 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(txn);
   });
 
-  // GET /api/v1/merchants/:id/stats  — Acquiring analytics (BIAN Merchant Activity Analysis)
+  // GET /api/v1/merchants/:id/stats, Acquiring analytics (BIAN Merchant Activity Analysis)
   // Aggregates over the merchant's received payments. No PII; same authorization as
   // /:id/transactions (owner / merchant_officer / security_auditor).
   fastify.get('/:id/stats', {
     schema: {
       tags: ['merchants'],
       summary: 'Merchant received-payments analytics (SD-89)',
-      description: 'Aggregated statistics for the merchant: totals, average ticket, breakdown by status, by currency, and operations per month. Pure aggregation over plaintext fields — no payer PII.',
+      description: 'Aggregated statistics for the merchant: totals, average ticket, breakdown by status, by currency, and operations per month. Pure aggregation over plaintext fields, no payer PII.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: {
@@ -514,14 +514,14 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(stats);
   });
 
-  // GET /api/v1/merchants/:id/events  — Merchant lifecycle audit trail (SD-89, PCI DSS Req 10)
+  // GET /api/v1/merchants/:id/events, Merchant lifecycle audit trail (PCI DSS)
   // Append-only log of submitted / approved / rejected / updated actions. No PII.
   // Same authorization as /:id/transactions (owner / merchant_officer / security_auditor).
   fastify.get('/:id/events', {
     schema: {
       tags: ['merchants'],
       summary: 'Merchant lifecycle audit trail (SD-89, Req 10)',
-      description: 'Append-only event log of merchant relationship actions (submitted, approved, rejected, KYB, config updates). Operational metadata only — no cardholder data.',
+      description: 'Append-only event log of merchant relationship actions (submitted, approved, rejected, KYB, config updates). Operational metadata only, no cardholder data.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       response: {
@@ -564,14 +564,14 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send({ events });
   });
 
-  // GET /api/v1/merchants/:id/activity  — v18 B-01/B-12: "user × merchant × action" audit view.
+  // GET /api/v1/merchants/:id/activity, v18 B-01/B-12: "user × merchant × action" audit view.
   // Reads businessProcessEvent tagged with merchantAgreementReference (OAuth-originated actions).
   // Filter by user (actingPartyReference) + free-text + date range, paginated. Display-safe
   // (no CHD, no raw IBAN). Same authorization as /:id/events (owner / officer / auditor / L1 / L2).
   fastify.get('/:id/activity', {
     schema: {
       tags: ['merchants'],
-      summary: 'Merchant activity view — who did what through this merchant (SD-89 / SD-16 audit)',
+      summary: 'Merchant activity view, who did what through this merchant (SD-89 / SD-16 audit)',
       description: `Lists \`businessProcessEvent\` records attributed to this merchant's OAuth client
 (v18 activity attribution). Shows the acting user (party display-safe), action/event, channel
 (\`oauth_merchant\`), timestamp and the related operation reference.
@@ -580,7 +580,7 @@ Used by customers to detect their onboarding state: no application / under_revie
 
 **Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
 
-**PCI DSS Req 3/7 (data minimization):** never returns CHD or raw IBAN.`,
+**PCI DSS (data minimization):** never returns CHD or raw IBAN.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       querystring: {
@@ -653,9 +653,7 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(result);
   });
 
-  // GET /api/v1/merchants/:id/authorizations  — v18 B-10: users who granted consent to this merchant.
-  // Reads partyAuthConsent filtered by merchantAgreementInstanceReference. Display-safe user identity
-  // (SD-13), scopes, status, grant/last-used timestamps. Search by user, paginated. Same authorization.
+  // GET /:id/authorizations: users who granted consent to this merchant, from partyAuthConsent.
   fastify.get('/:id/authorizations', {
     schema: {
       tags: ['merchants'],
@@ -666,7 +664,7 @@ Used by customers to detect their onboarding state: no application / under_revie
 
 **Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
 
-Display-safe — no CHD, no raw IBAN.`,
+Display-safe, no CHD, no raw IBAN.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       querystring: {
@@ -723,18 +721,18 @@ Display-safe — no CHD, no raw IBAN.`,
     return reply.send(result);
   });
 
-  // PATCH /api/v1/merchants/:id/review  (Ch-05 — BIAN Action Term: Control)
+  // PATCH /api/v1/merchants/:id/review  (Ch-05, BIAN Action Term: Control)
   fastify.patch('/:id/review', {
     schema: {
       tags: ['merchants'],
-      summary: 'Approve or reject a merchant application — BIAN Action: Control (SD-89)',
+      summary: 'Approve or reject a merchant application, BIAN Action: Control (SD-89)',
       description: `**Roles:** \`merchant_officer\`, \`security_auditor\` only.
 
 Transitions a \`merchantAgreementProcedure\` in \`under_review\` status to \`agreed\` (approve) or \`rejected\` (reject).
 The reviewing officer's partyRef is recorded for audit trail.
 
-**PCI DSS:** Req 7.1 (least privilege) — only \`merchant_officer\` role may approve/reject.
-**PCI DSS:** Req 12.8 — documented agreement approval by authorized officer.`,
+**PCI DSS:** (least privilege), only \`merchant_officer\` role may approve/reject.
+**PCI DSS:** documented agreement approval by authorized officer.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -830,14 +828,14 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     const patch = request.body as Record<string, unknown>;
     const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
 
-    // v18: validate the commission rate (SD-89). number, 0 ≤ rate ≤ 1, max 4 decimals.
+    // v18: validate the commission rate . number, 0 ≤ rate ≤ 1, max 4 decimals.
     if (patch.merchantCommissionRate !== undefined) {
       const rate = patch.merchantCommissionRate;
       if (typeof rate !== 'number' || !isFinite(rate) || rate < 0 || rate > 1) {
         return reply.status(400).send({ error: 'merchantCommissionRate must be a number between 0 and 1.' });
       }
       // At most 4 decimal places. Compare the rounded value back to the original rate (tolerating
-      // binary-float error) instead of comparing scaled integers directly — `rate * 10000` is not
+      // binary-float error) instead of comparing scaled integers directly: `rate * 10000` is not
       // guaranteed to be an exact integer even for valid inputs (e.g. 0.1 * 10000 = 1000.0000000001).
       const rounded = Math.round(rate * 10000) / 10000;
       if (Math.abs(rounded - rate) > 1e-9) {
@@ -861,8 +859,8 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
       }
     }
 
-    // E4: Ownership guard — selected default payout account must belong to the merchant's owner party.
-    // Prevents a merchant from routing payouts to a bank account they don't own (BIAN SD-66 / PCI Req 7).
+    // E4: Ownership guard, selected default payout account must belong to the merchant's owner party.
+    // Prevents a merchant from routing payouts to a bank account they don't own (/ PCI DSS).
     if (patch.merchantDefaultPayoutAccountReference) {
       const merchant = await getMerchantById(fastify.db, id);
       if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
@@ -876,7 +874,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     const result = await updateMerchant(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
 
-    // v18: audit the commission-rate change explicitly (SD-89, PCI DSS Req 10).
+    // v18: audit the commission-rate change explicitly (PCI DSS).
     if (patch.merchantCommissionRate !== undefined) {
       const actor = user?.partyRef ?? user?.sub ?? 'unknown';
       await appendMerchantEvent(fastify.db, id, 'merchant.commission_rate.updated', {
@@ -992,7 +990,7 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
           properties: {
             merchantAgreementInstanceReference: { type: 'string' },
             merchantWebhookEndpoint: { type: 'string' },
-            merchantWebhookSecret: { type: 'string', description: 'HMAC signing secret — verify the X-Webhook-Signature header with it. Generated on first save.' },
+            merchantWebhookSecret: { type: 'string', description: 'HMAC signing secret, verify the X-Webhook-Signature header with it. Generated on first save.' },
           },
         },
         400: { $ref: 'Error#' },
@@ -1009,7 +1007,7 @@ Delivery includes up to 3 retry attempts with exponential backoff.`,
     return reply.send(result);
   });
 
-  // POST /api/v1/merchants/:id/webhooks/test — send a SIMULATED payment.completed webhook so the
+  // POST /api/v1/merchants/:id/webhooks/test, send a SIMULATED payment.completed webhook so the
   // merchant can verify their endpoint without running a full payment. Owner / merchant_officer.
   fastify.post('/:id/webhooks/test', {
     schema: {
@@ -1027,7 +1025,7 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
           payload: { type: 'object', additionalProperties: true, description: 'Optional edited payload to send instead of the default sample.' },
           authHeader: {
             type: 'object',
-            description: 'Optional auth header to add (e.g. the scheme the merchant configured — paste an API key value here to test it).',
+            description: 'Optional auth header to add (e.g. the scheme the merchant configured, paste an API key value here to test it).',
             properties: { name: { type: 'string' }, value: { type: 'string' } },
           },
         },
@@ -1056,8 +1054,8 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
     return reply.send(result);
   });
 
-  // GET /api/v1/merchants/:id/keys  — list API key METADATA (no secret/hash)
-  // BIAN SD-89 credential management. Owner / merchant_officer / security_auditor.
+  // GET /api/v1/merchants/:id/keys, list API key METADATA (no secret/hash)
+  // credential management. Owner / merchant_officer / security_auditor.
   fastify.get('/:id/keys', {
     schema: {
       tags: ['merchants'],
@@ -1175,13 +1173,13 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
     return reply.send({ revoked: true, keyId });
   });
 
-  // POST /api/v1/merchants/:id/keys/import — register an EXISTING key from the merchant's own system
+  // POST /api/v1/merchants/:id/keys/import, register an EXISTING key from the merchant's own system
   fastify.post('/:id/keys/import', {
     schema: {
       tags: ['merchants'],
       summary: 'Import an existing merchant API key (SD-89)',
       description: `Registers an API key that the merchant already holds (e.g. issued by the merchant's
-own system). **PCI DSS Req 3:** only a bcrypt hash + a display prefix are stored — the supplied key is
+own system). **PCI DSS Req 3:** only a bcrypt hash + a display prefix are stored, the supplied key is
 hashed and discarded, never persisted in plaintext and never returned. Marked \`keyOrigin: 'imported'\`.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
@@ -1224,7 +1222,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     return reply.status(201).send(result);
   });
 
-  // PATCH /api/v1/merchants/:id/keys/:keyId — rename (relabel) an API key
+  // PATCH /api/v1/merchants/:id/keys/:keyId, rename (relabel) an API key
   // ── OAuth 2.0 Client Registration (v16, ADR-037) ──────────────────────────
 
   fastify.post('/:id/oauth-client', {
@@ -1290,7 +1288,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // GET /api/v1/merchants/:id/oauth-client — retrieve OAuth client config (no secret)
+  // GET /api/v1/merchants/:id/oauth-client, retrieve OAuth client config (no secret)
   fastify.get('/:id/oauth-client', {
     schema: {
       tags: ['merchants'],
@@ -1321,12 +1319,12 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     return reply.status(200).send(publicConfig);
   });
 
-  // PATCH /api/v1/merchants/:id/oauth-client — update OAuth client config
+  // PATCH /api/v1/merchants/:id/oauth-client, update OAuth client config
   fastify.patch('/:id/oauth-client', {
     schema: {
       tags: ['merchants'],
       summary: 'Update merchant OAuth 2.0 client config (SD-89)',
-      description: 'Updates selected fields of the merchant OAuth client config. All body fields are optional — only provided fields are updated. Requires merchant_officer or system_admin.',
+      description: 'Updates selected fields of the merchant OAuth client config. All body fields are optional, only provided fields are updated. Requires merchant_officer or system_admin.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -1349,7 +1347,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
           refresh_token_lifetime_days: { type: 'number', minimum: 1, maximum: 365 },
           claim_mapping: { type: 'object', additionalProperties: { type: 'string' } },
           logo_uri: { type: 'string', description: 'v18: OIDC client logo_uri (https). Shown on the consent page and app listings.' },
-          client_uri: { type: 'string', description: 'v18: OIDC client_uri (https) — merchant home page.' },
+          client_uri: { type: 'string', description: 'v18: OIDC client_uri (https), merchant home page.' },
           client_id: { type: 'string', minLength: 1, description: 'Set a custom client_id. Changing it orphans existing tokens/consents (aud mismatch) and requires updating the relying party config.' },
           client_secret: { type: 'string', minLength: 8, description: 'Set a custom client secret (re-hashed). The plaintext is never returned; store it now.' },
           client_secret_prefix: { type: 'string', maxLength: 16, description: 'Independent display/identification label (not derived from the secret). Set or generate on its own.' },
@@ -1403,7 +1401,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
 
   // ── Typed Webhook Registry (ADR-038) ────────────────────────────────────────
 
-  // GET /api/v1/merchants/:id/webhooks/registry — list all typed webhooks
+  // GET /api/v1/merchants/:id/webhooks/registry, list all typed webhooks
   fastify.get('/:id/webhooks/registry', {
     schema: {
       tags: ['merchants'],
@@ -1424,12 +1422,12 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // POST /api/v1/merchants/:id/webhooks/registry — register a typed webhook
+  // POST /api/v1/merchants/:id/webhooks/registry, register a typed webhook
   fastify.post('/:id/webhooks/registry', {
     schema: {
       tags: ['merchants'],
       summary: 'Register a typed webhook (SD-89)',
-      description: 'Registers or replaces the webhook for a specific event type. Returns the signing secret once — store it securely.',
+      description: 'Registers or replaces the webhook for a specific event type. Returns the signing secret once, store it securely.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -1463,7 +1461,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // PATCH /api/v1/merchants/:id/webhooks/registry/:webhookId — update a typed webhook
+  // PATCH /api/v1/merchants/:id/webhooks/registry/:webhookId, update a typed webhook
   fastify.patch('/:id/webhooks/registry/:webhookId', {
     schema: {
       tags: ['merchants'],
@@ -1501,7 +1499,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // DELETE /api/v1/merchants/:id/webhooks/registry/:webhookId — remove a typed webhook
+  // DELETE /api/v1/merchants/:id/webhooks/registry/:webhookId, remove a typed webhook
   fastify.delete('/:id/webhooks/registry/:webhookId', {
     schema: {
       tags: ['merchants'],
@@ -1521,7 +1519,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // POST /api/v1/merchants/:id/webhooks/registry/:webhookId/test — test a typed webhook
+  // POST /api/v1/merchants/:id/webhooks/registry/:webhookId/test, test a typed webhook
   fastify.post('/:id/webhooks/registry/:webhookId/test', {
     schema: {
       tags: ['merchants'],
@@ -1549,7 +1547,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // GET /api/v1/merchants/:id/webhooks/registry/:webhookId/test-payload — get canonical test payload
+  // GET /api/v1/merchants/:id/webhooks/registry/:webhookId/test-payload, get canonical test payload
   fastify.get('/:id/webhooks/registry/:webhookId/test-payload', {
     schema: {
       tags: ['merchants'],
@@ -1573,7 +1571,7 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     }
   });
 
-  // GET /api/v1/merchants/:id/webhooks/logs — list webhook delivery logs (paginated)
+  // GET /api/v1/merchants/:id/webhooks/logs, list webhook delivery logs (paginated)
   fastify.get('/:id/webhooks/logs', {
     schema: {
       tags: ['merchants'],

@@ -1,4 +1,4 @@
-// Internal VoP (Verification of Payee) engine — the built-in name-vs-account matcher used when no
+// Internal VoP (Verification of Payee) engine: the built-in name-vs-account matcher used when no
 // external VoP vendor is active (internal-first, ADR-010/029). ADDITIONAL to FDS/AML/HRP, not a
 // replacement: it answers "does the declared payee name match the destination account holder name?"
 // (match / close_match / no_match / not_supported). DATA-DRIVEN and market-gated: thresholds,

@@ -16,7 +16,7 @@ const E = { type: 'object', properties: { error: { type: 'string' } } };
 // granting auditEvents:view) are honored without touching this controller. Seeded holders today:
 // security_auditor, manager, operations_officer (observes internal-module process outcomes) and
 // level2_investigator. NOT level1_analyst or merchant_officer: the stream is cross-entity and
-// neither has a job-related need (PCI DSS Req 10.5.1 / 7.2.2).
+// neither has a job-related need (PCI DSS).
 const requireAuditView = requirePermission('auditEvents', 'view');
 
 export async function processEventController(fastify: FastifyInstance) {
@@ -36,7 +36,7 @@ export async function processEventController(fastify: FastifyInstance) {
           entityType: { type: 'string', enum: ['fraud_case', 'transaction', 'customer', 'merchant', 'integration'] },
           outcome:    { type: 'string' },
           q:          { type: 'string' },
-          ref:        { type: 'string', description: 'Related reference — finds every event for a transaction id, case id, merchant, customer/account ref, or card token.' },
+          ref:        { type: 'string', description: 'Related reference, finds every event for a transaction id, case id, merchant, customer/account ref, or card token.' },
           minScore:   { type: 'integer', minimum: 0, maximum: 100 },
           from:       { type: 'string', format: 'date-time' },
           to:         { type: 'string', format: 'date-time' },

@@ -3,7 +3,7 @@
 // per-network number-format checks, and the set of supported card networks) are data-driven and
 // stored in the capability module config, so new networks/rules can be added without code changes.
 //
-// PCI DSS Req 3.2: NO sensitive authentication data is stored. The CVV is only compared in memory
+// PCI DSS: NO sensitive authentication data is stored. The CVV is only compared in memory
 // against the configured value; neither the PAN nor the CVV is ever returned or logged.
 import { CardIssuerInboundPayload } from '../../../modules/provider/models/externalProviderArrangement.model';
 
@@ -232,7 +232,7 @@ export function validateCard(
   }
 
   // D1 (P13.1): on a CVV-bearing channel (interactive checkout / payment-link / simulator), the PSP
-  // sets `cvvExpected`. A missing CVV there is a decline (82) — the card-present-style verification
+  // sets `cvvExpected`. A missing CVV there is a decline (82): the card-present-style verification
   // was required but absent. Card-on-file / recurring tokenized payments do not set the flag, so they
   // keep approving without a CVV.
   const cvvExpected = input.cvvExpected === true || input.cvvExpected === 'true';

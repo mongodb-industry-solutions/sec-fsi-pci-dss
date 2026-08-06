@@ -201,10 +201,10 @@ export default function UsersPage() {
         description={isL1
           ? 'Find a customer by encrypted email, phone or account reference.'
           : 'Find a customer by exact key (email, phone, account reference) or investigate over encrypted KYC attributes with Queryable Encryption.'}
-        debugInfo="BIAN SD-53 Customer Agreement / SD-91 · PCI DSS Req 3/7/12.3 · MongoDB Queryable Encryption (no plaintext leaves the app)"
+        debugInfo="Customer Agreement / PCI DSS · MongoDB Queryable Encryption (no plaintext leaves the app)"
       />
 
-      {/* Blind single-record lookup — L1 only. L2/auditor use the advanced search below. */}
+      {/* Blind single-record lookup: L1 only. L2/auditor use the advanced search below. */}
       {isL1 && (<>
       <div className="bg-white rounded-xl border p-5 space-y-4">
         <h2 className="font-semibold">Search by encrypted field</h2>
@@ -402,7 +402,7 @@ export default function UsersPage() {
       {/* v27: encrypted-attribute search (Queryable Encryption). For L2/auditor this is THE search
           surface: it carries the exact keys (email/phone/account reference) plus the KYC attributes,
           so everything the L1 blind lookup does is available here too. Discovery capability that
-          returns a list, gated to L2 investigator / auditor (least-privilege, PCI DSS Req 7). Server
+          returns a list, gated to L2 investigator / auditor (least-privilege, PCI DSS). Server
           enforces the gate. */}
       {isStaffSearch && (
         <div className="space-y-4">

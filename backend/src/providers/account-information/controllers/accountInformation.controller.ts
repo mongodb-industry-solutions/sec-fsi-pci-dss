@@ -1,6 +1,6 @@
-// Account Information (AIS) builtin module controller (SD-36 Open Banking, ADR-029).
-// POST /score — validates a payout account; called by integration router.
-// GET/PUT /config — admin configuration.
+// Account Information (AIS) builtin module controller (Open Banking, ADR-029).
+// POST /score: validates a payout account; called by integration router.
+// GET/PUT /config: admin configuration.
 
 import { FastifyInstance } from 'fastify';
 import {
@@ -56,7 +56,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
       summary: 'AIS account validation (internal builtin)',
       description: 'Validates a payout account status and returns PSP internal ledger balance. '
         + 'Called by the integration router. Not JWT-authenticated; requires X-Integration-Source header. '
-        + 'IBAN is never present in the request — uses payoutAccountInstanceReference only.',
+        + 'IBAN is never present in the request: uses payoutAccountInstanceReference only.',
       headers: {
         type: 'object',
         required: ['x-integration-source'],
@@ -156,13 +156,13 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
   });
 
-  // ── v29 GLOBAL PAYOUT-ACCOUNT ADMINISTRATION (SD-66, built-in module surface) ─────────────────
+  // ── v29 GLOBAL PAYOUT-ACCOUNT ADMINISTRATION (built-in module surface) ─────────────────
   // Global cross-party administration of payout accounts, distinct from the party-scoped self-service
-  // surface (/api/v1/accounts/:partyRef). Gated to operations_officer (PCI Req 7) and to the
+  // surface (/api/v1/accounts/:partyRef). Gated to operations_officer (PCI DSS) and to the
   // account-information capability resolving to its internal provider (409 managed_externally).
   // QE/GDPR: IBAN/routing are never returned here (presence hints only); reveal stays on its own route.
 
-  // GET /accounts — global paginated list (QE-stripped + hints).
+  // GET /accounts: global paginated list (QE-stripped + hints).
   fastify.get('/accounts', {
     preHandler: [requirePermission('accounts', 'view'), gate],
     schema: {
@@ -212,7 +212,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return reply.send({ results: results.map(safeAccount), total, page, limit });
   });
 
-  // GET /accounts/:accountRef — global account detail (QE-stripped; audited).
+  // GET /accounts/:accountRef, global account detail (QE-stripped; audited).
   fastify.get('/accounts/:accountRef', {
     preHandler: [requirePermission('accounts', 'view'), gate],
     schema: {
@@ -239,7 +239,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return reply.send({ ...safeAccount(account), ownerName });
   });
 
-  // GET /parties — owner picker for account registration: search parties by owner name.
+  // GET /parties: owner picker for account registration: search parties by owner name.
   // Returns ONLY the party ref + owner name (need-to-know; no other PII). accounts:view + gate.
   fastify.get('/parties', {
     preHandler: [requirePermission('accounts', 'view'), gate],
@@ -257,7 +257,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   });
 
   // GET /accounts/:accountRef/cards (v30 cross-linking): list the payment cards funded by this
-  // account (SD-88 cardAccountReference). Reuses listAllCards (funding filter) via the Card-by-account
+  // account (cardAccountReference). Reuses listAllCards (funding filter) via the Card-by-account
   // port. Display-safe (no full PAN, no CVV).
   fastify.get('/accounts/:accountRef/cards', {
     preHandler: [requirePermission('accounts', 'view'), gate],
@@ -345,7 +345,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return reply.send({ payoutAccountRoutingNumber: account.payoutAccountRoutingNumber });
   });
 
-  // PATCH /accounts/:accountRef/owner — v30.1 administrative ownership reassignment. Moves the account
+  // PATCH /accounts/:accountRef/owner, v30.1 administrative ownership reassignment. Moves the account
   // to a different party. Sensitive (PII/fraud); audited (account.owner.reassigned). accounts:manage.
   fastify.patch('/accounts/:accountRef/owner', {
     preHandler: [requirePermission('accounts', 'manage'), gate],
@@ -374,7 +374,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return reply.send({ ...safeAccount(updated), ownerName });
   });
 
-  // POST /accounts — register a payout account for a party (IBAN/routing QE-encrypted at rest).
+  // POST /accounts: register a payout account for a party (IBAN/routing QE-encrypted at rest).
   fastify.post('/accounts', {
     preHandler: [requirePermission('accounts', 'manage'), gate],
     schema: {
@@ -427,7 +427,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return reply.status(201).send(safeAccount(created));
   });
 
-  // PATCH /accounts/:accountRef — update mutable banking metadata (IBAN/currency/type immutable).
+  // PATCH /accounts/:accountRef, update mutable banking metadata (IBAN/currency/type immutable).
   fastify.patch('/accounts/:accountRef', {
     preHandler: [requirePermission('accounts', 'manage'), gate],
     schema: {
@@ -466,7 +466,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return reply.send(safeAccount(updated));
   });
 
-  // DELETE /accounts/:accountRef — close the account (soft-close; record retained).
+  // DELETE /accounts/:accountRef, close the account (soft-close; record retained).
   fastify.delete('/accounts/:accountRef', {
     preHandler: [requirePermission('accounts', 'manage'), gate],
     schema: {

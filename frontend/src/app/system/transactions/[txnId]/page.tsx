@@ -315,19 +315,19 @@ export default function TransactionDetailPage() {
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          <InfoLabel label="Transaction ID" tip="BIAN SD-254 CardTransactionLog instance reference. The immutable primary key for this transaction record." />
+          <InfoLabel label="Transaction ID" tip="CardTransactionLog instance reference. The immutable primary key for this transaction record." />
           <span className="font-mono text-xs break-all">{txn.cardTransactionInstanceReference ?? txnId}</span>
           <InfoLabel label="Amount" tip="Authorized amount and settlement currency (ISO 4217). This card transaction is single-currency; no FX conversion applies." />
           <span className="font-medium">{formattedAmount}{currency ? <span className="text-gray-400 font-normal ml-1">({currency})</span> : null}</span>
           {txn.cardTransactionType && (
             <>
-              <InfoLabel label="Type" tip="BIAN SD-254 transaction type: purchase, cash advance, balance transfer, refund, fee or adjustment." />
+              <InfoLabel label="Type" tip="transaction type: purchase, cash advance, balance transfer, refund, fee or adjustment." />
               <span className="capitalize">{txn.cardTransactionType.replace(/_/g, ' ')}</span>
             </>
           )}
           {feeAmount != null && (
             <>
-              <InfoLabel label="Merchant commission" tip="BIAN SD-89 acquiring commission captured on this payment (fee attributed to the merchant), in the settlement currency." />
+              <InfoLabel label="Merchant commission" tip="acquiring commission captured on this payment (fee attributed to the merchant), in the settlement currency." />
               <span className="font-mono text-xs">{currency ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(feeAmount) : feeAmount}</span>
             </>
           )}
@@ -459,7 +459,7 @@ export default function TransactionDetailPage() {
                     <SensitiveReveal
                       label="Raw Gateway Payload"
                       masked="•••• (masked)"
-                      info="Full acquirer/gateway payload for this authorization (SD-254). QE:none: encrypted at rest and not searchable."
+                      info="Full acquirer/gateway payload for this authorization. QE:none: encrypted at rest and not searchable."
                       fetchValue={async () => JSON.stringify(txn.sensitive?.rawGatewayPayload, null, 2)}
                     />
                   ) : null}
@@ -467,7 +467,7 @@ export default function TransactionDetailPage() {
                     <SensitiveReveal
                       label="Processor Metadata"
                       masked="•••• (masked)"
-                      info="Processor-side metadata for this transaction (SD-254). QE:none: encrypted at rest and not searchable."
+                      info="Processor-side metadata for this transaction. QE:none: encrypted at rest and not searchable."
                       fetchValue={async () => JSON.stringify(txn.sensitive?.processorTransactionMetadata, null, 2)}
                     />
                   ) : null}
@@ -513,10 +513,10 @@ export default function TransactionDetailPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <InfoLabel label="Name" tip="Registered account holder (BIAN SD-13 Party). PII, minimized to the name here." /><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
+                <InfoLabel label="Name" tip="Registered account holder. PII, minimized to the name here." /><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
                 <InfoLabel label="Segment" tip="Customer segment (e.g. retail, SME, corporate), used for risk and servicing." /><span className="capitalize">{String(partyCustomer.customerSegment ?? '-')}</span>
                 <InfoLabel label="Status" tip="Lifecycle status of the customer agreement (active, suspended, closed)." /><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '-')}</span>
-                <InfoLabel label="KYC check" tip="Know Your Customer verification outcome (BIAN SD-13). Cleared / pending / failed drives onboarding and monitoring." /><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
+                <InfoLabel label="KYC check" tip="Know Your Customer verification outcome. Cleared / pending / failed drives onboarding and monitoring." /><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
               </div>
               {custSensitive ? (
                 <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
@@ -551,7 +551,7 @@ export default function TransactionDetailPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Landmark size={13} className="text-[#001E2B]" />
                     <span className="text-xs font-semibold text-gray-700">Funding account</span>
-                    <Tooltip text="The bank account that funds this card (BIAN SD-66). IBAN is GDPR/PSD2-protected (not PCI DSS scope) and revealed on demand." />
+                    <Tooltip text="The bank account that funds this card. IBAN is GDPR/PSD2-protected (not PCI DSS scope) and revealed on demand." />
                     {accountHref && (
                       <Link href={accountHref} className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
                         Open account <ChevronRight size={12} />
@@ -705,7 +705,7 @@ export default function TransactionDetailPage() {
               id: txnId,
               label: 'cardTransactionLog',
               labelColor: 'text-amber-400',
-              description: 'SD-27 - QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
+              description: 'QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
             },
             ...(txn.paymentCardReference ? [{
               kind: 'mongo' as const,
@@ -713,7 +713,7 @@ export default function TransactionDetailPage() {
               id: txn.paymentCardReference,
               label: 'paymentCardManagement',
               labelColor: 'text-blue-400',
-              description: 'SD-170 - card token (QE:equality), PAN mask, network, expiry',
+              description: 'card token (QE:equality), PAN mask, network, expiry',
             }] : []),
             ...(linkedCase ? [{
               kind: 'mongo' as const,
@@ -721,7 +721,7 @@ export default function TransactionDetailPage() {
               id: linkedCase.id,
               label: 'fraudDiagnosisCase',
               labelColor: 'text-red-400',
-              description: 'SD-92 - investigation case, risk indicators, resolution record',
+              description: 'investigation case, risk indicators, resolution record',
             }] : []),
           ]}
         />

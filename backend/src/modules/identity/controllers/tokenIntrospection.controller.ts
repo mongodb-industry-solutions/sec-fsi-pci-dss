@@ -1,5 +1,5 @@
 /**
- * RFC 7662 — Token Introspection Endpoint
+ * RFC 7662: Token Introspection Endpoint
  * POST /api/v1/auth/introspect
  * Authenticates the requesting OAuth client via Basic auth, then returns token metadata.
  */
@@ -22,7 +22,7 @@ export async function tokenIntrospectionController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oidc'],
       summary: 'RFC 7662 Token Introspection',
-      description: `Server-side token validation for OAuth clients. Requires client authentication (Authorization: Basic base64(client_id:client_secret)).\n\nReturns { active: true, ...claims } for valid tokens, or { active: false } for expired, revoked, or unknown tokens (RFC 7662 §2.2 — no 401/404 to avoid information leakage).\n\n**Merchant verification strategies:**\n- Introspection (this endpoint): zero merchant-side key management, +1 HTTP round-trip per request\n- Client-side JWKS verification (GET /api/v1/auth/jwks): local crypto, no round-trip, merchant manages key rotation`,
+      description: `Server-side token validation for OAuth clients. Requires client authentication (Authorization: Basic base64(client_id:client_secret)).\n\nReturns { active: true, ...claims } for valid tokens, or { active: false } for expired, revoked, or unknown tokens (RFC 7662 §2.2, no 401/404 to avoid information leakage).\n\n**Merchant verification strategies:**\n- Introspection (this endpoint): zero merchant-side key management, +1 HTTP round-trip per request\n- Client-side JWKS verification (GET /api/v1/auth/jwks): local crypto, no round-trip, merchant manages key rotation`,
       consumes: ['application/x-www-form-urlencoded'],
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {

@@ -9,10 +9,10 @@ import { useNotify, useConfirm } from '../../../../../components/ui/ConfirmProvi
 import { useEffectivePermissions } from '../../../../../lib/permissions';
 import { ModalShell, Field, ModalActions } from './AdminModal';
 
-// v29 SD-66 global payout-account administration panel (built-in account-information module). Rendered
+// v29 global payout-account administration panel (built-in account-information module). Rendered
 // as the "Accounts" tab of the account-information module page. QE/GDPR: IBAN/routing are never returned
 // here (presence hints only); the raw IBAN reveal stays on its dedicated party-scoped route.
-// PCI DSS Req 7, Req 10. Receives 409 managed_externally → static banner.
+// PCI DSS. Receives 409 managed_externally → static banner.
 
 const STATUSES = ['active', 'pending_validation', 'suspended', 'closed'] as const;
 const TYPES = ['bank_account', 'wallet', 'internal_ledger'] as const;

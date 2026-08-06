@@ -4,16 +4,16 @@ import { getJwks } from '../services/oidcKeys.service';
 export async function oidcDiscoveryController(fastify: FastifyInstance) {
   const issuer = () => process.env.PSP_BASE_URL ?? 'http://localhost:8081';
   // authorization_endpoint / end_session_endpoint are browser-facing PAGES rendered by the PSP
-  // frontend (login/consent UI, session cookie) — the backend's own /api/v1/auth/authorize returns
+  // frontend (login/consent UI, session cookie): the backend's own /api/v1/auth/authorize returns
   // JSON, not UI, so it must NOT be advertised here as the endpoint to redirect the user-agent to.
   const frontendBase = () => process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
-  // OIDC Discovery 1.0 §4 — path fixed by spec, must be at root (no /api/v1 prefix)
+  // OIDC Discovery 1.0 §4: path fixed by spec, must be at root (no /api/v1 prefix)
   fastify.get('/.well-known/openid-configuration', {
     schema: {
       tags: ['auth:oidc'],
       summary: 'OIDC Discovery Document',
-      description: 'OpenID Connect Discovery 1.0 — returns the authorization server metadata.',
+      description: 'OpenID Connect Discovery 1.0, returns the authorization server metadata.',
     },
   }, async (_req, _reply) => {
     const base = issuer();
@@ -44,7 +44,7 @@ export async function oidcDiscoveryController(fastify: FastifyInstance) {
     };
   });
 
-  // JWKS endpoint — public keys for client-side RS256 verification (ADR-036)
+  // JWKS endpoint: public keys for client-side RS256 verification (ADR-036)
   fastify.get('/api/v1/auth/jwks', {
     schema: {
       tags: ['auth:oidc'],

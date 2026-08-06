@@ -1,6 +1,6 @@
 /**
  * Unit tests (dev.v30 FT / FR-30.9, FR-30.11): getActiveProviderForType / getActiveProvidersForType.
- * Pins the internal-first, then routingPriority-ASC selection contract (R9). No DB — the provider
+ * Pins the internal-first, then routingPriority-ASC selection contract (R9). No DB: the provider
  * collection find().toArray() is mocked.
  *
  * Source: backend/src/modules/provider/services/integrationRegistry.service.ts

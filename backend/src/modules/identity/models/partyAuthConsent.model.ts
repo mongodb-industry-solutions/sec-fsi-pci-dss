@@ -1,4 +1,4 @@
-// BIAN SD-16: Party Authentication, ConsentGrant behavior qualifier
+// Party Authentication, ConsentGrant behavior qualifier
 // Tracks which merchant OAuth clients a user has authorized, with scopes and revocation support.
 
 export const PARTY_AUTH_CONSENT_COLLECTION = 'partyAuthConsent';
@@ -9,7 +9,7 @@ export type ConsentRevokedBy = 'user' | 'merchant' | 'psp';
 export interface PartyAuthConsentRecord {
   consentId: string;                                  // UUID, primary key
 
-  // Subject — the authenticated party who granted consent
+  // Subject: the authenticated party who granted consent
   partyAuthenticationInstanceReference: string;       // FK → customerAuthenticationAssessment.sub
 
   // OAuth client that was granted consent

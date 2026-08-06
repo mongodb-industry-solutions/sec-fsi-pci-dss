@@ -15,7 +15,7 @@ function IntegrityRow({ ok, label, detail }: { ok: boolean; label: string; detai
   );
 }
 
-// Security Auditor data-integrity oversight (PCI DSS Req 10). Read-only. Re-runnable.
+// Security Auditor data-integrity oversight (PCI DSS). Read-only. Re-runnable.
 // Renders even on error so the section is always visible and explains why.
 export function IntegrityPanel({ token }: { token: string }) {
   const { debugMode } = useDebugMode();
@@ -59,7 +59,7 @@ export function IntegrityPanel({ token }: { token: string }) {
             ? 'Integrity check unavailable. Ensure the backend is rebuilt and restarted (this endpoint is new).'
             : 'No integrity data.'}
         </p>
-        {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">SD-83 control-record integrity · PCI DSS Req 10 · read-only</p>}
+        {debugMode && <p className="mt-2 text-[10px] font-mono text-gray-400">control-record integrity · PCI DSS · read-only</p>}
       </div>
     );
   }
@@ -83,10 +83,10 @@ export function IntegrityPanel({ token }: { token: string }) {
           <IntegrityRow ok={d.orphanCustomerRefs === 0} label="Customer references resolve" detail={d.orphanCustomerRefs === 0 ? 'OK' : `${d.orphanCustomerRefs} orphaned`} />
           <IntegrityRow ok label="Total cases" detail={String(d.totalCases)} />
         </div>
-        {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-83 control-record integrity · PCI DSS Req 10 · read-only</p>}
+        {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">control-record integrity · PCI DSS · read-only</p>}
       </div>
 
-      {/* Payment-card integrity (SD-88): cards duplicated by error */}
+      {/* Payment-card integrity : cards duplicated by error */}
       {d.cards && (
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
@@ -100,7 +100,7 @@ export function IntegrityPanel({ token }: { token: string }) {
             <IntegrityRow ok={d.cards.tokenizationDuplicateCount === 0} label="Consistent tokenization (one token per card)" detail={d.cards.tokenizationDuplicateCount === 0 ? 'OK' : `${d.cards.tokenizationDuplicateCount} inconsistent`} />
             <IntegrityRow ok={d.cards.registryDriftCount === 0} label="Card registry reconciles with holders" detail={d.cards.registryDriftCount === 0 ? 'OK' : `${d.cards.registryDriftCount} drifted`} />
           </div>
-          {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">SD-88 payment-card integrity · masked PAN only · no CHD</p>}
+          {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">payment-card integrity · masked PAN only · no CHD</p>}
         </div>
       )}
 
@@ -191,7 +191,7 @@ export function IntegrityPanel({ token }: { token: string }) {
             ))}
           </ul>
           <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 text-xs text-gray-500">
-            Remediation: restore the missing customer agreement, or re-link the case to the correct customer{debugMode ? ' (SD-83 ↔ SD-13 referential integrity)' : ''}.
+            Remediation: restore the missing customer agreement, or re-link the case to the correct customer{debugMode ? ' ( ↔ referential integrity)' : ''}.
           </div>
         </div>
       )}

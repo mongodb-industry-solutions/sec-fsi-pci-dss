@@ -1,4 +1,4 @@
-// KYC capability module controller — STATIC routes (ADR-029).
+// KYC capability module controller: STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { verifyKyc } from '../services/kyc.service';

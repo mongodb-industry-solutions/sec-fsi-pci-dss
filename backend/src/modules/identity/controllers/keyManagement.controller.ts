@@ -25,12 +25,12 @@ function requireManagerRole(req: FastifyRequest, reply: FastifyReply): boolean {
 export async function keyManagementController(fastify: FastifyInstance) {
   const db = (): Db => (fastify as any).db as Db;
 
-  // GET /api/v1/auth/keys — list all keys (no private material)
+  // GET /api/v1/auth/keys: list all keys (no private material)
   fastify.get('/keys', {
     schema: {
       tags: ['auth:kms'],
       summary: 'List RSA Signing Keys',
-      description: 'Lists all OAuth RS256 signing keys with status. Returns public key metadata only — no private key material. Requires manager or system_admin role.',
+      description: 'Lists all OAuth RS256 signing keys with status. Returns public key metadata only, no private key material. Requires manager or system_admin role.',
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
     if (!requireManagerRole(req, reply)) return;
@@ -42,7 +42,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
     return { keys };
   });
 
-  // POST /api/v1/auth/keys/generate — generate new keypair
+  // POST /api/v1/auth/keys/generate: generate new keypair
   fastify.post('/keys/generate', {
     schema: {
       tags: ['auth:kms'],
@@ -60,7 +60,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
     return { kid: result.kid, message: 'New keypair generated. Old active key deprecated.' };
   });
 
-  // POST /api/v1/auth/keys/rotate — explicit rotation (alias for generate)
+  // POST /api/v1/auth/keys/rotate: explicit rotation (alias for generate)
   fastify.post('/keys/rotate', {
     schema: {
       tags: ['auth:kms'],
@@ -79,7 +79,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
     return { kid: result.kid, message: 'Key rotated. Previous key deprecated.' };
   });
 
-  // POST /api/v1/auth/keys/upload — upload external PEM pair
+  // POST /api/v1/auth/keys/upload: upload external PEM pair
   fastify.post('/keys/upload', {
     schema: {
       tags: ['auth:kms'],
@@ -106,12 +106,12 @@ export async function keyManagementController(fastify: FastifyInstance) {
     }
   });
 
-  // POST /api/v1/auth/keys/:keyId/revoke — revoke deprecated key
+  // POST /api/v1/auth/keys/:keyId/revoke, revoke deprecated key
   fastify.post('/keys/:keyId/revoke', {
     schema: {
       tags: ['auth:kms'],
       summary: 'Revoke a Deprecated Key',
-      description: 'Marks a deprecated key as revoked. It is removed from the JWKS endpoint and tokens signed with it become invalid. Cannot revoke the currently active key — rotate first. Requires manager or system_admin role.',
+      description: 'Marks a deprecated key as revoked. It is removed from the JWKS endpoint and tokens signed with it become invalid. Cannot revoke the currently active key, rotate first. Requires manager or system_admin role.',
       params: {
         type: 'object',
         required: ['keyId'],
@@ -129,12 +129,12 @@ export async function keyManagementController(fastify: FastifyInstance) {
     }
   });
 
-  // GET /api/v1/auth/keys/:keyId/public.pem — download public key (no auth — for merchants)
+  // GET /api/v1/auth/keys/:keyId/public.pem, download public key (no auth, for merchants)
   fastify.get('/keys/:keyId/public.pem', {
     schema: {
       tags: ['auth:kms'],
       summary: 'Download Public Key (PEM)',
-      description: 'Returns the public key in PEM format for merchants who prefer to verify tokens client-side. No authentication required — public keys are safe to share.',
+      description: 'Returns the public key in PEM format for merchants who prefer to verify tokens client-side. No authentication required, public keys are safe to share.',
       params: {
         type: 'object',
         required: ['keyId'],
@@ -143,7 +143,7 @@ export async function keyManagementController(fastify: FastifyInstance) {
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
     const { keyId } = req.params as { keyId: string };
-    // Served from the key provider (filesystem/KMS) — the single source of truth (ADR-036).
+    // Served from the key provider (filesystem/KMS): the single source of truth (ADR-036).
     const publicKeyPem = await getPublicPemByKid(keyId);
 
     if (!publicKeyPem) {

@@ -163,7 +163,7 @@ describe('createTransaction', () => {
     expect(result.fraudCaseCreated).toBe(false);
   });
 
-  // P13.3 (D2): when the FDS gate returns a verdict, the fraud case is driven by it — the case score
+  // P13.3 (D2): when the FDS gate returns a verdict, the fraud case is driven by it, the case score
   // and risk indicators are the FDS verdict, not the amount-count heuristic.
   it('opens the fraud case from the FDS verdict (score + rulesFired), not the amount heuristic', async () => {
     vi.mocked(dispatchProvider).mockImplementation(async (_db: any, group: string) => {
@@ -172,7 +172,7 @@ describe('createTransaction', () => {
       }
       return { provider: 'internal', status: 'received' } as any;
     });
-    // A LOW amount that the PSP amount rule would NOT flag — proving the verdict (not the amount) decides.
+    // A LOW amount that the PSP amount rule would NOT flag: proving the verdict (not the amount) decides.
     const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(true);
     expect(h.createFraudCase).toHaveBeenCalledTimes(1);
@@ -196,7 +196,7 @@ describe('createTransaction', () => {
     vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received' } as any);
   });
 
-  // U-01: cardTransactionDescription accepted and function returns successfully (BIAN SD-254)
+  // U-01: cardTransactionDescription accepted and function returns successfully 
   it('U-01: accepts cardTransactionDescription and returns authorized status', async () => {
     const result = await createTransaction(txDb(), { ...baseInput, cardTransactionDescription: 'AMAZON.COM*ELECTRONI' });
     expect(result.cardTransactionStatus).toBe('authorized');

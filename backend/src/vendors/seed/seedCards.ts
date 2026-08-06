@@ -50,12 +50,12 @@ export async function seedCards(db: Db) {
       { upsert: true }
     );
   }
-  // Build the physical-card registry (SD-88) from the seeded arrangements: one entry per token
+  // Build the physical-card registry from the seeded arrangements: one entry per token
   // with the distinct-holder count (the FDS/AML shared-card signal).
   const tokens = await rebuildCardRegistry(db);
   console.log(`  ${PAYMENT_CARD_COLLECTION}: ${records.length} upserted; registry rebuilt for ${tokens} cards`);
 
-  // Link each card to a payout account owned by its holder (BIAN SD-88 §cardAccountReference).
+  // Link each card to a payout account owned by its holder (§cardAccountReference).
   // A card funds from exactly one account; an account may back several cards. The seed data may
   // spread a holder's cards across several of their own accounts (diversity for demo/testing), so
   // we HONOUR an explicit fundingPayoutAccountInstanceReference when it points to an active account

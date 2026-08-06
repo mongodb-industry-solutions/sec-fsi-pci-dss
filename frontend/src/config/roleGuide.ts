@@ -32,7 +32,7 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
       'Cannot decrypt any cardholder data.',
       'Merchant capabilities apply only after KYB approval; a pending application grants no merchant access.',
     ],
-    pci: ['Req 3', 'Req 7', 'Req 12'],
+    pci: ['', '', ''],
   },
   level1_analyst: {
     icon: Search,
@@ -50,7 +50,7 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
       'Cannot decrypt the full PAN or sensitive customer profile fields.',
       'Cannot resolve a case as confirmed fraud without escalation; no admin or Integration Hub access.',
     ],
-    pci: ['Req 3', 'Req 7', 'Req 10'],
+    pci: ['', '', ''],
   },
   level2_investigator: {
     icon: KeyRound,
@@ -68,7 +68,7 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
       'Every field-level decryption is logged and auditable.',
       'Elevated access is scoped to assigned cases; not a blanket grant.',
     ],
-    pci: ['Req 3', 'Req 7', 'Req 8', 'Req 10'],
+    pci: ['', '', '', ''],
   },
   security_auditor: {
     icon: ScrollText,
@@ -85,7 +85,7 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
     restrictions: [
       'Strictly read-only: cannot modify cases, transactions, or configuration.',
     ],
-    pci: ['Req 10', 'Req 12'],
+    pci: ['', ''],
   },
   merchant_officer: {
     icon: CheckSquare,
@@ -101,17 +101,17 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
     ],
     restrictions: [
       'No fraud case or audit log access; no access to cardholder data.',
-      'KYB decision (approve/reject) authority; data correction of KYB records/owners is shared with the Operations Officer, who cannot make the decision (SoD, PCI Req 7).',
+      'KYB decision (approve/reject) authority; data correction of KYB records/owners is shared with the Operations Officer, who cannot make the decision (SoD, PCI DSS).',
     ],
-    pci: ['Req 7', 'Req 12'],
+    pci: ['', ''],
   },
   operations_officer: {
     icon: Wallet,
-    tagline: 'Operations: administer customer cards (SD-88), payout accounts (SD-66) and KYC/KYB records via the built-in modules.',
+    tagline: 'Operations: administer customer cards, payout accounts and KYC/KYB records via the built-in modules.',
     responsibilities: [
       'Administer the global card inventory: register, edit, activate/suspend, and revoke customer cards via the built-in card-issuer module.',
       'Administer payout accounts: create, edit, and close party payout accounts via the built-in account-information module.',
-      'KYC/KYB data administration: review and correct KYC records (SD-53) and KYB records + beneficial owners (SD-89). Data correction only, NOT the KYB approve/reject decision (that stays with the Merchant Officer, SoD).',
+      'KYC/KYB data administration: review and correct KYC records and KYB records + beneficial owners. Data correction only, NOT the KYB approve/reject decision (that stays with the Merchant Officer, SoD).',
       'Keep the card, account, KYC and KYB registries accurate for downstream operations.',
     ],
     dataAccess: [
@@ -124,9 +124,9 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
       'CVV and PIN are never seen persisted (SAD is never stored; the CVV is derived on demand).',
       'Full PAN and raw IBAN are visible only through an explicit on-demand reveal (ephemeral, audited), never in listings or loaded by default.',
       'Reveal (and administration) is disabled with 409 managed_externally when an external provider takes over the capability.',
-      'Does not manage providers or modules; that is the manager role (separation of duties, PCI DSS Req 7).',
+      'Does not manage providers or modules; that is the manager role (separation of duties, PCI DSS).',
     ],
-    pci: ['Req 3.2/3.3', 'Req 7', 'Req 10'],
+    pci: ['', '', ''],
   },
   manager: {
     icon: Database,
@@ -144,7 +144,7 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
       'No cardholder PAN decryption.',
       'Provider secrets cannot be read back after creation; only rotated or revoked.',
     ],
-    pci: ['Req 8', 'Req 10', 'Req 12'],
+    pci: ['', '', ''],
   },
 };
 

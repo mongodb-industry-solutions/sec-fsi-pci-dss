@@ -1,4 +1,4 @@
-// BIAN SD-15: Card Authorization — CardAuthorizationRecord control record
+// Card Authorization, CardAuthorizationRecord control record
 
 export const CARD_AUTHORIZATION_COLLECTION = 'cardAuthorizationRecord';
 

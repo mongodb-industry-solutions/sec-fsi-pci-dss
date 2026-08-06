@@ -5,7 +5,7 @@
  *
  * assertBeneficiaryPredicate accepts `caseRef` as a discriminating predicate. If the query does not
  * then filter by the party behind that case, any caseRef value returns the whole registry, which is
- * exactly the cross-party enumeration the rule forbids (PCI DSS Req 7.2.2).
+ * exactly the cross-party enumeration the rule forbids (PCI DSS).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -49,7 +49,7 @@ function makeDb(overrides: {
   return { db, queries };
 }
 
-describe('listAllBeneficiaries — caseRef scoping (ADR-048)', () => {
+describe('listAllBeneficiaries: caseRef scoping (ADR-048)', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('resolves the case to its customer and filters by that owner', async () => {

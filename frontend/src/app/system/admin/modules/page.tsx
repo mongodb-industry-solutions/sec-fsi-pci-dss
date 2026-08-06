@@ -6,15 +6,16 @@ import { CAPABILITY_LIST } from '../../../../config/capabilities';
 import { CORE_ADMIN_MODULES, MODULE_TYPE_LABEL, type ModuleType } from '../../../../config/adminModules';
 import { useEffectivePermissions } from '../../../../lib/permissions';
 
+import { serviceDomainLabel } from '../../../../lib/serviceDomain';
 const DOMAIN_LABEL: Record<string, string> = {
   fraud: 'Fraud & Financial Crime',
   customer: 'Customer & Business Due Diligence',
   gateway: 'Card / Payments',
 };
 
-// DISPLAY grouping only. KYB is owned by the `gateway` module (SD-89 merchant data ownership / callback
+// DISPLAY grouping only. KYB is owned by the `gateway` module (merchant data ownership / callback
 // routing / §10 matrix stay unchanged), but for the operator it is an onboarding due-diligence sibling of
-// KYC (SD-53). So group it next to KYC under "Customer & Business Due Diligence" without touching its
+// KYC . So group it next to KYC under "Customer & Business Due Diligence" without touching its
 // moduleDomain. This override does not affect the backend or the config route (/modules/kyb/config).
 const displayDomain = (c: { capability: string; moduleDomain: string | null }): string | null =>
   c.capability === 'kyb' ? 'customer' : c.moduleDomain;
@@ -39,7 +40,7 @@ export default function ModulesIndexPage() {
     items: CAPABILITY_LIST.filter((c) => c.hasModule && displayDomain(c) === d),
   }));
 
-  // SoD (PCI Req 7): the "domain" core module administers Auth Domains (SD-16), which is the manager's
+  // SoD (PCI DSS): the "domain" core module administers Auth Domains , which is the manager's
   // remit, not operations_officer's. Show it only to roles that hold authDomains access. Wait for
   // permissions to load (can() is default-deny meanwhile) to avoid the module flickering in on cold load.
   const coreModules = permsLoading
@@ -51,8 +52,8 @@ export default function ModulesIndexPage() {
       <SectionHeader
         icon={Boxes}
         title="Internal Modules"
-        description="All configurable modules — PSP Core modules and Built-in Provider engines (replaceable by an external vendor, internal-first)."
-        debugInfo="§2.6 module-type label · ADR-029 · capabilityModuleConfiguration · PCI DSS Req 12.8"
+        description="All configurable modules: PSP Core modules and Built-in Provider engines (replaceable by an external vendor, internal-first)."
+        debugInfo="§2.6 module-type label · ADR-029 · capabilityModuleConfiguration · PCI DSS"
       />
 
       {/* PSP core modules (configurable core behavior, not provider adapters). */}
@@ -99,7 +100,7 @@ export default function ModulesIndexPage() {
                       <p className="font-semibold text-gray-800 text-sm">{c.label}</p>
                       <ModuleTypeBadge type="built-in-provider" />
                     </div>
-                    <p className="text-xs text-gray-500">{c.bianServiceDomain}</p>
+                    <p className="text-xs text-gray-500">{serviceDomainLabel(c.bianServiceDomain)}</p>
                   </div>
                   <ChevronRight size={16} className="text-gray-400" />
                 </div>

@@ -9,7 +9,7 @@ import { Pagination } from '../../../../components/Pagination';
 import { useDebugMode } from '../../../../lib/debugMode';
 
 // ── Unified history row ───────────────────────────────────────────────────────
-// Each row is either a card transaction (SD-254) or a P2P transfer (SD-65).
+// Each row is either a card transaction or a P2P transfer .
 type RowCategory = 'card' | 'p2p' | 'rtp';
 
 interface HistoryRow {
@@ -40,7 +40,7 @@ interface HistoryRow {
   // 'to_approve' = someone requested money from me (I must approve to pay, outgoing).
   rtpRole?: 'requested' | 'to_approve';
   rtpRequestRef?: string;
-  linkedExecutionRef?: string; // the SD-65 execution created on accept (money leg of this RTP)
+  linkedExecutionRef?: string; // the execution created on accept (money leg of this RTP)
 }
 
 // ── Card transaction type badges ──────────────────────────────────────────────
@@ -75,7 +75,7 @@ const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
   completed:  { label: '✓ Completed', color: 'bg-emerald-100 text-emerald-800 font-semibold' },
 };
 
-// ── Fraud / risk status (BIAN SD-83) ──────────────────────────────────────────
+// ── Fraud / risk status ──────────────────────────────────────────
 const FRAUD_STATUS: Record<string, { label: string; color: string; icon: string }> = {
   open:             { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
   under_review:     { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
@@ -89,7 +89,7 @@ function fmtAmount(amount: number, currency: string) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
-// ── Card money direction (SD-254) ─────────────────────────────────────────────
+// ── Card money direction ─────────────────────────────────────────────
 // Any operation that debits the funding account is shown as a discount (−, red), mirroring the P2P
 // "sent" rows. refund / adjustment are credits (+, green). Statuses that never moved money (declined,
 // failed, voided, expired) render neutral (no sign) so we don't show −$X on an uncharged transaction.
@@ -133,8 +133,8 @@ function rowDirection(r: HistoryRow): 'in' | 'out' | 'neutral' {
   return 'out';
 }
 
-// Canonical, deduplicated lifecycle-status groups spanning every BIAN state across card (SD-254),
-// payment execution (SD-65) and RTP (SD-65 intent). Each group's `key` is the filter value; `states`
+// Canonical, deduplicated lifecycle-status groups spanning every BIAN state across card ,
+// payment execution and RTP (intent). Each group's `key` is the filter value; `states`
 // are the raw statuses it matches. This avoids a duplicated "Settled" (settled/completed/payment_settled)
 // and lists every possible state, not only the ones currently present in the loaded rows.
 const STATUS_GROUPS: { key: string; label: string; states: string[] }[] = [
@@ -260,7 +260,7 @@ export default function TransactionHistoryPage() {
         : Promise.resolve([] as HistoryRow[]);
 
       const [cards, p2p, rtp] = await Promise.all([cardPromise, p2pPromise, rtpPromise]);
-      // Presentation-only de-dup (BIAN keeps the RTP intent and the SD-65 execution as SEPARATE
+      // Presentation-only de-dup (BIAN keeps the RTP intent and the execution as SEPARATE
       // records): when an RTP has a linked execution, show ONLY the RTP row and hide that execution
       // row so the same movement is not listed twice. The RTP detail links through to the execution.
       const linkedExecRefs = new Set(rtp.map((r) => r.linkedExecutionRef).filter(Boolean) as string[]);
@@ -328,7 +328,7 @@ export default function TransactionHistoryPage() {
             icon={ClipboardList}
             title="Payment History"
             description="Card transactions and P2P transfers, your complete payment record."
-            debugInfo="BIAN SD-254 Card Transaction · SD-65 Payment Execution · PCI DSS Req 7.2"
+            debugInfo="Card Transaction Payment Execution · PCI DSS"
             actions={
               <Link href="/system/payment" className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
                 <Plus size={14} />
@@ -360,7 +360,7 @@ export default function TransactionHistoryPage() {
                 placeholder="Search by merchant, card, reference, id…"
                 className="flex-1 min-w-[160px] border rounded-lg px-3 py-2 text-sm"
               />
-              {/* Direction segmented control — simple in/out for casual users. */}
+              {/* Direction segmented control: simple in/out for casual users. */}
               <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
                 {([['', 'All'], ['in', 'In'], ['out', 'Out']] as const).map(([val, label]) => (
                   <button key={val || 'all'} onClick={() => { setDirectionFilter(val); setPage(1); }}

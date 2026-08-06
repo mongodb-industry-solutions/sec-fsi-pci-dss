@@ -1,10 +1,10 @@
 /**
- * Unit tests: fraud case OPEN + REOPEN role guards (SD-83, PCI DSS Req 7 separation of duties).
+ * Unit tests: fraud case OPEN + REOPEN role guards (PCI DSS separation of duties).
  * Source: backend/src/modules/fraud/controllers/fraudDiagnosis.controller.ts
  *
  * The controller delegates the SoD decision to two exported guards:
- *   assertOpenAllowed         — may this role OPEN/initiate a case? (POST /fraud)
- *   assertStatusChangeAllowed — may this role CHANGE status, incl. REOPEN? (PATCH /fraud/:id)
+ *   assertOpenAllowed: may this role OPEN/initiate a case? (POST /fraud)
+ *   assertStatusChangeAllowed: may this role CHANGE status, incl. REOPEN? (PATCH /fraud/:id)
  * Both must let L1/L2 through and block the read-only security_auditor with 403.
  */
 import { describe, it, expect } from 'vitest';

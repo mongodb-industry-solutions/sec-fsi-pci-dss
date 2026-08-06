@@ -1,7 +1,7 @@
 /**
  * Unit tests (dev.v8 P7, §7.8): the CHD carrier. When raw card verification is present, the issuer
- * gate publishes card.issuer.validation.requested carrying ONLY the encrypted `chd` envelope — never
- * raw PAN/CVV — and the issuer adapter can decrypt it just-in-time. The injected crypto is local.
+ * gate publishes card.issuer.validation.requested carrying ONLY the encrypted `chd` envelope, never
+ * raw PAN/CVV, and the issuer adapter can decrypt it just-in-time. The injected crypto is local.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { randomBytes } from 'node:crypto';
@@ -53,7 +53,7 @@ const input = {
   gatewayPayload: { source: 'test' }, cardVerification: { cardNumber: PAN, cvv: '123', expiry: '12/30' },
 };
 
-describe('P7 — encrypted CHD carrier (§7.8)', () => {
+describe('P7: encrypted CHD carrier (§7.8)', () => {
   let store: FakeStore;
   let crypto: EnvelopeChdCrypto;
   beforeEach(() => {

@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order - Payment Link Service
+// Payment Order - Payment Link Service
 // Implements the Payment Link integration pattern.
 
 import { Db } from 'mongodb';
@@ -138,7 +138,7 @@ export interface ProcessLinkPaymentInput {
   customerEmail?: string;
   cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
   // The CVV the buyer entered on the payment-link page. Forwarded to the issuer for verification ONLY
-  // (P13.1); never persisted/logged (PCI DSS Req 3.2). A wrong/missing CVV declines (D1).
+  // (P13.1); never persisted/logged (PCI DSS). A wrong/missing CVV declines (D1).
   cardCvv?: string;
 }
 
@@ -165,7 +165,7 @@ export async function processLinkPayment(
 
   const maskedPan = `****-****-****-${input.cardToken.slice(-4).padStart(4, '0')}`;
 
-  // SD-15: Card Authorization — run before creating the transaction
+  // Card Authorization, run before creating the transaction
   const authResult = await authorizeCard(db, {
     checkoutSessionInstanceReference: link.paymentLinkInstanceReference,
     cardToken: input.cardToken,
@@ -196,7 +196,7 @@ export async function processLinkPayment(
   }
 
   // An issuer decline (e.g. a wrong CVV) is a normal business outcome, not a server error: notify the
-  // merchant and return a declined result — never a 500.
+  // merchant and return a declined result, never a 500.
   let txResult: Awaited<ReturnType<typeof createTransaction>>;
   try {
     txResult = await createTransaction(db, {

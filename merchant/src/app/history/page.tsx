@@ -93,7 +93,7 @@ export default async function HistoryPage() {
   let results: any[] = [];
   let error: string | undefined;
   // The PSP /transactions merchant channel already returns a MERGED, merchant-isolated history
-  // (SD-65 executions + the party's card transactions made THROUGH this merchant). We only need to
+  // (executions + the party's card transactions made THROUGH this merchant). We only need to
   // request a high enough page size so nothing is truncated (default was 20).
   try {
     const data = await c!.listHistory(1, 100);
@@ -121,7 +121,7 @@ export default async function HistoryPage() {
   const rate = MERCHANT_COMMISSION_RATE;
   const toMs = (s?: string) => (s ? Date.parse(s) || 0 : 0);
 
-  // Operation rows (SD-65 executions + card transactions), from the merged PSP history.
+  // Operation rows (executions + card transactions), from the merged PSP history.
   const opRows = results.map((t, i) => {
     const gross = t.grossAmount ?? t.paymentExecutionAmount?.amount;
     const commission = typeof gross === 'number' ? gross * rate : undefined;
@@ -133,7 +133,7 @@ export default async function HistoryPage() {
       direction: (t.direction ?? 'n/a') as string,
       amount: money(gross, t.currency),
       // feeAmount is only persisted when a commission is charged (a zero fee is not written), so an
-      // absent value means no fee, i.e. 0 — show it as a real 0.00 amount rather than n/a.
+      // absent value means no fee, i.e. 0: show it as a real 0.00 amount rather than n/a.
       fee: money(t.feeAmount ?? 0, t.currency),
       commission: commission != null ? money(commission, t.currency) : 'n/a',
       rail: (t.paymentExecutionRail ?? 'n/a') as string,
@@ -143,7 +143,7 @@ export default async function HistoryPage() {
     };
   });
 
-  // Hide the SD-65 execution row when it is the settlement of an RTP shown here (BIAN keeps them as
+  // Hide the execution row when it is the settlement of an RTP shown here (BIAN keeps them as
   // separate records; we de-dup the presentation so the same movement is not listed twice).
   const linkedExecRefs = new Set(rtpDocs.map(({ x }) => x.linkedPaymentExecutionReference).filter(Boolean) as string[]);
   const opRowsDeduped = opRows.filter((r) => !linkedExecRefs.has(r.txnId));

@@ -424,8 +424,8 @@ export default function BeneficiariesPage() {
       downloadJsonFile('beneficiaries', {
         generatedAt: new Date().toISOString(),
         generatedByRole: role,
-        bianServiceDomain: 'SD-54 Counterparty Administration',
-        note: 'Contact details are stored masked (PCI DSS Req 3.4). Each read is recorded in the compliance ledger.',
+        bianServiceDomain: 'Counterparty Administration',
+        note: 'Contact details are stored masked (PCI DSS). Each read is recorded in the compliance ledger.',
         filtersApplied: appliedFilters(filters),
         totalMatching: grandTotal,
         exported: collected.length,
@@ -470,7 +470,7 @@ export default function BeneficiariesPage() {
           ? 'Your saved contacts for quick transfers. Add someone by phone or email, we never store their raw contact details, only a secure reference.'
           : 'Saved contacts registered by customers for transfers and payments. Contact details are masked at registration time.'
         }
-        debugInfo="BIAN SD-54 Counterparty Administration · PCI DSS Req 3.4 · Req 7 (scope: own for customers)"
+        debugInfo="Counterparty Administration · PCI DSS (scope: own for customers)"
       />
 
       {/* Toolbar. Staff read one owner, one case, or a search term: the three alternative
@@ -588,7 +588,7 @@ export default function BeneficiariesPage() {
           {ownerFilter.trim() && <> · owner <span className="font-mono">{shortRef(ownerFilter.trim())}</span></>}
           {caseFilter.trim() && <> · case <span className="font-mono">{caseFilter.trim()}</span></>}
           {search.trim() && <> · matching &ldquo;{search.trim()}&rdquo;</>}
-          . Contact details are masked at registration (PCI DSS Req 3.4) and this read is recorded in
+          . Contact details are masked at registration (PCI DSS) and this read is recorded in
           the compliance ledger.
         </p>
       )}
@@ -719,7 +719,7 @@ export default function BeneficiariesPage() {
 
       {debugMode && (
         <p className="text-[10px] font-mono text-gray-400">
-          GET /api/v1/beneficiaries · SD-54 · scope: {isCustomer ? 'own (forced server-side)' : 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}` : ownerFilter.trim() ? `ownerRef=${ownerFilter.trim()}` : search.trim().length >= MIN_QUERY ? `q=${search.trim()}` : 'none (no request issued)'}
+          GET /api/v1/beneficiaries · scope: {isCustomer ? 'own (forced server-side)': 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}`: ownerFilter.trim ? `ownerRef=${ownerFilter.trim}`: search.trim.length >= MIN_QUERY ? `q=${search.trim}`: 'none (no request issued)'}
         </p>
       )}
 

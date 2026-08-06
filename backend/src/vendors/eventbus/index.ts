@@ -28,7 +28,7 @@ export function resolveEventBusEngine(): EventBusEngine {
   // Read live from the environment (PSP_-prefixed, then legacy) so the engine can be selected at
   // startup regardless of when the config snapshot was taken. Validate against SUPPORTED_ENGINES:
   // an unsupported or blank value must NOT silently resolve to in-process (that masks a production
-  // misconfiguration) — warn, then fall back to the validated config default (ultimately in-process).
+  // misconfiguration): warn, then fall back to the validated config default (ultimately in-process).
   const fromEnv = process.env.PSP_EVENT_BUS_ENGINE ?? process.env.EVENT_BUS_ENGINE;
   const envEngine = coerceEngine(fromEnv);
   if (envEngine) return envEngine;

@@ -1,4 +1,4 @@
-// v28 BIAN SD-65: Request to Pay REST controller. Mounted at /gateway/rtp → /api/v1/gateway/rtp.
+// v28 Request to Pay REST controller. Mounted at /gateway/rtp → /api/v1/gateway/rtp.
 // RTP is a transfer that requires the payer's in-app approval (no CIBA). Request resources are strictly
 // separate from payment (execution) resources. All mutating routes use dualPermission (session JWT/RBAC
 // OR merchant OAuth scope) + idempotency keys + Fastify schemas. Providers only via dispatch (services).
@@ -71,7 +71,7 @@ const addressSchema = { type: 'object', properties: { streetName: { type: 'strin
 
 export async function rtpController(fastify: FastifyInstance) {
 
-  // POST /requests — create an RTP request (payee). Idempotent on the session path.
+  // POST /requests: create an RTP request (payee). Idempotent on the session path.
   fastify.post('/requests', {
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' }),
@@ -143,7 +143,7 @@ export async function rtpController(fastify: FastifyInstance) {
     } catch (err) { return handleRtpError(err, reply); }
   });
 
-  // GET /requests — list inbox (payerId) / outbox (requesterId). Defaults to the caller's own.
+  // GET /requests: list inbox (payerId) / outbox (requesterId). Defaults to the caller's own.
   fastify.get('/requests', {
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }),
@@ -167,7 +167,7 @@ export async function rtpController(fastify: FastifyInstance) {
     return reply.send({ results });
   });
 
-  // GET /requests/:ref — retrieve one.
+  // GET /requests/:ref, retrieve one.
   fastify.get('/requests/:ref', {
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }),
@@ -183,7 +183,7 @@ export async function rtpController(fastify: FastifyInstance) {
       return reply.code(403).send({ error: 'forbidden' });
     }
     // Enrich for the detail view:
-    // - payeeName: the requester's real name (authorized to the payer — requesting is the consent).
+    // - payeeName: the requester's real name (authorized to the payer, requesting is the consent).
     // - payerName: the payer's real name, only once they consented by approving/paying (SEPA/PSD2).
     // - payeeAccountDisplay: the destination (bank + masked IBAN) so the payer sees where the money goes.
     // - securityCase: visible to BOTH parties (transparency of the PSP/L1/L2 resolution on their funds).
@@ -209,7 +209,7 @@ export async function rtpController(fastify: FastifyInstance) {
       };
     }
 
-    // Beneficiary link for the payee's view: the requester's SD-54 arrangement representing the payer.
+    // Beneficiary link for the payee's view: the requester's arrangement representing the payer.
     // Resolve on read (covers RTP created before the field existed) if not already stored.
     let payerCounterpartyReference = req.payerCounterpartyReference;
     if (!payerCounterpartyReference && req.payerPartyReference) {
@@ -223,7 +223,7 @@ export async function rtpController(fastify: FastifyInstance) {
     return reply.send({ ...req, payeeName, payerName, payeeAccountDisplay, payerCounterpartyReference, securityCase });
   });
 
-  // GET /requests/:ref/events — per-request timeseries trail.
+  // GET /requests/:ref/events, per-request timeseries trail.
   fastify.get('/requests/:ref/events', {
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }),
@@ -291,16 +291,15 @@ export async function rtpController(fastify: FastifyInstance) {
     try { return reply.send(await cancelRtpRequest(fastify.db, ref, actor.partyRef)); } catch (err) { return handleRtpError(err, reply); }
   });
 
-  // POST /requests/:ref/qr — issue/get a QR for this request (shared QR capability).
-  fastify.post('/requests/:ref/qr', { config: { dualAuth: true }, preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }), schema: { tags: ['rtp'], summary: 'Issue/get a QR for this request', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } }, async (request, reply) => {
+  // POST /requests/:ref/qr, issue/get a QR for this request (shared QR capability).
+  // v35 CH-3: state-changing → write-level, as POST /gateway/qr/represent (PCI DSS).
+  fastify.post('/requests/:ref/qr', { config: { dualAuth: true }, preHandler: dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' }), schema: { tags: ['rtp'], summary: 'Issue/get a QR for this request', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } }, async (request, reply) => {
     const actor = await resolveActor(request, reply); if (!actor) return;
     const { ref } = request.params as { ref: string };
     const req = await getRtpRequest(fastify.db, ref);
     if (!req) return reply.code(404).send({ error: 'not_found' });
     const qr = await issueQr(fastify.db, {
-      subjectType: 'rtp_request', subjectReference: ref,
-      amount: req.amount, currency: req.currency, payeeName: req.payeeName,
-      remittance: req.structuredRemittance?.reference ?? req.purpose, expiresAt: req.expiresAt,
+      subjectType: 'rtp_request', subjectReference: ref, expiresAt: req.expiresAt,
     });
     // Persist the QR link back on the request (best-effort; not on the write path so failures are non-fatal).
     await fastify.db.collection(PAYMENT_REQUEST_COLLECTION).updateOne(

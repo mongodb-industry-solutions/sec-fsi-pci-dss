@@ -1,4 +1,4 @@
-// POST /api/auth/ciba/enroll — session-gated relay to register the browser's public key at the PSP.
+// POST /api/auth/ciba/enroll: session-gated relay to register the browser's public key at the PSP.
 // Body: { challenge, publicKeyPem, alg, signature, credentialId, authenticatorMetadata? }. Only PUBLIC
 // key material is forwarded; the private key never leaves the browser. The Bearer is attached server-side.
 import { NextRequest, NextResponse } from 'next/server';

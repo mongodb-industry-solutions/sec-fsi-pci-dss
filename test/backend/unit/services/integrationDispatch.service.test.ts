@@ -1,5 +1,5 @@
 /**
- * Unit tests: integrationDispatch.service — ADR-025 endpoint-first logic (F7.2)
+ * Unit tests: integrationDispatch.service, ADR-025 endpoint-first logic (F7.2)
  * Covers: provider with endpoint → fetch called; no endpoint + internal → logAndReturn;
  *         businessContext propagated to integrationEvents document.
  */
@@ -12,7 +12,7 @@ const h = vi.hoisted(() => {
   const updateOne  = vi.fn().mockResolvedValue({});
   const collection = vi.fn(() => ({ insertOne, findOne, updateOne }));
 
-  // fetch mock — returns a successful 200 response by default
+  // fetch mock: returns a successful 200 response by default
   const fetchMock = vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
@@ -148,7 +148,7 @@ describe('businessContext persisted in integrationEvents', () => {
   });
 });
 
-// ── category routing (no hardcoded provider in domain) — dev.v30 FR-30.9 ──────
+// ── category routing (no hardcoded provider in domain): dev.v30 FR-30.9 ──────
 
 describe('category routing (dev.v30 FR-30.9 / R9)', () => {
   it('resolves the active provider for the exact category passed by the caller', async () => {
@@ -168,14 +168,14 @@ describe('category routing (dev.v30 FR-30.9 / R9)', () => {
   });
 });
 
-// ── routing-group resolution — endpoint-first on the resolved member ──────────
+// ── routing-group resolution: endpoint-first on the resolved member ──────────
 
 describe('routing group resolution (ADR-025)', () => {
   it('dispatches to the group-resolved external member when it has an endpoint', async () => {
     h.findOne.mockResolvedValueOnce(
       makeProvider({ externalProviderIsInternal: false, routingGroupId: 'grp-1' })
     );
-    // The group lookup uses db.collection(...).findOne — reuse the same mock; return a group doc.
+    // The group lookup uses db.collection(...).findOne: reuse the same mock; return a group doc.
     h.findOne.mockResolvedValueOnce({ routingGroupInstanceReference: 'grp-1' });
     vi.mocked(resolveProviderFromGroup).mockResolvedValueOnce(
       makeProvider({

@@ -1,6 +1,6 @@
 /**
  * Unit tests (dev.v8 P7, §8): CHD retention. `chd` is purged ($unset) from the carrier event when the
- * journey closes, and a safety sweep purges abandoned carriers. Field $unset only — never a document
+ * journey closes, and a safety sweep purges abandoned carriers. Field $unset only, never a document
  * delete (the trail record is kept, CHD-free). Pure: a mock db captures the updateMany filter/update.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';

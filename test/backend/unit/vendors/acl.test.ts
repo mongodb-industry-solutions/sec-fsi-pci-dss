@@ -1,6 +1,6 @@
 /**
  * Unit tests: data-driven RBAC/ACL (ADR-030, plan §13).
- * Validates the builtin permission matrix (PCI Req 7 least-privilege + SoD), the default-deny
+ * Validates the builtin permission matrix (PCI DSS least-privilege + SoD), the default-deny
  * `can()` resolution (DB-backed with builtin fallback) and the `requirePermission` guard.
  */
 import { describe, it, expect, beforeEach } from 'vitest';

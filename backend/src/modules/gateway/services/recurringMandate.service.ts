@@ -1,4 +1,4 @@
-// v17.1 BIAN SD-66: Recurring mandate service (ACH Direct Debit / SEPA SDD).
+// v17.1 Recurring mandate service (ACH Direct Debit / SEPA SDD).
 // Create/list/cancel mandates and run the ones that are due. Each due run reuses
 // executeBankTransfer (rail engine + provider dispatch + risk gate), so no duplication.
 

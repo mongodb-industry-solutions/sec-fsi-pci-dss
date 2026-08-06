@@ -1,4 +1,4 @@
-// Canonical capability registry (ADR-029) — the single source of truth for the nine PSP
+// Canonical capability registry (ADR-029): the single source of truth for the nine PSP
 // capabilities. Each capability is one business axis with two views: external **Providers**
 // (Vendors) and an internal **Module** (engine). This descriptor maps the canonical kebab key to
 // its current stored provider type, owning Module domain, routing segments and BIAN/PCI metadata,
@@ -127,7 +127,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     capability: 'card-authorization',
     providerType: 'card_authorization',
     label: 'Card Authorization',
-    description: 'Card authorization request/response (no CVV passed — PCI DSS Req 3.3).',
+    description: 'Card authorization request/response (no CVV passed, PCI DSS Req 3.3).',
     callbackSegment: 'card/authorization',
     frontendFolder: 'card-authorization',
     moduleDomain: 'gateway',
@@ -166,7 +166,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     capability: 'generic',
     providerType: 'generic',
     label: 'Merchant Notifications',
-    description: 'Generic outbound notifications (e.g. merchant payment callbacks). Passthrough — no internal Module.',
+    description: 'Generic outbound notifications (e.g. merchant payment callbacks). Passthrough, no internal Module.',
     callbackSegment: 'generic',
     frontendFolder: 'generic',
     moduleDomain: null,

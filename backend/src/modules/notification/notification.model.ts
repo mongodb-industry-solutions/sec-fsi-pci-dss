@@ -1,6 +1,6 @@
 // Persisted notifications (ADR-031). A record per delivered notification so we can track read/unread
 // state and show history (read + unread) on the notifications page. No CHD/PII is stored here, only a
-// short title/detail and opaque references (PCI DSS Req 3); scoped to a recipient party (Req 7).
+// short title/detail and opaque references (PCI DSS); scoped to a recipient party .
 export const NOTIFICATION_COLLECTION = 'notification';
 
 // The type doubles as the UI category (Question / Message / Transaction / KYC / KYB / Response).
@@ -16,7 +16,7 @@ export type NotificationStatus = 'unread' | 'read';
 
 export interface NotificationRecord {
   notificationInstanceReference: string;     // PK, UUID
-  recipientPartyReference: string;           // FK → party (SD-13); the customer it is for
+  recipientPartyReference: string;           // FK → party ; the customer it is for
   notificationType: NotificationType;
   title: string;
   detail: string;

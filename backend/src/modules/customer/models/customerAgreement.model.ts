@@ -1,7 +1,7 @@
-// BIAN SD-53: Customer Agreement
+// Customer Agreement
 // CR: CustomerAgreementProcedure
 // Stores the bank-customer agreement lifecycle. PII (email, phone, name) lives in
-// party (SD-13 Party Data Management). Linked via partyInstanceReference.
+// party (Party Data Management). Linked via partyInstanceReference.
 //
 // v2: Sensitive fields (address, govId, riskNotes) are merged into this single collection.
 // Field-level protection is provided by QE:none encryption (DEK-sensitive tier).
@@ -13,7 +13,7 @@ export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementProcedure';
 
 export interface CustomerAgreementControlRecord {
   customerAgreementInstanceReference: string;
-  partyInstanceReference: string;               // FK to party (SD-13)
+  partyInstanceReference: string;               // FK to party 
 
   // QE:equality (DEK-lookup tier) - searchable, Level 1+
   customerAgreementReference: string;
@@ -31,7 +31,7 @@ export interface CustomerAgreementControlRecord {
   /** @deprecated v27: replaced by structured KYC verdict fields. Kept for back-compat; stop writing. */
   customerAgreementRiskNotes?: string;
 
-  // v27 KYC identity (user-supplied at onboarding, SD-53).
+  // v27 KYC identity (user-supplied at onboarding).
   // customerAgreementGovernmentID sub-doc is plaintext; its scalar leaves are QE-encrypted:
   //   .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate QE:range.
   customerAgreementGovernmentID?: GovernmentID;
@@ -48,7 +48,7 @@ export interface CustomerAgreementControlRecord {
   // v4: recurring payment mandate
   customerAgreementPreferredPaymentCardReference?: string;
 
-  // Ch-06: BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+  // Ch-06: BQ:Step, KYC identity verification (BQ:Step). PCI DSS.
   customerAgreementKycCheck?: CustomerAgreementKycCheck;
 
   bianServiceDomain: 'Customer Agreement';
@@ -65,7 +65,7 @@ export interface ResidentialAddress {
   countryCode: string;
 }
 
-// v27: structured government identity document (SD-53). Parent sub-doc is plaintext;
+// v27: structured government identity document . Parent sub-doc is plaintext;
 // individual scalar leaves are QE-encrypted (see encryptedFieldsMaps.ts).
 export interface GovernmentID {
   type: string;              // QE:equality (e.g. passport, national_id, driver_license)
@@ -82,7 +82,7 @@ export function isSensitiveDecrypted(field: unknown): boolean {
   return true;
 }
 
-// BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+// BQ:Step, KYC identity verification (BQ:Step). PCI DSS.
 export type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
 export interface CustomerAgreementKycCheck {

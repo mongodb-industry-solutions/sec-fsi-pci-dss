@@ -52,7 +52,7 @@ export async function validateCallback(
   return { valid, provider: valid ? provider : undefined, errorCode: valid ? undefined : 401 };
 }
 
-// Apply inbound field mapping to a callback body. §2.4: mapping is per event — when `event` is given
+// Apply inbound field mapping to a callback body. §2.4: mapping is per event, when `event` is given
 // the per-event inbound mapping is used (falling back to vendor-global via the resolver); the legacy
 // (event-less) callback routes keep using the vendor-global mapping directly.
 function applyInboundMapping(
@@ -80,7 +80,7 @@ export async function processFdsCallback(
     triggeredBy: 'external.fds.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -115,7 +115,7 @@ export async function processAmlCallback(
     triggeredBy: 'external.aml.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -136,7 +136,7 @@ export async function processKycCallback(
     triggeredBy: 'external.kyc.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -184,7 +184,7 @@ export async function processKybCallback(
     triggeredBy: 'external.kyb.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -232,7 +232,7 @@ export async function processHrpCallback(
     triggeredBy: 'external.hrp.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -253,7 +253,7 @@ export async function processCardAuthorizationCallback(
     triggeredBy: 'external.card_authorization.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -274,7 +274,7 @@ export async function processCardIssuerCallback(
     triggeredBy: 'external.card_issuer.callback',
     payload: mapped as unknown as Record<string, unknown>,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });
@@ -315,7 +315,7 @@ export async function processGenericCallback(
     triggeredBy: 'external.generic.callback',
     payload: mapped,
     latencyMs: 0,
-    // Inbound capture (PCI DSS Req 10.7): method + received body. Raw request headers are also
+    // Inbound capture (PCI DSS): method + received body. Raw request headers are also
     // recorded by the webhook inspector that receives the call.
     request: { method: 'POST', body: mapped },
   });

@@ -1,7 +1,7 @@
-// VoP capability module controller — STATIC routes (ADR-029).
-//   POST /api/v1/modules/vop/verify   — internal engine invocation (endpoint-first loopback)
-//   GET/PUT /api/v1/modules/vop/config — admin config of the internal engine
-//   GET /api/v1/modules/vop/rules      — effective config preview (drives the admin dashboard)
+// VoP capability module controller: STATIC routes (ADR-029).
+//   POST /api/v1/modules/vop/verify: internal engine invocation (endpoint-first loopback)
+//   GET/PUT /api/v1/modules/vop/config: admin config of the internal engine
+//   GET /api/v1/modules/vop/rules: effective config preview (drives the admin dashboard)
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { verifyPayee, resolveVopConfig, VopModuleConfig } from '../services/vop.service';
@@ -13,7 +13,7 @@ import {
 export async function vopController(fastify: FastifyInstance) {
   const CAP = 'vop';
 
-  // Internal engine — not JWT-authenticated; validated by X-Integration-Source (like FDS/HRP).
+  // Internal engine, not JWT-authenticated; validated by X-Integration-Source (like FDS/HRP).
   fastify.post('/verify', {
     schema: {
       tags: ['modules:vop'],
@@ -58,7 +58,7 @@ export async function vopController(fastify: FastifyInstance) {
     return (await getCapabilityModuleConfig(fastify.db, CAP)) ?? { capability: CAP, moduleConfig: {} };
   });
 
-  // Effective (resolved) config preview — thresholds + strategy + policy + markets in force.
+  // Effective (resolved) config preview: thresholds + strategy + policy + markets in force.
   fastify.get('/rules', {
     schema: {
       tags: ['modules:vop'],

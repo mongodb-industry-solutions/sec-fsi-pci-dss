@@ -5,7 +5,7 @@
 export const RTP_ALIAS_DIRECTORY_CACHE_COLLECTION = 'rtpAliasDirectoryCache';
 
 export interface RtpAliasDirectoryCache {
-  aliasHash: string;                    // SHA-256(alias), PK (unique index) — non-reversible
+  aliasHash: string;                    // SHA-256(alias), PK (unique index), non-reversible
   resolvedPartyReference?: string;      // FK → party
   resolvedCounterpartyReference?: string; // FK → counterpartyArrangement
   resolvedPspId?: string;

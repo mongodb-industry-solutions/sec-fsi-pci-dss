@@ -26,7 +26,7 @@ function partyOf(request: unknown): string {
 }
 
 // Customer notifications. Surfaces pending fraud-investigation questions (actionable) and resolved
-// transaction reviews (informational). Scoped to the caller's own party (PCI DSS Req 7); customers
+// transaction reviews (informational). Scoped to the caller's own party (PCI DSS); customers
 // are not exposed to fraud-case internals here, only the item and a link to the related transaction.
 export async function notificationsController(fastify: FastifyInstance) {
   fastify.get('/', {
@@ -120,14 +120,14 @@ export async function notificationsController(fastify: FastifyInstance) {
 
   // GET /api/v1/notifications/stream  -  SSE signal that the caller's notifications changed (a new
   // question was raised, or one was answered). Carries no data; the client refetches the scoped list.
-  // Auth required; scoped to the caller's own party (PCI DSS Req 7). fetch + Bearer header (no URL token).
+  // Auth required; scoped to the caller's own party (PCI DSS). fetch + Bearer header (no URL token).
   fastify.get('/stream', {
     schema: {
       tags: ['notifications'],
       summary: 'Live notifications signal (SSE)',
       description: 'Server-Sent Events stream. Sends a `changed` signal whenever the caller\'s notifications change '
         + '(new security question raised or one answered). The client must refetch `GET /notifications` on receiving the signal. '
-        + 'Carries no notification data itself (only a trigger). Requires Bearer token in the Authorization header — no URL token.',
+        + 'Carries no notification data itself (only a trigger). Requires Bearer token in the Authorization header, no URL token.',
       security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {

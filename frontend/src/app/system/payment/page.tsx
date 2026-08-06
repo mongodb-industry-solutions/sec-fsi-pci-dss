@@ -10,7 +10,7 @@ import { Tooltip } from '../../../components/Tooltip';
 import { detectNetwork, tokenizeCard } from '../../../lib/cardTokenize';
 import Link from 'next/link';
 
-// A saved card-on-file (BIAN SD-88) the customer can pay with. The surrogate token is reused so
+// A saved card-on-file the customer can pay with. The surrogate token is reused so
 // the transaction references the real stored card; the full PAN/CVV are never present here.
 interface SavedCard {
   id: string;
@@ -43,10 +43,10 @@ const genToken = () => `pm_${Math.random().toString(36).slice(2, 10)}${Math.rand
 
 // Static fallback; shown only if the API call fails (network error, not yet seeded)
 const MERCHANT_FALLBACK: MerchantOption[] = [
-  { id: '', label: 'TechGadgets Ltd.',  mcc: '5734', risk: 'low' },
-  { id: '', label: 'Casino Royale',     mcc: '7995', risk: 'high' },
-  { id: '', label: 'Metro Supermarket', mcc: '5411', risk: 'low' },
-  { id: '', label: 'Night Club XL',     mcc: '5813', risk: 'high' },
+  { id : '', label: 'TechGadgets Ltd.',  mcc: '5734', risk: 'low' },
+  { id : '', label: 'Casino Royale',     mcc: '7995', risk: 'high' },
+  { id : '', label: 'Metro Supermarket', mcc: '5411', risk: 'low' },
+  { id : '', label: 'Night Club XL',     mcc: '5813', risk: 'high' },
 ];
 
 const AMOUNT_PRESETS = ['120.00', '499.00', '850.00', '1250.00'];
@@ -134,7 +134,7 @@ export default function DemoPaymentPage() {
     return () => clearTimeout(t);
   }, [merchantSearch]);
 
-  // Saved cards the customer can pay with (their own card-on-file, SD-88).
+  // Saved cards the customer can pay with (their own card-on-file).
   const [savedCards, setSavedCards]         = useState<SavedCard[]>([]);
   const [cardsLoading, setCardsLoading]     = useState(true);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export default function DemoPaymentPage() {
     setNewExpiry(digits.length >= 3 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits);
   }
 
-  // Load the customer's saved cards (SD-88) to offer as payment methods.
+  // Load the customer's saved cards to offer as payment methods.
   useEffect(() => {
     const t = getToken() ?? '';
     if (!t) { setCardsLoading(false); return; }
@@ -285,7 +285,7 @@ export default function DemoPaymentPage() {
         cardTransactionDescription: (txDescription.trim() || merchant.toUpperCase()).slice(0, 22),
         cardTransactionNarrative: txNarrative.trim() || undefined,
         ...(selectedMerchantId ? { merchantAgreementInstanceReference: selectedMerchantId } : {}),
-        // New card → send expiry + network so the PSP auto-registers it as a card-on-file (SD-88).
+        // New card → send expiry + network so the PSP auto-registers it as a card-on-file .
         ...(cardMode === 'new' && selectedNetwork ? { paymentCardExpirationDate: newCardExpiry, paymentCardNetwork: selectedNetwork } : {}),
         gatewayPayload: { source: 'app-mode', paymentReference: paymentReference || undefined },
       }, token);
@@ -352,7 +352,7 @@ export default function DemoPaymentPage() {
                   <Link href="/system/cards" className="text-xs text-[#001E2B] hover:underline">Manage cards</Link>
                 </div>
 
-                {/* Saved-card picker (SD-88): up to 4 presets + search/autocomplete for the rest,
+                {/* Saved-card picker : up to 4 presets + search/autocomplete for the rest,
                     mirroring the Merchant picker. Selecting one reuses its surrogate token. */}
                 {cardsLoading ? (
                   <div className="grid grid-cols-2 gap-2">
@@ -443,7 +443,7 @@ export default function DemoPaymentPage() {
                     </div>
                     <p className="text-xs text-gray-400">
                       {selectedNetwork ? `${selectedNetwork} · ` : ''}Validated in your browser. The security code is never stored
-                      {debugMode ? ' (PCI DSS Req 3.2; SAD prohibited).' : '.'}
+                      {debugMode ? ' (PCI DSS; SAD prohibited).' : '.'}
                     </p>
                   </div>
                 ) : (
@@ -484,10 +484,10 @@ export default function DemoPaymentPage() {
               <div className="bg-white rounded-xl border p-5 space-y-4">
                 <h2 className="flex items-center gap-1.5 font-semibold text-gray-800">
                   Merchant
-                  <Tooltip text="The business you are paying (BIAN SD-89). Pick one of the first four, search for another, or type a name and MCC manually. Some categories (e.g. gambling) are higher risk and influence fraud scoring." />
+                  <Tooltip text="The business you are paying. Pick one of the first four, search for another, or type a name and MCC manually. Some categories (e.g. gambling) are higher risk and influence fraud scoring." />
                 </h2>
 
-                {/* Preset grid; first 4 active merchants from SD-89 */}
+                {/* Preset grid; first 4 active merchants from */}
                 {merchantsLoading ? (
                   <div className="grid grid-cols-2 gap-2">
                     {[0, 1, 2, 3].map(i => (
@@ -701,14 +701,13 @@ export default function DemoPaymentPage() {
               <div className="bg-white rounded-xl border p-5 space-y-5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transaction Description</h2>
-                  {debugMode && <span className="text-xs font-mono text-gray-300">SD-254</span>}
                 </div>
 
                 {/* Transaction type: read-only */}
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
                     Type
-                    <Tooltip text="Transaction classification per BIAN SD-254. Purchase is fixed for card checkout. Other values such as refund, cash_advance, balance_transfer, fee, and adjustment are set by backend workflows." />
+                    <Tooltip text="Transaction classification. Purchase is fixed for card checkout. Other values such as refund, cash_advance, balance_transfer, fee, and adjustment are set by backend workflows." />
                     {debugMode && <code className="text-gray-300 text-xs font-mono">cardTransactionType</code>}
                   </span>
                   <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-full">
@@ -790,7 +789,7 @@ export default function DemoPaymentPage() {
                     <p className="text-gray-500">Token is a PAN surrogate, not CHD under PCI DSS v4.0</p>
                     <p className={isFraudRisk ? 'text-amber-700' : 'text-gray-500'}>
                       {isFraudRisk
-                        ? 'Fraud trigger active: will auto-create fraudDiagnosisCase (SD-83)'
+                        ? 'Fraud trigger active: will auto-create fraudDiagnosisCase'
                         : 'No fraud trigger expected for this transaction'}
                     </p>
                   </div>
@@ -859,7 +858,7 @@ export default function DemoPaymentPage() {
                 <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-lg p-3 text-xs space-y-1">
                   <p className="font-semibold text-[#001E2B]">Debug: Transaction reference</p>
                   <p className="font-mono text-gray-600">Txn ID: {result.txnId}</p>
-                  {result.fraudCaseCreated && <p className="text-amber-700">fraudDiagnosisCase created (SD-83)</p>}
+                  {result.fraudCaseCreated && <p className="text-amber-700">fraudDiagnosisCase created</p>}
                 </div>
               )}
             </div>

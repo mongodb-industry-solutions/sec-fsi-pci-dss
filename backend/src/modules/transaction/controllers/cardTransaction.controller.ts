@@ -124,7 +124,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
           },
           merchantAgreementInstanceReference: {
             type: 'string',
-            description: 'Acquiring-side link (BIAN SD-89): the merchant this payment was made to. Optional; set by checkout/payment-link flows and the simulator. Not CHD/PII — stored plaintext and indexed so the merchant owner can list received payments.',
+            description: 'Acquiring-side link (BIAN SD-89): the merchant this payment was made to. Optional; set by checkout/payment-link flows and the simulator. Not CHD/PII, stored plaintext and indexed so the merchant owner can list received payments.',
           },
           paymentCardExpirationDate: {
             type: 'string',
@@ -296,7 +296,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
           limit: { type: 'number', default: 20, maximum: 100 },
         },
       },
-      // No strict 200 response schema: this route now serves TWO shapes — the session card-token list
+      // No strict 200 response schema: this route now serves TWO shapes, the session card-token list
       // (`{ results:[cardTransaction…], count }`) AND the OAuth merchant merged history
       // (`{ results:[{ grossAmount, paymentExecutionStatus, … }], total, page, limit }`). A strict
       // per-shape schema would make fast-json-stringify silently DROP the other shape's fields.
@@ -307,8 +307,8 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       },
     },
   }, async (request, reply) => {
-    // OAuth (merchant on-behalf-of): owner-scoped, merchant-isolated operation history (SD-89).
-    // Merges SD-65 executions and the party's own card transactions, display-safe (no CHD).
+    // OAuth (merchant on-behalf-of): owner-scoped, merchant-isolated operation history .
+    // Merges executions and the party's own card transactions, display-safe (no CHD).
     if (request.merchantContext) {
       const owner = await resolveOwner(request, reply);
       if (!owner) return;
@@ -318,7 +318,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       if (!owner.ownerPartyRef) return reply.send({ results: [], total: 0, page, limit });
 
       const merchantId = request.merchantContext.merchantId;
-      // Source 1 — SD-65 executions the party made THROUGH THIS merchant (isolation by SD-89 ref).
+      // Source 1: executions the party made THROUGH THIS merchant (isolation by ref).
       const filter = {
         merchantAgreementReference: merchantId,
         $or: [{ initiatorPartyReference: owner.ownerPartyRef }, { beneficiaryPartyReference: owner.ownerPartyRef }],
@@ -340,7 +340,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
         _sortAt: d.completedAt ?? d.initiatedAt ?? null,
       }));
 
-      // Source 2 — the party's OWN card transactions made in THIS merchant (masked PAN, no CHD).
+      // Source 2: the party's OWN card transactions made in THIS merchant (masked PAN, no CHD).
       const accountReference = await resolveAccountReferenceForParty(fastify.db, owner.ownerPartyRef);
       const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference, 200, merchantId) : [];
       const cardRows = cardTxns.map((t) => ({
@@ -576,7 +576,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
                   cardTransactionMaskedPanDisplay:   { type: 'string' },
                   // Payment concept (statement descriptor). Shown as the concept in history for AML/FDS context.
                   cardTransactionDescription:        { type: 'string' },
-                  // Fraud/risk status (BIAN SD-83), distinct from the payment authorization status above.
+                  // Fraud/risk status , distinct from the payment authorization status above.
                   fraudCaseCreated:                  { type: 'boolean' },
                   fraudDiagnosisCaseStatus:          { type: ['string', 'null'] },
                   fraudDiagnosisCaseReference:       { type: ['string', 'null'] },
@@ -628,7 +628,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
     const { userRole } = request as unknown as AuthenticatedRequest;
     const partyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
     let questions = await listQuestionsByTransaction(fastify.db, id);
-    // Ownership scoping for customers (PCI DSS Req 7): only questions addressed to them.
+    // Ownership scoping for customers (PCI DSS): only questions addressed to them.
     if (userRole === 'customer') questions = questions.filter((q) => !partyRef || q.transactionId === id);
     return reply.send({ questions });
   });

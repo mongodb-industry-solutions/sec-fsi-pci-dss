@@ -135,7 +135,7 @@ function CheckoutPageInner() {
     setState('paying');
     setError('');
 
-    // Saved card: pay with the stored surrogate TOKEN (never a PAN — we never held it). New card:
+    // Saved card: pay with the stored surrogate TOKEN (never a PAN, we never held it). New card:
     // derive the deterministic token from the entered number (same PAN → same token, so re-paying
     // never duplicates a card-on-file). The name is cosmetic (the issuer never validates it, PCI
     // does not require it); for a saved card we send its alias/network as the display label.
@@ -159,7 +159,7 @@ function CheckoutPageInner() {
         ...(usingSavedCard
           ? {}
           : { cardExpiryMonth: expiryMonth.padStart(2, '0'), cardExpiryYear: `20${expiryYear}` }),
-        // Forward the entered CVV for issuer verification (never persisted; PCI Req 3.2). A wrong CVV declines.
+        // Forward the entered CVV for issuer verification (never persisted; PCI DSS). A wrong CVV declines.
         cardCvv: cvv,
         cardholderEmail: cardholderEmail || undefined,
       });

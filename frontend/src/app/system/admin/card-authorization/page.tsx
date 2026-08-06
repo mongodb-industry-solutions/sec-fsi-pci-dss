@@ -6,7 +6,6 @@ export default function CardAuthorizationPage() {
       type: 'card_authorization',
       label: 'Card Authorization',
       description: 'Card transaction authorization via payment networks',
-      bianSd: 'SD-15',
     }} />
   );
 }

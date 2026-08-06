@@ -229,9 +229,9 @@ export default function StaffMerchantDetailPage() {
           </div>
         </div>
 
-        {/* KYB (BIAN SD-89 BQ:Step) */}
+        {/* KYB (BQ:Step) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-800 text-sm mb-2 flex items-center gap-1.5"><ShieldCheck size={14} className="text-teal-600" /> KYB check (SD-89)</h2>
+          <h2 className="font-semibold text-gray-800 text-sm mb-2 flex items-center gap-1.5"><ShieldCheck size={14} className="text-teal-600" /> KYB check</h2>
           {kyb ? (
             <div className="divide-y divide-gray-50">
               <InfoRow label="Status" value={String(kyb.merchantAgreementKybCheckStatus ?? '-')} />
@@ -247,7 +247,7 @@ export default function StaffMerchantDetailPage() {
 
       {/* Acquiring analytics */}
       <div className="space-y-4">
-        <h2 className="text-sm font-semibold text-gray-700">Activity <span className="text-xs font-normal text-gray-400">· aggregates only, no payer PII (PCI DSS Req 3/7)</span></h2>
+        <h2 className="text-sm font-semibold text-gray-700">Activity <span className="text-xs font-normal text-gray-400">· aggregates only, no payer PII (PCI DSS)</span></h2>
         {!stats ? (
           <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-sm text-gray-400">No activity available.</div>
         ) : (
@@ -287,7 +287,7 @@ export default function StaffMerchantDetailPage() {
         <div className="flex items-center justify-between gap-2 px-5 py-3 border-b border-gray-100 flex-wrap">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5">
             <Receipt size={14} className="text-[#001E2B]" /> Transactions
-            <span className="text-xs font-normal text-gray-400">· masked PAN only, no payer PII (PCI DSS Req 3/7)</span>
+            <span className="text-xs font-normal text-gray-400">· masked PAN only, no payer PII (PCI DSS)</span>
           </h2>
           <span className="text-xs text-gray-400">{payTotal} payment{payTotal !== 1 ? 's' : ''}</span>
         </div>
@@ -295,7 +295,7 @@ export default function StaffMerchantDetailPage() {
         {isAuditor && (
           <div className="px-5 py-2 border-b border-gray-100 bg-blue-50/60 text-xs text-blue-800 flex items-start gap-2">
             <ShieldCheck size={13} className="mt-0.5 shrink-0 text-blue-600" />
-            <span>Auditor oversight is read-only: you can analyze any payment and open its linked investigation case to review it, but initiating a new case is an analyst action (separation of duties, PCI DSS Req 7).</span>
+            <span>Auditor oversight is read-only: you can analyze any payment and open its linked investigation case to review it, but initiating a new case is an analyst action (separation of duties, PCI DSS).</span>
           </div>
         )}
 
@@ -381,11 +381,11 @@ export default function StaffMerchantDetailPage() {
         )}
       </div>
 
-      {/* Audit trail (BIAN SD-89 lifecycle, PCI DSS Req 10) */}
+      {/* Audit trail (lifecycle, PCI DSS) */}
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><ClipboardCheck size={14} className="text-[#001E2B]" /> Audit trail</h2>
-          <span className="text-[10px] font-mono text-gray-400">SD-89 · Req 10{auditDerived ? ' · derived from record' : ' · append-only log'}</span>
+          <span className="text-[10px] font-mono text-gray-400">{auditDerived ? ' · derived from record': ' · append-only log'}</span>
         </div>
         {auditRows.length === 0 ? (
           <p className="text-sm text-gray-400">No lifecycle events recorded.</p>

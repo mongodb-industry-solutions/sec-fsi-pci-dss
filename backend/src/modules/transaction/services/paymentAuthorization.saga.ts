@@ -20,7 +20,7 @@ const DEFAULT_GATES = ['card.issuer', 'fds', 'hrp', 'funds'];
 
 interface GateVerdict { approved: boolean; responseCode?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[] }
 // fundsHold: the atomic hold the funds gate made (available -> pending). Released as a compensation if
-// the journey is later declined by any gate (or if the hold lands after an earlier decline — race).
+// the journey is later declined by any gate (or if the hold lands after an earlier decline: race).
 interface JourneyState {
   expected: Set<string>;
   verdicts: Map<string, GateVerdict>;
@@ -54,7 +54,7 @@ export class PaymentAuthorizationSaga {
     // Only the authoritative gate verdict drives the saga. Audit-ledger projections (emit*/compliance
     // events) can share a gate's eventType (e.g. the card-issuer module's own compliance event is also
     // `card.issuer.validation.completed`) but carry a `ledgerKind` and use a ledger outcome ('rejected')
-    // — ignore them so they never masquerade as a gate approval.
+    //: ignore them so they never masquerade as a gate approval.
     if ((e.payload as { ledgerKind?: string }).ledgerKind) return;
     // Fallback if the gate result beats the `requested` event (in-process race): assume the default set.
     let st = this.journeys.get(txnId);
@@ -65,7 +65,7 @@ export class PaymentAuthorizationSaga {
     const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[]; held?: number; fundingPayoutAccountReference?: string };
     const approved = p.outcome ? p.outcome !== 'declined' : p.approved !== false;
 
-    // Record any hold the funds gate made — even after the journey is decided (ordering race): a gate
+    // Record any hold the funds gate made, even after the journey is decided (ordering race): a gate
     // may decline BEFORE the funds gate runs, so the hold can land on an already-declined journey.
     if (gate === 'funds' && p.held && p.fundingPayoutAccountReference) {
       st.fundsHold = { accountRef: p.fundingPayoutAccountReference, amount: p.held };

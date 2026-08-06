@@ -1,4 +1,4 @@
-// BIAN SD-66: Payout Account Arrangement service
+// Payout Account Arrangement service
 // CRUD for PSP payout accounts + atomic default-account management.
 
 import { Db } from 'mongodb';
@@ -91,9 +91,9 @@ export async function listPayoutAccounts(
   return { results, total };
 }
 
-// v29 admin (SD-66, built-in module account-information): cross-party GLOBAL payout-account list for
+// v29 admin (built-in module account-information): cross-party GLOBAL payout-account list for
 // the operations officer. Returns raw arrangements (caller strips QE fields via safeAccount, adding
-// payoutAccountHasIban/payoutAccountHasRoutingNumber hints — PCI/GDPR minimization). Paginated +
+// payoutAccountHasIban/payoutAccountHasRoutingNumber hints: PCI/GDPR minimization). Paginated +
 // filterable by status / party / currency.
 export async function listAllPayoutAccounts(
   db: Db,
@@ -153,7 +153,7 @@ export async function createPayoutAccount(
     payoutAccountCurrency: input.payoutAccountCurrency,
     payoutAccountCountryCode: input.payoutAccountCountryCode,
     payoutAccountPreferredRail: input.payoutAccountPreferredRail,
-    // Optional plaintext fields — only include when provided
+    // Optional plaintext fields, only include when provided
     ...(input.payoutAccountAlias ? { payoutAccountAlias: input.payoutAccountAlias } : {}),
     ...(input.payoutAccountBankName ? { payoutAccountBankName: input.payoutAccountBankName } : {}),
     ...(input.payoutAccountHolderName ? { payoutAccountHolderName: input.payoutAccountHolderName } : {}),
@@ -161,8 +161,8 @@ export async function createPayoutAccount(
     ...(input.payoutAccountCorrespondentBic ? { payoutAccountCorrespondentBic: input.payoutAccountCorrespondentBic.toUpperCase() } : {}),
     ...(input.payoutAccountBankAddress ? { payoutAccountBankAddress: input.payoutAccountBankAddress } : {}),
     // QE-encrypted fields: MUST be absent (not null/undefined) when not provided.
-    // MongoDB error 31041: "Cannot encrypt element of type: null" — QE driver rejects null values.
-    // v30.1: auto-generate a valid demo IBAN + routing when the caller leaves them empty — but ONLY for
+    // MongoDB error 31041: "Cannot encrypt element of type: null", QE driver rejects null values.
+    // v30.1: auto-generate a valid demo IBAN + routing when the caller leaves them empty, but ONLY for
     // externally-linked accounts. `internal_ledger` accounts intentionally have no bank identifiers, so
     // they are left absent unless explicitly provided. The demo IBAN/routing are seeded with the unique
     // account id (not the party ref) so a party with several accounts never gets duplicate identifiers.
@@ -253,7 +253,7 @@ export interface UpdatePayoutAccountInput {
   // Preferences
   payoutAccountAlias?: string;
   payoutAccountIsDefault?: boolean;
-  // Mutable banking metadata (BIAN SD-66: IBAN / currency / type are immutable)
+  // Mutable banking metadata (IBAN / currency / type are immutable)
   payoutAccountBankName?: string;
   payoutAccountHolderName?: string;
   payoutAccountBicSwift?: string;
@@ -268,7 +268,7 @@ export async function updatePayoutAccount(
 ): Promise<PayoutAccountArrangement | null> {
   const col = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
   const now = new Date();
-  // BIAN SD-66: payoutAccountIban, payoutAccountRoutingNumber, payoutAccountCurrency,
+  // payoutAccountIban, payoutAccountRoutingNumber, payoutAccountCurrency,
   // payoutAccountType, partyInstanceReference are immutable after creation.
   const safePatch: Record<string, unknown> = { recordUpdatedDateTime: now };
   if (patch.payoutAccountAlias !== undefined) safePatch.payoutAccountAlias = patch.payoutAccountAlias;

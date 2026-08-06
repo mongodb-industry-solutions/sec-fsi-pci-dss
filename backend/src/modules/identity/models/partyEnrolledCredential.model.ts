@@ -1,5 +1,5 @@
-// SD-91 / SD-16: Party Authentication. User authenticator (WebAuthn/FIDO2 style) registry.
-// Stores PUBLIC key material only (never private keys or biometric templates, PCI Req.3).
+// Party Authentication. User authenticator (WebAuthn/FIDO2 style) registry.
+// Stores PUBLIC key material only (never private keys or biometric templates, PCI DSS).
 // Distinct from partyAuthenticationKey (the OAuth signing-key audit mirror): this record is a
 // first-class USER credential that backs passwordless CIBA approval and can later feed step-up/SCA.
 
@@ -17,7 +17,7 @@ export interface EnrolledCredentialAuthenticatorMetadata {
 
 export interface PartyEnrolledCredentialRecord {
   partyEnrolledCredentialInstanceReference: string; // PK, random UUID (uuidv4) assigned at enrollment
-  // Owner. The SD-91 login id (customerAuthenticationInstanceReference), i.e. the OAuth `sub`.
+  // Owner. The login id (customerAuthenticationInstanceReference), i.e. the OAuth `sub`.
   customerAuthenticationInstanceReference: string;
   credentialId: string;             // opaque, unique per credential
   publicKeyPem: string;             // PUBLIC key only (SPKI PEM)

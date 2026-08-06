@@ -1,5 +1,5 @@
-// BIAN SD-66: Payout Account Balance — atomic balance operations
-// All mutations use MongoDB $inc — never read-modify-write. PCI DSS Req 10.
+// Payout Account Balance, atomic balance operations
+// All mutations use MongoDB $inc, never read-modify-write. PCI DSS.
 
 import { Db } from 'mongodb';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../models/payoutAccount.model';
@@ -93,7 +93,7 @@ export async function reserveFunds(
 
 /**
  * Debit the available balance directly (P2P transfer debit side).
- * Conditional on having sufficient available balance — returns false if insufficient funds.
+ * Conditional on having sufficient available balance: returns false if insufficient funds.
  */
 export async function debitAvailable(
   db: Db,
@@ -135,8 +135,8 @@ export async function creditDirect(
 /**
  * Hold funds on card authorization (cardholder / issuer perspective).
  * Moves amount from availableAmount → pendingAmount atomically.
- * Conditional on sufficient available balance — returns false if insufficient.
- * PCI DSS Req 3: no SAD stored; operates only on PSP-internal UUID references.
+ * Conditional on sufficient available balance: returns false if insufficient.
+ * PCI DSS: no SAD stored; operates only on PSP-internal UUID references.
  */
 export async function holdCardFunds(
   db: Db,
@@ -162,7 +162,7 @@ export async function holdCardFunds(
 
 /**
  * Clear the pending hold when a card purchase settles.
- * Decrements pendingAmount only — available was already reduced at auth time.
+ * Decrements pendingAmount only: available was already reduced at auth time.
  */
 export async function settleCardDebit(
   db: Db,

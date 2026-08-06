@@ -24,7 +24,7 @@ export interface JwtPayload {
   role: string;
   name: string;
   domain: string;
-  partyRef?: string; // Ch-05: partyInstanceReference (SD-13) — present for all users with a Party record
+  partyRef?: string; // Ch-05: partyInstanceReference , present for all users with a Party record
   epoch?: number;    // session validity epoch current at sign time (server-side logout invalidation)
 }
 
@@ -268,7 +268,7 @@ export interface DemoUser {
 }
 
 /**
- * Curated demo roster — the single, DB-backed, NON-hardcoded source shared by the /system login
+ * Curated demo roster: the single, DB-backed, NON-hardcoded source shared by the /system login
  * picker (debug mode) and the /simulator. Reads the live `customerAuthentication` collection (the
  * seeder guarantees these users exist), resolves the merchant a customer owns via
  * `merchantOwnerPartyReference`, and returns a deterministic order so every load is identical when
@@ -305,10 +305,10 @@ export async function getDemoUsers(db: Db, opts?: DemoUserFilter): Promise<DemoU
         mcc: (m as { merchantCategoryCode?: string }).merchantCategoryCode,
       });
     }
-  } catch { /* merchant collection optional — no merchant flag then */ }
+  } catch { /* merchant collection optional, no merchant flag then */ }
 
   let users: DemoUser[] = records.map((u) => {
-    // Ownership applies to the customer role only — staff are never merchant owners.
+    // Ownership applies to the customer role only: staff are never merchant owners.
     const merchant = u.customerAuthenticationUserRole === 'customer'
       ? ownerToMerchant.get(u.partyInstanceReference)
       : undefined;
@@ -324,7 +324,7 @@ export async function getDemoUsers(db: Db, opts?: DemoUserFilter): Promise<DemoU
 
   if (opts?.isMerchant) users = users.filter((u) => !!u.merchant);
 
-  // Deterministic order: role rank, then name, then email — identical on every load.
+  // Deterministic order: role rank, then name, then email, identical on every load.
   users.sort((a, b) =>
     (ROLE_RANK[a.role] ?? 99) - (ROLE_RANK[b.role] ?? 99)
     || a.name.localeCompare(b.name)
@@ -389,8 +389,8 @@ export async function resolveSelfRegistrationDomain(db: Db, name: string): Promi
 /**
  * Self-service account registration (public). Domain logic lives here (Hexagonal): validate the
  * domain policy, force the lowest-privilege role, derive status from the auto-approve policy, create
- * the SD-91 account + linked SD-13 party (reuses createUser), then publish a compliance event so the
- * onboarding is auditable (EDA / PCI DSS Req 10). No PII is placed in the event summary.
+ * the account + linked party (reuses createUser), then publish a compliance event so the
+ * onboarding is auditable (EDA / PCI DSS). No PII is placed in the event summary.
  */
 // Server-side password policy (mirrors the frontend PasswordFields checklist) so a direct API
 // caller cannot bypass the UI and create a weak account. Shared by self-service registration

@@ -6,7 +6,6 @@ export default function KycIdentityPage() {
       type: 'kyc_identity',
       label: 'KYC / Identity',
       description: 'Customer identity verification (KYC)',
-      bianSd: 'SD-53',
     }} />
   );
 }

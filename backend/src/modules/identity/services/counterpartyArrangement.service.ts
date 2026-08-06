@@ -1,6 +1,6 @@
-// BIAN SD-54: Counterparty Administration — beneficiary registry service
+// Counterparty Administration, beneficiary registry service
 // Beneficiaries are located by QE equality search on the party collection (phone / email).
-// Raw PII is NEVER stored — only the resolved partyInstanceReference and a masked hint.
+// Raw PII is NEVER stored, only the resolved partyInstanceReference and a masked hint.
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,7 +18,7 @@ import { getDbForRole } from '../../../vendors/encryption/roleClients';
 export interface RegisterBeneficiaryInput {
   ownerPartyReference: string;
   lookupType: CounterpartyLookupType;
-  lookupValue: string;           // raw phone or email — used for QE equality search only, NEVER stored
+  lookupValue: string;           // raw phone or email, used for QE equality search only, NEVER stored
   label?: string;
 }
 
@@ -50,7 +50,7 @@ export async function registerBeneficiary(
 ): Promise<BeneficiaryLookupResult> {
   const col = db.collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION);
 
-  // QE equality search — resolve raw phone/email to a party reference
+  // QE equality search: resolve raw phone/email to a party reference
   const counterpartyParty = await resolvePartyByLookup(input.lookupType, input.lookupValue);
 
   // Anti-enumeration: treat not-found and already-registered the same way to a caller
@@ -183,7 +183,7 @@ export async function removeBeneficiary(
 /** Sentinel owner reference for a predicate that resolves to no customer: matches no document. */
 const NO_MATCH = '__no_such_owner__';
 
-/** Owner party behind an investigation case (SD-83 case -> SD-53 agreement -> SD-13 party). */
+/** Owner party behind an investigation case (case -> agreement -> party). */
 async function resolveCaseOwner(db: Db, caseRef: string): Promise<string | undefined> {
   const [{ FRAUD_DIAGNOSIS_COLLECTION }, { CUSTOMER_AGREEMENT_COLLECTION }] = await Promise.all([
     import('../../fraud/models/fraudDiagnosis.model'),

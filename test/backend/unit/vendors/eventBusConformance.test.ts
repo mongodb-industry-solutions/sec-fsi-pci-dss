@@ -1,6 +1,6 @@
 /**
  * Bus conformance suite: one behavioural contract run against every EventBus adapter. Passing on all
- * engines is the swap guarantee — publishers/consumers see identical behaviour regardless of engine.
+ * engines is the swap guarantee: publishers/consumers see identical behaviour regardless of engine.
  * The broker adapter is exercised through a fake transport (the real Kafka/Rabbit clients run only
  * when those engines are selected; their logic IS this BrokerEventBus).
  */
@@ -40,7 +40,7 @@ const factories: Factory[] = [
   { name: 'BrokerEventBus (fake transport)', make: (store) => new BrokerEventBus(new FakeTransport(), { topic: 't', store }) },
 ];
 
-describe.each(factories)('EventBus conformance — $name', ({ make }) => {
+describe.each(factories)('EventBus conformance: $name', ({ make }) => {
   let store: FakeStore;
   let bus: EventBus;
 

@@ -106,7 +106,7 @@ export default function OutboundPage() {
 
   useEffect(() => {
     const ev = events.find((e) => e.event === selectedEvent)?.outbound;
-    if (!ev) return; // legacy vendor without per-event config — keep the vendor-global values shown
+    if (!ev) return; // legacy vendor without per-event config: keep the vendor-global values shown
     setEndpoint(ev.url ?? '');
     setHttpMethod(ev.httpMethod ?? 'POST');
     if (ev.timeoutMs != null) setTimeoutMs(ev.timeoutMs);

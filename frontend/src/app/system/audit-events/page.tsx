@@ -13,6 +13,7 @@ import { DateTimeRangeFilter } from '../../../components/search/DateTimeRangeFil
 import { Combobox, type ComboOption } from '../../../components/ui/Combobox';
 import { downloadJsonFile, appliedFilters } from '../../../lib/downloadJson';
 
+import { serviceDomainLabel } from '../../../lib/serviceDomain';
 type AuditRow = {
   id: string;
   source: string;
@@ -55,7 +56,7 @@ const EVENT_TYPES: Record<string, string[]> = {
 };
 
 // The row's `outcome` merges two fields: processOutcome on business/compliance events (a verdict
-// plus the SD-65 payout lifecycle states) and integrationEventStatus on integration events (call
+// plus the payout lifecycle states) and integrationEventStatus on integration events (call
 // delivery). Grouping them says which vocabulary belongs to which stream.
 const OUTCOME_GROUPS: Array<{ label: string; values: string[] }> = [
   { label: 'Verdict', values: ['approved', 'rejected', 'escalated', 'verified'] },
@@ -65,12 +66,12 @@ const OUTCOME_GROUPS: Array<{ label: string; values: string[] }> = [
 ];
 
 const OUTCOME_OPTIONS: ComboOption[] = [
-  { value: '', label: 'All' },
+  { value : '', label: 'All' },
   ...OUTCOME_GROUPS.flatMap((g) => g.values.map((v) => ({ value: v, label: v.replace(/_/g, ' '), group: g.label }))),
 ];
 
 const ENTITY_OPTIONS: ComboOption[] = [
-  { value: '', label: 'All entities' },
+  { value : '', label: 'All entities' },
   { value: 'fraud_case', label: 'Investigation case' },
   { value: 'transaction', label: 'Transaction' },
   { value: 'customer', label: 'Customer (KYC)' },
@@ -256,7 +257,7 @@ function AuditEventsView() {
         title="Audit Events"
         description="Unified, searchable audit trail across the whole platform."
         info="Combines business process events, compliance events, and integration (inbound/outbound test) events into one stream. Filter by source, event type, outcome, date range, or free text."
-        debugInfo="ADR-025 · businessProcessEvent + complianceProcessEvent + integrationEvents · PCI DSS Req 10.2 / 10.3 / 10.7"
+        debugInfo="ADR-025 · businessProcessEvent + complianceProcessEvent + integrationEvents · PCI DSS"
         actions={
           <button onClick={downloadJson} disabled={downloading || loading}
             className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium disabled:opacity-50"
@@ -398,7 +399,7 @@ function AuditEventsView() {
                           {ev.entityType && <span className="font-medium">{ENTITY_LABEL[ev.entityType] ?? ev.entityType}</span>}
                           {ev.entityId && <> · <span className="font-mono">{ev.entityId.slice(0, 16)}…</span></>}
                           {ev.performedByRole && <> · <span>{ev.performedByRole}</span></>}
-                          {ev.bianServiceDomain && <> · <span className="text-gray-400">{ev.bianServiceDomain}</span></>}
+                          {ev.bianServiceDomain && <> · <span className="text-gray-400">{serviceDomainLabel(ev.bianServiceDomain)}</span></>}
                         </div>
                       </div>
                       <div className="text-xs text-gray-400 shrink-0 tabular-nums">{new Date(ev.eventDateTime).toLocaleString()}</div>

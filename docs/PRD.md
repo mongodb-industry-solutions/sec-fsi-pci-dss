@@ -114,15 +114,15 @@ A synthetic digital bank (standalone, Leafy Bank-ready) runs a payment flow wher
 
 ### Payment Integration Use Case (Ch-04)
 
-**Problem:** External merchants want to accept card payments through the LeafyBank Payment Gateway without handling cardholder data themselves — the standard "easy integration" requirement that every payment provider answers with a hosted payment page.
+**Problem:** External merchants want to accept card payments through the LeafyBank Payment Gateway without handling cardholder data themselves, the standard "easy integration" requirement that every payment provider answers with a hosted payment page.
 
-**Solution — two integration patterns, lowest PCI scope:**
+**Solution: two integration patterns, lowest PCI scope:**
 
 #### Redirect Checkout
 
 An external merchant's backend creates a checkout session via API. The buyer is redirected to a hosted payment page on the PSP domain where card entry happens. After payment the buyer is redirected back to the merchant.
 
-**PCI DSS scope for external merchant:** SAQ A — the merchant's system never sees cardholder data at any point.
+**PCI DSS scope for external merchant:** SAQ A, the merchant's system never sees cardholder data at any point.
 
 ```
 Merchant System        LeafyBank Gateway                    Buyer Browser
@@ -230,12 +230,12 @@ Merchant System        LeafyBank Gateway
 
 [6. Merchant Onboarding (Ch-05)]
    A customer submits a merchant application via the Merchant portal.
-   Status becomes 'under_review' — the document is in the merchantAgreementProcedure collection.
+   Status becomes 'under_review': the document is in the merchantAgreementProcedure collection.
    A Merchant Acquiring officer (merchant_officer role) reviews the application
    and performs a KYB (Know Your Business) check before approving.
    On approval: status transitions to 'agreed', then 'active' upon T&C acceptance.
    The same Party (SD-13) record that holds the CustomerAgreement (SD-53)
-   now also owns the MerchantAgreement (SD-89) — the BIAN dual-role pattern.
+   now also owns the MerchantAgreement (SD-89): the BIAN dual-role pattern.
 ```
 
 ### Key Demo Moments (Explainability)
@@ -284,7 +284,7 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 | # | BIAN Service Domain | SD Reference | Role in Demo | Collection | Version |
 |---|---|---|---|---|---|
 | 13 | **Account Information (AIS)** | SD-36 | Funds-availability gate: reads funding-account balance (built-in reads internal ledger; PSD2 AIS substitutable) and drives the atomic hold | `payoutAccountArrangement` (read) | v17 |
-| 14 | **Currency Exchange** | — (adjunct SD-66) | Converts amounts into the account currency before any balance mutation (mid rate + spread); replaceable by an external FX provider | *(built-in module, config in `capabilityModuleConfiguration`)* | v17 |
+| 14 | **Currency Exchange** |: (adjunct SD-66) | Converts amounts into the account currency before any balance mutation (mid rate + spread); replaceable by an external FX provider | *(built-in module, config in `capabilityModuleConfiguration`)* | v17 |
 
 > **Note 5 (v17):** Card-payment authorization adds a 4th parallel gate `funds` (SD-36) to the issuer/FDS/HRP gates. The hold is atomic (`$gte`-conditional `$inc`) and is the authoritative decision; it is released as a saga compensation if any gate declines. Insufficient funds → `declined` + ISO-8583 `'51'`. See [engineering-proposal.md ADR-038](engineering-proposal.md).
 
@@ -292,7 +292,7 @@ BIAN (Banking Industry Architecture Network) provides a standardized vocabulary 
 >
 > **Note 2:** `customerAuthenticationAssessment` (SD-91) stores pre-seeded user accounts (email as QE:equality, bcrypt password hash, role) to support Application Mode login. Identity verification events belong to `partyAuthenticationAssessment` (SD-16). In a production FSI system, authentication would be delegated to an identity provider (e.g., MS Entra ID). The SD-91 collection demonstrates that even user credential lookups can be encrypted via QE.
 > 
-> **Note 4:** SD-13 `party` is the canonical PII store. `customerAgreementProcedure` (SD-53) holds only business keys and a `partyInstanceReference` FK — no email or phone. Email/phone lookups require a two-step query: (1) QE equality on `party.partyEmailAddress` → get `partyInstanceReference`; (2) plaintext index lookup on `customerAgreementProcedure.partyInstanceReference`. See `tmp/wiki/bian-openbanking-tradeoffs.md §1` for the performance analysis.
+> **Note 4:** SD-13 `party` is the canonical PII store. `customerAgreementProcedure` (SD-53) holds only business keys and a `partyInstanceReference` FK, no email or phone. Email/phone lookups require a two-step query: (1) QE equality on `party.partyEmailAddress` → get `partyInstanceReference`; (2) plaintext index lookup on `customerAgreementProcedure.partyInstanceReference`. See `tmp/wiki/bian-openbanking-tradeoffs.md §1` for the performance analysis.
 >
 > **Note 3 (v4):** The backend module structure mirrors the BIAN SD grouping. Each module owns the collections, services, and API routes for its assigned SDs. See [engineering-proposal.md §3.8](engineering-proposal.md) for the full BIAN Module Map.
 
@@ -326,7 +326,7 @@ interface CardTransactionLogControlRecord {
   cardTransactionMerchantName: string;            // plaintext
   cardTransactionMaskedPanDisplay: string;        // plaintext: display only: ****-****-****-1234
 
-  // BIAN SD-254 statement descriptor fields (plaintext, not CHD — no QE required)
+  // BIAN SD-254 statement descriptor fields (plaintext, not CHD, no QE required)
   cardTransactionDescription: string;             // max 22 chars; appears on cardholder bank statement
   cardTransactionNarrative?: string;              // extended context for L1/L2 fraud investigation
 
@@ -382,7 +382,7 @@ interface PaymentCardManagementControlRecord {
   paymentCardReference: string;                  // indexed plaintext: standard query, not QE
 
   // Encrypted: QE none (non-searchable)
-  cardExpirationDate: string;                    // QE:none: MM/YY format — CHD co-located with card reference
+  cardExpirationDate: string;                    // QE:none: MM/YY format, CHD co-located with card reference
 
   // Display fields (plaintext: non-sensitive)
   maskedPanDisplay: string;                      // ****-****-****-1234
@@ -420,14 +420,14 @@ interface FraudDiagnosisControlRecord {
   escalationAcceptedAt?: Date;                   // set when L2 approves; persisted so approval survives refresh
   caseResolutionOutcome?: 'fraud_confirmed' | 'false_positive' | 'chargeback_initiated' | 'under_review';
 
-  // DEPRECATED fields — do not write; use the notes event endpoints instead
+  // DEPRECATED fields: do not write; use the notes event endpoints instead
   // (Ch-03, 2026-06-10: replaced by fraudDiagnosisCaseEvents append-only log)
   /** @deprecated Use POST/DELETE/GET /api/v1/fraud/:id/notes instead */
   fraudDiagnosisCaseNotes?: string;
   /** @deprecated Customer-visible notes are now visibility:'customer' events in fraudDiagnosisCaseEvents */
   fraudDiagnosisCustomerSubjectNotes?: string;
 
-  // Case notes — append-only event log (Ch-03)
+  // Case notes: append-only event log (Ch-03)
   // Notes are stored as immutable `note_added` events. Errors are corrected via a `note_retracted`
   // event (BIAN SD-83 append-only principle, PCI DSS Req 10.3).
   // The customer sees a chronological list of visibility:'customer' notes in their transaction detail view.
@@ -496,7 +496,7 @@ consentAccessLog (SD-36)
 merchantAgreementProcedure (SD-89) ────────────────────► party
   │  merchantOwnerPartyReference          (D-21: BIAN-canonical Party owner link)
   │  Note: same Party can own a CustomerAgreement (SD-53) AND a MerchantAgreement (SD-89)
-  │  — dual-role pattern. Identity anchor is Party, not the role-scoped Agreement.
+  │: dual-role pattern. Identity anchor is Party, not the role-scoped Agreement.
   │ 1 : many
   ↓
 checkoutSessionLog (SD-64) / paymentLinkRecord (SD-64)
@@ -551,7 +551,7 @@ checkoutSessionLog (SD-64) / paymentLinkRecord (SD-64)
 | `customerAgreementResidentialAddress` | Customer Agreement (SD-53) | PII | `none` | `customerAgreementProcedure` (inline) | v1 |
 | `governmentIdentificationReference` | Customer Agreement (SD-53) | PII | `none` | `customerAgreementProcedure` (inline) | v1 |
 | `customerAgreementRiskNotes` | Customer Agreement (SD-53) | Internal | `none` | `customerAgreementProcedure` (inline) | v1 |
-| `cardTransactionAmount.amount` | Card Transaction (SD-254) | — | `range` | `cardTransactionLog` | **v2** |
+| `cardTransactionAmount.amount` | Card Transaction (SD-254) |: | `range` | `cardTransactionLog` | **v2** |
 | **`fullPan`** |: | CHD: **PROHIBITED** | **never store** |: |: |
 | **`cvv` / `pin`** |: | SAD: **PROHIBITED** | **never store** |: |: |
 | **`magneticStripeData`** |: | SAD: **PROHIBITED** | **never store** |: |: |
@@ -859,7 +859,7 @@ v4: PSP Payment Platform + Modular Architecture  (TBD: after v3 validated)
   New BIAN SDs: SD-89 Merchant Relations · SD-64 Payment Order · SD-65 Payment Execution · SD-57 Card Etoken
   New collections: merchantAgreementProcedure · paymentOrderProcedure · cardEtokenProcedure
   New actors: Merchant (first-class entity with MCC risk profile, limits, settlement config)
-  Goal: API-first payment platform story — MongoDB as the data backbone for a full PSP platform
+  Goal: API-first payment platform story, MongoDB as the data backbone for a full PSP platform
 
 v5: Agentic Fraud Investigation  (TBD: after v4 validated)
   AI pre-review on fraud trigger: MongoDB Agentic Platform (Magenta preferred)
@@ -921,7 +921,7 @@ v5: Agentic Fraud Investigation  (TBD: after v4 validated)
 **Theme:** MongoDB as the data backbone of a full PSP platform, structured around BIAN Service Domains.
 
 **Deliverables:**
-- Backend refactored to domain module layout: `src/modules/<sd-cluster>/` + `src/shared/` — zero API surface change, all existing tests pass
+- Backend refactored to domain module layout: `src/modules/<sd-cluster>/` + `src/shared/`, zero API surface change, all existing tests pass
 - Four new BIAN Service Domains: SD-89 Merchant Relations, SD-64 Payment Order, SD-65 Payment Execution, SD-57 Card Etoken
 - Three new collections: `merchantAgreementProcedure` (plaintext, bcrypt-hashed API keys), `paymentOrderProcedure` (intent lifecycle with TTL index), `cardEtokenProcedure` (QE:none on network token)
 - Merchant as first-class actor: MCC risk category, transaction limits, settlement schedule, webhook endpoint
@@ -976,7 +976,7 @@ Debug Mode is a demo-presenter feature that converts the application from a "bus
 - State persists across page navigation via `localStorage` key `demo_debug_mode`.
 - Toggling does not require a page reload.
 
-### 11.2 Business Mode (Debug OFF — default)
+### 11.2 Business Mode (Debug OFF: default)
 
 - Clean, professional UI suitable for executive or business audience.
 - No technical jargon, no ciphertext, no BIAN SD annotations.
@@ -992,7 +992,7 @@ Every UI element in the application gains technical context overlays:
 | **BIAN Badge** | Entity cards, page headers, form sections | Service Domain chip: `SD-89 · Merchant Relations`, collection name |
 | **PCI DSS Badge** | Alongside BIAN badge | Requirement citation: `PCI DSS Req 3.5.1` |
 | **Field Label** | Every form/display field | QE mode: `QE:equality`, `QE:none`, or `unencrypted` |
-| **Lock Tooltip** | Encrypted fields | `"Stored as BSON Binary subtype 6 — server never sees plaintext"` |
+| **Lock Tooltip** | Encrypted fields | `"Stored as BSON Binary subtype 6: server never sees plaintext"` |
 | **Info Panel** | Action buttons (`[ℹ]`) | BIAN Action Term, HTTP method, MongoDB write op, PCI DSS control, business logic explanation |
 | **Raw Document Panel** | Key entity pages | Live MongoDB document showing Binary ciphertext; fetched from `/api/v1/system/raw/:collection/:id` |
 | **Login Cards** | Login screen | All demo users shown as role cards with one-click login |
@@ -1001,7 +1001,7 @@ Every UI element in the application gains technical context overlays:
 ### 11.4 Raw Document Viewer
 
 - Uses the existing `GET /api/v1/system/raw/:collection/:id` endpoint (Simulator Mode infrastructure).
-- Encrypted fields are displayed as `Binary('hex...')` notation — visually demonstrates QE at rest.
+- Encrypted fields are displayed as `Binary('hex...')` notation: visually demonstrates QE at rest.
 - A "Refresh" button re-fetches in real time.
 - A copy-to-clipboard icon copies the full JSON.
 - Only available for entity types that have a direct MongoDB document (transactions, merchants, fraud cases).
@@ -1026,13 +1026,13 @@ Every UI element in the application gains technical context overlays:
 
 | Display Name | Username | Role | Department | Party Ref |
 |---|---|---|---|---|
-| Alex Johnson | `customer@demo.com` | customer | — | PTY-001 |
-| David Chen | `customer2@demo.com` | customer | — | PTY-057 |
-| Amara Okafor | `customer3@demo.com` | customer | — | PTY-058 |
-| Lena Fischer | `customer4@demo.com` | customer | — | PTY-059 |
-| Level 1 Analyst | `analyst@bank.demo` | level1_analyst | Fraud Detection | — |
-| Level 2 Investigator | `investigator@bank.demo` | level2_investigator | Fraud Investigation | — |
-| Security Auditor | `auditor@bank.demo` | security_auditor | Compliance | — |
+| Alex Johnson | `customer@demo.com` | customer |: | PTY-001 |
+| David Chen | `customer2@demo.com` | customer |: | PTY-057 |
+| Amara Okafor | `customer3@demo.com` | customer |: | PTY-058 |
+| Lena Fischer | `customer4@demo.com` | customer |: | PTY-059 |
+| Level 1 Analyst | `analyst@bank.demo` | level1_analyst | Fraud Detection |: |
+| Level 2 Investigator | `investigator@bank.demo` | level2_investigator | Fraud Investigation |: |
+| Security Auditor | `auditor@bank.demo` | security_auditor | Compliance |: |
 | Rachel Torres | `officer@bank.demo` | merchant_officer | Merchant Acquiring | PTY-056 |
 | Olivia Moreno | `olivia.moreno@back.es` | operations_officer | Operations | b0000060 |
 | Daniel Rossi | `daniel.rossi@back.es` | operations_officer | Operations | b0000061 |
@@ -1204,7 +1204,7 @@ LeafyBank's demo currently answers two questions well:
 
 But it fails to answer a third question that every FSI enterprise buyer will ask:
 
-> *"How would this integrate with our existing compliance stack — Refinitiv World-Check, FICO Falcon, Onfido, NICE Actimize, Equifax?"*
+> *"How would this integrate with our existing compliance stack: Refinitiv World-Check, FICO Falcon, Onfido, NICE Actimize, Equifax?"*
 
 Without an answer, the demo is a standalone showcase, not a reference architecture. The Integration Hub closes this gap by formalizing every compliance function as a pluggable provider using BIAN SD-193 External Provider Arrangements.
 
@@ -1223,7 +1223,7 @@ Every compliance function ships with a working internal default implementation. 
 | Integration Type | Internal Default | External Providers | BIAN SD | PCI DSS |
 |---|---|---|---|---|
 | `fraud_detection` | Internal amount/MCC fraud scoring (existing) | FICO Falcon, Featurespace, ThreatMetrix | SD-63 Fraud Evaluation | Req 10.2.1, 12.3.1 |
-| `hrp_sanctions` | HRPC check engine — 9 categories, 4 risk levels (existing) | Refinitiv World-Check, OFAC SDN, LexisNexis | SD-13 Party Reference Data | Req 12.8.1, 12.8.5 |
+| `hrp_sanctions` | HRPC check engine: 9 categories, 4 risk levels (existing) | Refinitiv World-Check, OFAC SDN, LexisNexis | SD-13 Party Reference Data | Req 12.8.1, 12.8.5 |
 | `kyc_identity` | KYC BQ:Step sub-document status (existing) | Jumio, Onfido, Socure, iDenfy | SD-53 Customer Agreement | Req 8.1, 12.8.1 |
 | `kyb_business` | KYB BQ:Step sub-document status (existing) | ComplyAdvantage, Creditsafe, Onfido Business | SD-89 Merchant Relations | Req 12.8.1, 12.8.3 |
 | `aml_monitoring` | Suspicious pattern analysis stub (new) | NICE Actimize, Oracle FCCM, Napier AI | SD-99 Suspicious Activity Analysis | Req 10.2.1, 12.3.1 |
@@ -1237,17 +1237,17 @@ Key SD-193 concepts mapped to LeafyBank:
 
 | BIAN SD-193 concept | LeafyBank implementation |
 |---|---|
-| Control Record | `ExternalProviderArrangement` — one document per registered provider |
+| Control Record | `ExternalProviderArrangement`: one document per registered provider |
 | BQ: Assessment | `externalProviderHealthStatus` + health check events |
 | BQ: Update | API key rotation, endpoint update, trigger event reconfiguration |
-| Action Log | `integrationEvents` collection — append-only audit log |
+| Action Log | `integrationEvents` collection: append-only audit log |
 | Arrangement Status | `active | inactive | test | suspended` lifecycle |
 
 ### 16.5 New Persona: System Administrator
 
 **Role:** `system_admin`  
 **Name (demo):** "Alex Morgan, Integration & Compliance Technology Manager"  
-**Avatar:** Slate — `bg-slate-600`
+**Avatar:** Slate, `bg-slate-600`
 
 The System Administrator is the business-side owner of the compliance integration stack. They are not a developer (they don't restart servers or edit config files) and not a fraud analyst (they don't investigate cases). Their job is to ensure the bank's automated compliance functions are properly configured, tested, and auditable. Their remit is system and platform governance (integrations/providers, auth domains, roles, general config, security), not business or cardholder data. As of v29.2 their relation to the internal modules is **read-only** (`modules:view`, system and security oversight): editing internal module config and policies belongs to the `operations_officer`, who owns internal business logic and financial processes. (Note: this platform-admin persona is labelled `system_admin` here but maps to the `manager` role in the RBAC matrix of `technical-spec.md` §1.15.)
 
@@ -1291,22 +1291,22 @@ The Integration Hub is designed around PCI DSS v4.0 third-party service provider
 
 | PCI DSS Requirement | Integration Hub response |
 |---|---|
-| Req 12.8.1 — Maintain list of all TPSPs | `integrationRegistry` is the maintained list; each provider has name, type, endpoint, status, and PCI DSS requirement mapping |
-| Req 12.8.2 — Written agreement | `externalProviderArrangementStatus` lifecycle tracks the agreement state; BQ:Update logs all changes |
-| Req 12.8.3 — Due diligence before engagement | `externalProviderLastHealthCheckAt` + `POST /test` result stored as evidence |
-| Req 12.8.5 — Monitor compliance status | Health check events + health status field; key rotation tracked via rotate-key events |
-| Req 10.2.1 — Audit log of system access | Every dispatch, callback, and key rotation creates an `IntegrationEvent` record |
-| Req 10.7 — Retain logs ≥ 90 days | TTL index on `integrationEvents`: 7776000 seconds |
-| Req 6.3.3 — Protect credentials | bcrypt hash storage; plaintext key shown once and never stored |
-| Req 7.1 — Separation of Duties | `system_admin` (business) vs devops `admin` (infrastructure) — distinct roles with disjoint capabilities |
+| Req 12.8.1: Maintain list of all TPSPs | `integrationRegistry` is the maintained list; each provider has name, type, endpoint, status, and PCI DSS requirement mapping |
+| Req 12.8.2: Written agreement | `externalProviderArrangementStatus` lifecycle tracks the agreement state; BQ:Update logs all changes |
+| Req 12.8.3: Due diligence before engagement | `externalProviderLastHealthCheckAt` + `POST /test` result stored as evidence |
+| Req 12.8.5: Monitor compliance status | Health check events + health status field; key rotation tracked via rotate-key events |
+| Req 10.2.1: Audit log of system access | Every dispatch, callback, and key rotation creates an `IntegrationEvent` record |
+| Req 10.7: Retain logs ≥ 90 days | TTL index on `integrationEvents`: 7776000 seconds |
+| Req 6.3.3: Protect credentials | bcrypt hash storage; plaintext key shown once and never stored |
+| Req 7.1: Separation of Duties | `system_admin` (business) vs devops `admin` (infrastructure), distinct roles with disjoint capabilities |
 
 ### 16.8 Demo Narrative for FSI Presentations
 
-**Scene 1 (no external providers):** Present the system to an FSI team. Everything works — fraud scoring, KYC, merchant onboarding. Show the integration dashboard with 3 built-in providers. Explain: "This is a fully functional compliance system with no vendor dependencies. Zero configuration required."
+**Scene 1 (no external providers):** Present the system to an FSI team. Everything works, fraud scoring, KYC, merchant onboarding. Show the integration dashboard with 3 built-in providers. Explain: "This is a fully functional compliance system with no vendor dependencies. Zero configuration required."
 
-**Scene 2 (live registration):** An architect says "we use Refinitiv World-Check." Open the admin portal → register a new `hrp_sanctions` provider with the Refinitiv endpoint and API key → test it → activate it. The HRPC check is now routed to Refinitiv. Show the event log. Explain: "The next HRPC check will use your provider — and if it fails, the system falls back to our internal check automatically."
+**Scene 2 (live registration):** An architect says "we use Refinitiv World-Check." Open the admin portal → register a new `hrp_sanctions` provider with the Refinitiv endpoint and API key → test it → activate it. The HRPC check is now routed to Refinitiv. Show the event log. Explain: "The next HRPC check will use your provider, and if it fails, the system falls back to our internal check automatically."
 
-**Scene 3 (audit):** Open the integration event log. Show PCI DSS Req 10.2.1 compliance — every provider interaction is logged. Open the integration registry. Explain: "This IS your PCI DSS Req 12.8.1 third-party service provider list. Every provider you register is automatically documented."
+**Scene 3 (audit):** Open the integration event log. Show PCI DSS Req 10.2.1 compliance, every provider interaction is logged. Open the integration registry. Explain: "This IS your PCI DSS Req 12.8.1 third-party service provider list. Every provider you register is automatically documented."
 
 ### 16.9 Decision Log
 
@@ -1323,7 +1323,7 @@ The Integration Hub is designed around PCI DSS v4.0 third-party service provider
 
 *This document is a living artifact. Update the Decisions Log with any architectural or scope change agreed during development.*
 
-## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+## Bank Transfers (ACH / SEPA / SWIFT): capability add-on
 
 > Delivered under development plan v17 (dev-plan tranche "v17.1"), not a numbered product release.
 

@@ -1,6 +1,6 @@
 /**
  * Unit tests (dev.v30): realistic per-card CVV derivation + cvvMode acceptance + extended validation.
- * PCI DSS Req 3.2: the CVV is derived (HMAC/CVK), never stored. These tests use a fixed CVK buffer;
+ * PCI DSS: the CVV is derived (HMAC/CVK), never stored. These tests use a fixed CVK buffer;
  * no DB, no KMS.
  */
 import { describe, it, expect } from 'vitest';

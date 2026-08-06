@@ -16,9 +16,9 @@ async function pathExists(p: string): Promise<boolean> {
  * Filesystem-backed OAuth signing key provider (ADR-036).
  *
  * Layout of the key store directory (PSP_OAUTH_KEY_STORE_DIR, default backend/keys/):
- *   private.pem              active private key (pkcs8, chmod 600) — signs tokens
+ *   private.pem              active private key (pkcs8, chmod 600): signs tokens
  *   public.pem               active public key  (spki,  chmod 644)
- *   retired/<kid>.pub.pem    deprecated public keys — verify-only during the grace period
+ *   retired/<kid>.pub.pem    deprecated public keys: verify-only during the grace period
  *
  * The private key material for deprecated keys is intentionally discarded on rotation:
  * only the active key signs, deprecated keys are kept solely to verify tokens issued
@@ -118,7 +118,7 @@ export class LocalKeyProvider implements OAuthKeyProvider {
 
   async revoke(kid: string): Promise<void> {
     if (kid === this.activeKid) {
-      throw Object.assign(new Error('Cannot revoke the active signing key — rotate first'), { statusCode: 400 });
+      throw Object.assign(new Error('Cannot revoke the active signing key: rotate first'), { statusCode: 400 });
     }
     const file = path.join(this.retiredDir, `${kid}.pub.pem`);
     if (!(await pathExists(file))) {
@@ -134,7 +134,7 @@ export class LocalKeyProvider implements OAuthKeyProvider {
       // Auto-generate a signing key when missing in any NON-production environment (development,
       // staging, demos) so the local provider works without mounting a key file or standing up KMS.
       // PRODUCTION still fails closed by default: a real, persisted key (or KMS) must be provisioned
-      // there — an auto-generated ephemeral key would not survive restarts and would diverge across
+      // there: an auto-generated ephemeral key would not survive restarts and would diverge across
       // replicas. Set PSP_OAUTH_KEY_AUTO_GENERATE=true to explicitly opt into ephemeral generation in
       // production anyway (e.g. single-replica deployments without KMS available yet).
       if (process.env.NODE_ENV !== 'production' || process.env.PSP_OAUTH_KEY_AUTO_GENERATE === 'true') {

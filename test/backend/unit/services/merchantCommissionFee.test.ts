@@ -1,9 +1,9 @@
 /**
- * Unit tests (v18 Item 1 — A-06/A-07): merchant commission fee.
+ * Unit tests (v18 Item 1: A-06/A-07): merchant commission fee.
  * Source: backend/src/modules/gateway/services/paymentExecution.service.ts (computeFee, resolveMerchantFee)
  *
  * computeFee is the single source of the commission calculation (DRY) reused by BOTH the payout
- * execution path (SD-65) and the runtime acquiring card-payment path (SD-254). resolveMerchantFee
+ * execution path and the runtime acquiring card-payment path . resolveMerchantFee
  * turns the merchant's CURRENT rate into the gross/net/fee triple an execution is born with, so the
  * stored amounts and the balance movements can never disagree.
  */

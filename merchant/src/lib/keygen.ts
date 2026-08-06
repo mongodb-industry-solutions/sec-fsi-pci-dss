@@ -1,5 +1,5 @@
 /**
- * Standalone ES256 key generator/downloader (v25) — a developer convenience in the merchant profile.
+ * Standalone ES256 key generator/downloader (v25): a developer convenience in the merchant profile.
  *
  * IMPORTANT: these are THROWAWAY keys, distinct from the login credential in `authenticator.ts`. They are
  * generated EXTRACTABLE on purpose so they can be exported/downloaded (JWK/PEM), are NOT stored in the

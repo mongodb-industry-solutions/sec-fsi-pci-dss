@@ -7,8 +7,8 @@ export const CONSENT_AGREEMENT_COLLECTION = 'consentAgreement';
 
 export interface ConsentAgreementRecord {
   consentAgreementInstanceReference: string;           // PK, UUID
-  partyInstanceReference: string;                      // FK to party (SD-13)
-  customerAgreementInstanceReference: string;          // FK to customerAgreementProcedure (SD-53)
+  partyInstanceReference: string;                      // FK to party 
+  customerAgreementInstanceReference: string;          // FK to customerAgreementProcedure 
   consentGrantorRole: string;                          // always 'customer' for self-grant
   consentRecipientIdentifier: string;                  // TPP system identifier
   consentScopeGrants: ConsentScope[];

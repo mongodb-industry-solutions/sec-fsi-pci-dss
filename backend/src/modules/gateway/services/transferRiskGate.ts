@@ -1,4 +1,4 @@
-// v17.1 (G4c): pre-initiation risk gate for bank transfers (BIAN SD-63/83/99).
+// v17.1 (G4c): pre-initiation risk gate for bank transfers (/83/99).
 // Runs FDS (fraud), HRP (sanctions) and AML monitoring through their providers BEFORE any funds
 // move or any rail is engaged, and returns a hard block decision. Shared by the bank-transfer and
 // P2P flows (DRY). Sanctions match and an FDS block recommendation are hard blocks; a high/critical

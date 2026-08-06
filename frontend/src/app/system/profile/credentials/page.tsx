@@ -1,5 +1,5 @@
 'use client';
-// "Passwordless credentials / security keys" — the user's enrolled authenticators (WebAuthn-style).
+// "Passwordless credentials / security keys": the user's enrolled authenticators (WebAuthn-style).
 // Self-scoped (the caller's own `sub`). Enroll generates a real ECDSA P-256 key pair in the browser with
 // a NON-EXTRACTABLE private key stored in IndexedDB; only the public key is sent to the server. Revoke
 // forces re-enrollment; rotate replaces the key. Revoking a credential removes it from the passwordless
@@ -109,7 +109,7 @@ export default function PasswordlessCredentialsPage() {
         icon={KeyRound}
         title="Credentials"
         description="Security keys registered on your devices for passwordless (CIBA) sign-in. Your private key never leaves this device."
-        debugInfo="SD-91/SD-16 · partyEnrolledCredential · WebAuthn/FIDO2 · CIBA · NIST SP 800-63B AAL1 · PCI DSS Req 8"
+        debugInfo="partyEnrolledCredential · WebAuthn/FIDO2 · CIBA · NIST SP 800-63B AAL1 · PCI DSS"
       />
 
       <div className="bg-white rounded-xl border p-5 space-y-3">

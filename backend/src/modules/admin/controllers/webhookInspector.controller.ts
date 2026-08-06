@@ -38,7 +38,7 @@ function authorized(authHeader: string | undefined): boolean {
 
 export async function webhookInspectorController(fastify: FastifyInstance) {
 
-  // ANY /webhook/hook — public catch-all receiver
+  // ANY /webhook/hook: public catch-all receiver
   fastify.route({
     method: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'],
     url: '/hook',
@@ -70,7 +70,7 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
     },
   });
 
-  // GET /webhook/stream — SSE, admin only; replays buffer on connect
+  // GET /webhook/stream: SSE, admin only; replays buffer on connect
   fastify.get('/stream', {
     schema: {
       tags: ['admin'],
@@ -85,7 +85,7 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
     const raw = beginSSE(reply, request);
     // Disable Nagle's algorithm: send each small SSE frame immediately instead of
     // coalescing it. Without this, a lone event can sit in the TCP/socket buffer
-    // until the next write — the reason new requests only appeared after a manual
+    // until the next write: the reason new requests only appeared after a manual
     // reconnect (which replays the whole buffer at once).
     raw.socket?.setNoDelay(true);
     raw.flushHeaders();
@@ -110,7 +110,7 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
     request.raw.on('close', cleanup);
   });
 
-  // DELETE /webhook/requests — clear buffer, admin only
+  // DELETE /webhook/requests: clear buffer, admin only
   fastify.delete('/requests', {
     schema: {
       tags: ['admin'],
@@ -127,7 +127,7 @@ export async function webhookInspectorController(fastify: FastifyInstance) {
     return reply.send({ cleared: true });
   });
 
-  // DELETE /webhook/requests/:id — remove single entry, admin only
+  // DELETE /webhook/requests/:id, remove single entry, admin only
   fastify.delete<{ Params: { id: string } }>('/requests/:id', {
     schema: {
       tags: ['admin'],

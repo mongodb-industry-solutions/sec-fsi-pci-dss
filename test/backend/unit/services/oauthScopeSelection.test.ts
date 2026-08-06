@@ -1,5 +1,5 @@
 /**
- * Unit tests: OAuth granular consent — scope selection + validation (v18 Fase E, E-04)
+ * Unit tests: OAuth granular consent, scope selection + validation (v18 Fase E, E-04)
  * Source: backend/src/modules/identity/services/oauth.service.ts
  *         backend/src/modules/gateway/services/merchantOAuth.service.ts
  */

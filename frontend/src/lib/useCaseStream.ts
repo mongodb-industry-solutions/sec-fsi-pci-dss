@@ -12,7 +12,7 @@ export interface CaseStreamEvent {
 
 // ADR-031: subscribe to a case's live event stream (SSE) so the investigation view updates without a
 // manual refresh (e.g. when a customer answers a question). Uses fetch + ReadableStream rather than
-// EventSource so the normal Bearer header is sent (no token in the URL; PCI DSS Req 4). Auto-reconnects
+// EventSource so the normal Bearer header is sent (no token in the URL; PCI DSS). Auto-reconnects
 // with backoff while mounted; aborts on unmount.
 export function useCaseStream(caseId: string | undefined, token: string, onEvent: (e: CaseStreamEvent) => void) {
   const cb = useRef(onEvent);

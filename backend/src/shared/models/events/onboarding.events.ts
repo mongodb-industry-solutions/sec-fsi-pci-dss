@@ -1,5 +1,5 @@
 // Bus payload contracts for `customer_onboarding` (KYC, §7.4) and `merchant_onboarding` (KYB, §7.5).
-// correlationId = customerReference (KYC) / merchantReference (KYB). Metadata only — never PII/images.
+// correlationId = customerReference (KYC) / merchantReference (KYB). Metadata only, never PII/images.
 
 // ── customer_onboarding (KYC) ────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@
 export interface ProfileValidationRequested {
   partyName?: string;
   country?: string;                         // ISO-3166
-  documentType?: string;                    // metadata only — never document images/PII
+  documentType?: string;                    // metadata only, never document images/PII
 }
 
 /**
@@ -44,7 +44,7 @@ export interface ProfileValidationCompleted {
 /**
  * @event    kyc.screening.requested
  * @producer psp.core (bridge from profile.validation.completed)  @consumer HRP Screening Provider
- * v27: high-risk-party screening for a customer, dispatched through the Integration Hub (SD-193).
+ * v27: high-risk-party screening for a customer, dispatched through the Integration Hub .
  */
 export interface KycScreeningRequested {
   partyInstanceReference: string;
@@ -105,7 +105,7 @@ export interface MerchantValidationCompleted {
   reason?: string;
 }
 
-// ── v31 KYB onboarding event chain (§5bis) — mirrors the KYC screening pattern, events only ─────────
+// ── v31 KYB onboarding event chain (§5bis): mirrors the KYC screening pattern, events only ─────────
 
 /**
  * @event    kyb.screening.requested

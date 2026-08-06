@@ -10,14 +10,14 @@ import {
 /**
  * ADR-036 (FS-first): the OAuthKeyProvider (local filesystem or AWS KMS) is the single
  * source of truth for key material. The partyAuthenticationKey collection is an audit
- * mirror — it records who rotated a key and when, and drives the admin dashboard listing.
+ * mirror: it records who rotated a key and when, and drives the admin dashboard listing.
  * It is NEVER read to verify tokens or to build the JWKS; those come from the provider.
  */
 
 let _provider: OAuthKeyProvider | null = null;
 
 export function getOAuthKeyProvider(): OAuthKeyProvider {
-  if (!_provider) throw new Error('OAuthKeyProvider not initialised — call initOidcKeys() at startup');
+  if (!_provider) throw new Error('OAuthKeyProvider not initialised: call initOidcKeys() at startup');
   return _provider;
 }
 

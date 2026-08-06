@@ -25,7 +25,7 @@ const FUNDS_DEBIT_TYPES = new Set(['purchase', 'cash_advance', 'fee']);
 
 // Provider Group reactors: each subscribes to a provider category's `*.requested` event, performs the
 // outbound call (the only place dispatchProvider runs for these flows), and publishes the matching
-// `*.completed`. This makes the payment-authorization gates bus-driven — the orchestrator only emits
+// `*.completed`. This makes the payment-authorization gates bus-driven: the orchestrator only emits
 // requests; the actual provider call is a reaction to the bus. Card data (`chd`) is decrypted here,
 // just-in-time, only by the card-issuer reactor; plaintext never returns to the bus.
 
@@ -41,11 +41,11 @@ export class ProviderGroups {
     // VOP is dispatched synchronously via dispatchProvider in the RTP screening flow (never emitted on
     // the bus), so there is intentionally NO 'vop.verification.requested' subscription here.
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
-    // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
+    // v27 Phase 6: KYC/HRP customer screening (->). A customer profile validation
     // completing triggers a re-screen; the request event is a first-class Integration Hub gate.
     this.bus.subscribe('profile.validation.completed', (e) => this.onProfileValidated(e));
     this.bus.subscribe('kyc.screening.requested', (e) => this.onKycScreening(e));
-    // v31 KYB onboarding chain (§5bis): bridge + entity screening reactors. Fan-out is events-only —
+    // v31 KYB onboarding chain (§5bis): bridge + entity screening reactors. Fan-out is events-only,
     // every provider is reached via dispatchProvider, so the built-in engine is swappable for an
     // external vendor with zero reactor change. correlationId = merchantAgreementInstanceReference.
     this.bus.subscribe('merchant.validation.requested', (e) => this.onMerchantValidated(e));
@@ -196,7 +196,7 @@ export class ProviderGroups {
     }));
   }
 
-  // v17 funds-availability gate (SD-36 AIS). Resolves the funding account from the card token, reads
+  // v17 funds-availability gate (AIS). Resolves the funding account from the card token, reads
   // the balance via the account_information capability (provider-indifferent: built-in module reads the
   // internal ledger, an external PSD2 AIS substitutes it), converts the amount to the account currency
   // (FX), and performs the ATOMIC hold. The hold ($gte-conditional $inc) is the authoritative decision:
@@ -214,7 +214,7 @@ export class ProviderGroups {
       bian: { serviceDomain: 'SD-36 Account Information', controlRecord: 'AccountInformationValidation' },
     }));
 
-    // Non-debit types (refund/balance_transfer/adjustment) never hold funds — the gate approves.
+    // Non-debit types (refund/balance_transfer/adjustment) never hold funds: the gate approves.
     if (!p.cardTransactionType || !FUNDS_DEBIT_TYPES.has(p.cardTransactionType)) {
       publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED });
       return;
@@ -222,7 +222,7 @@ export class ProviderGroups {
 
     // Resolve funding account from the card-on-file token. The internal funds gate ONLY governs cards
     // funded by a PSP-internal payout account (fundingPayoutAccountInstanceReference). A new/unsaved
-    // token or an external card has no internal funding account — its funds are the ISSUER's
+    // token or an external card has no internal funding account: its funds are the ISSUER's
     // responsibility (the card.issuer gate), so this gate passes through (approve, no hold).
     const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
       .findOne({ paymentCardReference: p.cardToken }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
@@ -318,7 +318,7 @@ export class ProviderGroups {
     let cardData: { cardNumber?: string; cvv?: string; expiry?: string } = {};
     if (p.chd) {
       try { cardData = await getChdCrypto().decrypt(p.chd, { correlationId: txnId, eventType: ISSUER_AAD_EVENT }); }
-      catch { /* tamper / AAD mismatch — send no CHD on the wire */ }
+      catch { /* tamper / AAD mismatch: send no CHD on the wire */ }
     }
 
     let decision: { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;

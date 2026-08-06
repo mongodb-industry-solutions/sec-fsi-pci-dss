@@ -16,7 +16,7 @@ function capabilityHref(providerType: string): string | null {
   return cap && cap !== 'generic' ? `/system/admin/providers/${cap}` : null;
 }
 
-// Derived from capabilities.ts — single source of truth; no manual sync needed.
+// Derived from capabilities.ts: single source of truth; no manual sync needed.
 const PROVIDER_TYPES = CAPABILITY_LIST.map((c) => c.providerType);
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(
   CAPABILITY_LIST.map((c) => [c.providerType, c.label])
@@ -195,7 +195,7 @@ export default function RoutingGroupsPage() {
         title="Groups"
         description="Provider categories. Built-in groups can be activated/deactivated; add custom groups for advanced routing."
         info="Each built-in group is a provider category (e.g. Fraud Detection). Open one to manage its providers. Built-in groups cannot be deleted; only deactivated. Custom groups add routing across multiple providers (strategy + members)."
-        debugInfo="BIAN SD-193 ExternalProviderArrangementPortfolio · built-in deactivate-only · custom = routing strategy + members · manager only"
+        debugInfo="ExternalProviderArrangementPortfolio · built-in deactivate-only · custom = routing strategy + members · manager only"
       />
 
       {/* Create */}

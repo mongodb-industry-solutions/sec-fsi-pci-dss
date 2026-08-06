@@ -14,8 +14,8 @@ export interface EscalationTokenEntry {
 // escalation is approved. They are issued as SIGNED JWTs (HS256) rather than stored in an
 // in-memory map, so they are STATELESS: they survive backend restarts, work across processes,
 // and need no server-side store. Validation is a signature + expiry check (synchronous), which
-// keeps the many call sites (role clients, transaction/customer reads) unchanged. PCI DSS Req 8
-// (authenticated, time-bound access) and Req 7 (need-to-know, case-scoped).
+// keeps the many call sites (role clients, transaction/customer reads) unchanged. PCI DSS
+// (authenticated, time-bound access) and (need-to-know, case-scoped).
 interface EscalationClaims extends jwt.JwtPayload {
   kind: 'escalation';
   caseId: string;

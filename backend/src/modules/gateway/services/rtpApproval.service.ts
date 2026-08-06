@@ -1,5 +1,5 @@
 // v28 RTP approval (in-app, authenticated payer; NO CIBA). Reuses the balance-aware P2P sequence:
-// funds check (AIS) → screening (FDS/HRP/AML + VoP) → hold → create SD-65 execution → dispatch
+// funds check (AIS) → screening (FDS/HRP/AML + VoP) → hold → create execution → dispatch
 // payment_initiation. Settlement (bank.transfer.settled/failed) is applied by PayoutOrchestrationProcess
 // (settleCardDebit + creditDirect), and projected back onto the request by RtpLifecycleProcess (F5).
 // The PSP holds no accounts and moves no money directly; every settlement is delegated to providers.
@@ -88,7 +88,7 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
   const held = await holdCardFunds(db, funding.payoutAccountInstanceReference, req.amount);
   if (!held) throw new RtpError('insufficient_funds', 'Insufficient available balance to approve this request', 422);
 
-  // 4. Create the SD-65 execution (source = payer, resolved = payee). sourcePayoutAccountReference
+  // 4. Create the execution (source = payer, resolved = payee). sourcePayoutAccountReference
   //    marks the P2P settlement path so PayoutOrchestrationProcess settles/credits both accounts.
   const executionRef = uuidv4();
   const now = new Date();

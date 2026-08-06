@@ -37,7 +37,7 @@ export default function ProductQrButton({ product }: { product: Product }) {
         </button>
       </Tip>
 
-      {/* Portal to <body>: the product card uses hover:-translate — a transformed ancestor would
+      {/* Portal to <body>: the product card uses hover:-translate, a transformed ancestor would
           become the containing block for this position:fixed overlay and collapse it to the card
           width on hover. Rendering at body level keeps it viewport-fixed. */}
       {(url || error) && typeof document !== 'undefined' && createPortal(

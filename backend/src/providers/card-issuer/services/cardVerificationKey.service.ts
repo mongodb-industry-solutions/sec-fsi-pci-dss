@@ -1,6 +1,6 @@
 // Card Verification Key (CVK) + per-card CVV derivation for the built-in card-issuer module.
 //
-// PCI DSS Req 3.2: the CVV/CVV2 is Sensitive Authentication Data and is NEVER stored (not in
+// PCI DSS: the CVV/CVV2 is Sensitive Authentication Data and is NEVER stored (not in
 // cleartext, not encrypted). A real issuer recomputes it inside an HSM from the card data plus a
 // secret issuer key. This module reproduces that model: the CVV is DERIVED on demand from
 // HMAC-SHA256(CVK, cardToken | expiryMMYY | serviceCode) and never persisted.

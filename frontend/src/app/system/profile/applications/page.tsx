@@ -1,5 +1,5 @@
 'use client';
-// v18 D-04/D-05/D-09 + v23: "Authorized Applications" — the user's connected apps (GitHub/Google style).
+// v18 D-04/D-05/D-09 + v23: "Authorized Applications", the user's connected apps (GitHub/Google style).
 // Lists the merchant apps the user authorized via OIDC: logo, name, approval date/time, scope summary,
 // last use and status. Self-scoped (the caller's own `sub`). Search + status filter + pagination.
 // Revoke is a SOFT action: a revoked app stays listed so the user can still review its past data and
@@ -133,7 +133,7 @@ export default function AuthorizedApplicationsPage() {
         icon={Layers}
         title="Authorized Applications"
         description="Apps and merchants you have authorized to access your account via OIDC. Review activity, revoke, or re-approve access at any time."
-        debugInfo="SD-16 · ConsentGrant · OAuth 2.0 / OIDC · PCI DSS Req 7 (least privilege) · soft-revoke (audit) · self-scoped (sub)"
+        debugInfo="ConsentGrant · OAuth 2.0 / OIDC · PCI DSS (least privilege) · soft-revoke (audit) · self-scoped (sub)"
       />
 
       {/* Filters + search */}

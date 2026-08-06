@@ -738,7 +738,7 @@ export async function adminController(fastify: FastifyInstance) {
   // POST /admin/reload
   // Hot-reload the DB runtime IN-PROCESS (no restart): reloads .env, rebuilds the Queryable
   // Encryption client + event bus/subscribers against a fresh connection. Use this after a
-  // drop + setup:db + seed on servers that cannot be restarted — it picks up the new key
+  // drop + setup:db + seed on servers that cannot be restarted, it picks up the new key
   // vault / DEKs and fixes "not all keys requested were satisfied" without exiting the process.
   // Cross-platform (pure Node). Independent of /admin/restart.
   fastify.post('/reload', {
@@ -773,7 +773,7 @@ export async function adminController(fastify: FastifyInstance) {
     }
 
     const startedIso = new Date().toISOString();
-    appendLog(`[admin] command "reload" — hot-reload runtime (in-process, no restart) @ ${startedIso}`);
+    appendLog(`[admin] command "reload": hot-reload runtime (in-process, no restart) @ ${startedIso}`);
     appendLog(`[admin] reload requested from ${ip}`);
     try {
       const { steps } = await reloadDbRuntime(fastify);
@@ -781,7 +781,7 @@ export async function adminController(fastify: FastifyInstance) {
       appendLog('[admin] command "reload" finished OK (login/QE now use the current key vault)');
       return reply.send({
         ok: true,
-        message: 'Runtime reloaded — .env + QE client + event bus rebuilt.',
+        message: 'Runtime reloaded, .env + QE client + event bus rebuilt.',
         steps,
       });
     } catch (err) {

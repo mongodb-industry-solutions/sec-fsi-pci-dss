@@ -21,7 +21,7 @@ const TYPE_META: Record<string, { label: string; icon: typeof Bell; tone: string
 };
 
 // ADR-031: full notifications list (read + unread) with search + type/status filter + pagination.
-// Clicking a notification marks it read (immutable history is kept). Scoped to the caller (Req 7).
+// Clicking a notification marks it read (immutable history is kept). Scoped to the caller .
 export default function NotificationsPage() {
   const [token, setToken] = useState('');
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -84,7 +84,7 @@ export default function NotificationsPage() {
         icon={Bell}
         title="Notifications"
         description="Items that need your attention and updates on your transactions."
-        debugInfo="ADR-031 · BIAN SD-83 · PCI DSS Req 7 (own-data) / Req 10 (traceable)"
+        debugInfo="ADR-031 · PCI DSS (own-data) / (traceable)"
         actions={unread > 0 ? (
           <button onClick={readAll} className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
             <CheckCheck size={14} /> Mark all read

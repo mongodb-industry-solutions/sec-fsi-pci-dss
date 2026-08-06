@@ -184,7 +184,7 @@ export default function AuditPage() {
             icon={BarChart3}
             title="Audit Log"
             description="Immutable event trail across all fraud cases and business processes."
-            debugInfo="BIAN SD-16 (append-only events) · PCI DSS Req 10 (logging & monitoring) · ADR-025 (businessProcessEvent timeseries)"
+            debugInfo="(append-only events) · PCI DSS (logging & monitoring) · ADR-025 (businessProcessEvent timeseries)"
           />
         </div>
 
@@ -343,7 +343,7 @@ export default function AuditPage() {
               </p>
             </div>
             <div className="bg-white border rounded-xl p-4">
-              <p className="font-semibold text-gray-700 mb-1">PCI DSS Req 10</p>
+              <p className="font-semibold text-gray-700 mb-1">PCI DSS</p>
               <p className="text-gray-500 text-xs">
                 This audit trail satisfies Requirement 10: track and monitor all access to network
                 resources and cardholder data. Timestamp, role, and action type are recorded for

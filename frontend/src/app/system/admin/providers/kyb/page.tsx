@@ -6,7 +6,6 @@ export default function KybBusinessPage() {
       type: 'kyb_business',
       label: 'KYB / Business',
       description: 'Merchant business entity verification (KYB)',
-      bianSd: 'SD-89',
     }} />
   );
 }

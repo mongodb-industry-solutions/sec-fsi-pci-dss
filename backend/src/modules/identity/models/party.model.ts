@@ -1,4 +1,4 @@
-// BIAN SD-13: Party Data Management
+// Party Data Management
 // CR: Party
 // Authoritative identity record for any principal (customer, bank staff, external party).
 // All other SDs reference this via partyInstanceReference. No credentials here.
@@ -15,9 +15,9 @@ export interface PartyTransferPreferences {
   requireConfirmationAboveCurrency?: string; // ISO 4217
 }
 
-// BIAN SD-13 Party Reference Data — postal contact point. Applies uniformly to any party
+// Party Reference Data: postal contact point. Applies uniformly to any party
 // type (customer or employee). PII under GDPR; stored plaintext for display (same posture as
-// partyName / partyDateOfBirth in this record — this is not PCI-scoped card data).
+// partyName / partyDateOfBirth in this record: this is not PCI-scoped card data).
 export interface PartyPostalAddress {
   line1: string;
   line2?: string;
@@ -34,7 +34,7 @@ export interface PartyControlRecord {
   // is also absent and the (partial) unique index skips the document. See createIndexes.ts.
   partyMobilePhoneNumber?: string;
   // Blind index: keyed HMAC of the normalized phone (NOT encrypted). Enforces phone
-  // uniqueness via a plaintext partial unique index — QE fields cannot have unique indexes.
+  // uniqueness via a plaintext partial unique index: QE fields cannot have unique indexes.
   // Derived from partyMobilePhoneNumber; never set by clients directly. See digest.ts.
   partyMobilePhoneNumberDigest?: string;
   // QE:substring (v27): analysts run "contains" searches over the encrypted name.
@@ -46,10 +46,10 @@ export interface PartyControlRecord {
   partyNationality?: string;
   // QE:equality (v27, contention): searchable place of birth (city).
   partyPlaceOfBirth?: string;
-  // QE:equality: SD-13 sex/gender demographic (KYC profile). GDPR PII, so encrypted at rest
+  // QE:equality: sex/gender demographic (KYC profile). GDPR PII, so encrypted at rest
   // like the other demographics. Optional; 'unspecified' when not declared (data minimization).
   partySex?: PartySex;
-  partyPostalAddress?: PartyPostalAddress;  // SD-13 postal contact point (customer + employee)
+  partyPostalAddress?: PartyPostalAddress;  // postal contact point (customer + employee)
   // v17: inbound transfer preferences and sender block list
   partyTransferPreferences?: PartyTransferPreferences;
   bianServiceDomain: 'Party Data Management';

@@ -6,7 +6,6 @@ export default function CreditBureauPage() {
       type: 'credit_bureau',
       label: 'Credit Bureau',
       description: 'Credit scoring and bureau checks',
-      bianSd: 'SD-83',
     }} />
   );
 }

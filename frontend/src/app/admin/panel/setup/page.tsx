@@ -42,7 +42,7 @@ const COMMANDS: CommandDef[] = [
 ];
 
 // ---------------------------------------------------------------------------
-//  Module-level store — persists across tab switches (mount/unmount)
+//  Module-level store: persists across tab switches (mount/unmount)
 // ---------------------------------------------------------------------------
 
 interface SetupStore {
@@ -101,7 +101,7 @@ async function _runCommand(commandId: string) {
   // Hot-reload is an in-process action (not a spawned script): plain JSON POST, no SSE stream.
   if (commandId === 'reload') {
     try {
-      _pushLog({ type: 'start', text: '$ reload — hot-reload runtime (.env + QE client + event bus), no restart' });
+      _pushLog({ type: 'start', text: '$ reload, hot-reload runtime (.env + QE client + event bus), no restart' });
       const res = await fetch(`${API_BASE_URL}/api/v1/admin/reload`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -112,7 +112,7 @@ async function _runCommand(commandId: string) {
       if (res.ok) {
         for (const step of body.steps ?? []) _pushLog({ type: 'log', text: `• ${step}` });
         _pushLog({ type: 'log', text: body.message ?? 'Runtime reloaded.' });
-        _pushLog({ type: 'done', text: 'Done — exit code 0' });
+        _pushLog({ type: 'done', text: 'Done, exit code 0' });
         _update({ commandStatus: 'success' });
       } else {
         _pushLog({ type: 'error', text: body.error ?? 'Reload failed' });

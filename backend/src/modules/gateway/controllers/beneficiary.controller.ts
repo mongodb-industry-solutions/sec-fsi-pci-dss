@@ -1,4 +1,4 @@
-// BIAN SD-54: Counterparty Administration + SD-65: P2P Payment Execution — dual-auth REST controller.
+// Counterparty Administration + P2P Payment Execution, dual-auth REST controller.
 // Routes mounted at /beneficiaries → /api/v1/beneficiaries
 //
 // Two authentication channels on ONE capability surface (v23, no separate /merchant/* tree):
@@ -6,7 +6,7 @@
 //   · third-party merchant (OAuth on-behalf-of: read:beneficiaries / write:beneficiaries / write:transfers).
 //     Owner is derived from token.sub (subject binding); responses are display-safe (masked hint,
 //     opaque arrangement reference, NEVER counterpartyPartyReference or the raw lookup value).
-// PCI DSS Req 7 (least privilege) · Req 10 (P2P transfer audit trail) · GDPR minimisation.
+// PCI DSS (least privilege) (P2P transfer audit trail) · GDPR minimisation.
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
@@ -34,7 +34,7 @@ function getUser(request: unknown): JwtUserPayload | undefined {
 
 // Display-safe projection for the OAuth (merchant) channel: only the opaque arrangement reference,
 // owner label, lookup type, masked hint and status. NEVER leak counterpartyPartyReference (PSP-internal
-// identity) or the raw lookup value (GDPR minimisation, SD-54 design).
+// identity) or the raw lookup value (GDPR minimisation, design).
 function safeBeneficiary(b: CounterpartyArrangement) {
   return {
     counterpartyArrangementReference: b.counterpartyArrangementReference,
@@ -59,7 +59,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
 
   // Payee standing data is a payment-diversion fraud vector, so every change to it is auditable:
   // who, when, through which channel, on whose list (PSD2 Art. 13 RTS trusted beneficiaries,
-  // AMLD Art. 40 record keeping, PCI DSS Req 10.2.1). Values stay masked.
+  // AMLD Art. 40 record keeping, PCI DSS). Values stay masked.
   const emitLifecycle = (
     action: 'beneficiary.registered' | 'beneficiary.relabelled' | 'beneficiary.removed',
     args: {
@@ -86,7 +86,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     });
   };
 
-  // ── GET /beneficiaries (+ /:ownerRef) — list a party's beneficiaries ──────────────────────────
+  // ── GET /beneficiaries (+ /:ownerRef), list a party's beneficiaries ──────────────────────────
   // Session: staff list all (optional filters), customer auto-scoped to own; full records.
   // OAuth: owner from token.sub, display-safe projection. Scope read:beneficiaries.
   const listHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -137,7 +137,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
         ...(q.caseRef ? { caseRef: q.caseRef } : {}),
         status: q.status, page: q.page, limit: q.limit,
       });
-      // One compliance event per record surfaced (PCI DSS Req 10.2.2).
+      // One compliance event per record surfaced (PCI DSS).
       for (const b of results) {
         emitComplianceEvent(fastify.db, {
           entityType: 'beneficiary', entityId: b.counterpartyArrangementReference,
@@ -191,7 +191,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     schema: listSchema(false),
   }, listHandler);
 
-  // GET /api/v1/beneficiaries/aggregates — counts and distributions, no identifiers. ADR-048.
+  // GET /api/v1/beneficiaries/aggregates: counts and distributions, no identifiers. ADR-048.
   fastify.get('/aggregates', {
     preHandler: requirePermission('beneficiaries', 'view'),
     schema: {
@@ -212,7 +212,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     },
   }, async (_request, reply) => reply.send(await getBeneficiaryAggregates(fastify.db)));
 
-  // GET /api/v1/beneficiaries/by-ref/:beneficiaryRef — staff single-record lookup (must precede /:ownerRef).
+  // GET /api/v1/beneficiaries/by-ref/:beneficiaryRef, staff single-record lookup (must precede /:ownerRef).
   fastify.get('/by-ref/:beneficiaryRef', {
     preHandler: requirePermission('beneficiaries', 'view'),
     schema: {
@@ -238,7 +238,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     schema: listSchema(true),
   }, listHandler);
 
-  // GET /api/v1/beneficiaries/:ownerRef/:beneficiaryRef — staff single-arrangement view.
+  // GET /api/v1/beneficiaries/:ownerRef/:beneficiaryRef, staff single-arrangement view.
   fastify.get('/:ownerRef/:beneficiaryRef', {
     preHandler: requirePermission('beneficiaries', 'view'),
     schema: {
@@ -262,7 +262,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     return reply.send(record);
   });
 
-  // PATCH /api/v1/beneficiaries/:ownerRef/:beneficiaryRef — update label/alias (staff/customer).
+  // PATCH /api/v1/beneficiaries/:ownerRef/:beneficiaryRef, update label/alias (staff/customer).
   fastify.patch('/:ownerRef/:beneficiaryRef', {
     preHandler: requirePermission('beneficiaries', 'manage'),
     schema: {
@@ -296,7 +296,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     return reply.send(updated);
   });
 
-  // ── POST /beneficiaries (+ /:ownerRef) — add a beneficiary by phone/email lookup ────────────────
+  // ── POST /beneficiaries (+ /:ownerRef), add a beneficiary by phone/email lookup ────────────────
   // Anti-enumeration: registerBeneficiary returns a neutral result for not-found/duplicate.
   // OAuth: owner from token.sub, display-safe result. Scope write:beneficiaries.
   const createHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -358,7 +358,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     schema: createSchema(true),
   }, createHandler);
 
-  // ── DELETE /beneficiaries/:beneficiaryRef (+ /:ownerRef/:beneficiaryRef) — soft-delete ──────────
+  // ── DELETE /beneficiaries/:beneficiaryRef (+ /:ownerRef/:beneficiaryRef), soft-delete ──────────
   const removeHandler = async (request: FastifyRequest, reply: FastifyReply) => {
     const { ownerRef, beneficiaryRef } = request.params as { ownerRef?: string; beneficiaryRef: string };
     const owner = await resolveOwner(request, reply, ownerRef);
@@ -395,7 +395,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
   }, removeHandler);
 
   // ── POST /beneficiaries/:beneficiaryRef/transfer (+ /:ownerRef/:beneficiaryRef/transfer) ─────────
-  // Send money to a saved beneficiary — P2P transfer (SD-65). The merchant supplies only an amount,
+  // Send money to a saved beneficiary: P2P transfer . The merchant supplies only an amount,
   // the opaque arrangement reference, an optional source account and note (no CHD, no IBAN); the PSP
   // resolves the recipient and (when omitted) the default source account server-side.
   const transferHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -430,13 +430,13 @@ export async function beneficiaryController(fastify: FastifyInstance) {
       fromAccountRef,
       amount: body.amount,
       note: body.note,
-      // SD-89: stamp the initiating merchant so a merchant-originated send is visible only in that
+      // stamp the initiating merchant so a merchant-originated send is visible only in that
       // merchant's history. Absent for first-party sends.
       ...(oauth ? { merchantAgreementReference: request.merchantContext?.merchantId } : {}),
     });
 
     if (oauth) {
-      // Attribute the merchant-originated action (SD-16 audit, PCI DSS Req 10).
+      // Attribute the merchant-originated action (audit, PCI DSS).
       emitProcessEvent(fastify.db, {
         entityType: 'execution', entityId: result.transferReference || beneficiaryRef,
         processType: 'payment_processing', processAction: 'merchant.beneficiary.send',
@@ -446,7 +446,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
         bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
         attribution: attributionFromMerchantContext(request.merchantContext),
       });
-      // Display-safe result — no recipient account/party identity leaked to the merchant.
+      // Display-safe result, no recipient account/party identity leaked to the merchant.
       const safe = {
         transferReference: result.transferReference,
         amount: result.amount,
@@ -466,7 +466,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
 
   const transferSchema = (withOwner: boolean) => ({
     tags: ['beneficiaries'],
-    summary: 'Send money to a beneficiary — P2P transfer (SD-65, session RBAC or OAuth write:transfers)',
+    summary: 'Send money to a beneficiary, P2P transfer (SD-65, session RBAC or OAuth write:transfers)',
     security: [{ bearerAuth: [] }],
     params: withOwner
       ? { type: 'object', required: ['ownerRef', 'beneficiaryRef'], properties: { ownerRef: { type: 'string' }, beneficiaryRef: { type: 'string' } } }

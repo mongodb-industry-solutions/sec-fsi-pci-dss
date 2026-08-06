@@ -6,7 +6,6 @@ export default function HrpSanctionsPage() {
       type: 'hrp_sanctions',
       label: 'HRP / Sanctions',
       description: 'High-risk person and sanctions list screening',
-      bianSd: 'SD-13',
     }} />
   );
 }

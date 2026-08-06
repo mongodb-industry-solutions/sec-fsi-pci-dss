@@ -1,6 +1,6 @@
 'use client';
-// Unified beneficiary action modal (v28). One component drives BOTH "Send money" (P2P, SD-65) and
-// "Request money" (RTP, SD-65 intent) so the two flows share an identical, simplified UI. The row only
+// Unified beneficiary action modal (v28). One component drives BOTH "Send money" (P2P) and
+// "Request money" (RTP, intent) so the two flows share an identical, simplified UI. The row only
 // shows a compact button; all data capture happens in a modal (portalled to <body> to escape any
 // transformed ancestor). Reuses the existing server actions and the PSP API only.
 //
@@ -97,7 +97,7 @@ export default function BeneficiaryPayModal({
             {beneficiaryLabel && <p className="mb-3 text-sm text-muted">To <span className="font-medium text-ink">{beneficiaryLabel}</span></p>}
 
             {done ? (
-              /* Confirmation state — identical for send and request. Only Repeat / Close. */
+              /* Confirmation state: identical for send and request. Only Repeat / Close. */
               <div className="space-y-4">
                 <div className="flex flex-col items-center gap-2 py-2 text-center">
                   <CheckCircle2 className="h-10 w-10 text-leaf-deep" aria-hidden />

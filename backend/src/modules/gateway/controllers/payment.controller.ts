@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order + SD-65: Payment Execution  -  REST controller
+// Payment Order + Payment Execution  -  REST controller
 // Routes mounted at /gateway/payments → /api/v1/gateway/payments
 
 import { FastifyInstance } from 'fastify';
@@ -26,7 +26,7 @@ export async function paymentController(fastify: FastifyInstance) {
 
   // POST /api/v1/gateway/payments
   // Item 2 (v18): SERVER-TO-SERVER merchant charge. Authenticated with the merchant's OAuth
-  // client_credentials token (RS256, scope write:payments) — NOT a user session (HS256) and NOT the
+  // client_credentials token (RS256, scope write:payments), NOT a user session (HS256) and NOT the
   // user authorization_code token. `skipAuth` bypasses the global HS256 preHandler; validateMerchantToken
   // verifies the machine token in-handler and resolves the acquiring merchant, so the charge is always
   // attributed to that merchant and the commission fee (Item 1) is applied to it. No CHD ever reaches the
@@ -35,12 +35,12 @@ export async function paymentController(fastify: FastifyInstance) {
     config: { skipAuth: true },
     schema: {
       tags: ['gateway'],
-      summary: 'Create a payment order (SD-64) — server-to-server merchant charge',
+      summary: 'Create a payment order (SD-64), server-to-server merchant charge',
       description: `Creates a \`paymentOrder\` (BIAN SD-64) with initial status \`initiated\`.
 
 **Idempotency:** The \`X-Idempotency-Key\` header is **required**. _(v5: duplicate-key detection and 409 enforcement are not yet implemented in this prototype.)_
 
-**Payment lifecycle (SD-64 state machine):**
+**Payment lifecycle (state machine):**
 \`\`\`
 initiated → confirmed → authorized → captured → settled
                                  → voided
@@ -48,7 +48,7 @@ initiated → confirmed → authorized → captured → settled
                                               → refunded
 \`\`\`
 
-**SD-65 routing:** On \`/authorize\`, the Payment Execution service selects a processor and records the routing decision.
+**routing:** On \`/authorize\`, the Payment Execution service selects a processor and records the routing decision.
 
 **Fraud evaluation:** Authorization triggers \`shared/services/fraudTrigger\`  -  a \`fraudDiagnosisCase\` is opened automatically if the amount or MCC meets the risk criteria.
 
@@ -75,7 +75,7 @@ initiated → confirmed → authorized → captured → settled
           amount: { type: 'number', description: 'Payment amount in the specified currency.' },
           currency: { type: 'string', description: 'ISO 4217 three-letter currency code.' },
           paymentOrderDescription: { type: 'string', description: 'Optional human-readable description.' },
-          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only — the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
+          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only, the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
         },
       },
       response: {
@@ -124,7 +124,7 @@ initiated → confirmed → authorized → captured → settled
       return reply.status(403).send({ error: 'access_denied', error_description: 'merchantAgreementInstanceReference does not match the authenticated client' });
     }
 
-    // SD-64: persist the payment order (idempotent on X-Idempotency-Key).
+    // persist the payment order (idempotent on X-Idempotency-Key).
     const order = await createPaymentOrder(fastify.db, {
       merchantAgreementInstanceReference: merchantId,
       paymentOrderMerchantReference: body.paymentOrderMerchantReference,
@@ -134,8 +134,8 @@ initiated → confirmed → authorized → captured → settled
       idempotencyKey,
     });
 
-    // Charge a TOKENISED card server-side (PCI DSS Req 3: no PAN/CVV in the merchant; the PSP holds the
-    // token). The card transaction (SD-254) carries the acquiring merchant reference, so completeAuthorized
+    // Charge a TOKENISED card server-side (PCI DSS: no PAN/CVV in the merchant; the PSP holds the
+    // token). The card transaction carries the acquiring merchant reference, so completeAuthorized
     // applies the commission fee (Item 1) and the merchant dashboard revenue reflects this API payment.
     const apiChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
     // v18 attribution: if the merchant forwarded the acting user's subject, resolve it to the payer's
@@ -163,7 +163,7 @@ initiated → confirmed → authorized → captured → settled
         merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'api_payment', merchantReference: body.paymentOrderMerchantReference, paymentOrderInstanceReference: order.paymentOrderInstanceReference },
       });
-      // Attribute the merchant-originated charge (SD-16 audit, PCI DSS Req 10).
+      // Attribute the merchant-originated charge (audit, PCI DSS).
       // Base attribution from the machine token (clientId + merchant). When the merchant forwarded an
       // acting user, override actingPartyReference with the user's OAuth subject so the charge lines up
       // with the self-scoped operations view (which matches on the subject).
@@ -178,7 +178,7 @@ initiated → confirmed → authorized → captured → settled
           ? { ...baseAttribution, ...(body.actingSubjectReference && { actingPartyReference: body.actingSubjectReference }) }
           : undefined,
       });
-      // Persist the SD-64 status transition so GET /gateway/payments/:id agrees with this response
+      // Persist the status transition so GET /gateway/payments/:id agrees with this response
       // (the order was created as 'initiated'). Fall back to the returned status if already advanced.
       const authorized = await authorizePaymentOrder(fastify.db, order.paymentOrderInstanceReference);
       return reply.status(201).send({ ...order, paymentOrderStatus: authorized?.paymentOrderStatus ?? 'authorized', cardTransactionInstanceReference: tx.cardTransactionInstanceReference });

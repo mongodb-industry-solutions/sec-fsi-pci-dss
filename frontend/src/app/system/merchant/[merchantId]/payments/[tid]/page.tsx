@@ -135,7 +135,7 @@ export default function MerchantTransactionDetailPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-start gap-2">
           <ShieldCheck size={14} className="text-blue-600 mt-0.5 shrink-0" />
           <p className="text-xs text-blue-700">
-            PCI DSS Req 3 &amp; 7 — Merchant acquiring view: only the masked PAN and card token are displayed. Full PAN, CVV, payer identity, and gateway payload are never exposed to the merchant.
+            PCI DSS &amp; 7: Merchant acquiring view: only the masked PAN and card token are displayed. Full PAN, CVV, payer identity, and gateway payload are never exposed to the merchant.
           </p>
         </div>
       )}
@@ -205,7 +205,7 @@ export default function MerchantTransactionDetailPage() {
           {debugMode && (
             <div className="mt-4 rounded-lg bg-gray-50 border border-gray-200 p-3">
               <p className="text-xs text-gray-500">
-                <strong>Data minimization:</strong> The card token is a surrogate identifier — not classified as CHD under PCI DSS v4.0. The full PAN, CVV/CVC, PIN, and cardholder identity are never exposed in the merchant view.
+                <strong>Data minimization:</strong> The card token is a surrogate identifier, not classified as CHD under PCI DSS v4.0. The full PAN, CVV/CVC, PIN, and cardholder identity are never exposed in the merchant view.
               </p>
             </div>
           )}
@@ -241,7 +241,7 @@ export default function MerchantTransactionDetailPage() {
         </div>
       </div>
 
-      {/* Security review — investigation status visible to the merchant */}
+      {/* Security review: investigation status visible to the merchant */}
       {caseInfo?.caseFound ? (() => {
         const caseStatus = caseInfo.fraudDiagnosisCaseStatus ?? '';
         const statusMeta = CASE_STATUS_DISPLAY[caseStatus] ?? { label: caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '●' };

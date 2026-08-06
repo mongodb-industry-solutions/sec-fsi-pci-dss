@@ -1,8 +1,8 @@
 // §8 / §7.8 CHD retention: the encrypted `chd` rides ONLY on card.issuer.validation.requested and is
 // kept temporarily + encrypted. When the journey reaches its terminal card.payment.authorization.
 // completed, the carrier's `chd` is purged in place ($unset) so SAD/CVV is never retained after
-// authorization (PCI Req 3.2); a periodic safety sweep purges abandoned carriers. This is a FIELD
-// $unset, never a document delete — the trail record is kept (CHD-free).
+// authorization (PCI DSS); a periodic safety sweep purges abandoned carriers. This is a FIELD
+// $unset, never a document delete: the trail record is kept (CHD-free).
 import { Db } from 'mongodb';
 import { EventBus, DomainEvent, DOMAIN_EVENT_COLLECTION } from '../../../vendors/eventbus';
 

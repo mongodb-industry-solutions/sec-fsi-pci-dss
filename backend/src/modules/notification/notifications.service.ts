@@ -64,7 +64,7 @@ export async function unreadCount(db: Db, partyRef: string): Promise<number> {
   return col(db).countDocuments({ recipientPartyReference: partyRef, notificationStatus: 'unread' });
 }
 
-// Mark one notification read (ownership-scoped by party, PCI DSS Req 7). Returns false if not found.
+// Mark one notification read (ownership-scoped by party, PCI DSS). Returns false if not found.
 export async function markRead(db: Db, id: string, partyRef: string): Promise<boolean> {
   const res = await col(db).updateOne(
     { notificationInstanceReference: id, recipientPartyReference: partyRef, notificationStatus: 'unread' },

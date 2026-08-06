@@ -1,6 +1,6 @@
-// HRP capability module controller — STATIC routes (ADR-029).
-//   POST /api/v1/modules/hrp/screen   — evaluate an individual (replaces old /integrations/hrp/screen)
-//   GET/PUT /api/v1/modules/hrp/config — admin config
+// HRP capability module controller: STATIC routes (ADR-029).
+//   POST /api/v1/modules/hrp/screen: evaluate an individual (replaces old /integrations/hrp/screen)
+//   GET/PUT /api/v1/modules/hrp/config: admin config
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { screenHrp, HrpConfig } from '../services/hrp.service';

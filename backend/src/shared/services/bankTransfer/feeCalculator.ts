@@ -1,4 +1,4 @@
-// v17.1 Bank Transfer — FeeCalculator: config-driven fee per rail (single source of truth).
+// v17.1 Bank Transfer: FeeCalculator: config-driven fee per rail (single source of truth).
 // SEPA is typically free, ACH low-flat, SWIFT cross-border + correspondent surcharge.
 // Pure and reusable; the fee schedule is injectable so an external provider can override it.
 

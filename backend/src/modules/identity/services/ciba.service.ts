@@ -93,7 +93,7 @@ export async function resolveHint(db: Db, hints: CibaHints): Promise<string> {
 
   // id_token_hint: per OIDC an ID Token MUST be signature-verified before its claims are trusted.
   // We only accept an ID token this provider issued, so verify it (RS256 + exp, by kid) via
-  // verifyAccessToken and take `sub` from the verified payload — never from an unverified blob.
+  // verifyAccessToken and take `sub` from the verified payload, never from an unverified blob.
   let sub: string | undefined;
   if (hints.id_token_hint) {
     let payload: { sub?: string };
@@ -399,7 +399,7 @@ export async function deliverBackchannelNotification(
       tokenLifetimeSeconds: client.tokenLifetimeSeconds,
       refreshTokenLifetimeDays: client.refreshTokenLifetimeDays,
     });
-    // Same audit event the polling token endpoint emits, so push delivery is not an audit gap (PCI Req 10).
+    // Same audit event the polling token endpoint emits, so push delivery is not an audit gap (PCI DSS).
     emitCibaEvent(db, req.customerAuthenticationInstanceReference, req.clientId, 'auth.ciba.token_issued', 'approved', { authReqId: req.authReqId, scopes: req.scopes, delivery: 'push' });
     Object.assign(data, tokens);
   }

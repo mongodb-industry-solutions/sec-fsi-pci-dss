@@ -1,9 +1,9 @@
-// Client-side card tokenization (PCI DSS Req 3 demo model).
+// Client-side card tokenization (PCI DSS demo model).
 //
 // In this system the browser is the tokenization boundary: the full PAN and the CVV are
 // validated here and NEVER leave the browser. Only the derived masked PAN and a surrogate token
 // are sent to the server. The CVV (sensitive authentication data, SAD) is used for validation
-// and then discarded; it is never transmitted or stored at any layer (PCI DSS Req 3.2).
+// and then discarded; it is never transmitted or stored at any layer (PCI DSS).
 
 export type CardNetwork = 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
 

@@ -9,7 +9,7 @@
  *   - the list counts parties with a COMPLETED KYC record (verified / rejected / expired),
  *   - `initiated` records are excluded, which is why the total is below the agreement count,
  *   - no employee party holds a customer agreement, so filtering by employee is structurally empty
- *     (BIAN SD-53: only a customer holds a CustomerAgreement), not broken,
+ *     (only a customer holds a CustomerAgreement), not broken,
  *   - the login-user population is a different, smaller set and must not be compared to this one.
  */
 import { describe, it, expect } from 'vitest';

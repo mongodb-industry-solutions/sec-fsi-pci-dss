@@ -1,4 +1,4 @@
-// Seeds the PSP's own revenue ledger: a party (SD-13) plus its payout account (SD-66).
+// Seeds the PSP's own revenue ledger: a party plus its payout account .
 // Merchant commissions are credited here at settlement, so the collected fee has a real holder
 // instead of existing only as a feeAmount field. No new collection and no new model: the PSP is a
 // party like any other, of type service_account (it is a system-owned account, never a customer).

@@ -2,7 +2,7 @@
  * Shared E2E helpers: JWT minting + role injection via the `demo_token` cookie.
  *
  * The app reads auth from the `demo_token` cookie (see frontend/src/lib/auth.ts
- * `getToken`), NOT localStorage — so role injection MUST use cookies. The JWT is
+ * `getToken`), NOT localStorage, so role injection MUST use cookies. The JWT is
  * only base64-decoded client-side (`decodeToken`), never signature-verified in the
  * frontend, so a fake signature is fine for E2E.
  *

@@ -74,7 +74,7 @@ export async function createIntegration(
     }
   }
 
-  // Reject duplicate type+endpoint (non-unique index — check manually for better error message)
+  // Reject duplicate type+endpoint (non-unique index: check manually for better error message)
   if (input.endpoint) {
     const existing = await col.findOne({
       externalProviderArrangementType: input.type,

@@ -45,7 +45,7 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
    - Providers interact directly with external systems or modules for event processing.  
 
 4. **Provider Event Configurations (configured per event, per vendor):**  
-   The configuration scope is layered — getting this wrong breaks the model:
+   The configuration scope is layered: getting this wrong breaks the model:
    - A **Provider Group** (category) routes to **one or more Vendors** (connectors).
    - A **Vendor** (External Provider) carries its **vendor-global** config, managed once at vendor level: **Overview**
      (identity, status, vendor-level metadata), **Routing** (how the group picks among its vendors:
@@ -54,7 +54,7 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
    - **Each event a vendor handles has its OWN Outbound and Inbound configuration**, including **its
      own URLs**: the outbound endpoint the PSP calls and the inbound callback URL the vendor calls
      back. A vendor handling three events has three independent outbound/inbound configs. URLs,
-     mapping, auth, retries and timeout are **never** vendor-global — they are **always per event**.
+     mapping, auth, retries and timeout are **never** vendor-global: they are **always per event**.
      (See §7.7: each event's wire contract.)
 
    - **Outbound Configuration (per event):**  
@@ -75,7 +75,7 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
 
 6. **Modules:**  
    - **Built-in Provider Modules:**  
-     Internal implementations of provider categories that ship with the PSP system. They are **not considered part of the PSP core** — they are replaceable subsystems that can be substituted by external vendors at any time. Despite being implemented internally, each built-in provider is treated architecturally as an independent external system.
+     Internal implementations of provider categories that ship with the PSP system. They are **not considered part of the PSP core**: they are replaceable subsystems that can be substituted by external vendors at any time. Despite being implemented internally, each built-in provider is treated architecturally as an independent external system.
 
      The following built-in providers ship with the system:
 
@@ -90,10 +90,10 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
      | `credit-bureau` | Credit Bureau | Internal credit scoring and assessment |
      | `card-authorization` | Card Authorization | Internal card authorization processing |
 
-     **Admin panel labeling:** The administration route `/system/admin/modules` lists **all configurable modules** in the system — both PSP core modules (e.g., `domain`, `gateway`, `identity`) and built-in provider modules (e.g., `fds`, `card-issuer`). Because both types appear in the same list, every entry must display a **module type label** (e.g., `Core` or `Built-in Provider`) so operators can tell at a glance whether they are configuring a core system behavior or a replaceable provider adapter.
+     **Admin panel labeling:** The administration route `/system/admin/modules` lists **all configurable modules** in the system, both PSP core modules (e.g., `domain`, `gateway`, `identity`) and built-in provider modules (e.g., `fds`, `card-issuer`). Because both types appear in the same list, every entry must display a **module type label** (e.g., `Core` or `Built-in Provider`) so operators can tell at a glance whether they are configuring a core system behavior or a replaceable provider adapter.
 
    - **Implementation contract (mandatory):**  
-     Built-in providers **must strictly implement the same architectural interfaces and definitions** established for external vendors. The integration mechanism is identical — event-driven dispatch via the Event Bus, the same inbound/outbound attribute mapping contracts (§7.7), the same authentication and callback URL configuration, retries, and timeouts. There is **no shortcut path**: no built-in implementation may hardcode behavior, bypass the EDA + Hexagonal boundary, or couple directly to the PSP core. Violating this contract defeats the substitutability guarantee and pollutes the architectural baseline.
+     Built-in providers **must strictly implement the same architectural interfaces and definitions** established for external vendors. The integration mechanism is identical: event-driven dispatch via the Event Bus, the same inbound/outbound attribute mapping contracts (§7.7), the same authentication and callback URL configuration, retries, and timeouts. There is **no shortcut path**: no built-in implementation may hardcode behavior, bypass the EDA + Hexagonal boundary, or couple directly to the PSP core. Violating this contract defeats the substitutability guarantee and pollutes the architectural baseline.
 
    - **Configuration & Response Handling:**  
      - Modules must implement the inbound/outbound requirements of the provider for specific events.  
@@ -103,14 +103,14 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
 
 | Directory | Purpose |
 |---|---|
-| `backend/src/modules/` | PSP core — business domains and process orchestration |
-| `backend/src/providers/` | Built-in provider modules — replaceable adapters (see §2.6) |
+| `backend/src/modules/` | PSP core: business domains and process orchestration |
+| `backend/src/providers/` | Built-in provider modules: replaceable adapters (see §2.6) |
 | `backend/src/shared/` | Shared business resources reused by both `modules/` and `providers/` |
 | `backend/src/vendors/` | System-level libraries with no business logic (event bus, encryption, middleware, seed, setup) |
 
-**Shared resources (`backend/src/shared/`).** Any business type, interface, utility, or constant needed by more than one module or provider must live in `shared/` — never duplicated across consumers. Both `modules/` and `providers/` import from `shared/`; neither imports from the other. `vendors/` is imported by all layers but never imports from `modules/`, `providers/`, or `shared/`.
+**Shared resources (`backend/src/shared/`).** Any business type, interface, utility, or constant needed by more than one module or provider must live in `shared/`, never duplicated across consumers. Both `modules/` and `providers/` import from `shared/`; neither imports from the other. `vendors/` is imported by all layers but never imports from `modules/`, `providers/`, or `shared/`.
 
-**Internal structure convention.** Every directory under `modules/`, `providers/`, and `shared/` follows the same standard layout. Only the subdirectories actually required by that unit are created — do not invent new names:
+**Internal structure convention.** Every directory under `modules/`, `providers/`, and `shared/` follows the same standard layout. Only the subdirectories actually required by that unit are created: do not invent new names:
 
 ```
 <unit>/
@@ -120,7 +120,7 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
   config/        # configuration constants and maps
 ```
 
-**File-per-class rule.** Each service, controller, and config must be its own file. For models, use one file per class unless the interfaces are small *and* belong to the same family (e.g., a group of related request/response shapes with little content); in that case they may be co-located in a single file. The deciding criterion is semantics and readability — never convenience. No duplication across units: if a type is used in more than one place it belongs in `shared/models/`.
+**File-per-class rule.** Each service, controller, and config must be its own file. For models, use one file per class unless the interfaces are small *and* belong to the same family (e.g., a group of related request/response shapes with little content); in that case they may be co-located in a single file. The deciding criterion is semantics and readability, never convenience. No duplication across units: if a type is used in more than one place it belongs in `shared/models/`.
 
 ---
 
@@ -169,7 +169,7 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
 #### **5.0 Event model and conventions**
 
 - **Single Event Bus, by design (non-negotiable).** Every event in this section is published on and
-  consumed through the one `EventBus` port — there is no parallel event channel and no service calls
+  consumed through the one `EventBus` port: there is no parallel event channel and no service calls
   another service directly for these flows. Concretely:
   - **Provider calls are bus-driven:** a `*.requested` event is what triggers the outbound dispatch;
     the inbound callback re-enters the system by publishing the matching `*.completed`. Services do
@@ -181,7 +181,7 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
     not a separate push mechanism.
   - **Transport is swappable:** because everything goes through the `EventBus` port, moving from the
     in-process adapter to Kafka/RabbitMQ changes only the adapter, not any publisher or consumer.
-- **Envelope (`DomainEvent`)** — `eventId` (uuid, idempotency key), `eventType` (dotted name),
+- **Envelope (`DomainEvent`)**: `eventId` (uuid, idempotency key), `eventType` (dotted name),
   `occurredAt`, `correlationId` (the journey instance), `causationId` (cause -> effect),
   `businessProcess` (the journey class), `source` (emitting component), `actor`, `bian`, `payload`,
   `schemaVersion`, optional `transient`.
@@ -195,7 +195,7 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
   merchant_onboarding | provider_integration | system`.
 - **Naming standard:** `<domain>.<subject>.<action>[.<phase>]`, lowercase, dotted. Two phase
   suffixes only, always as a symmetric pair: **`.requested`** (an async ask) and **`.completed`**
-  (its result). There are no separate success/failure event names — the outcome
+  (its result). There are no separate success/failure event names: the outcome
   (`authorized | declined | match | clear ...`) travels in the `.completed` payload.
 - **Start/end per business process.** Every business process has exactly one opening event
   (`<process>.requested`) and one closing event (`<process>.completed`). Between them, each provider
@@ -208,17 +208,17 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
   `*.completed` sets `causationId =` the last provider `*.completed`. The full cause->effect graph of
   a journey is therefore reconstructable from the store.
 - **Persistence layers** (do not confuse them):
-  1. `domainEvent` — the Event Bus store, the canonical correlated journey (queried by `correlationId`).
-  2. `businessProcessEvent` / `complianceProcessEvent` — the audit ledger; a **durable projection**
+  1. `domainEvent`: the Event Bus store, the canonical correlated journey (queried by `correlationId`).
+  2. `businessProcessEvent` / `complianceProcessEvent`: the audit ledger; a **durable projection**
      written by a bus subscriber from the domain events. It never originates events. (Legacy code
-     writes the ledger and mirrors to the bus; the migration flips this to publish-then-project — §9.2.)
-  3. `externalProviderArrangementActionLog` — the outbound/inbound HTTP I/O with providers
+     writes the ledger and mirrors to the bus; the migration flips this to publish-then-project: §9.2.)
+  3. `externalProviderArrangementActionLog`: the outbound/inbound HTTP I/O with providers
      (`triggeredBy`), the request side of each `.requested`.
 - **PCI DSS:** cardholder data stays fully event-driven. Raw CHD keys (`cardNumber`/`cvv`/`expiry`)
   are never allowed in a payload (`sanitizeDeep` strips them on every publish). To reach the Card
   Issuer, the CHD travels as a single **application-encrypted** envelope field (`chd`,
   opaque ciphertext) on the validation event. Every bus backend persists in-flight messages (Kafka
-  log, RabbitMQ queue, in-process Mongo) — so the carrier event **is** persisted, but only
+  log, RabbitMQ queue, in-process Mongo), so the carrier event **is** persisted, but only
   **temporarily and encrypted**: the field is ciphertext at rest (Req 3.4) and is **purged (`$unset`)
   once the journey completes** (short/bounded retention), leaving the permanent trail record CHD-free,
   so SAD/CVV is not kept after authorization (Req 3.2); the audit ledger and action log never carry
@@ -227,7 +227,7 @@ described as the real, code-backed sequence of `DomainEvent`s on the Event Bus.
   it to the external provider per the outbound config over TLS (§7.7). Control logs are CHD-free
   (Req 10.7). See §7 intro and §7.7.
 
-#### **5.1 `card_payment` — async two-phase authorization (core)**
+#### **5.1 `card_payment`: async two-phase authorization (core)**
 
 `correlationId = txnId`. Phase 1 gates the authorization; Phase 2 runs post-auth (see 5.2).
 
@@ -270,7 +270,7 @@ sequenceDiagram
 
 - **One start, one end.** `card.payment.authorization.requested` opens the journey;
   `card.payment.authorization.completed` closes it, emitted once **all** gate `*.completed` events are
-  in. Its payload carries `outcome: authorized | declined` (+ `responseCode`, `decisionReason`) — no
+  in. Its payload carries `outcome: authorized | declined` (+ `responseCode`, `decisionReason`), no
   separate `payment.authorized` / `payment.declined`, no `transaction.authorized` / `.declined`. The
   closing event is also projected to the audit ledger, so the compliance record is preserved.
 - Each gate is a `*.requested -> *.completed` pair; the `*.completed` payload carries the per-gate
@@ -282,7 +282,7 @@ sequenceDiagram
 - The synchronous `createTransaction` wrapper (checkout / payment-link) awaits the closing event, so
   those entry points are unchanged.
 
-#### **5.2 `fraud_investigation` — post-auth + case lifecycle**
+#### **5.2 `fraud_investigation`: post-auth + case lifecycle**
 
 Begins from `card.payment.authorization.completed` (outcome=authorized). The AML sub-process uses the
 payment `correlationId` (`txnId`); the case-lifecycle events use the case reference (`caseRef`) and
@@ -300,7 +300,7 @@ AML monitoring.
 | 6 | `fraud.case.updated` | `psp.core` | caseRef | any case status/field change (incl. resolution) | yes (+ audit projection) |
 
 - **One bus, no duplicate signal names.** The case view's live SSE subscribes to these **canonical
-  persisted** events by `caseRef` — there are no separate transient `question.*` / `case.updated`
+  persisted** events by `caseRef`: there are no separate transient `question.*` / `case.updated`
   signals. A single publish both persists the event and wakes the SSE subscriber.
 - AML never blocks the (already authorized) payment. A late AML alert triggers `fraud.case.enriched`
   again (and `fraud.case.opened` first if no case exists yet).
@@ -363,12 +363,12 @@ The `card_issuer` inbound callback also publishes `card.issuer.validation.comple
 |---|---|---|
 | `party.notification` | bell / sidebar counter SSE | **transient** |
 
-The case view's live updates are **not** transient signals — they ride the canonical persisted
+The case view's live updates are **not** transient signals: they ride the canonical persisted
 `fraud.*` events (5.2). `transient` is now reserved for ephemeral fan-out like `party.notification`.
 
 ---
 
-### **6. Event Standardization — Locked Rules & Decisions**
+### **6. Event Standardization: Locked Rules & Decisions**
 
 The standard in §5.0 is **agreed and permanent**. This chapter states the invariants every
 implementation must hold plus the resolved cross-cutting decisions. (The one-time rename of the
@@ -378,7 +378,7 @@ current code to these names is the *temporary* migration map in §9.)
 
 1. **One opening + one closing event per business process.** The closing `*.completed` fires only
    when every dependent provider `*.completed` has arrived; `payload.outcome` carries the result.
-2. **No success/failure event names** — outcome lives in the `.completed` payload.
+2. **No success/failure event names**: outcome lives in the `.completed` payload.
 3. **Every provider call is a `*.requested -> *.completed` pair on the bus** (the HTTP dispatch is
    the wire side, logged in the action log). This closes the trail gap (request->response pairs).
 4. **`causationId` is mandatory** along the chain (see 5.0) so a journey graph is fully traceable.
@@ -391,7 +391,7 @@ current code to these names is the *temporary* migration map in §9.)
 
 **Decision:** post-auth `aml.monitoring.*` and case enrichment keep `businessProcess:
 fraud_investigation`, even though they share the payment's `correlationId`. Rationale: post-auth *is*
-investigation, so the `byProcess` split is meaningful — `byProcess('card_payment')` returns the
+investigation, so the `byProcess` split is meaningful: `byProcess('card_payment')` returns the
 Phase-1 authorization, `byProcess('fraud_investigation')` returns the post-auth monitoring + case.
 The trail by `correlationId` remains the single end-to-end journey regardless.
 
@@ -402,13 +402,13 @@ The trail by `correlationId` remains the single end-to-end journey regardless.
 The data each event carries between producer and consumer. Conventions:
 
 - **Two distinct interface families. Do not mix them.**
-  1. **Bus interfaces** (§7.0-7.6) — the contract for *how information is managed as events*: the
-     envelope (§7.0) + the event `payload`. **Reference-led, no sensitive data, backend-agnostic** —
+  1. **Bus interfaces** (§7.0-7.6): the contract for *how information is managed as events*: the
+     envelope (§7.0) + the event `payload`. **Reference-led, no sensitive data, backend-agnostic**,
      identical whether the bus is in-process Mongo, Kafka, or RabbitMQ. Naming: `XxxRequested` /
      `XxxCompleted`.
-  2. **Vendor interfaces** (§7.7) — the contract *with the external vendor*: the outbound/inbound
+  2. **Vendor interfaces** (§7.7): the contract *with the external vendor*: the outbound/inbound
      payload of each call, **owned by the specific Provider Group**. The *resolved* data. Naming:
-     the event in camelCase + a direction suffix — `<Event>Outbound` / `<Event>Inbound` (e.g.
+     the event in camelCase + a direction suffix: `<Event>Outbound` / `<Event>Inbound` (e.g.
      `CardIssuerValidationOutbound` / `CardIssuerValidationInbound`).
 - **The Provider Group is the only bridge between the two**, in both directions:
   - **Outbound:** it consumes the bus `*.requested`, **resolves the references** (PII, account,
@@ -416,7 +416,7 @@ The data each event carries between producer and consumer. Conventions:
     home), applies the outbound attribute mapping, and builds the vendor request.
   - **Inbound:** it authenticates the vendor callback, applies the inbound mapping, and
     **reconstructs** the bus `*.completed` event.
-  - **Resolved sensitive data never returns to the bus** — only the verdict/outcome (+ non-sensitive
+  - **Resolved sensitive data never returns to the bus**, only the verdict/outcome (+ non-sensitive
     metadata). QE-protected data therefore never rides the bus at all: the bus carries references, the
     vendor call carries the resolved data, and the two contracts stay separate by design.
 - **No envelope duplication on the bus.** The bus payload carries domain data only; envelope fields
@@ -433,13 +433,13 @@ The data each event carries between producer and consumer. Conventions:
   (codes/reasons/scores) are extra optional fields. No separate success/failure events.
 - **CHD on the bus only as an encrypted, temporarily-persisted envelope (issuer validation).** The
   flow stays fully event-driven: the validation event carries the CHD as a single
-  **application-encrypted** field `chd` (opaque ciphertext — envelope encryption with a
+  **application-encrypted** field `chd` (opaque ciphertext: envelope encryption with a
   managed data key, same KMS family as Queryable Encryption). The **Card Issuer provider group is the
   consumer**: it reads the event, **decrypts `chd` just-in-time**, and dispatches the
   plaintext to the external provider per the outbound config over TLS (§7.7). Guarantees:
-  - raw CHD keys (`cardNumber`/`cvv`/`expiry`) are never allowed in any payload — `sanitizeDeep`
+  - raw CHD keys (`cardNumber`/`cvv`/`expiry`) are never allowed in any payload: `sanitizeDeep`
     strips them on publish; CHD only ever rides inside the encrypted `chd`;
-  - every bus backend persists in-flight messages, so the carrier event **is** persisted — but only
+  - every bus backend persists in-flight messages, so the carrier event **is** persisted, but only
     **temporarily and encrypted**: `chd` is ciphertext at rest (Req 3.4) and is
     **purged once the journey completes** (short/bounded retention), so SAD/CVV is not retained after
     authorization (Req 3.2). The permanent correlated trail and audit ledger keep only the CHD-free
@@ -452,7 +452,7 @@ The data each event carries between producer and consumer. Conventions:
 
 Every event on the bus is a `DomainEvent`: the **envelope** wraps a typed **payload**. The envelope
 fields carry the message metadata (identity, correlation, routing, BIAN); the `payload` carries the
-business data defined in §7.1-7.6. The journey id lives here, in `correlationId` — never inside the
+business data defined in §7.1-7.6. The journey id lives here, in `correlationId`, never inside the
 payload. `payload` is generic so each event binds its §7.x type, e.g.
 `DomainEvent<CardIssuerValidationRequested>`.
 
@@ -462,7 +462,7 @@ type BusinessProcess =
   | 'customer_onboarding' | 'merchant_onboarding' | 'provider_integration' | 'system';
 
 interface DomainEvent<T = Record<string, unknown>> {
-  eventId: string;            // uuid v4 — unique per event; idempotency / dedupe key
+  eventId: string;            // uuid v4, unique per event; idempotency / dedupe key
   eventType: string;          // dotted name, e.g. "card.issuer.validation.completed"
   occurredAt: string;         // ISO-8601 timestamp
   correlationId: string;      // the journey instance id (= transactionId / paymentId / caseRef)
@@ -472,7 +472,7 @@ interface DomainEvent<T = Record<string, unknown>> {
   source: string;             // emitting component, e.g. "psp.core", "saga.payment-authorization"
   actor?: { partyRef?: string | null; role?: string | null };  // who triggered it, if applicable
   bian?: { serviceDomain: string; controlRecord: string };     // BIAN mapping for the event
-  payload: T;                 // the typed business data (§7.1-7.6) — NEVER cardholder data
+  payload: T;                 // the typed business data (§7.1-7.6), NEVER cardholder data
   schemaVersion: number;      // envelope schema version
   transient?: boolean;        // delivered to subscribers but not appended to the store (e.g. SSE)
 }
@@ -502,7 +502,7 @@ interface CardPaymentAuthorizationRequested {
   channel: 'api' | 'checkout' | 'payment_link';
   merchantName: string;
   merchantCategoryCode?: string;
-  maskedPan: string;                        // "411111******1111" — masked only
+  maskedPan: string;                        // "411111******1111", masked only
   cardNetwork?: string;                     // visa | mastercard | amex | ...
   cardToken?: string;                       // tokenized card-on-file reference
   accountReference?: string;
@@ -517,7 +517,7 @@ interface CardPaymentAuthorizationRequested {
  * @note      CHD rides ONLY in encrypted chd; persisted temporarily + purged (see §7 intro, §7.7).
  */
 interface CardIssuerValidationRequested {
-  cardToken: string;                        // tokenized card-on-file reference — NOT the PAN
+  cardToken: string;                        // tokenized card-on-file reference, NOT the PAN
   maskedPan: string;
   cardNetwork?: string;
   amount: number;
@@ -536,7 +536,7 @@ interface CardIssuerValidationCompleted {
   outcome: 'approved' | 'declined';
   responseCode?: string;                    // ISO-8583-style: "00", "05", "51"
   decisionReason?: string;                  // "cvv_mismatch" | "expired_card" | "insufficient_funds"
-  cvvProvided?: boolean;                    // audit signal only — never the CVV value
+  cvvProvided?: boolean;                    // audit signal only, never the CVV value
   cardNetwork?: string;
 }
 
@@ -569,7 +569,7 @@ interface FdsScoringCompleted {
   outcome: 'approved' | 'declined';         // declined = block
   riskScore?: number;                       // 0..100
   recommendation?: 'approve' | 'review' | 'block';
-  riskFactors?: string[];                   // e.g. ["new_device","geo_mismatch","high_velocity"] — feeds the case
+  riskFactors?: string[];                   // e.g. ["new_device","geo_mismatch","high_velocity"], feeds the case
   reason?: string;
 }
 
@@ -583,7 +583,7 @@ interface FdsScoringCompleted {
  *            reference always suffices (external-party envelope is the §7.9 pattern, not a field).
  */
 interface HrpScreeningRequested {
-  // Who to screen — the adapter resolves the identity JIT from the QE party store via these references.
+  // Who to screen: the adapter resolves the identity JIT from the QE party store via these references.
   subjectPartyReference?: string;           // the account holder / payer
   counterpartyReference?: string;           // merchant / beneficiary, if applicable
   // Screening context (non-PII)
@@ -604,7 +604,7 @@ interface HrpScreeningCompleted {
   outcome: 'approved' | 'declined';         // declined = sanctions/PEP match -> hard stop
   matchType?: 'sanctions' | 'pep' | 'adverse_media';
   matchScore?: number;                      // 0..100 confidence of the watchlist match
-  matchedList?: string;                     // e.g. "OFAC SDN" | "EU consolidated" — feeds the case
+  matchedList?: string;                     // e.g. "OFAC SDN" | "EU consolidated", feeds the case
   reason?: string;
 }
 
@@ -773,7 +773,7 @@ interface CardSharedThresholdExceeded {
 interface ProfileValidationRequested {
   partyName?: string;
   country?: string;                           // ISO-3166
-  documentType?: string;                      // metadata only — never document images/PII
+  documentType?: string;                      // metadata only, never document images/PII
 }
 
 /**
@@ -885,7 +885,7 @@ interface PartyNotification {
 #### **7.7 Provider wire contracts (HTTP, outside the bus)**
 
 The wire is what a **Provider Group adapter** sends to its vendor and what the vendor returns on its
-callback — a different contract from the bus payload. This holds for **every** provider group; the
+callback: a different contract from the bus payload. This holds for **every** provider group; the
 Card Issuer below is the worked example. The adapter is the bus<->vendor translator:
 
 - **Build (outbound):** consume the bus `*.requested`, **resolve its references** (PII, account,
@@ -893,18 +893,18 @@ Card Issuer below is the worked example. The adapter is the bus<->vendor transla
   **outbound** attribute mapping, and assemble the vendor request. The rich/sensitive signal set is
   assembled here, not carried on the bus.
 - **Reconstruct (inbound):** authenticate the callback, apply the **inbound** mapping, and publish the
-  bus `*.completed` — carrying only the verdict + non-sensitive metadata, never the resolved PII/CHD.
+  bus `*.completed`: carrying only the verdict + non-sensitive metadata, never the resolved PII/CHD.
 - **No verdict duplication.** The bus `*.completed` (§7.1/§7.2) is the **single source of truth** for
   the verdict; each wire callback **reuses** it (`WireCorrelation & Pick<*.completed, ...>`) so no
   field is defined twice. The adapter translates values where they differ (HRP `match` -> `declined`),
   adds context-only fields when publishing (e.g. `cardToken`), and restores the envelope. The wire
   **request**, by contrast, is a different *resolved* shape assembled from the lean bus `*.requested` +
-  the QE store — not a copy of the bus request.
+  the QE store, not a copy of the bus request.
 
 For the Card Issuer the adapter consumes `card.issuer.validation.requested`, decrypts `chd`, and sends
 the plaintext CHD over TLS; `clientReference` lets the async callback map back to the journey.
 Attribute mapping is configured **per event, per vendor** (§2): each event a vendor handles has its
-own outbound/inbound mapping, endpoint, auth, retries and timeout — renaming fields to whatever that
+own outbound/inbound mapping, endpoint, auth, retries and timeout: renaming fields to whatever that
 vendor expects outbound, and back to ours inbound. Vendor-global config (overview, routing, events)
 is set once at vendor level.
 
@@ -931,7 +931,7 @@ interface CardIssuerValidationOutbound extends WireCorrelation {
   amount: number;
   currency: string;
   cardNetwork?: string;
-  cardNumber: string;                         // PAN — plaintext only on this wire
+  cardNumber: string;                         // PAN, plaintext only on this wire
   cvv: string;
   expiry: string;                             // MM/YY
   // Provider-specific names are produced by attribute mapping, e.g. cardNumber -> card_value.
@@ -954,7 +954,7 @@ type CardIssuerValidationInbound = WireCorrelation &
  * @type      outbound
  * @producer  Provider Group: FDS
  * @consumer  Vendor: FDS
- * @note      Assembled by the adapter from the stored transaction/party/device records — no CHD.
+ * @note      Assembled by the adapter from the stored transaction/party/device records, no CHD.
  */
 interface FdsScoringOutbound extends WireCorrelation {
   amount: number; currency: string; channel: string;
@@ -1039,7 +1039,7 @@ type AmlMonitoringInbound = WireCorrelation & AmlMonitoringCompleted;
 
 - The inbound handler reads `clientReference`, looks up the journey, and publishes the matching
   `*.completed` (§7.1/§7.2) on the bus with the resolved `correlationId`, mapping the wire callback's
-  fields into the lean bus payload — **only the verdict + non-sensitive metadata, never the resolved
+  fields into the lean bus payload: **only the verdict + non-sensitive metadata, never the resolved
   PII/CHD**.
 - **KYC / KYB** follow the same shape: the adapter resolves the identity / business profile from the
   QE store and sends a `KycValidationOutbound` / `KybValidationOutbound` (resolved identity + documents metadata);
@@ -1053,7 +1053,7 @@ type AmlMonitoringInbound = WireCorrelation & AmlMonitoringCompleted;
 
 **Callback correlation (wire -> bus bridge).** The vendor has no `correlationId`, so the Provider
 Group must reconstruct it when the async callback lands. The inbound callback URL is **per event, per
-vendor** (configured in that event's inbound config, §2) — and **static** (one URL per event+vendor,
+vendor** (configured in that event's inbound config, §2), and **static** (one URL per event+vendor,
 configured once; never per business-process instance):
 
 ```
@@ -1062,7 +1062,7 @@ POST /api/v1/providers/{group}/{vendorId}/{event}/callback   // static per event
 
 Correlation travels in the callback **message**, not the URL. To maximize vendor support, the
 reference (`clientReference = correlationId`) can be carried either in the **body** or in a **header**,
-on both legs — that event's inbound attribute mapping declares where:
+on both legs: that event's inbound attribute mapping declares where:
 
 - **Outbound:** the adapter stamps `clientReference` into the request body field and/or header the
   vendor echoes (e.g. body `metadata.ref` / `merchantReference`, or header `X-Client-Reference`).
@@ -1075,8 +1075,8 @@ a URL token):
 ```ts
 interface PendingCorrelation {
   ref: string;              // clientReference (= correlationId) or the vendor's own ref from the ACK
-  correlationId: string;    // the journey — restores the envelope correlationId
-  causationId: string;      // eventId of the originating *.requested — restores the cause->effect chain
+  correlationId: string;    // the journey, restores the envelope correlationId
+  causationId: string;      // eventId of the originating *.requested, restores the cause->effect chain
   businessProcess: string;  // restores the envelope businessProcess (also derivable from eventType)
   eventType: string;        // the *.completed to publish, e.g. "card.issuer.validation.completed"
   expiresAt: string;        // if it lapses with no callback -> the saga times out (fail-open per gate)
@@ -1095,12 +1095,12 @@ On callback the Provider Group: (1) **authenticates** it (HMAC signature / anti-
 `authConfig.hmacInbound`); (2) reads the reference from the body **or** header per the inbound
 mapping; (3) resolves `correlationId` via the `PendingCorrelation` registry; (4) applies inbound
 attribute mapping to build the `*.completed` payload; (5) **publishes** the `DomainEvent` with the
-**restored envelope** (`correlationId` + `causationId` + `businessProcess` from the pending entry —
+**restored envelope** (`correlationId` + `causationId` + `businessProcess` from the pending entry,
 the saga, subscribed by `correlationId`, receives it); (6) clears the entry.
 The internal built-in module follows the same contract in-process (it already holds the
 `correlationId`, so no lookup is needed).
 
-#### **7.8 `chd` field — encryption format and algorithms**
+#### **7.8 `chd` field: encryption format and algorithms**
 
 The `chd` field on `card.issuer.validation.requested` is the **only** carrier of cardholder data on
 the bus, and it is always an opaque ciphertext token. Encryption is **envelope encryption** so the
@@ -1118,36 +1118,36 @@ key-management surface for the whole system).
 | Layer | Algorithm | Parameters |
 |---|---|---|
 | Content encryption (DEK -> ciphertext) | **AES-256-GCM** (AEAD) | 256-bit DEK, **96-bit random IV per message**, 128-bit auth tag |
-| Authenticated data (AAD) | bound to the journey | `AAD = correlationId + "." + eventType` — a token cannot be replayed onto another event/journey |
+| Authenticated data (AAD) | bound to the journey | `AAD = correlationId + "." + eventType`: a token cannot be replayed onto another event/journey |
 | Key wrapping (CMK -> wraps DEK) | **KMS envelope** (AWS KMS / Azure Key Vault / GCP KMS / KMIP) | per-message 256-bit DEK from `GenerateDataKey`; CMK never exported |
 | Serialization | **Opaque compact token** (default) | versioned, dot-joined base64url parts; built with native `node:crypto` (no extra dependency). JWE Compact (RFC 7516, `enc=A256GCM`) is an optional alternative only if external interop is ever needed |
 
-**Confidentiality is the requirement — not just integrity.** The `chd` MUST be a **JWE**
+**Confidentiality is the requirement, not just integrity.** The `chd` MUST be a **JWE**
 (encrypted): its content is **unreadable** in any context without the KMS-held key. It MUST NOT be a
-JWS or any signed-but-readable token — signing only proves the data was not modified and would leave
+JWS or any signed-but-readable token: signing only proves the data was not modified and would leave
 the CHD visible, which is not acceptable. Consequences:
 
 - `base64url` is an **encoding, not encryption**: decoding the ciphertext segment yields only the
   AES-256-GCM **encrypted bytes**, never readable CHD. Plaintext is recoverable solely via
   `KMS.Decrypt`, restricted to the Card Issuer adapter.
 - Only crypto metadata (version + key id) is readable. **No CHD ever appears in the metadata or the
-  AAD** — the AAD is the journey binding (`correlationId.eventType`), not card data.
+  AAD**: the AAD is the journey binding (`correlationId.eventType`), not card data.
 - Therefore anyone who inspects the event in the store, broker, or a log sees only opaque ciphertext;
   AES-256-GCM gives confidentiality **and** integrity (AEAD), but confidentiality is the primary
   guarantee here.
 
-**Token format (the `chd` string).** Opaque, versioned, dot-joined base64url parts — everything the
+**Token format (the `chd` string).** Opaque, versioned, dot-joined base64url parts: everything the
 consumer needs to decrypt, and nothing readable but the version and key id:
 
 ```
 v1 "." BASE64URL(kid) "." BASE64URL(wrappedDEK) "." BASE64URL(iv) "." BASE64URL(ciphertext) "." BASE64URL(tag)
 ```
 
-- `v1` — format version (lets the scheme evolve); `kid` — which CMK wrapped the DEK.
+- `v1`: format version (lets the scheme evolve); `kid`, which CMK wrapped the DEK.
 - The IV (12 bytes), ciphertext, and 16-byte GCM tag are the `node:crypto` `createCipheriv`
   /`createDecipheriv('aes-256-gcm', ...)` outputs. No JWE library or extra dependency is required.
 
-**Encryption (producer — psp.core, when emitting `card.issuer.validation.requested`).**
+**Encryption (producer: psp.core, when emitting `card.issuer.validation.requested`).**
 
 ```
 1. dek, wrappedDEK = KMS.GenerateDataKey(CMK, AES-256)        // dek in memory only
@@ -1159,7 +1159,7 @@ v1 "." BASE64URL(kid) "." BASE64URL(wrappedDEK) "." BASE64URL(iv) "." BASE64URL(
 6. zeroize(dek, cleartext)                                    // wipe plaintext + data key
 ```
 
-**Decryption (consumer — Card Issuer provider-group adapter, just-in-time).**
+**Decryption (consumer: Card Issuer provider-group adapter, just-in-time).**
 
 ```
 1. v, kid, wrappedDEK, iv, ciphertext, tag = splitToken(chd)
@@ -1183,23 +1183,23 @@ v1 "." BASE64URL(kid) "." BASE64URL(wrappedDEK) "." BASE64URL(iv) "." BASE64URL(
   and purged on completion; the CMK/DEK design means even an un-purged copy stays unreadable at rest
   (Req 3.4). Plaintext and the unwrapped DEK exist only transiently in the adapter and are zeroized.
 
-#### **7.9 Sensitive data classes — CHD vs PII**
+#### **7.9 Sensitive data classes: CHD vs PII**
 
 Two classes of sensitive data, **different regimes, different handling**. Do not conflate them.
 
 | Class | Examples | Regime | On the bus | Persistence | Who can decrypt |
 |---|---|---|---|---|---|
 | **CHD** | PAN, CVV, expiry | PCI DSS (Req 3.2/3.4) | encrypted `chd` envelope (§7.8); purged after journey | **never** (CVV never; PAN only as unreadable, transient) | Card Issuer adapter **only** |
-| **PII** | full name, DOB, email, phone, address, document no. | GDPR / privacy | **reference-first** — pass a `partyReference`, the adapter resolves identity JIT from the QE party store; encrypted `pii` envelope only if the party is not in our store | **may persist** — already in the party record, encrypted at rest with Queryable Encryption | screening adapters **and** the case/investigation service |
+| **PII** | full name, DOB, email, phone, address, document no. | GDPR / privacy | **reference-first**: pass a `partyReference`, the adapter resolves identity JIT from the QE party store; encrypted `pii` envelope only if the party is not in our store | **may persist**, already in the party record, encrypted at rest with Queryable Encryption | screening adapters **and** the case/investigation service |
 
 Principles:
 
 - **Minimize.** Send only the fields the screen needs (sanctions/PEP: name, DOB, nationality,
-  country, optional document number) — never the whole profile.
+  country, optional document number), never the whole profile.
 - **Reference over value.** Prefer `subjectPartyReference` so PII never rides the bus at all; the HRP
   adapter QE-decrypts the identity just-in-time, screens, and discards it.
 - **Encrypt when unavoidable.** For an external party not in our store, carry identity in the `pii`
-  envelope using the **same crypto scheme as §7.8** — but the decrypt grant includes the
+  envelope using the **same crypto scheme as §7.8**, but the decrypt grant includes the
   case/investigation service (an investigator legitimately sees the name), unlike `chd` which is
   issuer-only. PII may be retained (it is part of the party record); CVV never is.
 - **At rest**, both classes are protected: CHD never lands in a store; PII fields use Queryable
@@ -1210,7 +1210,7 @@ Principles:
 
 ---
 
-### **8. Event store (`domainEvent`) — collection design**
+### **8. Event store (`domainEvent`): collection design**
 
 The in-process Event Bus persists events to the MongoDB collection `domainEvent`. **It MUST be a
 normal collection, NOT a time series collection.** Two of the reasons are hard blockers, not
@@ -1218,10 +1218,10 @@ preferences:
 
 1. **Idempotent append requires a UNIQUE index on `eventId`.** Publish is at-least-once; the store
    dedupes on `eventId` (duplicate-key 11000 = already processed). **Time series collections do not
-   support unique indexes** — the idempotency guarantee would be lost. *(blocker)*
+   support unique indexes**: the idempotency guarantee would be lost. *(blocker)*
 2. **The `chd` purge requires a field-level update.** The encrypted `chd` on
    `card.issuer.validation.requested` is removed with `$unset` when the journey completes. **Time
-   series collections are insert-optimized and do not support `$unset` of a measurement field** — the
+   series collections are insert-optimized and do not support `$unset` of a measurement field**: the
    field could not be purged in place. *(blocker)*
 3. **The primary access pattern is by `correlationId`, not by time window.** The journey trail and
    `byProcess` queries hit secondary indexes on `correlationId` / `businessProcess` / `eventType`;
@@ -1230,7 +1230,7 @@ preferences:
    is constrained around the time/meta fields.
 
 Time series *would* give better compression, write throughput, and a native `expireAfterSeconds` TTL
-— attractive under high load — but the unique-index and field-update blockers make it unusable for
+- attractive under high load, but the unique-index and field-update blockers make it unusable for
 this store. (A separate, strictly append-only, immutable audit *stream* could be time series; the
 `domainEvent` bus store cannot, because it needs both idempotency and the `chd` purge.)
 
@@ -1246,15 +1246,15 @@ this store. (A separate, strictly append-only, immutable audit *stream* could be
 
 **`chd` retention (the concrete realization of "temporary + encrypted", §5.0 / §7.8):**
 
-- The encrypted `chd` rides on the `card.issuer.validation.requested` document, encrypted (§7.8) — the
+- The encrypted `chd` rides on the `card.issuer.validation.requested` document, encrypted (§7.8): the
   only event that ever carries it.
 - When the journey reaches its terminal `card.payment.authorization.completed`, the saga (or a purge
   hook) `$unset`s `chd` from that document. The event record persists for the trail; the CHD is gone.
 - A periodic **safety sweep** `$unset`s `chd` from any `card.issuer.validation.requested` older than a
   short bound (e.g. 15 min) that never reached a terminal event (abandoned journeys), so SAD/CVV is
-  never retained past authorization (Req 3.2). This is a field sweep, **not** a document TTL — a
+  never retained past authorization (Req 3.2). This is a field sweep, **not** a document TTL: a
   document TTL would delete the trail record, which must be kept.
 - The audit ledger and `externalProviderArrangementActionLog` never hold `chd` at all.
 
 This keeps the event store immutable in practice except for the single, documented, security-driven
-`chd` purge — and that exception is itself the reason a normal collection is required.
+`chd` purge, and that exception is itself the reason a normal collection is required.

@@ -1,5 +1,5 @@
 // Provenance chip shown only in debug mode: BIAN service domain / control record
-// labels ("SD-53 · BQ:Step · KycCheck · PCI Req 8.1") and collection names.
+// labels ("BQ:Step · KycCheck · PCI DSS") and collection names.
 // Labels are long, so segments split on "·" wrap independently instead of forcing
 // the surrounding header to overflow on narrow screens.
 

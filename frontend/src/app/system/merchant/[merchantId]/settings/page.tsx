@@ -23,7 +23,7 @@ export default function SettingsSectionPage() {
   const merchantId = merchant?.merchantAgreementInstanceReference ?? '';
   const ownerPartyRef = (merchant as unknown as Record<string, unknown> | null)?.merchantOwnerPartyReference as string | undefined;
 
-  // v18 B-09: commission rate is editable only for roles with merchants:manage — the merchant
+  // v18 B-09: commission rate is editable only for roles with merchants:manage, the merchant
   // owner (customer) or PSP staff (merchant_officer / security_auditor). Others see it read-only.
   const canManageCommission = role === 'customer' || role === 'merchant_officer' || role === 'security_auditor';
 
@@ -139,7 +139,7 @@ export default function SettingsSectionPage() {
         title="Settings"
         description="Operational configuration for your merchant account."
         info="You can self-serve operational settings here. Risk-governed values, such as your transaction limit and account status, are managed by the PSP and shown for reference."
-        debugInfo="BIAN SD-89 Merchant Relations · PCI DSS Req 12.8 (TPSP responsibilities)"
+        debugInfo="Merchant Relations · PCI DSS (TPSP responsibilities)"
       />
 
       {/* Operational settings (owner editable) */}
@@ -184,11 +184,11 @@ export default function SettingsSectionPage() {
           </select>
         </div>
 
-        {/* Commission per operation (v18 B-07 — BIAN SD-89) */}
+        {/* Commission per operation (v18 B-07:) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Commission per operation</label>
           <p className="text-xs text-gray-500 mb-2">
-            The fee this merchant charges per operation, recognized as commission revenue (BIAN SD-89 · SD-65 fee).
+            The fee this merchant charges per operation, recognized as commission revenue.
           </p>
           {canManageCommission ? (
             <>
@@ -221,7 +221,7 @@ export default function SettingsSectionPage() {
           )}
         </div>
 
-        {/* Default Payout Account (E3 — BIAN SD-89 / SD-66) */}
+        {/* Default Payout Account (E3:) */}
         {ownerPartyRef && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -231,7 +231,7 @@ export default function SettingsSectionPage() {
               </span>
             </label>
             <p className="text-xs text-gray-500 mb-2">
-              All customer payments and settlements will be credited to this bank account (BIAN SD-66 · SD-89). Choose from your registered active accounts.
+              All customer payments and settlements will be credited to this bank account. Choose from your registered active accounts.
             </p>
             {!payoutAccountsLoaded ? (
               <div className="text-xs text-gray-400">Loading accounts…</div>
@@ -272,7 +272,7 @@ export default function SettingsSectionPage() {
             )}
             {debugMode && (
               <p className="text-[10px] font-mono text-gray-400 mt-1">
-                merchantDefaultPayoutAccountReference → payoutAccountArrangement (SD-66). Guard: account.partyInstanceReference must equal merchantOwnerPartyReference.
+                merchantDefaultPayoutAccountReference → payoutAccountArrangement. Guard: account.partyInstanceReference must equal merchantOwnerPartyReference.
               </p>
             )}
           </div>
@@ -334,7 +334,7 @@ export default function SettingsSectionPage() {
         )}
       </div>
 
-      {/* Business verification (KYB) — read-only, active merchants */}
+      {/* Business verification (KYB): read-only, active merchants */}
       {merchant.merchantAgreementKybCheck && (() => {
         const kyb = merchant.merchantAgreementKybCheck;
         const KYB_COLORS: Record<string, string> = {
@@ -357,7 +357,7 @@ export default function SettingsSectionPage() {
               <h2 className="font-semibold text-gray-800 text-sm">Business verification (KYB)</h2>
             </div>
             <p className="text-xs text-gray-500">
-              Know Your Business identity verification performed by the PSP during onboarding (PCI DSS Req 12.8).
+              Know Your Business identity verification performed by the PSP during onboarding (PCI DSS).
             </p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <div className="text-gray-500">KYB status</div>
@@ -389,7 +389,7 @@ export default function SettingsSectionPage() {
             </div>
             {debugMode && (
               <p className="text-[10px] font-mono text-gray-400 pt-1">
-                SD-89 · KybCheck · PCI Req 12.8
+                KybCheck · PCI DSS
               </p>
             )}
           </div>
@@ -408,7 +408,7 @@ export default function SettingsSectionPage() {
               <p className="text-sm font-medium text-gray-700">Deactivate this merchant account</p>
               <p className="text-xs text-gray-500 mt-0.5">
                 Suspends all payment processing, OAuth authentication, and new operations immediately.
-                The account and all its data are retained for audit compliance (PCI DSS Req 10). You can request reactivation from your merchant officer.
+                The account and all its data are retained for audit compliance (PCI DSS). You can request reactivation from your merchant officer.
               </p>
             </div>
             <button

@@ -77,7 +77,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
     setBusy(true); setMsg(null);
     try {
       const res = await api.rtp.accept(req.paymentRequestInstanceReference, { fundingAccountRef: fundingRef || undefined }, token, `rtp-accept-${req.paymentRequestInstanceReference}`);
-      setMsg(res.status === 'accepted' ? 'Approved — payment on the way.' : (res.reason ?? 'Could not approve.'));
+      setMsg(res.status === 'accepted' ? 'Approved: payment on the way.': (res.reason ?? 'Could not approve.'));
       const fresh = await api.rtp.getById(req.paymentRequestInstanceReference, token).catch(() => null);
       if (fresh) setReq(fresh);
       onChanged?.();
@@ -118,7 +118,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                 {statusChip}
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">{req.recordCreatedDateTime ? new Date(req.recordCreatedDateTime).toLocaleString() : '—'}</p>
+            <p className="text-sm text-gray-500 mt-1">{req.recordCreatedDateTime ? new Date(req.recordCreatedDateTime).toLocaleString(): '—'}</p>
             {req.purpose && <p className="text-sm text-gray-600 mt-1">{req.purpose}</p>}
           </div>
           <div className="text-right shrink-0">
@@ -128,7 +128,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
           </div>
         </div>
 
-        {/* Sender / Recipient — perspective-aware privacy:
+        {/* Sender / Recipient: perspective-aware privacy:
             - Payer view: sees the requester's NAME (authorized on request) + their own funding account.
             - Payee view: sees only the payer label THEY provided (beneficiary/alias) + their own receiving account.
             - Staff (L1/L2/auditor): full refs + accounts for investigation. */}
@@ -206,7 +206,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
               {/* Requester name: authorized to the payer (requesting is the consent). */}
               <dt className="text-gray-500">Name</dt>
-              <dd className="text-gray-800">{req.payeeName ?? (isPayee ? 'You' : '—')}</dd>
+              <dd className="text-gray-800">{req.payeeName ?? (isPayee ? 'You': '—')}</dd>
               {/* Destination account: bank + masked IBAN so the PAYER sees where the money goes. */}
               {req.payeeAccountDisplay?.bankName && (<>
                 <dt className="text-gray-500">Destination bank</dt>
@@ -231,9 +231,9 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
           </div>
         </div>
 
-        {/* Identifiers — visible to BOTH parties (and staff) for support / investigations.
+        {/* Identifiers: visible to BOTH parties (and staff) for support / investigations.
             Request ID = the Request-to-Pay intent (what you approve). Transfer ID = the actual money
-            movement (SD-65 execution) created after approval. They are deliberately distinct records. */}
+            movement created after approval. They are deliberately distinct records. */}
         <div className="border-t pt-4 mt-4 text-sm space-y-2">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -254,7 +254,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
         </div>
       </div>
 
-      {/* Timeline — created / approved by payer / completed (both parties). */}
+      {/* Timeline: created / approved by payer / completed (both parties). */}
       {events.length > 0 && (
         <div className="bg-white rounded-xl border p-5 mb-4">
           <h2 className="text-sm font-semibold text-gray-900 mb-2">Timeline</h2>
@@ -272,7 +272,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
         </div>
       )}
 
-      {/* Security Review — BOTH parties see the PSP/L1/L2 outcome + notes on their funds (transparency).
+      {/* Security Review: BOTH parties see the PSP/L1/L2 outcome + notes on their funds (transparency).
           Staff additionally get a link into the full investigation case. */}
       <div className="bg-white rounded-xl border p-5 mb-4">
         <h2 className="text-sm font-semibold text-gray-900 mb-2">Security Review</h2>
@@ -299,7 +299,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
         )}
       </div>
 
-      {/* Approve / reject — payer only, while pending */}
+      {/* Approve / reject: payer only, while pending */}
       {pending && isPayer && (
         <div className="bg-white rounded-xl border p-5 mb-4">
           {msg && <div className="mb-3 rounded bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">{msg}</div>}

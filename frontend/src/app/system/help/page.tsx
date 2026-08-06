@@ -36,15 +36,15 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=46',
     mongodbFeatures: ['Private Endpoints (AWS/Azure/GCP)', 'VPC/VNet Peering', 'IP Access List', 'Network Peering'],
     items: [
-      { id: '1.1', text: 'Document and publish a network security control (NSC) policy and assign roles and responsibilities', detail: 'Req 1.1.1, 1.1.2. Must cover all NSC types: firewalls, routers, cloud security groups, WAFs. Roles must be named.' },
-      { id: '1.2', text: 'Maintain current network topology diagrams showing all CDE connections and data-flow diagrams', detail: 'Req 1.2.3, 1.2.4. Update whenever infrastructure changes.' },
-      { id: '1.3', text: 'Configure all NSCs with deny-all default; allow only explicitly justified services, protocols, and ports', detail: 'Req 1.2.1, 1.3.1, 1.3.2. Document business justification for each allowed rule (Req 1.2.5, 1.2.6).' },
-      { id: '1.4', text: 'Install NSCs between all wireless networks and the CDE with deny-all default', detail: 'Req 1.3.3. Required even if wireless is considered internal.' },
-      { id: '1.5', text: 'Implement anti-spoofing measures to detect and block forged source IP addresses', detail: 'Req 1.4.3. Prevents source IP spoofing attacks targeting the CDE.' },
-      { id: '1.6', text: 'Ensure CHD storage systems are not directly accessible from untrusted networks', detail: 'Req 1.4.4. Databases, file servers, and any storage holding PAN must sit behind NSCs.' },
-      { id: '1.7', text: 'Restrict disclosure of internal IP addresses and routing information to external parties', detail: 'Req 1.4.5. Prevents network reconnaissance.' },
-      { id: '1.8', text: 'Review NSC configurations at least every six months and correct identified weaknesses', detail: 'Req 1.2.7. Document review results and any corrective actions.' },
-      { id: '1.9', text: 'Apply security controls to all employee devices connecting to both untrusted networks and the CDE', detail: 'Req 1.5.1. Laptops and mobile devices represent a common CDE perimeter gap.' },
+      { id: '1.1', text: 'Document and publish a network security control (NSC) policy and assign roles and responsibilities', detail: 'Must cover all NSC types: firewalls, routers, cloud security groups, WAFs. Roles must be named.' },
+      { id: '1.2', text: 'Maintain current network topology diagrams showing all CDE connections and data-flow diagrams', detail: 'Update whenever infrastructure changes.' },
+      { id: '1.3', text: 'Configure all NSCs with deny-all default; allow only explicitly justified services, protocols, and ports', detail: 'Document business justification for each allowed rule.' },
+      { id: '1.4', text: 'Install NSCs between all wireless networks and the CDE with deny-all default', detail: 'Required even if wireless is considered internal.' },
+      { id: '1.5', text: 'Implement anti-spoofing measures to detect and block forged source IP addresses', detail: 'Prevents source IP spoofing attacks targeting the CDE.' },
+      { id: '1.6', text: 'Ensure CHD storage systems are not directly accessible from untrusted networks', detail: 'Databases, file servers, and any storage holding PAN must sit behind NSCs.' },
+      { id: '1.7', text: 'Restrict disclosure of internal IP addresses and routing information to external parties', detail: 'Prevents network reconnaissance.' },
+      { id: '1.8', text: 'Review NSC configurations at least every six months and correct identified weaknesses', detail: 'Document review results and any corrective actions.' },
+      { id: '1.9', text: 'Apply security controls to all employee devices connecting to both untrusted networks and the CDE', detail: 'Laptops and mobile devices represent a common CDE perimeter gap.' },
     ],
   },
   {
@@ -55,29 +55,29 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=68',
     mongodbFeatures: ['TLS Mandatory (Atlas)', 'Encrypted Storage', 'Atlas Security Advisor', 'IP Access List defaults'],
     items: [
-      { id: '2.1', text: 'Develop, implement, and maintain configuration standards for all system components', detail: 'Req 2.2.1. Standards must align with CIS Benchmarks, NIST, or vendor hardening guides.' },
-      { id: '2.2', text: 'Change or disable all vendor-supplied default accounts and passwords before installation', detail: 'Req 2.2.2. Default credentials are the #1 exploitation vector. Remove unused default accounts entirely.' },
-      { id: '2.3', text: 'Separate primary functions requiring different security levels onto separate system components', detail: 'Req 2.2.3. Web servers and database servers must not share the same host.' },
-      { id: '2.4', text: 'Enable only necessary functions, components, ports, protocols, and services', detail: 'Req 2.2.4. Disable all unused features on operating systems, databases, and applications.' },
-      { id: '2.5', text: 'Encrypt all non-console administrative access (SSH, RDP, web-based management) with strong cryptography', detail: 'Req 2.2.7. Clear-text admin protocols (Telnet, HTTP, rlogin) are prohibited in the CDE.' },
-      { id: '2.6', text: 'Change all wireless vendor defaults at installation: SSIDs, passwords, SNMP community strings, and encryption keys', detail: 'Req 2.3.1, 2.3.2. Default wireless settings are publicly known and trivially exploitable.' },
+      { id: '2.1', text: 'Develop, implement, and maintain configuration standards for all system components', detail: 'Standards must align with CIS Benchmarks, NIST, or vendor hardening guides.' },
+      { id: '2.2', text: 'Change or disable all vendor-supplied default accounts and passwords before installation', detail: 'Default credentials are the #1 exploitation vector. Remove unused default accounts entirely.' },
+      { id: '2.3', text: 'Separate primary functions requiring different security levels onto separate system components', detail: 'Web servers and database servers must not share the same host.' },
+      { id: '2.4', text: 'Enable only necessary functions, components, ports, protocols, and services', detail: 'Disable all unused features on operating systems, databases, and applications.' },
+      { id: '2.5', text: 'Encrypt all non-console administrative access (SSH, RDP, web-based management) with strong cryptography', detail: 'Clear-text admin protocols (Telnet, HTTP, rlogin) are prohibited in the CDE.' },
+      { id: '2.6', text: 'Change all wireless vendor defaults at installation: SSIDs, passwords, SNMP community strings, and encryption keys', detail: 'Default wireless settings are publicly known and trivially exploitable.' },
     ],
   },
   {
     num: '3', title: 'Protect Stored Account Data',
     goal: 'Protect Account Data', goalNum: '2',
     summary: 'Minimize storage of cardholder data, never store Sensitive Authentication Data (SAD) after authorization, and render stored PANs unreadable using strong cryptography. Implement full key management lifecycle controls.',
-    frequency: 'Data retention policies enforced continuously; crypto architecture reviewed annually (Req 3.6.1.1).',
+    frequency: 'Data retention policies enforced continuously; crypto architecture reviewed annually.',
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=88',
     mongodbFeatures: ['Queryable Encryption (QE)', 'Client-Side Field Level Encryption (CSFLE)', 'Customer-Managed Keys (CMK)', 'AWS KMS / Azure Key Vault / GCP KMS / KMIP'],
     items: [
-      { id: '3.1', text: 'Define and enforce a data retention and disposal policy; store account data only as long as necessary', detail: 'Req 3.1.1, 3.2.1. Automated purge mechanisms required. Every stored PAN needs a documented business justification.' },
-      { id: '3.2', text: 'Never store Sensitive Authentication Data (SAD) after authorization is complete', detail: 'Req 3.3.1. SAD includes full track data, CAV2/CVC2/CVV2/CID codes, and PINs. No exceptions for non-issuers.' },
-      { id: '3.3', text: 'Render PAN unreadable using AES-256 encryption, truncation, HMAC keyed hashing, or index tokens with separate vault', detail: 'Req 3.4.1, 3.5.1.1. Plain SHA-256 hashing is no longer sufficient (v4.0); must use keyed cryptographic hashes (HMAC).', newV4: true },
-      { id: '3.4', text: 'Implement technical controls to prevent PAN copy/paste or relocation via remote access tools', detail: 'Req 3.4.2. Restricts clipboard operations, screen capture, and file transfer tools that could exfiltrate PAN.', newV4: true },
-      { id: '3.5', text: 'Implement full key management lifecycle: generation, distribution, storage, retirement, replacement, destruction', detail: 'Req 3.6.1, 3.7.1 to 3.7.9. Includes split knowledge, dual control, regular key rotation, and secure key ceremony documentation.' },
-      { id: '3.6', text: 'Document your cryptographic architecture: all algorithms, protocols, keys, key strengths, and key custodians', detail: 'Req 3.6.1.1. Required for service providers; strongly recommended for all entities. Review at least annually.', newV4: true },
-      { id: '3.7', text: 'Use only strong cryptography: RSA 2048+, AES-128/256, ECDSA P-256+, and TLS 1.2+; review cipher suite list annually', detail: 'Req 3.5.1, 12.3.3. Explicit inventory of all cryptographic algorithms in use, reviewed annually for deprecation.' },
+      { id: '3.1', text: 'Define and enforce a data retention and disposal policy; store account data only as long as necessary', detail: 'Automated purge mechanisms required. Every stored PAN needs a documented business justification.' },
+      { id: '3.2', text: 'Never store Sensitive Authentication Data (SAD) after authorization is complete', detail: 'SAD includes full track data, CAV2/CVC2/CVV2/CID codes, and PINs. No exceptions for non-issuers.' },
+      { id: '3.3', text: 'Render PAN unreadable using AES-256 encryption, truncation, HMAC keyed hashing, or index tokens with separate vault', detail: 'Plain SHA-256 hashing is no longer sufficient (v4.0); must use keyed cryptographic hashes (HMAC).', newV4: true },
+      { id: '3.4', text: 'Implement technical controls to prevent PAN copy/paste or relocation via remote access tools', detail: 'Restricts clipboard operations, screen capture, and file transfer tools that could exfiltrate PAN.', newV4: true },
+      { id: '3.5', text: 'Implement full key management lifecycle: generation, distribution, storage, retirement, replacement, destruction', detail: 'Includes split knowledge, dual control, regular key rotation, and secure key ceremony documentation.' },
+      { id: '3.6', text: 'Document your cryptographic architecture: all algorithms, protocols, keys, key strengths, and key custodians', detail: 'Required for service providers; strongly recommended for all entities. Review at least annually.', newV4: true },
+      { id: '3.7', text: 'Use only strong cryptography: RSA 2048+, AES-128/256, ECDSA P-256+, and TLS 1.2+; review cipher suite list annually', detail: 'Explicit inventory of all cryptographic algorithms in use, reviewed annually for deprecation.' },
     ],
   },
   {
@@ -88,11 +88,11 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=114',
     mongodbFeatures: ['TLS 1.2/1.3 enforced by Atlas (cannot be disabled)', 'Certificate Management', 'Driver TLS verification'],
     items: [
-      { id: '4.1', text: 'Use strong cryptography (TLS 1.2+) for all PAN transmissions over open, public networks', detail: 'Req 4.2.1. Open networks include the Internet, Wi-Fi, Bluetooth, GPRS, and satellite. PAN must never travel in cleartext.', newV4: true },
-      { id: '4.2', text: 'Maintain an inventory of all trusted keys and certificates used to protect PAN in transit', detail: 'Req 4.2.1.1. Inventory must include certificate expiry dates, issuing CA, and renewal process.', newV4: true },
-      { id: '4.3', text: 'Accept only valid, non-expired, non-revoked certificates from trusted certificate authorities', detail: 'Req 4.2.1. Implement certificate pinning or CA validation on all CHD-handling connections.' },
-      { id: '4.4', text: 'Never transmit PANs via unprotected end-user messaging technologies', detail: 'Req 4.2.2. Covers SMS, email, instant messaging, and chat platforms unless end-to-end encrypted.' },
-      { id: '4.5', text: 'Document a cardholder data transmission policy with assigned roles and responsibilities', detail: 'Req 4.1.1, 4.1.2. Policy must explicitly prohibit clear-text PAN transmission.' },
+      { id: '4.1', text: 'Use strong cryptography (TLS 1.2+) for all PAN transmissions over open, public networks', detail: 'Open networks include the Internet, Wi-Fi, Bluetooth, GPRS, and satellite. PAN must never travel in cleartext.', newV4: true },
+      { id: '4.2', text: 'Maintain an inventory of all trusted keys and certificates used to protect PAN in transit', detail: 'Inventory must include certificate expiry dates, issuing CA, and renewal process.', newV4: true },
+      { id: '4.3', text: 'Accept only valid, non-expired, non-revoked certificates from trusted certificate authorities', detail: 'Implement certificate pinning or CA validation on all CHD-handling connections.' },
+      { id: '4.4', text: 'Never transmit PANs via unprotected end-user messaging technologies', detail: 'Covers SMS, email, instant messaging, and chat platforms unless end-to-end encrypted.' },
+      { id: '4.5', text: 'Document a cardholder data transmission policy with assigned roles and responsibilities', detail: 'Policy must explicitly prohibit clear-text PAN transmission.' },
     ],
   },
   {
@@ -103,12 +103,12 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=128',
     mongodbFeatures: ['Atlas managed infrastructure (MongoDB patches underlying OS)', 'Atlas Security Advisor'],
     items: [
-      { id: '5.1', text: 'Deploy anti-malware solutions on all system components; evaluate systems not commonly at risk periodically', detail: 'Req 5.2.1, 5.2.3. Covers all media types including removable storage (Req 5.3.3).', newV4: true },
-      { id: '5.2', text: 'Ensure anti-malware detects viruses, worms, Trojans, spyware, rootkits, ransomware, and adware', detail: 'Req 5.2.2. Solution must actively detect and remove all listed malware types.' },
-      { id: '5.3', text: 'Enable automatic signature/definition updates and real-time or continuous behavioral scanning', detail: 'Req 5.3.1, 5.3.2. Scheduled-only scanning requires TRA-defined frequency.' },
-      { id: '5.4', text: 'Enable and retain anti-malware audit logs per the audit log retention policy (Req 10)', detail: 'Req 5.3.4. Malware detection events must be logged and retained for 12 months.' },
-      { id: '5.5', text: 'Prevent users from disabling or altering anti-malware without documented management authorization per-case', detail: 'Req 5.3.5. Anti-malware must not have a user-accessible disable switch.' },
-      { id: '5.6', text: 'Implement DMARC, SPF, and DKIM to protect personnel from phishing attacks targeting the CDE', detail: 'Req 5.4.1. DMARC policy at minimum p=quarantine, SPF with -all, and DKIM signing are all required.', newV4: true },
+      { id: '5.1', text: 'Deploy anti-malware solutions on all system components; evaluate systems not commonly at risk periodically', detail: 'Covers all media types including removable storage.', newV4: true },
+      { id: '5.2', text: 'Ensure anti-malware detects viruses, worms, Trojans, spyware, rootkits, ransomware, and adware', detail: 'Solution must actively detect and remove all listed malware types.' },
+      { id: '5.3', text: 'Enable automatic signature/definition updates and real-time or continuous behavioral scanning', detail: 'Scheduled-only scanning requires TRA-defined frequency.' },
+      { id: '5.4', text: 'Enable and retain anti-malware audit logs per the audit log retention policy', detail: 'Malware detection events must be logged and retained for 12 months.' },
+      { id: '5.5', text: 'Prevent users from disabling or altering anti-malware without documented management authorization per-case', detail: 'Anti-malware must not have a user-accessible disable switch.' },
+      { id: '5.6', text: 'Implement DMARC, SPF, and DKIM to protect personnel from phishing attacks targeting the CDE', detail: 'DMARC policy at minimum p=quarantine, SPF with -all, and DKIM signing are all required.', newV4: true },
     ],
   },
   {
@@ -119,14 +119,14 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=143',
     mongodbFeatures: ['Atlas automated minor-version patching', 'MongoDB Security Advisories', 'Atlas Security Advisor'],
     items: [
-      { id: '6.1', text: 'Implement a secure SDLC; train all developers in software security at least annually', detail: 'Req 6.2.1, 6.2.2. Training must cover current threats and OWASP Top 10. Track completion with records.' },
-      { id: '6.2', text: 'Review all custom and bespoke software for security vulnerabilities before every production release', detail: 'Req 6.2.3, 6.2.3.1. Automated SAST/DAST tools acceptable; manual code review required for payment-critical paths.' },
-      { id: '6.3', text: 'Prevent/mitigate OWASP Top 10 vulnerabilities: injection, XSS, broken auth, IDOR, and CSRF in all custom code', detail: 'Req 6.2.4. Explicitly includes SQL injection, NoSQL injection, OS injection, and LDAP injection.' },
-      { id: '6.4', text: 'Apply critical security patches within 1 month of release; apply all other patches within 6 months', detail: 'Req 6.3.3. Critical refers to CVSS v3.1 scores 9.0+ or those exploiting CHD systems.' },
-      { id: '6.5', text: 'Maintain a software inventory (SBOM-equivalent) for all bespoke and custom software including third-party libraries', detail: 'Req 6.3.2. Inventory must include component name, version, and supplier.', newV4: true },
-      { id: '6.6', text: 'Deploy and maintain a WAF for all public-facing web applications that actively blocks web attacks', detail: 'Req 6.4.1, 6.4.2. Automated WAF in blocking mode required. Rule sets must be updated continuously.', newV4: true },
-      { id: '6.7', text: 'For payment pages: inventory all scripts, authorize each one, and verify integrity (SRI hashes or CSP)', detail: 'Req 6.4.3. Addresses Magecart/JS skimming attacks. Each script must be authorized, integrity-verified, and documented.', newV4: true },
-      { id: '6.8', text: 'Separate development, test, and production environments; prohibit live/production data in test environments', detail: 'Req 6.5.1 to 6.5.6. Test PANs must be synthetic; production data must never be used in test/dev environments.' },
+      { id: '6.1', text: 'Implement a secure SDLC; train all developers in software security at least annually', detail: 'Training must cover current threats and OWASP Top 10. Track completion with records.' },
+      { id: '6.2', text: 'Review all custom and bespoke software for security vulnerabilities before every production release', detail: 'Automated SAST/DAST tools acceptable; manual code review required for payment-critical paths.' },
+      { id: '6.3', text: 'Prevent/mitigate OWASP Top 10 vulnerabilities: injection, XSS, broken auth, IDOR, and CSRF in all custom code', detail: 'Explicitly includes SQL injection, NoSQL injection, OS injection, and LDAP injection.' },
+      { id: '6.4', text: 'Apply critical security patches within 1 month of release; apply all other patches within 6 months', detail: 'Critical refers to CVSS v3.1 scores 9.0+ or those exploiting CHD systems.' },
+      { id: '6.5', text: 'Maintain a software inventory (SBOM-equivalent) for all bespoke and custom software including third-party libraries', detail: 'Inventory must include component name, version, and supplier.', newV4: true },
+      { id: '6.6', text: 'Deploy and maintain a WAF for all public-facing web applications that actively blocks web attacks', detail: 'Automated WAF in blocking mode required. Rule sets must be updated continuously.', newV4: true },
+      { id: '6.7', text: 'For payment pages: inventory all scripts, authorize each one, and verify integrity (SRI hashes or CSP)', detail: 'Addresses Magecart/JS skimming attacks. Each script must be authorized, integrity-verified, and documented.', newV4: true },
+      { id: '6.8', text: 'Separate development, test, and production environments; prohibit live/production data in test environments', detail: 'Test PANs must be synthetic; production data must never be used in test/dev environments.' },
     ],
   },
   {
@@ -137,12 +137,12 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=175',
     mongodbFeatures: ['Role-Based Access Control (RBAC)', 'Custom Database Roles', 'Built-in Roles (read/readWrite/dbAdmin)', 'Atlas RBAC for operations'],
     items: [
-      { id: '7.1', text: 'Implement a least-privilege, need-to-know access control model with deny-all as the default', detail: 'Req 7.2.1. Every access grant must have a documented business justification.' },
-      { id: '7.2', text: 'Assign access aligned strictly with job classification and function; require formal approval for all access grants', detail: 'Req 7.2.2, 7.2.3. Requests must be approved by authorized management in writing before provisioning.' },
-      { id: '7.3', text: 'Review all user accounts and associated access privileges at least every six months', detail: 'Req 7.2.4. Accounts that no longer require access must be disabled promptly.', newV4: true },
-      { id: '7.4', text: 'Formally manage and periodically review all application and system account access privileges', detail: 'Req 7.2.5, 7.2.5.1. Service accounts, application accounts, and API keys must be inventoried.', newV4: true },
-      { id: '7.5', text: 'Restrict all cardholder data repository queries to programmatic methods only; prohibit direct query tool access', detail: 'Req 7.2.6. No analyst or DBA should run ad-hoc queries against CHD tables outside approved programmatic interfaces.' },
-      { id: '7.6', text: 'Deploy an access control system enforcing all access assignments with default set to "deny all"', detail: 'Req 7.3.1 to 7.3.3. IAM, LDAP, PAM, or database RBAC must enforce all access decisions.' },
+      { id: '7.1', text: 'Implement a least-privilege, need-to-know access control model with deny-all as the default', detail: 'Every access grant must have a documented business justification.' },
+      { id: '7.2', text: 'Assign access aligned strictly with job classification and function; require formal approval for all access grants', detail: 'Requests must be approved by authorized management in writing before provisioning.' },
+      { id: '7.3', text: 'Review all user accounts and associated access privileges at least every six months', detail: 'Accounts that no longer require access must be disabled promptly.', newV4: true },
+      { id: '7.4', text: 'Formally manage and periodically review all application and system account access privileges', detail: 'Service accounts, application accounts, and API keys must be inventoried.', newV4: true },
+      { id: '7.5', text: 'Restrict all cardholder data repository queries to programmatic methods only; prohibit direct query tool access', detail: 'No analyst or DBA should run ad-hoc queries against CHD tables outside approved programmatic interfaces.' },
+      { id: '7.6', text: 'Deploy an access control system enforcing all access assignments with default set to "deny all"', detail: 'IAM, LDAP, PAM, or database RBAC must enforce all access decisions.' },
     ],
   },
   {
@@ -153,16 +153,16 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=193',
     mongodbFeatures: ['Atlas MFA', 'LDAP/Active Directory Integration', 'x.509 Certificate Auth', 'SCRAM-SHA-256', 'OIDC / Workforce Identity Federation'],
     items: [
-      { id: '8.1', text: 'Assign a unique ID to every user before granting access to any system component or cardholder data', detail: 'Req 8.2.1. Shared accounts and generic IDs are prohibited except in documented exception cases.' },
-      { id: '8.2', text: 'Manage the full user ID lifecycle: add, modify, suspend, and delete accounts through a formal identity management process', detail: 'Req 8.2.4, 8.2.5. Terminated users must have access revoked immediately on termination day.' },
-      { id: '8.3', text: 'Disable inactive user accounts within 90 days of inactivity', detail: 'Req 8.2.6. Set automated account expiry in your IAM system.' },
-      { id: '8.4', text: 'Lock accounts after a maximum of 10 consecutive failed authentication attempts', detail: 'Req 8.3.4. Lockout duration must be at least 30 minutes or until an administrator resets the account.' },
-      { id: '8.5', text: 'Enforce passwords/passphrases of at least 12 characters containing both numeric and alphabetic characters', detail: 'Req 8.3.6. If the system cannot support 12 characters, 8-character minimum is permitted as a temporary compensating control.', newV4: true },
-      { id: '8.6', text: 'Implement MFA for ALL access into the CDE; every user, every role, every location, every method', detail: 'Req 8.4.2. One of the most impactful changes in v4.0. MFA is no longer limited to admin access.', newV4: true },
-      { id: '8.7', text: 'Implement MFA for all remote network access originating from outside the entity\'s network that could impact the CDE', detail: 'Req 8.4.3. VPN, remote desktop, SSH, and jump hosts all require MFA from outside the network perimeter.' },
-      { id: '8.8', text: 'Ensure MFA implementation is replay-proof and cannot be bypassed by any user including administrators', detail: 'Req 8.5.1. MFA bypass mechanisms must be formally controlled and audited.', newV4: true },
-      { id: '8.9', text: 'Prohibit hard-coded passwords in scripts, configuration files, and source code', detail: 'Req 8.6.2. Use secrets management solutions (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault).', newV4: true },
-      { id: '8.10', text: 'Re-authenticate idle sessions after 15 minutes of inactivity', detail: 'Req 8.2.8. Applies to all CDE-facing applications, admin consoles, and database sessions.' },
+      { id: '8.1', text: 'Assign a unique ID to every user before granting access to any system component or cardholder data', detail: 'Shared accounts and generic IDs are prohibited except in documented exception cases.' },
+      { id: '8.2', text: 'Manage the full user ID lifecycle: add, modify, suspend, and delete accounts through a formal identity management process', detail: 'Terminated users must have access revoked immediately on termination day.' },
+      { id: '8.3', text: 'Disable inactive user accounts within 90 days of inactivity', detail: 'Set automated account expiry in your IAM system.' },
+      { id: '8.4', text: 'Lock accounts after a maximum of 10 consecutive failed authentication attempts', detail: 'Lockout duration must be at least 30 minutes or until an administrator resets the account.' },
+      { id: '8.5', text: 'Enforce passwords/passphrases of at least 12 characters containing both numeric and alphabetic characters', detail: 'If the system cannot support 12 characters, 8-character minimum is permitted as a temporary compensating control.', newV4: true },
+      { id: '8.6', text: 'Implement MFA for ALL access into the CDE; every user, every role, every location, every method', detail: 'One of the most impactful changes in v4.0. MFA is no longer limited to admin access.', newV4: true },
+      { id: '8.7', text: 'Implement MFA for all remote network access originating from outside the entity\'s network that could impact the CDE', detail: 'VPN, remote desktop, SSH, and jump hosts all require MFA from outside the network perimeter.' },
+      { id: '8.8', text: 'Ensure MFA implementation is replay-proof and cannot be bypassed by any user including administrators', detail: 'MFA bypass mechanisms must be formally controlled and audited.', newV4: true },
+      { id: '8.9', text: 'Prohibit hard-coded passwords in scripts, configuration files, and source code', detail: 'Use secrets management solutions (HashiCorp Vault, AWS Secrets Manager, Azure Key Vault).', newV4: true },
+      { id: '8.10', text: 'Re-authenticate idle sessions after 15 minutes of inactivity', detail: 'Applies to all CDE-facing applications, admin consoles, and database sessions.' },
     ],
   },
   {
@@ -173,13 +173,13 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=220',
     mongodbFeatures: ['Atlas hosted in PCI-compliant data centers (SOC 2 / ISO 27001 certified)', 'Atlas physical security inherited (shared responsibility model)'],
     items: [
-      { id: '9.1', text: 'Implement appropriate physical entry controls to restrict access to the CDE and sensitive areas', detail: 'Req 9.2.1. Includes badge readers, biometric access, locked server rooms, and mantrap entryways.' },
-      { id: '9.2', text: 'Monitor sensitive areas with video surveillance or equivalent physical access control mechanisms', detail: 'Req 9.2.2. Footage must be retained per local regulations (minimum 3 months).' },
-      { id: '9.3', text: 'Implement a visitor management process: issue visitor badges, escort visitors, and maintain a visitor log', detail: 'Req 9.3.2 to 9.3.4. Log must record date/time, full name, organization, and employee granting access.' },
-      { id: '9.4', text: 'Classify all media containing cardholder data by sensitivity level; approve and log all media movements outside the facility', detail: 'Req 9.4.2 to 9.4.4. Includes backup tapes, hard drives, USB drives, and printed reports containing PAN.' },
-      { id: '9.5', text: 'Destroy all hard-copy materials containing PAN when no longer needed; render electronic media with CHD unrecoverable', detail: 'Req 9.4.6, 9.4.7. Cross-cut shredding for paper; NIST SP 800-88 cryptographic erasure or physical destruction for digital media.' },
-      { id: '9.6', text: 'Maintain an inventory of all POI devices and inspect them periodically for tampering', detail: 'Req 9.5.1 to 9.5.1.2. Visual inspection frequency must be justified via TRA.', newV4: true },
-      { id: '9.7', text: 'Train all POI-handling personnel to identify tampering, unauthorized substitution, and social engineering attempts', detail: 'Req 9.5.1.3. Personnel must know what to look for and who to report to.' },
+      { id: '9.1', text: 'Implement appropriate physical entry controls to restrict access to the CDE and sensitive areas', detail: 'Includes badge readers, biometric access, locked server rooms, and mantrap entryways.' },
+      { id: '9.2', text: 'Monitor sensitive areas with video surveillance or equivalent physical access control mechanisms', detail: 'Footage must be retained per local regulations (minimum 3 months).' },
+      { id: '9.3', text: 'Implement a visitor management process: issue visitor badges, escort visitors, and maintain a visitor log', detail: 'Log must record date/time, full name, organization, and employee granting access.' },
+      { id: '9.4', text: 'Classify all media containing cardholder data by sensitivity level; approve and log all media movements outside the facility', detail: 'Includes backup tapes, hard drives, USB drives, and printed reports containing PAN.' },
+      { id: '9.5', text: 'Destroy all hard-copy materials containing PAN when no longer needed; render electronic media with CHD unrecoverable', detail: 'Cross-cut shredding for paper; NIST SP 800-88 cryptographic erasure or physical destruction for digital media.' },
+      { id: '9.6', text: 'Maintain an inventory of all POI devices and inspect them periodically for tampering', detail: 'Visual inspection frequency must be justified via TRA.', newV4: true },
+      { id: '9.7', text: 'Train all POI-handling personnel to identify tampering, unauthorized substitution, and social engineering attempts', detail: 'Personnel must know what to look for and who to report to.' },
     ],
   },
   {
@@ -190,13 +190,13 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=251',
     mongodbFeatures: ['MongoDB Atlas Audit Logging', 'Atlas Log Integration (Datadog, Splunk, PagerDuty, Sumo Logic)', 'Change Streams', 'Atlas Alerts', 'SIEM forwarding'],
     items: [
-      { id: '10.1', text: 'Enable audit logging on all CDE systems: all user access to CHD, admin actions, invalid login attempts, and access mechanism changes', detail: 'Req 10.2.1, 10.2.1.1. Log entries must include user ID, event type, date/time, success/failure, originating system, and affected resource.' },
-      { id: '10.2', text: 'Protect audit logs from unauthorized modification and deletion; changes must generate alerts', detail: 'Req 10.2.2, 10.3.1. Logs must be write-once or append-only where possible. Implement FIM on log files.' },
-      { id: '10.3', text: 'Promptly back up audit logs to a centralized log server or other media that is difficult to alter', detail: 'Req 10.3.3. Central SIEM or syslog server with restricted write access.' },
-      { id: '10.4', text: 'Implement automated mechanisms (SIEM) to review security logs from all CDE systems at least daily', detail: 'Req 10.4.1, 10.4.1.1. Manual log review is no longer acceptable for security-critical logs.', newV4: true },
-      { id: '10.5', text: 'Retain audit logs for at least 12 months with the most recent 3 months immediately available for analysis', detail: 'Req 10.5.1. Logs older than 3 months may be in compressed/archived storage; document the retrieval SLA.' },
-      { id: '10.6', text: 'Synchronize all CDE system clocks from a trusted, industry-accepted time source', detail: 'Req 10.6.1 to 10.6.3. NTP from reliable sources; synchronization settings must be protected from unauthorized modification.' },
-      { id: '10.7', text: 'Detect, alert on, and address promptly any failures of critical security controls', detail: 'Req 10.7.2, 10.7.3. Critical controls include NSCs, IDS/IPS, FIM, anti-malware, and audit logging.', newV4: true },
+      { id: '10.1', text: 'Enable audit logging on all CDE systems: all user access to CHD, admin actions, invalid login attempts, and access mechanism changes', detail: 'Log entries must include user ID, event type, date/time, success/failure, originating system, and affected resource.' },
+      { id: '10.2', text: 'Protect audit logs from unauthorized modification and deletion; changes must generate alerts', detail: 'Logs must be write-once or append-only where possible. Implement FIM on log files.' },
+      { id: '10.3', text: 'Promptly back up audit logs to a centralized log server or other media that is difficult to alter', detail: 'Central SIEM or syslog server with restricted write access.' },
+      { id: '10.4', text: 'Implement automated mechanisms (SIEM) to review security logs from all CDE systems at least daily', detail: 'Manual log review is no longer acceptable for security-critical logs.', newV4: true },
+      { id: '10.5', text: 'Retain audit logs for at least 12 months with the most recent 3 months immediately available for analysis', detail: 'Logs older than 3 months may be in compressed/archived storage; document the retrieval SLA.' },
+      { id: '10.6', text: 'Synchronize all CDE system clocks from a trusted, industry-accepted time source', detail: 'NTP from reliable sources; synchronization settings must be protected from unauthorized modification.' },
+      { id: '10.7', text: 'Detect, alert on, and address promptly any failures of critical security controls', detail: 'Critical controls include NSCs, IDS/IPS, FIM, anti-malware, and audit logging.', newV4: true },
     ],
   },
   {
@@ -207,14 +207,14 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=292',
     mongodbFeatures: ['Atlas Security Advisor (configuration best practices)', 'MongoDB automated patching', 'Atlas vulnerability notifications'],
     items: [
-      { id: '11.1', text: 'Perform internal vulnerability scans at least every three months using authenticated scanning', detail: 'Req 11.3.1, 11.3.1.2. Rescan until all high-risk and critical findings are resolved.', newV4: true },
-      { id: '11.2', text: 'Perform external vulnerability scans via an Approved Scanning Vendor (ASV) at least every three months', detail: 'Req 11.3.2. Only PCI SSC-approved ASVs qualify. Directory: https://www.pcisecuritystandards.org/assessors_and_solutions/approved_scanning_vendors' },
-      { id: '11.3', text: 'Conduct internal and external penetration testing at least annually and after any significant infrastructure or application changes', detail: 'Req 11.4.1, 11.4.2. Testing must follow NIST SP 800-115, PTES, or OWASP methodology.' },
-      { id: '11.4', text: 'If using network segmentation to isolate the CDE, test segmentation effectiveness at least annually (service providers: every 6 months)', detail: 'Req 11.4.3. Any successful breach of the isolation invalidates the scope reduction.' },
-      { id: '11.5', text: 'Deploy IDS/IPS to detect and/or prevent intrusions into the CDE; update signatures regularly', detail: 'Req 11.4.5. Alerts must route to the security team with defined response procedures.' },
-      { id: '11.6', text: 'Implement file integrity monitoring (FIM) on critical system files; review alerts and perform comparisons at least weekly', detail: 'Req 11.5.2. FIM must cover OS binaries, configuration files, audit logs, and application code.' },
-      { id: '11.7', text: 'Deploy change-and-tamper detection for payment page HTTP headers and script contents; evaluate at least weekly', detail: 'Req 11.6.1. Addresses Magecart/JS skimming attacks targeting payment pages.', newV4: true },
-      { id: '11.8', text: 'Manage wireless access point detection quarterly; alert on unauthorized APs within 24 hours', detail: 'Req 11.2.1. Use wireless intrusion detection, automated scanning, or physical sweeps.' },
+      { id: '11.1', text: 'Perform internal vulnerability scans at least every three months using authenticated scanning', detail: 'Rescan until all high-risk and critical findings are resolved.', newV4: true },
+      { id: '11.2', text: 'Perform external vulnerability scans via an Approved Scanning Vendor (ASV) at least every three months', detail: 'Only PCI SSC-approved ASVs qualify. Directory: https://www.pcisecuritystandards.org/assessors_and_solutions/approved_scanning_vendors' },
+      { id: '11.3', text: 'Conduct internal and external penetration testing at least annually and after any significant infrastructure or application changes', detail: 'Testing must follow NIST SP 800-115, PTES, or OWASP methodology.' },
+      { id: '11.4', text: 'If using network segmentation to isolate the CDE, test segmentation effectiveness at least annually (service providers: every 6 months)', detail: 'Any successful breach of the isolation invalidates the scope reduction.' },
+      { id: '11.5', text: 'Deploy IDS/IPS to detect and/or prevent intrusions into the CDE; update signatures regularly', detail: 'Alerts must route to the security team with defined response procedures.' },
+      { id: '11.6', text: 'Implement file integrity monitoring (FIM) on critical system files; review alerts and perform comparisons at least weekly', detail: 'FIM must cover OS binaries, configuration files, audit logs, and application code.' },
+      { id: '11.7', text: 'Deploy change-and-tamper detection for payment page HTTP headers and script contents; evaluate at least weekly', detail: 'Addresses Magecart/JS skimming attacks targeting payment pages.', newV4: true },
+      { id: '11.8', text: 'Manage wireless access point detection quarterly; alert on unauthorized APs within 24 hours', detail: 'Use wireless intrusion detection, automated scanning, or physical sweeps.' },
     ],
   },
   {
@@ -225,16 +225,16 @@ const REQUIREMENTS: PciRequirement[] = [
     reference: 'https://docs-prv.pcisecuritystandards.org/PCI%20DSS/Standard/PCI_DSS_v4_0_1.pdf#page=338',
     mongodbFeatures: ['MongoDB Trust Center (PCI, SOC 2, ISO certs)', 'Shared Responsibility Model documentation', 'TOSM (Trust and Operational Security Manual)', 'MongoDB DPA'],
     items: [
-      { id: '12.1', text: 'Publish and maintain an information security policy; review and update it at least annually', detail: 'Req 12.1.1, 12.1.2. Policy must be disseminated to all relevant personnel. Acknowledge receipt in writing annually.' },
-      { id: '12.2', text: 'Formally assign information security responsibility to a CISO or equivalent security-knowledgeable executive', detail: 'Req 12.1.4. The responsible person must have both authority and budget to enforce security requirements.' },
-      { id: '12.3', text: 'Conduct a Targeted Risk Analysis (TRA) for each PCI DSS requirement that specifies a "periodic" activity without a defined frequency', detail: 'Req 12.3.1. Nine requirements need TRA-defined frequencies. Must be reviewed annually.', newV4: true },
-      { id: '12.4', text: 'Review cryptographic cipher suites and protocols in use at least annually; plan removal of deprecated algorithms', detail: 'Req 12.3.3. Check against NIST SP 800-131A for deprecated algorithms.', newV4: true },
-      { id: '12.5', text: 'Document and confirm the PCI DSS scope at least annually and upon significant change; obtain written executive sign-off', detail: 'Req 12.5.2. Scope creep is a common audit finding. Service providers must confirm scope every 6 months.', newV4: true },
-      { id: '12.6', text: 'Conduct a security awareness training program for all personnel upon hire and at least annually; include phishing and social engineering', detail: 'Req 12.6.1, 12.6.3. Training must cover threats relevant to each role and recognition of social engineering attempts.', newV4: true },
-      { id: '12.7', text: 'Screen all personnel with CDE access prior to hire; conduct background checks appropriate to their level of access', detail: 'Req 12.7.1. At minimum: identity verification, criminal record check, and employment history verification.' },
-      { id: '12.8', text: 'Maintain a list of all third-party service providers (TPSPs) with written agreements documenting PCI DSS responsibility allocation', detail: 'Req 12.8.1 to 12.8.5. Includes cloud providers, payment processors, hosting companies, and managed service providers.' },
-      { id: '12.9', text: 'Maintain and test an incident response plan annually; ensure 24/7 availability of incident response contacts', detail: 'Req 12.10.1 to 12.10.4. Test via tabletop exercises or simulations. Document lessons learned.' },
-      { id: '12.10', text: 'Define incident response procedures for PAN found in unexpected locations; include response, notification, and isolation steps', detail: 'Req 12.10.7. Automated tools to scan for PAN in unexpected systems recommended.', newV4: true },
+      { id: '12.1', text: 'Publish and maintain an information security policy; review and update it at least annually', detail: 'Policy must be disseminated to all relevant personnel. Acknowledge receipt in writing annually.' },
+      { id: '12.2', text: 'Formally assign information security responsibility to a CISO or equivalent security-knowledgeable executive', detail: 'The responsible person must have both authority and budget to enforce security requirements.' },
+      { id: '12.3', text: 'Conduct a Targeted Risk Analysis (TRA) for each PCI DSS requirement that specifies a "periodic" activity without a defined frequency', detail: 'Nine requirements need TRA-defined frequencies. Must be reviewed annually.', newV4: true },
+      { id: '12.4', text: 'Review cryptographic cipher suites and protocols in use at least annually; plan removal of deprecated algorithms', detail: 'Check against NIST SP 800-131A for deprecated algorithms.', newV4: true },
+      { id: '12.5', text: 'Document and confirm the PCI DSS scope at least annually and upon significant change; obtain written executive sign-off', detail: 'Scope creep is a common audit finding. Service providers must confirm scope every 6 months.', newV4: true },
+      { id: '12.6', text: 'Conduct a security awareness training program for all personnel upon hire and at least annually; include phishing and social engineering', detail: 'Training must cover threats relevant to each role and recognition of social engineering attempts.', newV4: true },
+      { id: '12.7', text: 'Screen all personnel with CDE access prior to hire; conduct background checks appropriate to their level of access', detail: 'At minimum: identity verification, criminal record check, and employment history verification.' },
+      { id: '12.8', text: 'Maintain a list of all third-party service providers (TPSPs) with written agreements documenting PCI DSS responsibility allocation', detail: 'Includes cloud providers, payment processors, hosting companies, and managed service providers.' },
+      { id: '12.9', text: 'Maintain and test an incident response plan annually; ensure 24/7 availability of incident response contacts', detail: 'Test via tabletop exercises or simulations. Document lessons learned.' },
+      { id: '12.10', text: 'Define incident response procedures for PAN found in unexpected locations; include response, notification, and isolation steps', detail: 'Automated tools to scan for PAN in unexpected systems recommended.', newV4: true },
     ],
   },
 ];
@@ -254,11 +254,11 @@ const MONGODB_MAPPING = [
     docs: 'https://www.mongodb.com/docs/atlas/security-ssl/' },
   { reqs: '7 & 8', area: 'Access Control and Authentication',
     features: ['Role-Based Access Control (RBAC) with built-in and custom roles', 'Atlas MFA (TOTP, SMS, Okta, etc.)', 'LDAP/Active Directory integration', 'x.509 certificate authentication', 'SCRAM-SHA-256 (default)', 'OIDC / Workforce Identity Federation (AWS IAM, GCP Service Accounts)'],
-    description: 'Atlas RBAC supports granular roles at the database, collection, and field level. Combined with LDAP integration, your existing corporate IAM policies apply directly to database access; a single source of truth for access provisioning that directly satisfies Req 7 and 8.',
+    description: 'Atlas RBAC supports granular roles at the database, collection, and field level. Combined with LDAP integration, your existing corporate IAM policies apply directly to database access; a single source of truth for access provisioning that directly satisfies the access-control requirements.',
     docs: 'https://www.mongodb.com/docs/atlas/security-add-mongodb-users/' },
   { reqs: '10', area: 'Audit Logging and SIEM Integration',
     features: ['Atlas Database Audit Logging (authentication, authorization, CRUD operations)', 'Atlas Log Integration to Datadog, Splunk, Sumo Logic, PagerDuty', 'MongoDB Change Streams for real-time data access monitoring', 'Atlas Alerts for anomaly detection'],
-    description: 'Atlas audit logging captures every authentication attempt, authorization decision, and data operation with user ID, timestamp, source IP, and outcome. Log Integration forwards these in real time to your SIEM, satisfying the automated daily review requirement (Req 10.4.1.1) without manual intervention.',
+    description: 'Atlas audit logging captures every authentication attempt, authorization decision, and data operation with user ID, timestamp, source IP, and outcome. Log Integration forwards these in real time to your SIEM, satisfying the automated daily review requirement without manual intervention.',
     docs: 'https://www.mongodb.com/docs/atlas/database-auditing/' },
   { reqs: '11', area: 'Security Testing and Vulnerability Management',
     features: ['Atlas Security Advisor (configuration recommendations)', 'Automated minor-version patching (Atlas manages underlying infrastructure)', 'MongoDB Security Advisories (CVE notifications)'],
@@ -301,7 +301,7 @@ const TAB_HREF: Record<Tab, string> = {
 const HELP_TABS: Array<{ id: Tab; label: string; icon: LucideIcon }> = [
   { id: 'overview',  label: 'Overview',                 icon: Eye },
   { id: 'roles',     label: 'Your Role',                icon: Users },
-  { id: 'checklist', label: 'PCI DSS v4.0.1 Checklist', icon: CheckSquare },
+  { id: 'checklist', label: 'PCI DSS Checklist', icon: CheckSquare },
   { id: 'mongodb',   label: 'Architecture Proposal',    icon: Database },
   { id: 'qa',        label: 'Q&A',                      icon: MessageCircle },
 ];
@@ -490,7 +490,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
           />
         </div>
 
-        {/* Tabs — desktop: bottom-border underline; mobile: carousel */}
+        {/* Tabs: desktop: bottom-border underline; mobile: carousel */}
         <div className="screen-only mb-6">
           {/* Desktop (md+) */}
           <div className="hidden md:flex border-b border-gray-300 gap-1">
@@ -550,9 +550,8 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </p>
             <p className="text-gray-400 text-sm leading-relaxed">
               The data model follows <span className="text-gray-200 font-medium">BIAN</span> service domains (Card
-              Transaction SD-254, Fraud Diagnosis SD-83, Customer Agreement SD-53, External Provider Arrangements SD-193),
-              and the security controls map to <span className="text-gray-200 font-medium">PCI DSS v4.0.1</span> (Req 3
-              encryption, Req 7/8 access control, Req 10 logging). BIAN gives an industry-standard structure; PCI DSS gives
+              Transaction, Fraud Diagnosis, Customer Agreement, External Provider Arrangements),
+              and the security controls map to <span className="text-gray-200 font-medium">PCI DSS v4.0.1</span>. BIAN gives an industry-standard structure; PCI DSS gives
               the control objectives.
             </p>
           </div>
@@ -633,16 +632,16 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { req: 'Req 3',    title: 'Stored Data Protection', desc: 'Full PAN only in the issuer module vault (QE); PSP core keeps token + BIN + last4; CVV derived, never stored.' },
-                { req: 'Req 7, 8', title: 'Access Control and Auth', desc: 'Data-driven RBAC (ADR-030); each role gets the minimum data access.' },
-                { req: 'Req 10',   title: 'Audit Logging',           desc: 'Every case action logged with user, timestamp, and action type.' },
-                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'SD-53/91 identity, SD-64/65/66 payments, SD-83 fraud, SD-88/89, SD-193.' },
+                { req: 'PCI DSS', title: 'Stored Data Protection', desc: 'Full PAN only in the issuer module vault (QE); PSP core keeps token + BIN + last4; CVV derived, never stored.' },
+                { req: 'PCI DSS', title: 'Access Control and Auth', desc: 'Data-driven RBAC (ADR-030); each role gets the minimum data access.' },
+                { req: 'PCI DSS', title: 'Audit Logging',           desc: 'Every case action logged with user, timestamp, and action type.' },
+                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'Identity, payments, fraud, cards, merchants and the integration hub.' },
                 { req: 'OAuth/OIDC', title: 'Identity and SSO',      desc: 'OAuth 2.0 + PKCE, OpenID Connect, CIBA passwordless, FIDO2/WebAuthn, NIST 800-63B.' },
                 { req: 'PSD2',     title: 'Open Banking (AIS/PIS)',  desc: 'AISP account validation and PISP payment initiation as pluggable providers.' },
                 { req: 'GDPR',     title: 'Data Protection',         desc: 'Art. 5 minimization and masking; Art. 32 encryption at rest and access control.' },
                 { req: 'ISO 20022', title: 'Payment Messaging',      desc: 'pacs.002, RemittanceInformation and mandate ids across ACH/SEPA/SWIFT rails.' },
               ].map(a => (
-                <div key={a.req} className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3.5">
+                <div key={a.title} className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-3.5">
                   <p className="text-[#00ED64] text-xs font-bold mb-1">{a.req}</p>
                   <p className="text-gray-200 text-xs font-semibold mb-1">{a.title}</p>
                   <p className="text-gray-500 text-xs leading-snug">{a.desc}</p>
@@ -665,7 +664,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                   <p className="text-[11px] font-semibold text-[#00ED64] uppercase tracking-widest mb-2">Your access in this demo</p>
                   <h2 className="text-base font-semibold text-white mb-3">What your role can do, see, and is accountable for</h2>
                   <p className="text-gray-400 text-sm leading-relaxed">
-                    Access in this platform follows PCI DSS <span className="text-gray-200 font-medium">least-privilege, need-to-know</span> (Req 7):
+                    Access in this platform follows PCI DSS <span className="text-gray-200 font-medium">least-privilege, need-to-know</span>:
                     every role is granted the minimum data and actions required for its job. This page explains the responsibilities of the role
                     you are signed in as, and how they map to the PCI DSS requirements detailed in the Checklist tab.
                   </p>
@@ -838,9 +837,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                   onClick={() => toggle(req.num, expanded, setExpanded)}
                   className="screen-only w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-gray-800/40 transition-colors"
                 >
-                  <div className={`shrink-0 w-8 h-8 rounded-lg ${gc.bg} flex items-center justify-center`}>
-                    <span className={`text-xs font-black ${gc.text}`}>{req.num}</span>
-                  </div>
+                  <div className={`shrink-0 w-2.5 h-8 rounded-full ${gc.bg}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-gray-200 text-sm font-medium leading-snug">{req.title}</p>
                     <p className={`text-xs mt-0.5 ${gc.text}`}>{GOAL_LABELS[req.goalNum]}</p>
@@ -866,7 +863,6 @@ export function HelpContent({ tab }: { tab: Tab }) {
 
                 {/* Print header (always visible in print) */}
                 <div className="print-only p-req-header">
-                  <span className="p-req-num">REQ {req.num}</span>
                   <div>
                     <div className="p-req-title">{req.title}</div>
                     <div className="p-req-goal">{req.goal}</div>
@@ -978,9 +974,17 @@ export function HelpContent({ tab }: { tab: Tab }) {
                 ['QSA',  'Qualified Security Assessor; individual certified by PCI SSC to produce ROC/AOC.'],
                 ['ASV',  'Approved Scanning Vendor; certified to perform external vulnerability scans. Required quarterly.'],
                 ['ROC',  'Report on Compliance; the assessment document produced by a QSA for Level 1 entities.'],
+                ['AOC',  'Attestation of Compliance; signed declaration of the assessment result, submitted with the ROC or SAQ.'],
                 ['SAQ',  'Self-Assessment Questionnaire; validation tool for eligible merchants/SPs. 10 types available.'],
                 ['TRA',  'Targeted Risk Analysis; formal risk analysis introduced in v4.0 for periodic activity frequencies.'],
                 ['P2PE', 'Point-to-Point Encryption; can reduce merchant scope to SAQ P2PE (approx. 33 requirements).'],
+                ['CVV',  'Card Verification Value; the 3 digit card validation code (CVV2 on Visa, CVC2 on Mastercard). SAD, never stored.'],
+                ['CID',  'Card Identification Number; the card validation code used by Amex (4 digits) and Discover (3 digits). SAD, never stored.'],
+                ['PIN',  'Personal Identification Number; cardholder authentication code. SAD, never stored; PIN blocks travel encrypted only.'],
+                ['CMK',  'Customer Master Key; the KMS-held key that wraps the DEKs. Never leaves the KMS.'],
+                ['DEK',  'Data Encryption Key; the key that actually encrypts the field data, stored wrapped by the CMK in the key vault.'],
+                ['KMS',  'Key Management Service; the external system that stores and rotates the CMK (AWS KMS, Azure Key Vault, GCP KMS).'],
+                ['SIEM', 'Security Information and Event Management; centralizes and correlates audit logs for daily review.'],
               ].map(([term, def]) => (
                 <div key={term} className="flex gap-2.5 p-def-row">
                   <span className="font-bold text-[#00ED64] text-xs shrink-0 w-12 p-def-term">{term}</span>
@@ -1045,7 +1049,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </div>
           </div>
 
-          {/* Feature mapping — collapsible panel */}
+          {/* Feature mapping: collapsible panel */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
               type="button"
@@ -1087,7 +1091,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             )}
           </div>
 
-          {/* Reference architecture — collapsible */}
+          {/* Reference architecture: collapsible */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
               type="button"
@@ -1106,7 +1110,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                 <p className="text-gray-600 text-xs mb-3">A 5-layer security model using MongoDB Atlas for a PCI DSS-compliant cardholder data environment.</p>
                 {[
                   { num: '①', label: 'Application Tier',         color: GOAL_COLORS['2'],
-                    items: ['Application-layer encryption; MongoDB driver encrypts PAN before sending to Atlas (CSFLE/QE).', 'No plaintext PAN in application logs or error messages.', 'JWT-based session management with short expiry and MFA enforcement.', 'WAF in front of all public-facing APIs (Req 6.4.2).'] },
+                    items: ['Application-layer encryption; MongoDB driver encrypts PAN before sending to Atlas (CSFLE/QE).', 'No plaintext PAN in application logs or error messages.', 'JWT-based session management with short expiry and MFA enforcement.', 'WAF in front of all public-facing APIs.'] },
                   { num: '②', label: 'Network Tier',              color: GOAL_COLORS['1'],
                     items: ['Private Endpoints; all Atlas traffic stays on cloud provider backbone, never public internet.', 'IP Access List; only application server IPs whitelisted in Atlas.', 'VPC/VNet peering for multi-region deployments.', 'TLS 1.2/1.3 enforced on all connections; cannot be downgraded.'] },
                   { num: '③', label: 'Data Tier (Atlas)',          color: GOAL_COLORS['3'],
@@ -1114,7 +1118,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                   { num: '④', label: 'Monitoring and Audit Tier', color: GOAL_COLORS['5'],
                     items: ['Atlas Audit Logging; all authentication, authorization, and CRUD operations logged.', 'Atlas Log Integration to SIEM (Datadog / Splunk / Sumo Logic).', 'Automated alerts for suspicious access patterns and configuration drift.', 'Atlas Security Advisor; continuous compliance posture monitoring.'] },
                   { num: '⑤', label: 'Key Management Tier',       color: GOAL_COLORS['4'],
-                    items: ['AWS KMS / Azure Key Vault / GCP Cloud KMS / KMIP for master key management.', 'Envelope encryption; data keys encrypted by master keys you control exclusively.', 'Key rotation policy; annual minimum, automated rotation recommended.', 'Split knowledge and dual control for key custodians (Req 3.7).'] },
+                    items: ['AWS KMS / Azure Key Vault / GCP Cloud KMS / KMIP for master key management.', 'Envelope encryption; data keys encrypted by master keys you control exclusively.', 'Key rotation policy; annual minimum, automated rotation recommended.', 'Split knowledge and dual control for key custodians.'] },
                 ].map(l => (
                   <div key={l.label} className={`rounded-lg border border-gray-700/50 bg-gray-800/30 border-l-4 ${l.color.border} p-4 p-arch-layer`}>
                     <div className="flex items-center gap-2 mb-4">
@@ -1134,7 +1138,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             )}
           </div>
 
-          {/* Value proposition — collapsible */}
+          {/* Value proposition: collapsible */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
               type="button"
@@ -1156,16 +1160,16 @@ export function HelpContent({ tab }: { tab: Tab }) {
                       desc: 'The only commercially available database solution enabling equality searches on client-side encrypted fields. Zero plaintext PAN exposure to the database server; MongoDB staff included.',
                       link: 'https://www.mongodb.com/docs/manual/core/queryable-encryption/', linkText: 'QE Docs' },
                     { title: 'Customer-Managed Keys', emoji: '🗝️',
-                      desc: 'Full cryptographic key sovereignty. Your KMS encrypts data keys; MongoDB never has access to your master keys. Satisfies Req 3.6 to 3.7 key management obligations.',
+                      desc: 'Full cryptographic key sovereignty. Your KMS encrypts data keys; MongoDB never has access to your master keys. Satisfies the key-management obligations.',
                       link: 'https://www.mongodb.com/docs/atlas/security-kms-encryption/', linkText: 'CMK Docs' },
                     { title: 'Private Networking', emoji: '🔒',
-                      desc: 'Private Endpoints ensure all CDE traffic stays on cloud-provider backbone. Combined with IP allowlisting, creates a verifiable CDE network boundary satisfying Req 1 and 2.',
+                      desc: 'Private Endpoints ensure all CDE traffic stays on cloud-provider backbone. Combined with IP allowlisting, creates a verifiable CDE network boundary satisfying the network-security requirements.',
                       link: 'https://www.mongodb.com/docs/atlas/security-private-endpoint/', linkText: 'Private Endpoint Docs' },
                     { title: 'Audit Logging and SIEM', emoji: '📋',
-                      desc: 'Field-level audit logging forwarded to SIEM in real time. Automated daily review satisfies the new Req 10.4.1.1 requirement for automated log review mechanisms.',
+                      desc: 'Field-level audit logging forwarded to SIEM in real time. Automated daily review satisfies the requirement for automated log review mechanisms.',
                       link: 'https://www.mongodb.com/docs/atlas/database-auditing/', linkText: 'Audit Docs' },
                     { title: 'RBAC and Identity Federation', emoji: '👥',
-                      desc: 'Granular role-based access at database and collection level. LDAP/AD integration, OIDC/SCIM provisioning, and workforce identity federation satisfy Req 7 and 8.',
+                      desc: 'Granular role-based access at database and collection level. LDAP/AD integration, OIDC/SCIM provisioning, and workforce identity federation satisfy the access-control requirements.',
                       link: 'https://www.mongodb.com/docs/atlas/security-add-mongodb-users/', linkText: 'RBAC Docs' },
                     { title: 'PCI Level 1 Validated SP', emoji: '🏆',
                       desc: 'Annual QSA assessment of the entire Atlas infrastructure. Request MongoDB\'s Attestation of Compliance (AOC) to reference in your own PCI assessment; reducing your compliance scope.',
@@ -1210,7 +1214,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                 </p>
                 {[
                   { label: 'Banking domain model', color: GOAL_COLORS['1'], items: [
-                    { name: 'BIAN v12 (Banking Industry Architecture Network)', desc: 'The whole data model is BIAN control records: SD-13/16/53/54 (party identity and authentication), SD-64/65/66 (payment order, execution, initiation), SD-83 (fraud diagnosis), SD-88 (card-on-file), SD-89 (merchant / OAuth client agreement), SD-91 (party authentication), SD-193 (integration hub).', link: 'https://bian.org/' },
+                    { name: 'BIAN v12 (Banking Industry Architecture Network)', desc: 'The whole data model is built from BIAN control records: party identity and authentication, payment order, execution and initiation, fraud diagnosis, card-on-file, merchant and OAuth client agreements, and the integration hub.', link: 'https://bian.org/' },
                   ] },
                   { label: 'Identity, authentication and authorization', color: GOAL_COLORS['2'], items: [
                     { name: 'OAuth 2.0 (RFC 6749)', desc: 'authorization_code, client_credentials and refresh_token grants power the merchant SSO and service-to-service calls.', link: 'https://datatracker.ietf.org/doc/html/rfc6749' },
@@ -1223,8 +1227,8 @@ export function HelpContent({ tab }: { tab: Tab }) {
                     { name: 'NIST SP 800-63B', desc: 'Authentication assurance: AAL1 today (software authenticator plus user presence), AAL2 once platform user verification is enabled.', link: 'https://pages.nist.gov/800-63-3/sp800-63b.html' },
                   ] },
                   { label: 'Open banking and data protection (PSD2, GDPR)', color: GOAL_COLORS['3'], items: [
-                    { name: 'PSD2 AISP (Account Information Service, BIAN SD-36)', desc: 'A pluggable account-information provider validates the payout account before any transfer (ADR-039).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
-                    { name: 'PSD2 PISP (Payment Initiation Service, BIAN SD-66)', desc: 'A pluggable PISP provider initiates bank transfers. The PSP holds no balances, so every transfer is external.', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'PSD2 AISP (Account Information Service)', desc: 'A pluggable account-information provider validates the payout account before any transfer (ADR-039).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'PSD2 PISP (Payment Initiation Service)', desc: 'A pluggable PISP provider initiates bank transfers. The PSP holds no balances, so every transfer is external.', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
                     { name: 'PSD2 SCA (Strong Customer Authentication)', desc: 'Aligned at the authentication layer. Dynamic linking for payment authorization is deferred (the flow authenticates identity, it does not yet authorize a specific payment).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
                     { name: 'GDPR (Art. 5 and Art. 32)', desc: 'Data minimization and masking, encryption at rest, access control and erasure. Bank data (IBAN, BIC) sits under GDPR and PSD2, outside PCI scope.', link: 'https://gdpr-info.eu/' },
                   ] },

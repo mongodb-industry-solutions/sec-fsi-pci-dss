@@ -7,23 +7,23 @@ import {
   PSP_REVENUE_ACCOUNT_REFERENCE,
 } from '../../modules/gateway/services/commissionSettlement.service';
 
-// Demo bank-transfer executions (SD-65) covering the three recipient-identity variants so the
+// Demo bank-transfer executions covering the three recipient-identity variants so the
 // payment-history detail page (/system/payment/history/{ref}) shows a navigable link or full
 // destination for each. All initiated by Luis (b0000001) from his default account.
-//   1. To a saved beneficiary (SD-54 arrangement)      → links /system/beneficiaries/{cab…}
-//   2. To a registered payout account (SD-66)          → links /system/accounts/{pau…}
+//   1. To a saved beneficiary (arrangement)      → links /system/beneficiaries/{cab…}
+//   2. To a registered payout account → links /system/accounts/{pau…}
 //   3. To an unregistered external IBAN                → shows full IBAN (QE-encrypted at rest)
-// destinationIban is QE:none — the seeder runs on the L2 encrypted client, so it is encrypted on insert.
+// destinationIban is QE:none, the seeder runs on the L2 encrypted client, so it is encrypted on insert.
 
 const INITIATOR = 'b0000001-0000-4000-8000-000000000001';       // Luis
 const SOURCE_ACCOUNT = 'pao00001-0000-4000-8000-000000000001';  // Luis' default (EUR)
 const NOW = new Date('2026-07-01T10:00:00.000Z');
 
-// v18: Espresso Works Ltd (SD-89) — merchant the commission fee is attributed to.
+// v18: Espresso Works Ltd , merchant the commission fee is attributed to.
 const ESPRESSO = 'm0000001-0000-4000-8000-000000000001';
 const COMMISSION_RATE = 0.025;
 
-// Build a merchant-commission execution (SD-65) with fee attribution (SD-89) so the merchant dashboard
+// Build a merchant-commission execution with fee attribution so the merchant dashboard
 // shows commissionRevenue after reseed. Deterministic; no balance movement (no source/resolved account).
 function commissionExecution(ref: string, gross: number, collected: Date): PaymentExecutionProcedure {
   const feeAmount = Math.round(gross * COMMISSION_RATE * 100) / 100;
@@ -43,7 +43,7 @@ function commissionExecution(ref: string, gross: number, collected: Date): Payme
 }
 
 const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
-  // 1. Beneficiary transfer — Carlos (cab00002 → party b0000003 → account pau00007)
+  // 1. Beneficiary transfer: Carlos (cab00002 → party b0000003 → account pau00007)
   {
     paymentExecutionInstanceReference: 'e0000001-0000-4000-8000-000000000001',
     paymentOrderInstanceReference:     'e0000001-0000-4000-8000-000000000001',
@@ -62,7 +62,7 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
   },
-  // 2. Registered payout account destination (pau00001) — no beneficiary arrangement
+  // 2. Registered payout account destination (pau00001), no beneficiary arrangement
   {
     paymentExecutionInstanceReference: 'e0000002-0000-4000-8000-000000000002',
     paymentOrderInstanceReference:     'e0000002-0000-4000-8000-000000000002',
@@ -79,7 +79,7 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
   },
-  // 3. Unregistered external IBAN — full IBAN stored QE-encrypted, shown to the owner
+  // 3. Unregistered external IBAN: full IBAN stored QE-encrypted, shown to the owner
   {
     paymentExecutionInstanceReference: 'e0000003-0000-4000-8000-000000000003',
     paymentOrderInstanceReference:     'e0000003-0000-4000-8000-000000000003',
@@ -120,7 +120,7 @@ export async function seedPaymentExecutions(db: Db) {
     upserted++;
 
     // Apply the balance movement ONLY when the execution is newly inserted (idempotent across
-    // reseeds), and only for settled (completed) transfers — so the seeded balances reconcile with
+    // reseeds), and only for settled (completed) transfers, so the seeded balances reconcile with
     // the account-movement ledger (opening deposit − Σ sent + Σ received). Debit the source; credit
     // an internal destination when present (external IBAN destinations leave the PSP → no credit).
     if (res.upsertedCount === 1 && exec.paymentExecutionStatus === 'completed') {
@@ -138,7 +138,7 @@ export async function seedPaymentExecutions(db: Db) {
       }
     }
 
-    // A collected merchant commission (SD-89) has a holder: credit the PSP revenue ledger and log it,
+    // A collected merchant commission has a holder: credit the PSP revenue ledger and log it,
     // mirroring what the runtime path does at settlement (commissionSettlement.service). Only fees
     // attributed to a merchant count; a bare feeAmount is a rail charge, not a commission.
     //

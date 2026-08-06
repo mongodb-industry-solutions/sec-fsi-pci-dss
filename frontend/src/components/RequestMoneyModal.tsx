@@ -37,7 +37,7 @@ export function RequestMoneyModal({ beneficiary, token, onClose }: RequestMoneyM
         // The payer display the PAYEE will see is the beneficiary label THEY chose (their own data),
         // since the payer hasn't consented to share basic data until they approve.
         payerAlias: beneficiary.counterpartyLabel,
-        // Link back to the requester's own beneficiary (SD-54), so the payee's detail can open it.
+        // Link back to the requester's own beneficiary , so the payee's detail can open it.
         payerCounterpartyReference: beneficiary.counterpartyArrangementReference,
       }, token, `rtp-ben-${Date.now()}`);
       try { await api.rtp.present(req.paymentRequestInstanceReference, token); } catch { /* still created */ }
@@ -71,7 +71,7 @@ export function RequestMoneyModal({ beneficiary, token, onClose }: RequestMoneyM
                 <Check size={24} className="text-green-600" />
               </div>
               <p className="font-semibold text-gray-900">Requested {fmtAmount(success.amount, success.currency)}</p>
-              <p className="text-sm text-gray-500 mt-1">from {beneficiary.counterpartyLabel} — awaiting their approval</p>
+              <p className="text-sm text-gray-500 mt-1">from {beneficiary.counterpartyLabel}: awaiting their approval</p>
               <p className="text-xs font-mono text-gray-400 mt-2">Ref: {success.ref.slice(0, 8)}…</p>
             </div>
             {success.qr && <QrRepresentation encodedPayload={success.qr.encodedPayload} payloadFormat={success.qr.payloadFormat} label="Let them scan to approve" />}

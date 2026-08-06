@@ -9,7 +9,7 @@ import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/model
 import type { AnalystRole } from '../models/fraudDiagnosis.model';
 
 // Resolve the acting user (unique id + name) from the JWT for individual audit accountability
-// (PCI DSS Req 10.2.1). partyRef is the stable BIAN Party reference; sub is the auth fallback.
+// (PCI DSS). partyRef is the stable BIAN Party reference; sub is the auth fallback.
 function actorOf(request: unknown): { ref?: string; name?: string } {
   const u = (request as { user?: JwtUserPayload }).user;
   return { ref: u?.partyRef ?? u?.sub, name: u?.name };
@@ -27,7 +27,7 @@ const ENRICHMENT_ROLES = ['level1_analyst', 'level2_investigator', 'security_aud
 // Statuses from which a case may be reopened (terminal states only).
 const REOPENABLE_STATUSES = ['resolved_cleared', 'resolved_fraud', 'closed'];
 
-// Separation of duties (PCI DSS Req 7; BIAN SD-83): opening/initiating a fraud case is an analyst
+// Separation of duties (PCI DSS;): opening/initiating a fraud case is an analyst
 // control action. The security auditor is read-only oversight and must not initiate cases.
 // Exported so the guard can be unit-tested without a live server (mirrors resolveTargetSub).
 export function assertOpenAllowed(userRole: string): { error: string; status: 403 } | null {
@@ -216,7 +216,7 @@ without creating a duplicate.
       },
     },
   }, async (request, reply) => {
-    // Separation of duties (PCI DSS Req 7; BIAN SD-83): opening (initiating) a fraud case is
+    // Separation of duties (PCI DSS;): opening (initiating) a fraud case is
     // an analyst control action. The security auditor is read-only oversight and must not
     // initiate cases. manager/merchant_officer/customer are already blocked from /fraud.
     const { userRole } = request as unknown as AuthenticatedRequest;
@@ -225,12 +225,12 @@ without creating a duplicate.
 
     const { transactionId, executionId, reason } = request.body as { transactionId?: string; executionId?: string; reason?: string };
 
-    // Exactly one subject reference must be supplied (card transaction OR SD-65 transfer).
+    // Exactly one subject reference must be supplied (card transaction OR transfer).
     if ((!transactionId && !executionId) || (transactionId && executionId)) {
       return reply.status(400).send({ error: 'Provide exactly one of transactionId (card) or executionId (transfer).' });
     }
 
-    // SD-65 transfer path: mirror the automated P2P compliance process (display-safe snapshot,
+    // transfer path: mirror the automated P2P compliance process (display-safe snapshot,
     // dedup, paymentExecutionInstanceReference + transactionKind). The service appends the standard
     // case_opened audit event and emits the fraud.case.opened process event via createFraudCase.
     if (executionId) {
@@ -318,7 +318,7 @@ without creating a duplicate.
 
   // GET /api/v1/fraud/stats; investigation analytics for L1/L2/auditor dashboards.
   // Registered before /:id so "stats" is not matched as a case id.
-  // Aggregates over case metadata only; no cardholder PII (PCI DSS Req 3/7).
+  // Aggregates over case metadata only; no cardholder PII (PCI DSS).
   fastify.get('/stats', {
     schema: {
       tags: ['fraud'],
@@ -346,7 +346,7 @@ without creating a duplicate.
     return reply.send(stats);
   });
 
-  // GET /api/v1/fraud/integrity; Security Auditor data-integrity oversight (PCI DSS Req 10).
+  // GET /api/v1/fraud/integrity; Security Auditor data-integrity oversight (PCI DSS).
   // Registered before /:id. Auditor-only: verifies control-record integrity (no PII).
   fastify.get('/integrity', {
     schema: {
@@ -587,7 +587,7 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
     if (body.fraudDiagnosisCaseStatus) {
       const { userRole } = request as unknown as AuthenticatedRequest;
 
-      // SoD (PCI DSS Req 7): the auditor is read-only and cannot change a case status (incl. reopen).
+      // SoD (PCI DSS): the auditor is read-only and cannot change a case status (incl. reopen).
       const statusDenied = assertStatusChangeAllowed(userRole);
       if (statusDenied) return reply.status(statusDenied.status).send({ error: statusDenied.error });
 
@@ -1017,7 +1017,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
-    // Idempotent resume: the first approval records the acceptance and audits it (PCI Req 10).
+    // Idempotent resume: the first approval records the acceptance and audits it (PCI DSS).
     // Subsequent calls (e.g. the L2 reloading the case to re-derive a fresh stateless token)
     // only re-issue the token; no duplicate acceptance timestamp, no audit-trail noise.
     const alreadyAccepted = !!fraudCase.fraudDiagnosisEscalationAcceptedAt;
@@ -1103,7 +1103,7 @@ The case status is set back to \`under_review\`. L1 can then close it as a false
     });
   });
 
-  // -- BIAN SD-83 append-only notes ------------------------------------------
+  // -- append-only notes ------------------------------------------
 
   // POST /api/v1/fraud/:id/notes
   fastify.post('/:id/notes', {
@@ -1280,7 +1280,7 @@ Retracted notes are hidden from the customer but remain visible in the internal 
     return reply.send({ notes });
   });
 
-  // POST /api/v1/fraud/:id/questions  -  L1/L2 pose a structured question to the customer (SD-83).
+  // POST /api/v1/fraud/:id/questions  -  L1/L2 pose a structured question to the customer .
   fastify.post('/:id/questions', {
     schema: {
       tags: ['fraud'],
@@ -1322,7 +1322,7 @@ page; the answer is immutable once submitted (PCI DSS Req 10 traceability).`,
   // GET /api/v1/fraud/:id/stream  -  Server-Sent Events for live case updates (e.g. a customer
   // answering a question). Investigation roles only; a valid JWT is required (no anonymous stream).
   // Consumed via fetch + ReadableStream on the client so the normal Bearer header is used (no token
-  // in the URL; PCI DSS Req 4/10). No CHD is streamed, only event kinds + opaque references.
+  // in the URL; PCI DSS). No CHD is streamed, only event kinds + opaque references.
   fastify.get('/:id/stream', {
     schema: { tags: ['fraud'], summary: 'Live case event stream (SSE)', security: [{ bearerAuth: [] }] },
   }, async (request, reply) => {

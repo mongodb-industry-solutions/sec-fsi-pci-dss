@@ -132,7 +132,7 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          {/* App requesting access — merchant logo (OIDC logo_uri) with graceful fallback (E-11) */}
+          {/* App requesting access: merchant logo (OIDC logo_uri) with graceful fallback (E-11) */}
           <div className="px-6 py-5 border-b border-gray-100 flex items-center gap-3">
             <MerchantAvatar logoUri={info.logo_uri} clientName={info.client_name} />
             <p className="text-sm text-gray-600">

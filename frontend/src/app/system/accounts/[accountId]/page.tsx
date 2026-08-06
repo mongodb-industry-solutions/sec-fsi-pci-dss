@@ -1,7 +1,7 @@
 'use client';
-// BIAN SD-66: Payout Account Detail, Customer Account Detail Page (v17 Phase C)
-// PCI DSS Req 3.3: IBAN never shown in full. GDPR: account holder data visible to data subject only.
-// PCI DSS Req 7: partyRef from JWT must match account's partyInstanceReference (enforced backend).
+// Payout Account Detail, Customer Account Detail Page (v17 Phase C)
+// PCI DSS: IBAN never shown in full. GDPR: account holder data visible to data subject only.
+// PCI DSS: partyRef from JWT must match account's partyInstanceReference (enforced backend).
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -474,7 +474,7 @@ export default function AccountDetailPage() {
                     </div>
                     {account.payoutAccountBankName && (
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {/* PCI Req 3.3: display bank name only, never full IBAN */}
+                        {/* PCI DSS: display bank name only, never full IBAN */}
                         {account.payoutAccountBankName}
                       </p>
                     )}
@@ -607,7 +607,7 @@ export default function AccountDetailPage() {
                             type="button"
                             onClick={toggleIban}
                             disabled={ibanLoading}
-                            title={ibanRevealed ? 'Hide IBAN' : 'Reveal IBAN (PCI DSS Req 3.3)'}
+                            title={ibanRevealed ? 'Hide IBAN' : 'Reveal IBAN (PCI DSS)'}
                             className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                           >
                             {ibanLoading ? (
@@ -715,7 +715,7 @@ export default function AccountDetailPage() {
                     <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
                       <Lock size={13} className="mt-0.5 shrink-0" />
                       <span>
-                        <strong>IBAN is immutable</strong> per BIAN SD-66, it uniquely identifies the account. Use the eye icon in the read-only view to reveal it. To correct an IBAN, close this account and register a new one.
+                        <strong>IBAN is immutable</strong>: it uniquely identifies the account. Use the eye icon in the read-only view to reveal it. To correct an IBAN, close this account and register a new one.
                       </span>
                     </div>
                   </div>
@@ -859,7 +859,7 @@ export default function AccountDetailPage() {
               )}
             </div>
 
-            {/* Linked payment cards (BIAN SD-88 cardAccountReference) */}
+            {/* Linked payment cards (cardAccountReference) */}
             <div className="bg-white rounded-xl border p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <CreditCard size={14} className="text-gray-400" />
@@ -969,7 +969,7 @@ export default function AccountDetailPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-700">Close this account</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Closes the account permanently (BIAN SD-66 lifecycle). No payout will be sent to a closed account.
+                      Closes the account permanently. No payout will be sent to a closed account.
                     </p>
                   </div>
                   <button

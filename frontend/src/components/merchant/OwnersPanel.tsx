@@ -1,5 +1,5 @@
 'use client';
-// v31 (SD-89 + SD-13): beneficial-owner / shareholder panel. Reused by the KYB administration detail
+// v31 (+): beneficial-owner / shareholder panel. Reused by the KYB administration detail
 // and the merchant detail Owners tab. Read-only unless `canManage` (merchants:manage). Enforces the
 // invariants client-side (sum ≤ 100 meter, one-primary) mirroring the server (which is authoritative).
 import { useEffect, useState, useCallback } from 'react';
@@ -28,7 +28,7 @@ export function OwnersPanel({ merchantId, token, canManage }: { merchantId: stri
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [newOwner, setNewOwner] = useState({ partyRef: '', role: 'shareholder', pct: 0, primary: false });
+  const [newOwner, setNewOwner] = useState({ partyRef : '', role: 'shareholder', pct: 0, primary: false });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -65,7 +65,7 @@ export function OwnersPanel({ merchantId, token, canManage }: { merchantId: stri
         merchantBeneficialOwnerIsPrimary: newOwner.primary,
       }, token);
       notify('Owner added', 'success');
-      setAdding(false); setNewOwner({ partyRef: '', role: 'shareholder', pct: 0, primary: false });
+      setAdding(false); setNewOwner({ partyRef : '', role: 'shareholder', pct: 0, primary: false });
       await load();
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not add owner', 'error'); }
   };
@@ -76,7 +76,7 @@ export function OwnersPanel({ merchantId, token, canManage }: { merchantId: stri
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><Users size={15} /> Beneficial owners / shareholders
-          <Tooltip text="SD-89 + SD-13 (FATF / 4th AMLD). 1..N owners with exactly one primary/controlling owner (UBO). Ownership % is business metadata; owner PII (name, DOB, address) lives on the party record, not here (GDPR minimization)." />
+          <Tooltip text="FATF / 4th AMLD. 1..N owners with exactly one primary/controlling owner (UBO). Ownership % is business metadata; owner PII (name, DOB, address) lives on the party record, not here (GDPR minimization)." />
         </h3>
         {canManage && !adding && (
           <button onClick={() => setAdding(true)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium"><Plus size={13} /> Add owner</button>
@@ -110,7 +110,7 @@ export function OwnersPanel({ merchantId, token, canManage }: { merchantId: stri
             {owners.map((o) => (
               <tr key={o.merchantBeneficialOwnerPartyReference} className="border-b border-gray-50">
                 <td className="py-2 pr-3">
-                  {/* Staff (merchants:manage) get a link to the owner's KYC detail — closes the KYB→KYC
+                  {/* Staff (merchants:manage) get a link to the owner's KYC detail, closes the KYB→KYC
                       analysis loop (owner layer). A merchant-owner viewing the shell sees plain text. */}
                   {canManage ? (
                     <Link href={`/system/admin/modules/kyc/${o.merchantBeneficialOwnerPartyReference}`} title="Open this owner's KYC record" className="font-medium text-[#016BF8] hover:underline inline-flex items-center gap-1">
