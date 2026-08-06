@@ -1,7 +1,7 @@
-// BIAN SD-54: Counterparty Administration — beneficiary registry
+// BIAN SD-54: Counterparty Administration, beneficiary registry
 // Each entry is a saved contact (beneficiary) in a user's personal list.
 // counterpartyArrangementReference is the opaque "beneficiary token" shared with merchants.
-// Raw phone/email is NEVER stored here — only the resolved partyInstanceReference and a masked hint.
+// Raw phone/email is NEVER stored here, only the resolved partyInstanceReference and a masked hint.
 
 import { config } from '../../../config';
 
@@ -16,11 +16,11 @@ export type CounterpartyArrangementStatus = 'active' | 'removed';
 export type CounterpartyLookupType = 'phone' | 'email';
 
 export interface CounterpartyArrangement {
-  counterpartyArrangementReference: string;  // UUID v4 — the opaque beneficiary token
+  counterpartyArrangementReference: string;  // UUID v4, the opaque beneficiary token
   ownerPartyReference: string;               // FK → party: who owns this contact entry
   counterpartyPartyReference: string;        // FK → party: the resolved beneficiary (PSP internal)
 
-  // Display — privacy-first
+  // Display: privacy-first
   counterpartyLabel: string;                 // owner-defined label or masked hint if blank at creation
   counterpartyLookupType: CounterpartyLookupType;
   counterpartyLookupHint: string;            // masked at store time: "+34 6** *** 789" or "j***@example.com"
@@ -48,7 +48,7 @@ export function maskLookupValue(type: CounterpartyLookupType, raw: string): stri
     if (!domain) return '***';
     return `${local.charAt(0)}***@${domain}`;
   }
-  // phone — keep first 3 chars + last 3 chars
+  // phone: keep first 3 chars + last 3 chars
   const digits = raw.replace(/\D/g, '');
   const prefix = raw.slice(0, raw.length - digits.length + 3); // country code area
   const last3 = digits.slice(-3);

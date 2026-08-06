@@ -1,4 +1,4 @@
-// Credit Bureau capability module controller — STATIC routes (ADR-029).
+// Credit Bureau capability module controller: STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { scoreCreditBureau } from '../services/creditBureau.service';

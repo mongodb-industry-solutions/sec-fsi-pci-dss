@@ -1,4 +1,4 @@
-// BIAN SD-15: Card Authorization — Stub adapter + Integration Hub routing
+// BIAN SD-15: Card Authorization, Stub adapter + Integration Hub routing
 //
 // When no 'card_authorization' provider is registered, falls back to stub (always approve).
 // When a real provider is configured, delegates to integrationDispatch.service.ts.
@@ -55,7 +55,7 @@ export async function authorizeCard(
   const requestAt = new Date();
 
   // PSP-level control (precedes the issuer): if the token belongs to a card-on-file the customer
-  // has DEACTIVATED (suspended) or REMOVED (revoked), decline immediately — even a valid card the
+  // has DEACTIVATED (suspended) or REMOVED (revoked), decline immediately, even a valid card the
   // issuer would approve is rejected here. New/unsaved tokens have no card-on-file and pass through.
   const onFile = await getCardByToken(db, req.cardToken);
   if (onFile && onFile.paymentCardStatus !== 'active') {
@@ -92,7 +92,7 @@ export async function authorizeCard(
   let providerRef = 'stub';
 
   if (provider && !provider.externalProviderIsInternal) {
-    // Real external provider — delegate via Integration Hub
+    // Real external provider: delegate via Integration Hub
     providerRef = provider.externalProviderArrangementInstanceReference;
     const dispatchResult = await dispatchProvider(db, 'card_authorization', 'card.authorization.requested', {
       cardToken: req.cardToken,
@@ -106,7 +106,7 @@ export async function authorizeCard(
     responseCode = result === 'approved' ? RESPONSE_CODE_APPROVED : RESPONSE_CODE_DECLINED;
     if (result === 'approved') authCode = generateAuthCode();
   } else {
-    // Stub adapter — scenario-driven or always-approve
+    // Stub adapter: scenario-driven or always-approve
     providerRef = provider?.externalProviderArrangementInstanceReference ?? 'stub';
     const catConfig = provider?.categoryConfig as CardAuthorizationConfig | undefined;
     const mode = catConfig?.simulatorMode ?? 'always_approve';

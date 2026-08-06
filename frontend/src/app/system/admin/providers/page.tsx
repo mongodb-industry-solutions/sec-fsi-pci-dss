@@ -14,6 +14,7 @@ import { useNotify } from '../../../../components/ui/ConfirmProvider';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { CAPABILITY_LIST } from '../../../../config/capabilities';
 
+import { serviceDomainLabel } from '../../../../lib/serviceDomain';
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(
   CAPABILITY_LIST.map((c) => [c.providerType, c.label])
 );
@@ -157,7 +158,7 @@ export default function IntegrationsListPage() {
       <SectionHeader
         icon={Plug}
         title="Providers"
-        description="External provider vendors; BIAN SD-193 External Provider Arrangements."
+        description="External provider vendors and their arrangements."
         debugInfo="SD-193 · ExternalProviderArrangement · PCI DSS Req 12.8.1"
         actions={
           <Link
@@ -294,7 +295,7 @@ export default function IntegrationsListPage() {
                       )}
                     </td>
                     {debugMode && (
-                      <td className="px-4 py-3 text-xs text-gray-400 font-mono">{i.bianServiceDomain}</td>
+                      <td className="px-4 py-3 text-xs text-gray-400 font-mono">{serviceDomainLabel(i.bianServiceDomain)}</td>
                     )}
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">

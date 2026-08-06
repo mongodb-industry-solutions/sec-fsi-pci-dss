@@ -91,7 +91,7 @@ export interface MerchantAgreementControlRecord {
   merchantAgreementStatus: MerchantAgreementStatus;
   merchantTier: 'standard' | 'enterprise';
 
-  // D-21: Party owner link — BIAN-canonical cross-domain reference via SD-13 Party.
+  // D-21: Party owner link, BIAN-canonical cross-domain reference via SD-13 Party.
   // v31: kept and maintained as a DERIVED pointer to the primary/controlling owner (back-compat:
   // existing N:1 reverse-lookups, payout fallback, notification routing). Always equals the party ref
   // of the merchantBeneficialOwners element whose merchantBeneficialOwnerIsPrimary === true.
@@ -105,12 +105,12 @@ export interface MerchantAgreementControlRecord {
   // Resolution order: merchantDefaultPayoutAccountReference → owner's default payoutAccount → exception
   merchantDefaultPayoutAccountReference?: string;  // FK → payoutAccountArrangement (SD-66)
 
-  // Ch-05: Review metadata (top-level — kept for backward compat). Populated by merchant_officer.
+  // Ch-05: Review metadata (top-level, kept for backward compat). Populated by merchant_officer.
   merchantReviewNote?: string;
   merchantReviewedByPartyReference?: string;        // FK → party.partyInstanceReference of reviewing officer
   merchantReviewedDateTime?: Date;
 
-  // Ch-06: BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+  // Ch-06: BQ:Step, KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
   merchantAgreementKybCheck?: MerchantAgreementKybCheck;
 
   // Gateway configuration
@@ -133,7 +133,7 @@ export interface MerchantAgreementControlRecord {
   // API key management (replaces single merchantApiKeyHash)
   merchantApiKeys: MerchantApiKeyRecord[];
 
-  // v16: OAuth 2.0 client registration (SD-89 BQ:Grant — ADR-037)
+  // v16: OAuth 2.0 client registration (SD-89 BQ:Grant, ADR-037)
   merchantOAuthClient?: MerchantOAuthClientConfig;
 
   // BIAN metadata
@@ -155,10 +155,10 @@ export type MerchantAgreementStatus =
   | 'suspended'       // Fraud hold or compliance flag
   | 'rejected'        // KYB failed or policy issue (Control: reject)
   | 'closed';         // Agreement terminated (Terminate)
-// BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+// BQ:Step, KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
 export type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
-// v31: result vocabularies (NOT lifecycle statuses — ADR-009). Reused verbatim from the provider/HRP
+// v31: result vocabularies (NOT lifecycle statuses, ADR-009). Reused verbatim from the provider/HRP
 // layer so internal and external screening speak the same language.
 export type KybBusinessRiskLevel = 'low' | 'medium' | 'high';
 export type KybScreeningResult = 'clear' | 'hit' | 'pending';
@@ -183,7 +183,7 @@ export interface MerchantAgreementKybCheck {
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';
 
-// v16: OAuth 2.0 client config (BIAN SD-89 BQ:Grant — OAuth Client Authorization, ADR-037)
+// v16: OAuth 2.0 client config (BIAN SD-89 BQ:Grant, OAuth Client Authorization, ADR-037)
 // added the CIBA grant (OIDC Client-Initiated Backchannel Authentication). Full URN, spec-faithful.
 export type OAuthGrantType =
   | 'authorization_code'

@@ -84,7 +84,7 @@ export default function DemoCaseDetailPage() {
   const [actionMsg, setActionMsg] = useState<string | null>(null);
   const [liveSignal, setLiveSignal] = useState(0);
 
-  // ADR-031: live updates via SSE — when the customer answers a question, refresh the case + panel.
+  // ADR-031: live updates via SSE, when the customer answers a question, refresh the case + panel.
   useCaseStream(caseId, token, () => { if (token) reload(token); setLiveSignal((s) => s + 1); });
 
   async function reload(resolvedToken: string) {
@@ -526,7 +526,7 @@ export default function DemoCaseDetailPage() {
                             <SensitiveReveal
                               label="Address"
                               masked="•••• (masked)"
-                              info="Residential address (SD-53). QE:none: encrypted at rest and not searchable."
+                              info="Residential address. QE:none: encrypted at rest and not searchable."
                               fetchValue={async () => fmtAddress(s.customerAgreementResidentialAddress) || 'n/a'}
                             />
                           ) : null}
@@ -804,7 +804,7 @@ export default function DemoCaseDetailPage() {
                 collection: 'fraudDiagnosisCase',
                 id: caseId,
                 label: 'fraudDiagnosisCase',
-                description: 'Raw fraud case document as stored in Atlas (SD-83)',
+                description: 'Raw fraud case document as stored in Atlas',
               },
               {
                 kind: 'mongo',

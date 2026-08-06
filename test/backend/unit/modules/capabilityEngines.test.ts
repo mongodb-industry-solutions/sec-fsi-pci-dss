@@ -1,6 +1,6 @@
 /**
  * Unit tests: internal capability Module engines (ADR-029, dev.v7 Fase 4).
- * Pure functions — no DB. Validates the engines that back /api/v1/modules/<cap>/{score|screen}.
+ * Pure functions, no DB. Validates the engines that back /api/v1/modules/<cap>/{score|screen}.
  */
 import { describe, it, expect } from 'vitest';
 import { scoreFds } from '../../../../backend/src/providers/fds/services/fds.service';

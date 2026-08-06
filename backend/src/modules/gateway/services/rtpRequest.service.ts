@@ -1,4 +1,4 @@
-// BIAN SD-65 Payment Order — Request to Pay domain service (v28).
+// BIAN SD-65 Payment Order: Request to Pay domain service (v28).
 // RTP is an INTENT domain, strictly separate from payment execution. This service owns the request
 // record lifecycle (create/get/list/present/view/cancel + transition), the per-request timeseries
 // event trail, and the business/compliance ledger emissions. Approval → linked execution lives in

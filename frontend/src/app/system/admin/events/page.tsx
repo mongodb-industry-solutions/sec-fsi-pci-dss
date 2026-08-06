@@ -6,6 +6,7 @@ import { Pagination } from '../../../../components/Pagination';
 import { api } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
 
+import { serviceDomainLabel } from '../../../../lib/serviceDomain';
 type ProcessEvent = {
   businessProcessEventInstanceReference: string;
   eventDateTime: string;
@@ -29,7 +30,7 @@ const OUTCOME_STYLES: Record<string, string> = {
 };
 
 const TAB_PROCESS_TYPES = [
-  { value: '', label: 'All' },
+  { value : '', label: 'All' },
   { value: 'payment_processing', label: 'Payment' },
   { value: 'fraud_evaluation', label: 'Fraud' },
   { value: 'aml_screening', label: 'AML' },
@@ -140,7 +141,7 @@ export default function AdminEventsPage() {
                       <span className="font-mono">{ev.entityId.slice(0, 12)}…</span>
                       {ev.performedByRole && <> · <span>{ev.performedByRole}</span></>}
                     </div>
-                    <div className="text-xs text-gray-400 mt-0.5">{ev.bianServiceDomain}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{serviceDomainLabel(ev.bianServiceDomain)}</div>
                   </div>
                   <div className="text-xs text-gray-400 shrink-0 tabular-nums">
                     {new Date(ev.eventDateTime).toLocaleString()}

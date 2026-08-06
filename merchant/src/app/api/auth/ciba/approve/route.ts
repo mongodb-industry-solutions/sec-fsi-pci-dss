@@ -1,4 +1,4 @@
-// POST /api/auth/ciba/approve — session-less relay to submit the signed assertion to the PSP.
+// POST /api/auth/ciba/approve: session-less relay to submit the signed assertion to the PSP.
 // The assertion (signature over the challenge) IS the authentication (WebAuthn model), so no session is
 // needed. Served server-side to avoid a browser→PSP CORS surface. Body: { auth_req_id, credentialId, signature }.
 import { NextRequest, NextResponse } from 'next/server';

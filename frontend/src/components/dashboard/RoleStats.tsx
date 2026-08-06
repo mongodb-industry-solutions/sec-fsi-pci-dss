@@ -150,7 +150,7 @@ function ManagerStats({ token }: { token: string }) {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<Plug size={14} />} label="Integrations" value={String(rows.length)} sub="registered" />
         <StatCard icon={<ShieldCheck size={14} />} label="Internal" value={String(internal)} sub="built-in providers" />
-        <StatCard icon={<Plug size={14} />} label="External" value={String(rows.length - internal)} sub="third-party (SD-193)" />
+        <StatCard icon={<Plug size={14} />} label="External" value={String(rows.length - internal)} sub="third-party" />
         <StatCard icon={<CheckCircle2 size={14} />} label="Healthy" value={String(healthy)} accent="text-green-600" />
       </div>
       <BreakdownBars title="By health status" total={rows.length} items={byHealth.map((x) => ({ label: x.label, value: x.value, colorClass: HEALTH_COLOR[x.label] ?? 'bg-gray-400' }))} />

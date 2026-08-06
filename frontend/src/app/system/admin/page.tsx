@@ -12,6 +12,7 @@ import { useDebugMode } from '../../../lib/debugMode';
 import { useEffectivePermissions } from '../../../lib/permissions';
 import { CAPABILITY_LIST, type CapabilityDescriptor } from '../../../config/capabilities';
 
+import { serviceDomainLabel } from '../../../lib/serviceDomain';
 interface Integration {
   externalProviderArrangementInstanceReference: string;
   externalProviderArrangementName: string;
@@ -93,7 +94,7 @@ export default function AdminDashboardPage() {
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">
                 {canManageProviders
-                  ? 'BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8'
+                  ? 'External Provider Arrangements · PCI DSS Req 12.8'
                   : 'Internal module administration (config + data) · provider status shown read-only'}
               </p>
             </div>
@@ -119,7 +120,7 @@ export default function AdminDashboardPage() {
 
         {debugMode && (
           <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">
-            <p className="text-slate-400 mb-2">SD-193 External Provider Arrangements, Registry snapshot</p>
+            <p className="text-slate-400 mb-2">External Provider Arrangements, Registry snapshot</p>
             <p>Total registered: <span className="text-[#00ED64]">{integrations.length}</span></p>
             <p>Internal (built-in): <span className="text-[#00ED64]">{integrations.filter(i => i.externalProviderIsInternal).length}</span></p>
             <p>External: <span className="text-[#00ED64]">{integrations.filter(i => !i.externalProviderIsInternal).length}</span></p>
@@ -226,7 +227,7 @@ function ModuleGrid({ activeByType, debugMode }: { activeByType: Record<string, 
             )}
 
             {debugMode && (
-              <p className="mt-2 text-[10px] font-mono text-gray-400">{cap.bianServiceDomain} · capability={cap.capability}</p>
+              <p className="mt-2 text-[10px] font-mono text-gray-400">{serviceDomainLabel(cap.bianServiceDomain)} · capability={cap.capability}</p>
             )}
           </Link>
         );

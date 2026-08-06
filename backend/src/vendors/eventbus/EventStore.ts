@@ -9,7 +9,7 @@ export const DOMAIN_EVENT_COLLECTION = 'domainEvent';
 export interface EventStore {
   /** Append one event. Idempotent: a duplicate eventId is ignored, not an error. */
   append(event: DomainEvent): Promise<void>;
-  /** All events of a journey, oldest first — the full correlated trail. */
+  /** All events of a journey, oldest first: the full correlated trail. */
   trail(correlationId: string): Promise<DomainEvent[]>;
   /** Events of a given business-process class (optionally a time window), newest first. */
   byProcess(businessProcess: BusinessProcess, opts?: { from?: string; to?: string; limit?: number }): Promise<DomainEvent[]>;

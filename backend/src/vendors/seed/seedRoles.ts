@@ -8,7 +8,7 @@ import { ROLE_COLLECTION, BUILTIN_ROLES, RoleRecord } from '../../shared/models/
 //
 // Merge strategy for existing builtin roles:
 //   - $setOnInsert: metadata fields (label, description, scope, bianServiceDomain, createdAt)
-//     — preserves manager edits to those fields.
+//: preserves manager edits to those fields.
 //   - $set rolePermissions: always overwritten from seed so new resources added to code
 //     (e.g. 'accounts' in v17) propagate on re-seed without needing a manual DB patch.
 //     A manager who customised permissions will see them reset; that is acceptable for builtin

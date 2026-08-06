@@ -490,7 +490,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
           />
         </div>
 
-        {/* Tabs — desktop: bottom-border underline; mobile: carousel */}
+        {/* Tabs: desktop: bottom-border underline; mobile: carousel */}
         <div className="screen-only mb-6">
           {/* Desktop (md+) */}
           <div className="hidden md:flex border-b border-gray-300 gap-1">
@@ -550,7 +550,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </p>
             <p className="text-gray-400 text-sm leading-relaxed">
               The data model follows <span className="text-gray-200 font-medium">BIAN</span> service domains (Card
-              Transaction SD-254, Fraud Diagnosis SD-83, Customer Agreement SD-53, External Provider Arrangements SD-193),
+              Transaction, Fraud Diagnosis, Customer Agreement, External Provider Arrangements),
               and the security controls map to <span className="text-gray-200 font-medium">PCI DSS v4.0.1</span> (Req 3
               encryption, Req 7/8 access control, Req 10 logging). BIAN gives an industry-standard structure; PCI DSS gives
               the control objectives.
@@ -636,7 +636,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                 { req: 'Req 3',    title: 'Stored Data Protection', desc: 'Full PAN only in the issuer module vault (QE); PSP core keeps token + BIN + last4; CVV derived, never stored.' },
                 { req: 'Req 7, 8', title: 'Access Control and Auth', desc: 'Data-driven RBAC (ADR-030); each role gets the minimum data access.' },
                 { req: 'Req 10',   title: 'Audit Logging',           desc: 'Every case action logged with user, timestamp, and action type.' },
-                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'SD-53/91 identity, SD-64/65/66 payments, SD-83 fraud, SD-88/89, SD-193.' },
+                { req: 'BIAN',     title: 'Service Domain Model',    desc: 'Identity, payments, fraud, cards, merchants and the integration hub.' },
                 { req: 'OAuth/OIDC', title: 'Identity and SSO',      desc: 'OAuth 2.0 + PKCE, OpenID Connect, CIBA passwordless, FIDO2/WebAuthn, NIST 800-63B.' },
                 { req: 'PSD2',     title: 'Open Banking (AIS/PIS)',  desc: 'AISP account validation and PISP payment initiation as pluggable providers.' },
                 { req: 'GDPR',     title: 'Data Protection',         desc: 'Art. 5 minimization and masking; Art. 32 encryption at rest and access control.' },
@@ -1053,7 +1053,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             </div>
           </div>
 
-          {/* Feature mapping — collapsible panel */}
+          {/* Feature mapping: collapsible panel */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
               type="button"
@@ -1095,7 +1095,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             )}
           </div>
 
-          {/* Reference architecture — collapsible */}
+          {/* Reference architecture: collapsible */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
               type="button"
@@ -1142,7 +1142,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
             )}
           </div>
 
-          {/* Value proposition — collapsible */}
+          {/* Value proposition: collapsible */}
           <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
             <button
               type="button"
@@ -1218,7 +1218,7 @@ export function HelpContent({ tab }: { tab: Tab }) {
                 </p>
                 {[
                   { label: 'Banking domain model', color: GOAL_COLORS['1'], items: [
-                    { name: 'BIAN v12 (Banking Industry Architecture Network)', desc: 'The whole data model is BIAN control records: SD-13/16/53/54 (party identity and authentication), SD-64/65/66 (payment order, execution, initiation), SD-83 (fraud diagnosis), SD-88 (card-on-file), SD-89 (merchant / OAuth client agreement), SD-91 (party authentication), SD-193 (integration hub).', link: 'https://bian.org/' },
+                    { name: 'BIAN v12 (Banking Industry Architecture Network)', desc: 'The whole data model is built from BIAN control records: party identity and authentication, payment order, execution and initiation, fraud diagnosis, card-on-file, merchant and OAuth client agreements, and the integration hub.', link: 'https://bian.org/' },
                   ] },
                   { label: 'Identity, authentication and authorization', color: GOAL_COLORS['2'], items: [
                     { name: 'OAuth 2.0 (RFC 6749)', desc: 'authorization_code, client_credentials and refresh_token grants power the merchant SSO and service-to-service calls.', link: 'https://datatracker.ietf.org/doc/html/rfc6749' },
@@ -1231,8 +1231,8 @@ export function HelpContent({ tab }: { tab: Tab }) {
                     { name: 'NIST SP 800-63B', desc: 'Authentication assurance: AAL1 today (software authenticator plus user presence), AAL2 once platform user verification is enabled.', link: 'https://pages.nist.gov/800-63-3/sp800-63b.html' },
                   ] },
                   { label: 'Open banking and data protection (PSD2, GDPR)', color: GOAL_COLORS['3'], items: [
-                    { name: 'PSD2 AISP (Account Information Service, BIAN SD-36)', desc: 'A pluggable account-information provider validates the payout account before any transfer (ADR-039).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
-                    { name: 'PSD2 PISP (Payment Initiation Service, BIAN SD-66)', desc: 'A pluggable PISP provider initiates bank transfers. The PSP holds no balances, so every transfer is external.', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'PSD2 AISP (Account Information Service)', desc: 'A pluggable account-information provider validates the payout account before any transfer (ADR-039).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
+                    { name: 'PSD2 PISP (Payment Initiation Service)', desc: 'A pluggable PISP provider initiates bank transfers. The PSP holds no balances, so every transfer is external.', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
                     { name: 'PSD2 SCA (Strong Customer Authentication)', desc: 'Aligned at the authentication layer. Dynamic linking for payment authorization is deferred (the flow authenticates identity, it does not yet authorize a specific payment).', link: 'https://www.eba.europa.eu/regulation-and-policy/payment-services-and-electronic-money' },
                     { name: 'GDPR (Art. 5 and Art. 32)', desc: 'Data minimization and masking, encryption at rest, access control and erasure. Bank data (IBAN, BIC) sits under GDPR and PSD2, outside PCI scope.', link: 'https://gdpr-info.eu/' },
                   ] },

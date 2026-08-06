@@ -231,7 +231,7 @@ export default function StaffMerchantDetailPage() {
 
         {/* KYB (BIAN SD-89 BQ:Step) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="font-semibold text-gray-800 text-sm mb-2 flex items-center gap-1.5"><ShieldCheck size={14} className="text-teal-600" /> KYB check (SD-89)</h2>
+          <h2 className="font-semibold text-gray-800 text-sm mb-2 flex items-center gap-1.5"><ShieldCheck size={14} className="text-teal-600" /> KYB check</h2>
           {kyb ? (
             <div className="divide-y divide-gray-50">
               <InfoRow label="Status" value={String(kyb.merchantAgreementKybCheckStatus ?? '-')} />
@@ -385,7 +385,7 @@ export default function StaffMerchantDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-gray-800 text-sm flex items-center gap-1.5"><ClipboardCheck size={14} className="text-[#001E2B]" /> Audit trail</h2>
-          <span className="text-[10px] font-mono text-gray-400">SD-89 · Req 10{auditDerived ? ' · derived from record' : ' · append-only log'}</span>
+          <span className="text-[10px] font-mono text-gray-400">Req 10{auditDerived ? ' · derived from record': ' · append-only log'}</span>
         </div>
         {auditRows.length === 0 ? (
           <p className="text-sm text-gray-400">No lifecycle events recorded.</p>

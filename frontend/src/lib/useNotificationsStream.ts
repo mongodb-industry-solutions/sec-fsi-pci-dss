@@ -23,7 +23,7 @@ export function useNotificationsChanged(onChange: () => void) {
 
 // ADR-031: live signal that the current user's notifications changed (SSE). Carries no data; each
 // subscriber refetches its own scoped data. Uses fetch + ReadableStream so the Bearer header is sent
-// (no token in the URL — PCI DSS Req 4).
+// (no token in the URL: PCI DSS Req 4).
 //
 // IMPORTANT: there is ONE shared connection per token, fanned out to every subscriber (the top-bar
 // bell, the sidebar badge, the transaction page, the questions panel…). Opening a separate SSE stream

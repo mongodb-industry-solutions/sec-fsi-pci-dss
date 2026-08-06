@@ -49,7 +49,7 @@ function makeDb(overrides: {
   return { db, queries };
 }
 
-describe('listAllBeneficiaries — caseRef scoping (ADR-048)', () => {
+describe('listAllBeneficiaries: caseRef scoping (ADR-048)', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('resolves the case to its customer and filters by that owner', async () => {

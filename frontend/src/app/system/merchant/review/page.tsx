@@ -121,7 +121,7 @@ export default function MerchantReviewPage() {
   function initReview(merchantId: string, action: 'approve' | 'reject') {
     setReviewState((prev) => ({
       ...prev,
-      [merchantId]: { merchantId, action, note: '', loading: false, done: false, error: '' },
+      [merchantId]: { merchantId, action, note : '', loading: false, done: false, error: '' },
     }));
     setExpanded((prev) => ({ ...prev, [merchantId]: true }));
   }
@@ -358,7 +358,7 @@ export default function MerchantReviewPage() {
                             KYB: merchantAgreementKybCheckStatus → <span className={rs.action === 'approve' ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
                               {rs.action === 'approve' ? 'verified' : 'rejected'}
                             </span>
-                            {' '}· SD-89 BQ:Step · PCI Req 12.8
+                            {' '} BQ:Step · PCI Req 12.8
                           </div>
                         )}
                       </div>

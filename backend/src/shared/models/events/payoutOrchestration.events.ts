@@ -18,11 +18,11 @@ export interface PayoutOrchestrationTriggered {
   currency: string;
 }
 
-// ── AIS — Account Information Service (SD-36 Open Banking) ───────────────────
+// ── AIS: Account Information Service (SD-36 Open Banking) ───────────────────
 
 export interface AisAccountValidationRequested {
   paymentExecutionInstanceReference: string;
-  payoutAccountInstanceReference: string;   // PSP reference — wire adapter resolves IBAN via L2 vault
+  payoutAccountInstanceReference: string;   // PSP reference, wire adapter resolves IBAN via L2 vault
   accountCountryCode: string;
   accountCurrency: string;
   requestedFields: ('balance' | 'identity' | 'status')[];
@@ -55,7 +55,7 @@ export interface PayoutExecutionCreated {
   exceptionReason?: string;
 }
 
-// ── Bank transfer — payment-initiation provider (SD-66 PISP) ─────────────────
+// ── Bank transfer: payment-initiation provider (SD-66 PISP) ─────────────────
 
 export interface BankTransferSubmitted {
   paymentExecutionInstanceReference: string;

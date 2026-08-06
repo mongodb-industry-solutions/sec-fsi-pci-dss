@@ -329,10 +329,10 @@ export default function InfoPage() {
                   </div>
                 );
               })()}
-              {/* Application versions — shown first, most relevant for quick checks */}
+              {/* Application versions: shown first, most relevant for quick checks */}
               <InfoRow
                 label="backend version"
-                value={health?.version ? `v${health.version}` : '—'}
+                value={health?.version ? `v${health.version}`: '—'}
               />
               <InfoRow
                 label="frontend version"

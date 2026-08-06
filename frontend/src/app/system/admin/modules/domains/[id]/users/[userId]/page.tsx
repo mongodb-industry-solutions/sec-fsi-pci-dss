@@ -148,7 +148,7 @@ function UserDetail() {
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
         <h2 className="font-semibold text-sm text-gray-800">Account details</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          {/* Email — protected PII, masked with reveal toggle */}
+          {/* Email: protected PII, masked with reveal toggle */}
           <div className="sm:col-span-2">
             <label className="flex items-center gap-1 text-xs text-gray-500 mb-1"><Lock size={11} className="text-gray-400" /> Email (login identifier · protected)</label>
             <div className="flex items-center gap-2">
@@ -162,7 +162,7 @@ function UserDetail() {
             </div>
             <p className="text-[10px] text-gray-400 mt-0.5">Immutable; QE-encrypted at rest and masked by default (PCI DSS Req 3.3 / data minimization).</p>
           </div>
-          {/* Phone — protected PII (party SD-13); masked with reveal toggle, editable once revealed */}
+          {/* Phone: protected PII (party SD-13); masked with reveal toggle, editable once revealed */}
           <div className="sm:col-span-2">
             <label className="flex items-center gap-1 text-xs text-gray-500 mb-1"><Lock size={11} className="text-gray-400" /> Mobile phone (protected)</label>
             <div className="flex items-center gap-2">

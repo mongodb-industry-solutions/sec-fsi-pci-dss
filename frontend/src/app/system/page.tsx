@@ -88,7 +88,7 @@ const ROLE_CARDS: Record<string, DashboardCard[]> = {
   ],
   security_auditor: [
     { label: 'Cases',          description: 'Read-only view of every fraud case and its complete audit trail.',                  icon: BriefcaseMedical, href: '/system/investigation',  bianSd: 'SD-63',  pciDss: 'Req 10.4' },
-    { label: 'Transactions',   description: 'Full transaction audit view — all fields visible, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',   bianSd: 'SD-27',  pciDss: 'Req 10.2.1' },
+    { label: 'Transactions',   description: 'Full transaction audit view, all fields visible, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',   bianSd: 'SD-27',  pciDss: 'Req 10.2.1' },
     { label: 'Users',          description: 'Customer and staff account review: authentication records and role assignments.',   icon: Users,            href: '/system/users',          bianSd: 'SD-91',  pciDss: 'Req 8.2' },
     { label: 'Audit Log',      description: 'Security event log: who did what and when, across all cases and users.',           icon: BarChart3,        href: '/system/audit',          bianSd: 'SD-16',  pciDss: 'Req 10' },
     { label: 'Audit Events',   description: 'Unified activity log across payments, compliance checks and integrations.',        icon: Activity,         href: '/system/audit-events',   bianSd: 'SD-193', pciDss: 'Req 10.2' },
@@ -368,15 +368,15 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
   const MAIN_CARDS: { label: string; description: string; icon: LucideIcon; href: string; debug: string }[] = [
     { label: 'Audit Events', description: 'Unified business, compliance and integration audit trail.', icon: Activity,   href: '/system/audit-events',           debug: 'ADR-025 · Req 10.2 / 10.7' },
     { label: 'Modules',      description: 'Internal capability engines (scoring, screening) and their config.', icon: LayoutGrid, href: '/system/admin/modules',          debug: 'ADR-029 · internal modules' },
-    { label: 'Providers',    description: 'External provider arrangements; register, route and monitor.', icon: Plug,       href: '/system/admin/providers',        debug: 'SD-193 · Req 12.8' },
-    { label: 'Groups',       description: 'Provider categories and routing groups; activate built-ins or add custom groups.', icon: Network,    href: '/system/admin/providers/groups', debug: 'SD-193 · routing portfolio' },
+    { label: 'Providers',    description: 'External provider arrangements; register, route and monitor.', icon: Plug,       href: '/system/admin/providers',        debug: 'Req 12.8' },
+    { label: 'Groups',       description: 'Provider categories and routing groups; activate built-ins or add custom groups.', icon: Network,    href: '/system/admin/providers/groups', debug: 'routing portfolio' },
   ];
 
   return (
     <>
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900">Integration Hub</h2>
-        <p className="text-sm text-gray-500 mt-0.5">BIAN SD-193 External Provider Arrangements · PCI DSS Req 12.8</p>
+        <p className="text-sm text-gray-500 mt-0.5">External Provider Arrangements · PCI DSS Req 12.8</p>
       </div>
 
       {/* Primary sections */}
@@ -403,7 +403,7 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
 
       {debugMode && (
         <div className="mt-6 bg-slate-900 rounded-xl p-4 text-xs font-mono text-slate-300">
-          <p className="text-slate-400 mb-2">SD-193 External Provider Arrangements, Registry snapshot</p>
+          <p className="text-slate-400 mb-2">External Provider Arrangements, Registry snapshot</p>
           <p>Total registered: <span className="text-[#00ED64]">{integrations.length}</span></p>
           <p>Internal (built-in): <span className="text-[#00ED64]">{integrations.filter(i => i.externalProviderIsInternal).length}</span></p>
           <p>External: <span className="text-[#00ED64]">{integrations.filter(i => !i.externalProviderIsInternal).length}</span></p>

@@ -15,9 +15,9 @@ export interface PartyTransferPreferences {
   requireConfirmationAboveCurrency?: string; // ISO 4217
 }
 
-// BIAN SD-13 Party Reference Data — postal contact point. Applies uniformly to any party
+// BIAN SD-13 Party Reference Data: postal contact point. Applies uniformly to any party
 // type (customer or employee). PII under GDPR; stored plaintext for display (same posture as
-// partyName / partyDateOfBirth in this record — this is not PCI-scoped card data).
+// partyName / partyDateOfBirth in this record: this is not PCI-scoped card data).
 export interface PartyPostalAddress {
   line1: string;
   line2?: string;
@@ -34,7 +34,7 @@ export interface PartyControlRecord {
   // is also absent and the (partial) unique index skips the document. See createIndexes.ts.
   partyMobilePhoneNumber?: string;
   // Blind index: keyed HMAC of the normalized phone (NOT encrypted). Enforces phone
-  // uniqueness via a plaintext partial unique index — QE fields cannot have unique indexes.
+  // uniqueness via a plaintext partial unique index: QE fields cannot have unique indexes.
   // Derived from partyMobilePhoneNumber; never set by clients directly. See digest.ts.
   partyMobilePhoneNumberDigest?: string;
   // QE:substring (v27): analysts run "contains" searches over the encrypted name.

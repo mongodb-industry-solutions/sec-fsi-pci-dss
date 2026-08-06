@@ -1,5 +1,5 @@
 'use client';
-// v18 D-04/D-05/D-09 + v23: "Authorized Applications" — the user's connected apps (GitHub/Google style).
+// v18 D-04/D-05/D-09 + v23: "Authorized Applications", the user's connected apps (GitHub/Google style).
 // Lists the merchant apps the user authorized via OIDC: logo, name, approval date/time, scope summary,
 // last use and status. Self-scoped (the caller's own `sub`). Search + status filter + pagination.
 // Revoke is a SOFT action: a revoked app stays listed so the user can still review its past data and

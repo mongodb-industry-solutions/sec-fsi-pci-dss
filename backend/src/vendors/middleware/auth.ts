@@ -26,7 +26,7 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/auth/register',
   '/api/v1/auth/domains',
   // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
-  // or their own RS256 access token — NOT the PSP session JWT. Exact paths only, so the
+  // or their own RS256 access token, NOT the PSP session JWT. Exact paths only, so the
   // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
   '/.well-known/openid-configuration',
   '/api/v1/auth/jwks',
@@ -125,14 +125,14 @@ async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload):
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
-  // Match against the pathname only — query strings (e.g. ?featured=true) must
+  // Match against the pathname only: query strings (e.g. ?featured=true) must
   // not break public-route matching.
   const path = url.split('?')[0];
 
   // Routes that opt out of JWT via `config: { skipAuth: true }` validate their own
   // caller identity in-handler. The internal capability-module engines (ADR-029:
   // /api/v1/modules/<cap>/score|screen) use the X-Integration-Source header instead
-  // of a Bearer token — the EDA dispatcher calls them server-to-server, not as a user.
+  // of a Bearer token: the EDA dispatcher calls them server-to-server, not as a user.
   const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean; dualAuth?: boolean };
   if (routeConfig.skipAuth) {
     attachRbacContext(request);
@@ -213,7 +213,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   }
 
   // Customers are blocked from investigation, customer-search, and audit endpoints (but may
-  // manage their own stored cards — see isCustomerBlocked). They use /api/v1/auth/me otherwise.
+  // manage their own stored cards: see isCustomerBlocked). They use /api/v1/auth/me otherwise.
   const role = (payload as { role?: string }).role;
   if (isCustomerBlocked(role, url)) {
     return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });

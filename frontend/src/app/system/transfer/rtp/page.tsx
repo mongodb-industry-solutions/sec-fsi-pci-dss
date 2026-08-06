@@ -1,5 +1,5 @@
 'use client';
-// v28 Request to Pay — payee creates a request money (a transfer that needs the payer's approval).
+// v28 Request to Pay: payee creates a request money (a transfer that needs the payer's approval).
 // On create we present it to the payer (lands in their approval inbox + notification) and offer a
 // shared QR so the payer can scan instead of receiving in-app. Requires the payee to have an active
 // payout account (create guard on the backend; surfaced here).

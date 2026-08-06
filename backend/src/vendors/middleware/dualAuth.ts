@@ -40,7 +40,7 @@ function sessionRole(request: FastifyRequest): string | undefined {
 /**
  * preHandler: authorize a dual-auth capability route.
  *  · OAuth channel (request.merchantContext present): require the route's scope (403 otherwise).
- *  · Session channel: enforce the RBAC action via can() — identical to requirePermission('view'/'manage').
+ *  · Session channel: enforce the RBAC action via can(), identical to requirePermission('view'/'manage').
  * Separation of duties: an OAuth token is never granted staff RBAC, and a session is never scope-gated.
  */
 export function dualPermission(opts: DualPermissionOptions) {

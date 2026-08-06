@@ -4,7 +4,7 @@ import { CUSTOMER_QUESTION_COLLECTION, CustomerQuestionRecord } from '../../modu
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../modules/fraud/models/fraudDiagnosis.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../modules/customer/models/customerAgreement.model';
 
-// ADR-031: notifications are a DERIVED read-model — there is no static dataset to load. This seeder
+// ADR-031: notifications are a DERIVED read-model, there is no static dataset to load. This seeder
 // materializes notifications from the authoritative records so the bell/page are populated out of the
 // box. `createNotification` de-dupes by (party, type, relatedReference), so this is idempotent and
 // safe to re-run. No CHD is written (PCI DSS Req 3); each notification is scoped to a recipient party.

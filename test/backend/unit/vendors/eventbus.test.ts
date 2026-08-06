@@ -1,5 +1,5 @@
 /**
- * Unit tests: EventBus vendor (dev.v8 F1). Pure — no DB. Uses an injectable in-memory EventStore.
+ * Unit tests: EventBus vendor (dev.v8 F1). Pure, no DB. Uses an injectable in-memory EventStore.
  * Validates the stable contract: publish persists (CHD-sanitized), pattern subscribe/wildcard
  * delivery, idempotency by eventId, and the correlated trail.
  */

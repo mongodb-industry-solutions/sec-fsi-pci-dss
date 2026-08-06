@@ -135,7 +135,7 @@ export async function syncCardRegistry(db: Db, token: string): Promise<{ cardHol
   const now = new Date();
 
   if (holders.length === 0) {
-    // No active holders left — drop the registry entry (the card is no longer on file anywhere).
+    // No active holders left: drop the registry entry (the card is no longer on file anywhere).
     await reg.deleteOne({ paymentCardReference: token });
     return { cardHolderCount: 0 };
   }
@@ -211,7 +211,7 @@ export async function registerCardForCustomer(db: Db, input: CreateCardInput): P
   if (existing && existing.paymentCardStatus !== 'revoked') {
     cardId = existing.paymentCardInstanceReference;
     status = existing.paymentCardStatus;
-    reused = true; // already on file for this customer — do not duplicate
+    reused = true; // already on file for this customer: do not duplicate
   } else if (existing && existing.paymentCardStatus === 'revoked') {
     // Re-register a previously removed card: reactivate and refresh details.
     const set: Record<string, unknown> = { paymentCardStatus: 'active', paymentCardMandateStatus: 'active', recordUpdatedDateTime: new Date() };
@@ -283,7 +283,7 @@ export async function getCardIntegrity(db: Db) {
 export async function rebuildCardRegistry(db: Db): Promise<number> {
   // QE-encrypted collections do NOT support the `distinct` command (the driver attaches
   // `distinct.encryptionInformation`, which the server / crypt_shared rejects). Use an aggregation
-  // `$group` on the (non-encrypted) surrogate token instead — supported on QE collections.
+  // `$group` on the (non-encrypted) surrogate token instead: supported on QE collections.
   const grouped = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .aggregate([{ $group: { _id: '$paymentCardReference' } }])
     .toArray();
@@ -294,7 +294,7 @@ export async function rebuildCardRegistry(db: Db): Promise<number> {
 
 // v29 admin (SD-88, built-in module card-issuer): cross-party GLOBAL card list for the operations
 // officer. Display-safe projection identical to the customer list (surrogate token, masked PAN,
-// network, status, agreement ref, dates) — the QE:none expiry is NOT included here (returned only by
+// network, status, agreement ref, dates): the QE:none expiry is NOT included here (returned only by
 // the per-card detail). Revoked cards are retained for audit and excluded. Paginated + filterable.
 export async function listAllCards(
   db: Db,
@@ -393,7 +393,7 @@ export async function getCardsByCustomer(db: Db, customerRef: string) {
     // Revoked (customer-removed) cards are retained for audit but excluded from the list.
     .find({ customerAgreementInstanceReference: customerRef, paymentCardStatus: { $ne: 'revoked' } })
     // List projection: display-safe fields plus the surrogate token (non-CHD, used to pay with a
-    // saved card and to correlate transactions). The QE:none expiry is NOT included here — it is
+    // saved card and to correlate transactions). The QE:none expiry is NOT included here, it is
     // returned only by the per-card detail endpoint.
     .project({
       paymentCardInstanceReference: 1,

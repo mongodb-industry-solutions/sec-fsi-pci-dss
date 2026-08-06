@@ -1,4 +1,4 @@
-// EventBus PORT — the stable interface the whole system depends on. The current implementation is
+// EventBus PORT: the stable interface the whole system depends on. The current implementation is
 // in-process (EventBusInProcess); a future KafkaEventBus / RabbitEventBus implements THIS SAME
 // interface so publishers and consumers never change (dev.v8 D1).
 import { DomainEvent } from './types';

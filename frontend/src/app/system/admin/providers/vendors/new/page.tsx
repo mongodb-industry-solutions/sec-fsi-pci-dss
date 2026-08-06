@@ -6,12 +6,13 @@ import { ArrowLeft, KeyRound } from 'lucide-react';
 import { api } from '../../../../../../lib/api';
 import { getToken } from '../../../../../../lib/auth';
 import { CAPABILITY_LIST } from '../../../../../../config/capabilities';
+import { serviceDomainLabel } from '../../../../../../lib/serviceDomain';
 
-// Derived from capabilities.ts — single source of truth.
+// Derived from capabilities.ts: single source of truth.
 const TYPE_OPTIONS = CAPABILITY_LIST.map((c) => ({
   value: c.providerType,
   label: c.label,
-  hint:  c.bianServiceDomain.split(' ').slice(0, 2).join(' '),  // e.g. "SD-36"
+  hint:  serviceDomainLabel(c.bianServiceDomain),
 }));
 
 const AUTH_OPTIONS = [
@@ -27,12 +28,12 @@ const DEFAULT_CATEGORY_CONFIGS: Record<string, Record<string, unknown>> = {
   kyc_identity:    { verificationLevels: ['basic', 'enhanced'], defaultLevel: 'basic', documentTypesAccepted: ['passport', 'national_id'], livenessCheckRequired: false, biometricSupported: false, reVerificationDays: 365, dataRetentionDays: 2555, consentRequired: true },
   kyb_business:    { uboDisclosureThreshold: 25, businessTypesSupported: ['llc', 'corporation'], registrationCountries: [], dueDiligenceLevel: 'standard', renewalDays: 730, pepScreeningIncluded: true, adverseMediaScreening: false },
   aml_monitoring:  { screeningTypes: ['transaction'], watchlistSources: ['OFAC_SDN', 'FATF'], jurisdictions: [], continuousMonitoring: false, alertSeverityLevels: ['medium', 'high', 'critical'] },
-  credit_bureau:      { bureauName: '', bureauRegion: 'US', pullTypes: ['soft'], defaultPullType: 'soft', scoreRangeMin: 300, scoreRangeMax: 850, consentRequired: true, refreshFrequencyDays: 90, jurisdictions: [] },
-  card_authorization: { merchantCode: '', signatureVersion: 'HMAC_SHA256', enableThreeDS: false, mockMode: false, simulatorMode: 'scenario_driven' },
+  credit_bureau:      { bureauName : '', bureauRegion: 'US', pullTypes: ['soft'], defaultPullType: 'soft', scoreRangeMin: 300, scoreRangeMax: 850, consentRequired: true, refreshFrequencyDays: 90, jurisdictions: [] },
+  card_authorization: { merchantCode : '', signatureVersion: 'HMAC_SHA256', enableThreeDS: false, mockMode: false, simulatorMode: 'scenario_driven' },
   card_issuer:        { cardNetworks: ['visa', 'mastercard'], cvvValidationEnabled: true, pinValidationEnabled: false, mockMode: false, pinBlockFormat: 'ISO-0' },
   account_information: { alwaysVerifyActive: true, returnInternalBalance: true, identityCheckEnabled: true },
   payment_initiation:  { alwaysSucceed: true, settlementDelayT0Ms: 0, settlementDelayT1Ms: 3000, settlementDelayT2Ms: 6000, settlementDelayT3Ms: 9000 },
-  generic:            { categoryLabel: '', customEventTypes: [], description: '' },
+  generic:            { categoryLabel : '', customEventTypes: [], description: '' },
 };
 
 function NewIntegrationForm() {
@@ -43,18 +44,18 @@ function NewIntegrationForm() {
   const token = getToken() ?? '';
 
   const [form, setForm] = useState({
-    name: '',
+    name : '',
     type: TYPE_OPTIONS.some(o => o.value === preselectedType) ? preselectedType : 'fraud_detection',
     mode: 'sync',
-    endpoint: '',
-    callbackUrl: '',
+    endpoint : '',
+    callbackUrl : '',
     status: 'test',
     authScheme: 'bearer',
     bearerHeaderName: 'Authorization',
     bearerPrefix: 'Bearer',
     apiKeyHeaderName: 'X-API-Key',
     apiKeyLocation: 'header',
-    genericLabel: '',
+    genericLabel : '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -158,7 +159,7 @@ function NewIntegrationForm() {
           All Integrations
         </Link>
         <h1 className="text-xl font-bold text-gray-900 mt-2">Register Provider</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Add an external service provider to the SD-193 Integration Registry.</p>
+        <p className="text-sm text-gray-500 mt-0.5">Add an external service provider to the Integration Registry.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border p-6 space-y-5">

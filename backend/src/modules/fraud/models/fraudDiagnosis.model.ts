@@ -107,7 +107,7 @@ export interface FraudDiagnosisCaseEventRecord {
   fraudDiagnosisInstanceReference: string;               // FK to fraudDiagnosisCase
   actionDateTime: Date;
   actionType: ActionType;
-  performedByInstanceReference: string;   // unique acting-user id (partyRef/sub) — PCI DSS Req 10.2.1
+  performedByInstanceReference: string;   // unique acting-user id (partyRef/sub), PCI DSS Req 10.2.1
   performedByName?: string;                // acting user's display name (shown in the activity log)
   performedByRole: AnalystRole;
   actionDetails: Record<string, unknown>;

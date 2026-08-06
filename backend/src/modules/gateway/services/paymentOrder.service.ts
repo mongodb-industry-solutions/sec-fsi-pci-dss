@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order — MongoDB-backed service (v17)
+// BIAN SD-64: Payment Order, MongoDB-backed service (v17)
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';

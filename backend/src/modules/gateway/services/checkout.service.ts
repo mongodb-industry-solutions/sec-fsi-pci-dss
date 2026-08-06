@@ -176,12 +176,12 @@ export async function processCheckoutPayment(
 
   // v18 on-behalf-of: if the merchant app created this session while acting for a logged-in user, stamp
   // the resulting card transaction with THAT payer's canonical account reference so the purchase lands
-  // in their payment history — even when no email is typed on the hosted page. Identity ref only, no PII.
+  // in their payment history, even when no email is typed on the hosted page. Identity ref only, no PII.
   const actingAccountReference = session.checkoutSessionActingPartyReference
     ? await resolveAccountReferenceForParty(db, session.checkoutSessionActingPartyReference)
     : undefined;
 
-  // SD-15: Card Authorization — run before creating the transaction
+  // SD-15: Card Authorization, run before creating the transaction
   const mcc = input.merchantCategoryCode ?? '5999';
   const authResult = await authorizeCard(db, {
     checkoutSessionInstanceReference: input.sessionId,
@@ -221,7 +221,7 @@ export async function processCheckoutPayment(
 
   // Create the underlying card transaction. An issuer decline (e.g. a wrong CVV) is a normal business
   // outcome, not a server error: surface it as a declined payment (merchant callback + redirect back
-  // to the merchant), the same as the pre-auth decline above — never a 500.
+  // to the merchant), the same as the pre-auth decline above, never a 500.
   let txResult: Awaited<ReturnType<typeof createTransaction>>;
   try {
     txResult = await createTransaction(db, {

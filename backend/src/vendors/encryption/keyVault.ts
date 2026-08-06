@@ -54,10 +54,10 @@ export interface DEKs {
   cardExpiry: Binary;             // paymentCardManagement.paymentCardExpirationDate
   payoutIban: Binary;             // payoutAccountArrangement.payoutAccountIban (SD-66)
   payoutRouting: Binary;          // payoutAccountArrangement.payoutAccountRoutingNumber (SD-66)
-  execDestIban: Binary;           // paymentExecutionProcedure.destinationIban (SD-65) — unregistered destination
-  partyAddress: Binary;           // party.partyPostalAddress (SD-13) — GDPR PII
-  partyDob: Binary;               // party.partyDateOfBirth (SD-13) — GDPR PII
-  // v28 RTP QE:none fields (sensitive tier, L2 only) — one DEK per field per collection
+  execDestIban: Binary;           // paymentExecutionProcedure.destinationIban (SD-65), unregistered destination
+  partyAddress: Binary;           // party.partyPostalAddress (SD-13), GDPR PII
+  partyDob: Binary;               // party.partyDateOfBirth (SD-13), GDPR PII
+  // v28 RTP QE:none fields (sensitive tier, L2 only), one DEK per field per collection
   rtpPayeeAlias: Binary;          // paymentRequestProcedure.payeeAlias
   rtpPayerAlias: Binary;          // paymentRequestProcedure.payerAlias
   rtpRemittance: Binary;          // paymentRequestProcedure.unstructuredRemittance

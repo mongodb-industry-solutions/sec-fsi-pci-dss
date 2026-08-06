@@ -39,7 +39,7 @@ export const SCOPE_CATALOG: Record<string, ScopeCatalogEntry> = {
   // v28 Request to Pay (RTP) scopes.
   'read:rtp': { description: 'View your payment requests (Request to Pay)', required: false },
   'write:rtp': { description: 'Create, approve, reject and cancel payment requests (Request to Pay)', required: false },
-  // v18 (Item 2): server-to-server merchant charge scope. Machine grant (client_credentials) only —
+  // v18 (Item 2): server-to-server merchant charge scope. Machine grant (client_credentials) only,
   // never requested on the user consent page (it is the merchant's own capability, not user-delegated).
   'write:payments': { description: 'Create payments (server-to-server merchant charge)', required: false },
 };
@@ -99,7 +99,7 @@ export async function issueMerchantOAuthClient(
     throw Object.assign(new Error('Merchant must be in active status to issue OAuth credentials'), { statusCode: 400 });
   }
   if (merchant.merchantOAuthClient?.oauthClientStatus === 'active') {
-    throw Object.assign(new Error('OAuth client already active — revoke existing client first'), { statusCode: 409 });
+    throw Object.assign(new Error('OAuth client already active: revoke existing client first'), { statusCode: 409 });
   }
 
   const clientId = uuidv4();
@@ -203,7 +203,7 @@ export async function updateMerchantOAuthClient(
     throw Object.assign(new Error('Merchant not found'), { statusCode: 404 });
   }
   if (!merchant.merchantOAuthClient) {
-    throw Object.assign(new Error('No OAuth client configured for this merchant — issue one first'), { statusCode: 400 });
+    throw Object.assign(new Error('No OAuth client configured for this merchant: issue one first'), { statusCode: 400 });
   }
 
   assertHttpsOrEmpty(patch.logo_uri, 'logo_uri');
@@ -230,7 +230,7 @@ export async function updateMerchantOAuthClient(
     const newId = patch.client_id.trim();
     if (!newId) throw Object.assign(new Error('client_id cannot be empty'), { statusCode: 400 });
     if (newId !== merchant.merchantOAuthClient.oauthClientId) {
-      // Enforce global uniqueness — the client_id is the OAuth identity used to resolve the merchant.
+      // Enforce global uniqueness: the client_id is the OAuth identity used to resolve the merchant.
       const clash = await col.findOne({
         'merchantOAuthClient.oauthClientId': newId,
         merchantAgreementInstanceReference: { $ne: merchantId },
@@ -243,7 +243,7 @@ export async function updateMerchantOAuthClient(
     if (patch.client_secret.length < 8) {
       throw Object.assign(new Error('client_secret must be at least 8 characters'), { statusCode: 400 });
     }
-    // Hash the secret only. The prefix is an independent label (see below) — not derived here — so
+    // Hash the secret only. The prefix is an independent label (see below), not derived here, so
     // setting a secret never changes it and no part of the real secret is exposed via the prefix.
     credentialPatch.oauthClientSecretHash = await bcrypt.hash(patch.client_secret, 12);
   }

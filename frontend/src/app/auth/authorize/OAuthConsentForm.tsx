@@ -160,7 +160,7 @@ export default function OAuthConsentForm({
       // E-10: check what this client was ALREADY granted BEFORE deciding what to show, so the consent
       // list never flashes on screen when it is not needed.
       // OAuth2/OIDC (RFC 6749 §4.1 + OIDC Core §3.1.2.3): once an active consent grant already covers
-      // every requested scope, the authorization server SHOULD NOT re-prompt — it auto-approves
+      // every requested scope, the authorization server SHOULD NOT re-prompt: it auto-approves
       // (equivalent to "Allow") and redirects, WITHOUT showing the permissions/Allow-Deny screen.
       // Only new/broader (ungranted) scopes require the user to decide, so we show the list only then.
       try {

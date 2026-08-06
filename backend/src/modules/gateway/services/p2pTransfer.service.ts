@@ -59,10 +59,10 @@ export async function executeP2PTransfer(
   if (!senderAccount || senderAccount.partyInstanceReference !== initiatorPartyRef || senderAccount.payoutAccountStatus !== 'active') {
     return fail(amount, '', 'Source account not found or not active.');
   }
-  // Currency is always the sender account's native currency (server-authoritative — client hint is ignored).
+  // Currency is always the sender account's native currency (server-authoritative: client hint is ignored).
   const transferCurrency = senderAccount.payoutAccountCurrency;
 
-  // 3. Resolve the recipient's payout account — currency-matched active default, then any active
+  // 3. Resolve the recipient's payout account: currency-matched active default, then any active
   const recipientPartyRef = arrangement.counterpartyPartyReference;
   let recipientAccount: PayoutAccountArrangement | null = await db
     .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)

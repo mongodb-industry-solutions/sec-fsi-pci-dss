@@ -1,4 +1,4 @@
-// v17.1 Bank Transfer — RailResolver: single source of rail derivation + validation.
+// v17.1 Bank Transfer: RailResolver: single source of rail derivation + validation.
 // OOP, stateless, reusable. Given a destination (+ optional user override) it derives the
 // correct rail (SEPA/ACH/SWIFT/local) and validates the banking coordinates per standard.
 // No I/O: safe to unit-test and to call from providers, orchestrator and API alike.

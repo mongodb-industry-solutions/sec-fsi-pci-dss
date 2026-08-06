@@ -6,6 +6,7 @@ import { Card } from '../_shared';
 import { api } from '../../../../../../lib/api';
 import { useDebugMode } from '../../../../../../lib/debugMode';
 
+import { serviceDomainLabel } from '../../../../../../lib/serviceDomain';
 // ── Type descriptions ────────────────────────────────────────────────────────
 
 const TYPE_PURPOSE: Record<string, string> = {
@@ -74,7 +75,7 @@ export default function OverviewPage() {
             {TYPE_LABEL[integration.externalProviderArrangementType] ?? integration.externalProviderArrangementType}
           </span>
           <span className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 font-medium border">
-            {integration.bianServiceDomain}
+            {serviceDomainLabel(integration.bianServiceDomain)}
           </span>
           <span className={`text-xs px-2.5 py-1 rounded-full font-medium border ${
             integration.externalProviderMode === 'sync' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
@@ -171,7 +172,7 @@ export default function OverviewPage() {
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
             <div>
               <dt className="text-xs text-gray-500">BIAN Service Domain</dt>
-              <dd className="font-mono text-gray-800 mt-0.5">{integration.bianServiceDomain}</dd>
+              <dd className="font-mono text-gray-800 mt-0.5">{serviceDomainLabel(integration.bianServiceDomain)}</dd>
             </div>
             <div>
               <dt className="text-xs text-gray-500">Control Record Type</dt>

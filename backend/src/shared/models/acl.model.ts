@@ -2,13 +2,13 @@
 // PCI DSS Req 7 (role-based access control, least privilege, default-deny, documented
 // matrix + separation of duties) · BIAN SD-16 (Party Authentication).
 //
-// E1 (plan §13): the permission CATALOG (resource × action) is STATIC — it mirrors the real
+// E1 (plan §13): the permission CATALOG (resource × action) is STATIC, it mirrors the real
 // enforcement points, so no permission exists without a guard. The role→permission ASSIGNMENT
 // is DATA (the `role` collection, CRUD by the manager). Builtin roles seed from BUILTIN_ROLES.
 
 export const ROLE_COLLECTION = 'role';
 
-// Resources map 1:1 to BIAN Service Domains (or ADRs) — the protected business/admin areas.
+// Resources map 1:1 to BIAN Service Domains (or ADRs), the protected business/admin areas.
 export const RESOURCES = [
   'transactions',   // SD-254 Card Transaction
   'customers',      // SD-53 Customer Agreement
@@ -23,7 +23,7 @@ export const RESOURCES = [
   'consents',       // Open Banking consent
   'accounts',       // SD-66 Payout Account Arrangement (v17)
   'beneficiaries',  // SD-54 Counterparty Administration (v18)
-  'paymentRequests', // SD-65 Payment Order — Request to Pay intent domain (v28)
+  'paymentRequests', // SD-65 Payment Order: Request to Pay intent domain (v28)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -38,7 +38,7 @@ export interface RoleRecord {
   roleName: string;                 // PK (unique). Matches JwtUserPayload.role.
   roleLabel: string;
   roleDescription?: string;
-  rolePermissions: RolePermissions; // { [resource]: action[] } — default-deny: absent ⇒ no access
+  rolePermissions: RolePermissions; // { [resource]: action[] }, default-deny: absent ⇒ no access
   roleScope: 'own' | 'all';         // `own` = record-level scope to the caller (customer)
   roleIsBuiltin: boolean;           // builtin: editable permissions, NOT deletable (E3)
   bianServiceDomain: string;
@@ -53,7 +53,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
   {
     roleName: 'customer',
     roleLabel: 'Customer',
-    roleDescription: 'Account holder — own transactions, own stored cards and own consents only.',
+    roleDescription: 'Account holder, own transactions, own stored cards and own consents only.',
     roleScope: 'own',
     roleIsBuiltin: true,
     bianServiceDomain: 'Customer Agreement',
@@ -107,7 +107,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
-      accounts: ['view', 'viewSensitive'],  // PCI Req 3.3 — IBAN reveal for fraud investigations
+      accounts: ['view', 'viewSensitive'],  // PCI Req 3.3, IBAN reveal for fraud investigations
       // v32 A2: `investigate` authorises cross-party beneficiary SEARCH (ADR-048).
       beneficiaries: ['view', 'investigate', 'manage'],  // SD-54: search + edit/remove for investigations
       paymentRequests: ['view'],            // SD-65: read RTP requests for investigations

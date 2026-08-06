@@ -127,7 +127,7 @@ export async function notificationsController(fastify: FastifyInstance) {
       summary: 'Live notifications signal (SSE)',
       description: 'Server-Sent Events stream. Sends a `changed` signal whenever the caller\'s notifications change '
         + '(new security question raised or one answered). The client must refetch `GET /notifications` on receiving the signal. '
-        + 'Carries no notification data itself (only a trigger). Requires Bearer token in the Authorization header — no URL token.',
+        + 'Carries no notification data itself (only a trigger). Requires Bearer token in the Authorization header, no URL token.',
       security: [{ bearerAuth: [] }],
     },
   }, async (request, reply) => {

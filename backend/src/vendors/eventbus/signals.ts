@@ -14,7 +14,7 @@ export interface CaseStreamEvent {
 }
 
 // The case stream rides the canonical persisted fraud.* events (§5.2 / §9.1): the SSE `kind` maps to
-// the standard eventType — `fraud.question.created|answered`, `fraud.case.updated`.
+// the standard eventType: `fraud.question.created|answered`, `fraud.case.updated`.
 const CASE_STREAM_EVENT_TYPES = ['fraud.question.created', 'fraud.question.answered', 'fraud.case.updated'];
 
 export function publishCaseEvent(event: CaseStreamEvent): void {

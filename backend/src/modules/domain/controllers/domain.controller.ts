@@ -1,4 +1,4 @@
-// Auth Domains capability-less Module — STATIC full-CRUD routes (ADR-029) at /api/v1/modules/domains.
+// Auth Domains capability-less Module: STATIC full-CRUD routes (ADR-029) at /api/v1/modules/domains.
 // Admin-managed (JWT required; default auth applies). List supports q + pagination (10/page, §5.4).
 import { FastifyInstance } from 'fastify';
 import {

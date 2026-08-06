@@ -85,7 +85,7 @@ export default function StaffExecutionDetailPage() {
     if (!canOpen || openBusy) return;
     const ok = await confirm({
       title: 'Open investigation case?',
-      message: 'This opens a fraud diagnosis case (SD-83) for this transfer and records the action in the audit trail.',
+      message: 'This opens a fraud diagnosis case for this transfer and records the action in the audit trail.',
       confirmLabel: 'Open case',
     });
     if (!ok) return;

@@ -207,7 +207,7 @@ export async function usersController(fastify: FastifyInstance) {
       tags,
       summary: 'Delete a user',
       description: 'Permanently removes a managed user from the system. '
-        + 'Existing JWTs issued for this user remain valid until expiry — consider also forcing a logout. '
+        + 'Existing JWTs issued for this user remain valid until expiry: consider also forcing a logout. '
         + 'Requires `authDomains:manage` permission (manager role). '
         + 'Built-in demo users can be deleted but will be re-seeded on next setup run.',
       security: [{ bearerAuth: [] }],

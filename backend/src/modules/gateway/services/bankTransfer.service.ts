@@ -21,7 +21,7 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 
 /**
  * Mask a bank account identifier (IBAN or domestic account number) for display storage.
- * Keeps the first 4 and last 4 characters, masks the middle with bullets — enough to recognise
+ * Keeps the first 4 and last 4 characters, masks the middle with bullets: enough to recognise
  * and trace the destination without persisting the full number (PCI DSS Req 3.3).
  * "FR7630006000011234567890189" → "FR76••••0189"; short values keep only the last 2.
  */

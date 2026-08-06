@@ -1,6 +1,6 @@
 // Payment Initiation (PISP) builtin module controller (SD-66, ADR-029).
-// POST /score — submits a simulated bank transfer; schedules settled/failed callback on the bus.
-// GET/PUT /config — admin configuration.
+// POST /score: submits a simulated bank transfer; schedules settled/failed callback on the bus.
+// GET/PUT /config: admin configuration.
 
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
@@ -24,10 +24,10 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
   fastify.post('/transfer', {
     schema: {
       tags: ['modules:payment-initiation'],
-      summary: 'Payment initiation — submit bank transfer (internal builtin)',
+      summary: 'Payment initiation, submit bank transfer (internal builtin)',
       description: 'Submits a simulated bank transfer. Returns submitted immediately; '
         + 'fires bank.transfer.settled (or .failed) on the event bus after T+N delay. '
-        + 'IBAN is never present — uses payoutAccountInstanceReference only. '
+        + 'IBAN is never present: uses payoutAccountInstanceReference only. '
         + 'Not JWT-authenticated; requires X-Integration-Source header.',
       headers: {
         type: 'object',
@@ -126,7 +126,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
             }));
           }
         } catch {
-          // Bus may be shut down if the server is stopping — ignore gracefully
+          // Bus may be shut down if the server is stopping: ignore gracefully
         }
       }, result.settlementDelayMs);
     }

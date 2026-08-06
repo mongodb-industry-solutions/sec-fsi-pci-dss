@@ -360,7 +360,7 @@ export default function TransactionHistoryPage() {
                 placeholder="Search by merchant, card, reference, id…"
                 className="flex-1 min-w-[160px] border rounded-lg px-3 py-2 text-sm"
               />
-              {/* Direction segmented control — simple in/out for casual users. */}
+              {/* Direction segmented control: simple in/out for casual users. */}
               <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
                 {([['', 'All'], ['in', 'In'], ['out', 'Out']] as const).map(([val, label]) => (
                   <button key={val || 'all'} onClick={() => { setDirectionFilter(val); setPage(1); }}

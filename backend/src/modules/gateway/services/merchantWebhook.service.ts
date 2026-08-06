@@ -1,5 +1,5 @@
 /**
- * WebhookService — SD-89 BQ:Notification, ADR-038
+ * WebhookService: SD-89 BQ:Notification, ADR-038
  * OOP class encapsulating the typed webhook registry: registration, delivery,
  * ISO 20022-aligned test payloads, HMAC-SHA256 signing, body mapping, and
  * persistent delivery log.
@@ -208,7 +208,7 @@ export class WebhookService {
   }
 
   // Resolves the configured API key auth into extra headers or body fields for delivery.
-  // Uses keyPrefix (first 8 chars) — plaintext is never stored. For demo purposes only;
+  // Uses keyPrefix (first 8 chars): plaintext is never stored. For demo purposes only;
   // production systems should use a dedicated outbound credential stored in a secrets manager.
   static resolveApiKeyAuth(
     cfg: MerchantWebhookConfig,

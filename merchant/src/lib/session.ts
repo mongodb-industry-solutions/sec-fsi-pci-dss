@@ -1,5 +1,5 @@
 // Stateless, encrypted httpOnly session cookie (AES-256-GCM). No DB, no server store.
-// The browser never sees the Bearer/refresh token — only the encrypted blob.
+// The browser never sees the Bearer/refresh token, only the encrypted blob.
 import 'server-only';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { cookies } from 'next/headers';
@@ -15,7 +15,7 @@ export interface Session {
   idToken?: string;
   /** Epoch ms when the access token expires. */
   expiresAt: number;
-  /** Scopes actually granted by the user (may be a subset — granular consent, E-12). */
+  /** Scopes actually granted by the user (may be a subset: granular consent, E-12). */
   grantedScopes: string[];
   sub: string;
   name?: string;
@@ -77,7 +77,7 @@ export async function setSession(session: Session): Promise<void> {
 }
 
 // Attach the session cookie directly to a NextResponse. Use this in route
-// handlers that return a redirect — mutating next/headers cookies() is not
+// handlers that return a redirect: mutating next/headers cookies() is not
 // reliably merged into a returned NextResponse across Next versions.
 export function attachSession(res: NextResponse, session: Session): void {
   res.cookies.set(COOKIE_NAME, encrypt(session), sessionCookieOpts());
@@ -87,7 +87,7 @@ export async function clearSession(): Promise<void> {
   (await cookies()).delete(COOKIE_NAME);
 }
 
-// Expire the session cookie directly on a NextResponse. Use in handlers that return a redirect —
+// Expire the session cookie directly on a NextResponse. Use in handlers that return a redirect,
 // mutating next/headers cookies() is not reliably merged into a returned NextResponse across Next versions.
 export function clearSessionOn(res: NextResponse): void {
   // sameSite is restated explicitly (in addition to the spread) so static
@@ -103,7 +103,7 @@ export async function setLoginState(s: LoginState): Promise<void> {
 }
 
 // Attach the transient login-state cookie directly to a NextResponse (reliable
-// on returned redirects — see attachSession).
+// on returned redirects: see attachSession).
 export function attachLoginState(res: NextResponse, s: LoginState): void {
   res.cookies.set(LOGIN_COOKIE, encrypt(s), loginCookieOpts());
 }

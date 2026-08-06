@@ -1,7 +1,7 @@
 'use client';
 // v31: KYB administration detail (deep-linkable, §7.2). Structured entity-layer verdict + owner-layer
 // risk (composed from each UBO's KYC), beneficial-owners panel, KYB-data correction (amendmentReason
-// required; never edits the verdict/status — decision 2), and the correlated process timeline (§5bis.5).
+// required; never edits the verdict/status: decision 2), and the correlated process timeline (§5bis.5).
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -75,7 +75,7 @@ export default function KybDetailPage() {
       {/* Entity verdict + owner-layer risk */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
-          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><ShieldCheck size={15} /> Entity-layer verdict (SD-89 BQ:Step)
+          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><ShieldCheck size={15} /> Entity-layer verdict
             <Tooltip text="Structured KYB verdict produced by the screening chain (kyb_business + hrp + aml), not manual entry. businessRiskLevel/sanctions/adverse-media are result vocabularies; the BQ:Step status is derived from them by the shared mapper (§3.7)." /></h3>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-gray-500 text-xs">Status</span> <Badge label={String(kyb.merchantAgreementKybCheckStatus ?? 'n/a')} tone={kyb.merchantAgreementKybCheckStatus === 'verified' ? 'green' : kyb.merchantAgreementKybCheckStatus === 'rejected' ? 'red' : 'gray'} />
@@ -87,7 +87,7 @@ export default function KybDetailPage() {
         </div>
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
           <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">Owner-layer risk (composed)
-            <Tooltip text="Aggregated from each beneficial owner's SD-53 KYC verdict by reference (no PII duplication). A controlling person failing PEP/sanctions raises the merchant's risk." /></h3>
+            <Tooltip text="Aggregated from each beneficial owner's KYC verdict by reference (no PII duplication). A controlling person failing PEP/sanctions raises the merchant's risk." /></h3>
           {olr ? (
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge label={`PEP: ${olr.anyPep ? 'hit' : 'clear'}`} tone={olr.anyPep ? 'red' : 'green'} />

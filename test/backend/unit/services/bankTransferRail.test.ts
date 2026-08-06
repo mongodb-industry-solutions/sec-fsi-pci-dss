@@ -1,4 +1,4 @@
-// v17.1 Bank Transfer rail engine — unit tests (validators + RailResolver + FeeCalculator).
+// v17.1 Bank Transfer rail engine: unit tests (validators + RailResolver + FeeCalculator).
 import {
   isValidIban, isValidBic, isValidRoutingNumber,
   RailResolver, UnsupportedCorridorError, FeeCalculator, DEFAULT_FEE_SCHEDULE,

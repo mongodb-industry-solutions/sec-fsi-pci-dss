@@ -1,7 +1,7 @@
 // BIAN SD-66 / SD-65 / SD-15: unified account ledger entry (read-only derived view)
-// No separate collection — movements are aggregated at query time from:
+// No separate collection: movements are aggregated at query time from:
 //   paymentExecutionProcedure (outgoing disbursements)
-//   cardTransactionLog        (card debits / refunds — via card.fundingPayoutAccountInstanceReference)
+//   cardTransactionLog        (card debits / refunds: via card.fundingPayoutAccountInstanceReference)
 
 export type MovementType = 'card_debit' | 'card_refund' | 'payout_disbursement' | 'balance_credit' | 'p2p_sent' | 'p2p_received';
 export type MovementDirection = 'debit' | 'credit';

@@ -1,7 +1,7 @@
 /**
  * Unit tests (v17): funds-availability gate correctness.
  *  - checkFunds (pure): interprets the ledger balance into a funds verdict.
- *  - PaymentAuthorizationSaga: compensation — a hold made by the funds gate is released (pending ->
+ *  - PaymentAuthorizationSaga: compensation, a hold made by the funds gate is released (pending ->
  *    available) whenever the journey is declined by ANY gate, including the ordering race where the
  *    hold lands AFTER an earlier decline.
  */
@@ -59,7 +59,7 @@ describe('checkFunds (SD-36 AIS)', () => {
   });
 });
 
-describe('PaymentAuthorizationSaga — funds hold compensation', () => {
+describe('PaymentAuthorizationSaga: funds hold compensation', () => {
   let bus: EventBusInProcess;
   beforeEach(() => {
     h.completeAuthorized.mockClear(); h.declineTransaction.mockClear(); h.releaseCardHold.mockClear();

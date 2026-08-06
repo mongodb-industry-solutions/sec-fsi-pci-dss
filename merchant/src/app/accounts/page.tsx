@@ -1,4 +1,4 @@
-// Accounts (C-16): the user's payout accounts — masked IBAN only (GDPR/PSD2), default flagged.
+// Accounts (C-16): the user's payout accounts, masked IBAN only (GDPR/PSD2), default flagged.
 import { redirect } from 'next/navigation';
 import { Wallet, Landmark, Lock } from 'lucide-react';
 import { PspClient, PspError } from '@/lib/PspClient';

@@ -321,7 +321,7 @@ export default function MerchantSSOPage() {
   const [revoking, setRevoking] = useState(false);
 
   // Frontend origin for the browser-facing Authorize/Logout endpoints. Set post-mount (not derived
-  // during render) so SSR and the first client render both output '' — reading window.location at
+  // during render) so SSR and the first client render both output '': reading window.location at
   // render time would differ between them and trigger a hydration mismatch.
   const [frontendBase, setFrontendBase] = useState('');
   useEffect(() => { setFrontendBase(window.location.origin); }, []);
@@ -481,10 +481,10 @@ export default function MerchantSSOPage() {
     setRevoking(false);
   }
 
-  // OIDC endpoints. Discovery/token/jwks/userinfo/introspect/revoke are server-to-server — the
+  // OIDC endpoints. Discovery/token/jwks/userinfo/introspect/revoke are server-to-server: the
   // backend's actual public base URL (never derive it from window.location: frontend and backend
   // are different hosts in staging/prod). Authorize/logout are browser-facing PSP frontend PAGES
-  // (the backend's /api/v1/auth/authorize returns JSON, not UI) — this page's own origin
+  // (the backend's /api/v1/auth/authorize returns JSON, not UI): this page's own origin
   // (frontendBase state above, set post-mount to avoid a hydration mismatch).
   const issuerBase = usePrivateEndpoints ? privateBase : BACKEND_PUBLIC_URL;
   const endpoints = [
@@ -613,7 +613,7 @@ export default function MerchantSSOPage() {
           <div>
             <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
               Client Secret
-              <Tooltip text="The confidential client secret. Stored only as a bcrypt hash — never returned — so this field is blank (unchanged) unless you set a new value. Type a custom secret or Generate one, then Save; copy it to the relying party's config. The Secret Prefix is a separate, independent label (not derived from this secret)." />
+              <Tooltip text="The confidential client secret. Stored only as a bcrypt hash, never returned, so this field is blank (unchanged) unless you set a new value. Type a custom secret or Generate one, then Save; copy it to the relying party's config. The Secret Prefix is a separate, independent label (not derived from this secret)." />
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -636,7 +636,7 @@ export default function MerchantSSOPage() {
           <div>
             <label className="text-[10px] text-gray-400 uppercase tracking-wide mb-1 flex items-center">
               Secret Prefix
-              <Tooltip text="An independent display/identification label for this credential (like a key nickname). It is NOT part of the secret and cannot authenticate — decoupling it means no byte of the real secret is ever exposed. Specify your own or Generate one." />
+              <Tooltip text="An independent display/identification label for this credential (like a key nickname). It is NOT part of the secret and cannot authenticate: decoupling it means no byte of the real secret is ever exposed. Specify your own or Generate one." />
             </label>
             <div className="flex items-center gap-2">
               <input

@@ -56,7 +56,7 @@ const baseInput = {
   cardTransactionDescription: 'SHOP', gatewayPayload: { source: 'test' },
 };
 
-describe('P5 — per-gate *.requested/*.completed pairs + causation', () => {
+describe('P5: per-gate *.requested/*.completed pairs + causation', () => {
   let store: FakeStore;
   beforeEach(() => {
     store = new FakeStore();

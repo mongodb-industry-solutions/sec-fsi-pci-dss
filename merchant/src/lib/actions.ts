@@ -1,5 +1,5 @@
 'use server';
-// Server actions — the only place pages trigger PSP writes. Secrets stay server-side.
+// Server actions: the only place pages trigger PSP writes. Secrets stay server-side.
 import { randomUUID } from 'crypto';
 import { PspClient, PspError } from './PspClient';
 import { ENV } from './env';
@@ -41,7 +41,7 @@ function toResult(fn: () => Promise<ActionResult>): Promise<ActionResult> {
   });
 }
 
-// ── Product checkout — dispatches by payment method ─────────────────────────────
+// ── Product checkout: dispatches by payment method ─────────────────────────────
 export async function payForProduct(productId: string): Promise<ActionResult> {
   return toResult(async () => {
     const product = findProduct(productId);
@@ -88,7 +88,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
         // Server-to-server charge: the merchant's OWN client_credentials token (write:payments), NOT the
         // user session token. No CHD in the merchant; the PSP charges a tokenised card. We forward the
         // acting user's OAuth subject (from the session) purely for ATTRIBUTION so the charge is traceable
-        // to the buyer (payment history + operations view) — the charge itself stays merchant-authenticated.
+        // to the buyer (payment history + operations view): the charge itself stays merchant-authenticated.
         const c = await client();
         const order = await PspClient.apiPaymentServerToServer(
           {
@@ -243,7 +243,7 @@ export async function bankTransfer(input: {
   });
 }
 
-// ── Request to Pay (RTP) — merchant requests / approves money (v28) ─────────────
+// ── Request to Pay (RTP): merchant requests / approves money (v28) ─────────────
 export async function requestMoney(input: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payerCounterpartyReference?: string }): Promise<ActionResult> {
   return toResult(async () => {
     const c = await client();

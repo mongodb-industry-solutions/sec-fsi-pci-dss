@@ -316,7 +316,7 @@ export default function OverviewSectionPage() {
             <StatCard icon={<CalendarDays size={14} />} label="This month" value={String(thisMonth?.count ?? 0)} sub={`${MONTHS[now.getMonth()]} ${now.getFullYear()}`} />
           </div>
 
-          {/* v18 B-06: commission revenue (SD-89) — recognized from the fee applied per operation (SD-65). */}
+          {/* v18 B-06: commission revenue (SD-89), recognized from the fee applied per operation (SD-65). */}
           {stats.commissionRevenue && stats.commissionRevenue.count > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-4">

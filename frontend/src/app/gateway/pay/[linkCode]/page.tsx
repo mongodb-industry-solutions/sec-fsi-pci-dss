@@ -89,7 +89,7 @@ function PaymentLinkPageInner() {
     setState('paying');
     setError('');
 
-    // Saved card: pay with its stored surrogate TOKEN (never a PAN — we never held it) and omit
+    // Saved card: pay with its stored surrogate TOKEN (never a PAN, we never held it) and omit
     // expiry (the issuer authorizes on the token; only the CVV is re-checked). New card: derive the
     // deterministic token from the entered number (same PAN → same token, so re-paying never
     // duplicates a card-on-file). The name is cosmetic; for a saved card we send its alias/network.

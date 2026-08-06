@@ -6,6 +6,7 @@ import { CAPABILITY_LIST } from '../../../../config/capabilities';
 import { CORE_ADMIN_MODULES, MODULE_TYPE_LABEL, type ModuleType } from '../../../../config/adminModules';
 import { useEffectivePermissions } from '../../../../lib/permissions';
 
+import { serviceDomainLabel } from '../../../../lib/serviceDomain';
 const DOMAIN_LABEL: Record<string, string> = {
   fraud: 'Fraud & Financial Crime',
   customer: 'Customer & Business Due Diligence',
@@ -51,7 +52,7 @@ export default function ModulesIndexPage() {
       <SectionHeader
         icon={Boxes}
         title="Internal Modules"
-        description="All configurable modules — PSP Core modules and Built-in Provider engines (replaceable by an external vendor, internal-first)."
+        description="All configurable modules: PSP Core modules and Built-in Provider engines (replaceable by an external vendor, internal-first)."
         debugInfo="§2.6 module-type label · ADR-029 · capabilityModuleConfiguration · PCI DSS Req 12.8"
       />
 
@@ -99,7 +100,7 @@ export default function ModulesIndexPage() {
                       <p className="font-semibold text-gray-800 text-sm">{c.label}</p>
                       <ModuleTypeBadge type="built-in-provider" />
                     </div>
-                    <p className="text-xs text-gray-500">{c.bianServiceDomain}</p>
+                    <p className="text-xs text-gray-500">{serviceDomainLabel(c.bianServiceDomain)}</p>
                   </div>
                   <ChevronRight size={16} className="text-gray-400" />
                 </div>

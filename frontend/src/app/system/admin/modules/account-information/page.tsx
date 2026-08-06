@@ -171,7 +171,7 @@ function AccountInfoModule() {
       <SectionHeader
         icon={Landmark}
         title={`${descriptor.label}; Internal Module`}
-        description="AIS validation policies plus global payout-account administration (SD-66), unified in one module surface."
+        description="AIS validation policies plus global payout-account administration, unified in one module surface."
         debugInfo="capability=account-information · SD-66 Payout Account Arrangement · GDPR/PSD2 · PCI Req 7 · Req 10"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />

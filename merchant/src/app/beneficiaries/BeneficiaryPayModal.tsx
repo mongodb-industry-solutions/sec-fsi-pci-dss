@@ -97,7 +97,7 @@ export default function BeneficiaryPayModal({
             {beneficiaryLabel && <p className="mb-3 text-sm text-muted">To <span className="font-medium text-ink">{beneficiaryLabel}</span></p>}
 
             {done ? (
-              /* Confirmation state — identical for send and request. Only Repeat / Close. */
+              /* Confirmation state: identical for send and request. Only Repeat / Close. */
               <div className="space-y-4">
                 <div className="flex flex-col items-center gap-2 py-2 text-center">
                   <CheckCircle2 className="h-10 w-10 text-leaf-deep" aria-hidden />

@@ -93,7 +93,7 @@ export async function resolveHint(db: Db, hints: CibaHints): Promise<string> {
 
   // id_token_hint: per OIDC an ID Token MUST be signature-verified before its claims are trusted.
   // We only accept an ID token this provider issued, so verify it (RS256 + exp, by kid) via
-  // verifyAccessToken and take `sub` from the verified payload — never from an unverified blob.
+  // verifyAccessToken and take `sub` from the verified payload, never from an unverified blob.
   let sub: string | undefined;
   if (hints.id_token_hint) {
     let payload: { sub?: string };

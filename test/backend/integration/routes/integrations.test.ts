@@ -2,7 +2,7 @@
  * Integration tests: /api/v1/integrations routes (FR-v6-03, FR-v6-05, FR-v6-06)
  * Source: backend/src/modules/provider/controllers/integrationRegistry.controller.ts
  *
- * Requires TEST_MONGODB_URI — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI: skips gracefully when not set.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';

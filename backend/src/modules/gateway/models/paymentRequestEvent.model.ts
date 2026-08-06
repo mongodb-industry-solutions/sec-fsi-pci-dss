@@ -7,7 +7,7 @@ export const PAYMENT_REQUEST_EVENT_COLLECTION = 'paymentRequestEvent';
 
 export interface PaymentRequestEvent {
   eventDateTime: Date;                       // timeField
-  paymentRequestInstanceReference: string;   // metaField — correlation key
+  paymentRequestInstanceReference: string;   // metaField, correlation key
   fromStatus?: string;
   toStatus: string;
   action: string;                            // e.g. 'created' | 'presented' | 'accepted' | 'settled'

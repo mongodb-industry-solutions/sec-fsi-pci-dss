@@ -1,7 +1,7 @@
 /**
  * Unit tests (dev.v8 P11a, §2.4/§7.7): the per-event config resolver. Per-event outbound/inbound
  * config overrides vendor-global; vendor-global is the migration fallback; sensible defaults apply
- * when neither is set. Pure — no DB.
+ * when neither is set. Pure, no DB.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -113,7 +113,7 @@ describe('deriveEventConfigs (P11d seed migration)', () => {
     expect(resolved.url).toBe('http://localhost:8081/api/v1/modules/x/score');
   });
 
-  it('is idempotent — returns existing per-event config unchanged', () => {
+  it('is idempotent: returns existing per-event config unchanged', () => {
     const existing = [{ event: 'x', outbound: { url: 'u' }, inbound: {} }];
     const vendor = { ...base, externalProviderEvents: existing } as ExternalProviderArrangement;
     expect(deriveEventConfigs(vendor)).toBe(existing);

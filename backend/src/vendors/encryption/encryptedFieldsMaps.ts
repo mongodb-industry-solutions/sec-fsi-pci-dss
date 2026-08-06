@@ -96,7 +96,7 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'string',
           queries: { queryType: 'equality', contention: 8 },
         },
-        // GDPR PII — QE:none (L2 only). Postal address is sensitive personal data;
+        // GDPR PII: QE:none (L2 only). Postal address is sensitive personal data;
         // encrypted at rest, decrypted only for the L2 client (or the party themselves).
         ...(includeSensitive ? [
           { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
@@ -313,7 +313,7 @@ export function buildEncryptedFieldsMaps(
     },
 
     // -- SD-66: Payout Account Arrangement -----------------------------------─
-    // IBAN and routing number are GDPR Art. 32 / PSD2 sensitive bank data — QE:none, L2 only.
+    // IBAN and routing number are GDPR Art. 32 / PSD2 sensitive bank data: QE:none, L2 only.
     // (Not PCI DSS: PCI scope is card data / PAN, not bank accounts.)
     // No QE:equality needed (accounts are looked up by payoutAccountInstanceReference).
     ...(includeSensitive ? {
@@ -323,7 +323,7 @@ export function buildEncryptedFieldsMaps(
             keyId: deks.payoutIban,
             path: 'payoutAccountIban',
             bsonType: 'string',
-            // QE:none — non-searchable, retrieval only
+            // QE:none, non-searchable, retrieval only
           },
           {
             keyId: deks.payoutRouting,
@@ -336,7 +336,7 @@ export function buildEncryptedFieldsMaps(
 
     // -- SD-65: Payment Execution Procedure ----------------------------------─
     // destinationIban holds the full IBAN of an UNREGISTERED external destination the user typed
-    // for a one-off bank transfer. GDPR Art. 32 / PSD2 sensitive bank data — QE:none, L2 only.
+    // for a one-off bank transfer. GDPR Art. 32 / PSD2 sensitive bank data: QE:none, L2 only.
     // (Not PCI DSS.) The masked form (destinationAccountMasked) stays plaintext for list views.
     ...(includeSensitive ? {
       paymentExecutionProcedure: {
@@ -345,7 +345,7 @@ export function buildEncryptedFieldsMaps(
             keyId: deks.execDestIban,
             path: 'destinationIban',
             bsonType: 'string',
-            // QE:none — non-searchable, retrieval only
+            // QE:none, non-searchable, retrieval only
           },
         ],
       },

@@ -101,7 +101,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [nationality, setNationality] = useState('');
-  const [applied, setApplied] = useState({ name: '', email: '', phone: '', nationality: '' });
+  const [applied, setApplied] = useState({ name : '', email : '', phone : '', nationality: '' });
   const [listLoading, setListLoading] = useState(true);
   const load = useCallback(async () => {
     if (!token) return;
@@ -115,7 +115,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
   const doSearch = () => { setPage(1); setApplied({ name, email, phone, nationality }); };
   const clearAll = () => {
     setName(''); setEmail(''); setPhone(''); setNationality('');
-    setApplied({ name: '', email: '', phone: '', nationality: '' });
+    setApplied({ name : '', email : '', phone : '', nationality: '' });
     setStatus(''); setSegment(''); setRiskRating(''); setPartyType('customer'); setPage(1);
   };
   const onEnter = (e: { key: string }) => { if (e.key === 'Enter') doSearch(); };
@@ -136,7 +136,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
       </div>
       <div className="flex flex-wrap items-center gap-2">
         {/* Only a customer holds a CustomerAgreement (SD-53), so Employee is always empty here. */}
-        <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type (SD-13). KYC administers customer agreements (SD-53), which only a customer party holds."><option value="customer">Customer</option><option value="employee">Employee</option><option value="all">All</option></select>
+        <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type. KYC administers customer agreements, which only a customer party holds."><option value="customer">Customer</option><option value="employee">Employee</option><option value="all">All</option></select>
         <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All statuses</option>{['verified', 'rejected', 'expired'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={segment} onChange={(e) => { setPage(1); setSegment(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All segments</option>{['retail', 'premium', 'corporate', 'sme'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={riskRating} onChange={(e) => { setPage(1); setRiskRating(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All risk</option>{['low', 'medium', 'high'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
@@ -161,7 +161,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
             {!listLoading && rows.length === 0 && (
               <tr><td colSpan={6} className="py-8 px-4 text-center text-sm text-gray-400">
                 {partyType === 'employee'
-                  ? 'No employee holds a customer agreement. KYC administers cardholders, and in BIAN only a customer party holds a CustomerAgreement (SD-53), so this surface is empty for employees by design.'
+                  ? 'No employee holds a customer agreement. KYC administers cardholders, and in BIAN only a customer party holds a CustomerAgreement, so this surface is empty for employees by design.'
                   : 'No KYC records match.'}
               </td></tr>
             )}
@@ -169,9 +169,9 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
         </table>
       </div>
       {/* v32 E1/E3: the population is stated explicitly. It is NOT the same as the number of login
-          users a manager sees: this counts parties with a COMPLETED KYC record (SD-53 agreements,
+          users a manager sees: this counts parties with a COMPLETED KYC record (agreements,
           statuses verified / rejected / expired), while the user administration surface counts
-          authentication users (SD-16). Records still in `initiated` are excluded here, which is why
+          authentication users. Records still in `initiated` are excluded here, which is why
           this total can be lower than the number of customer agreements. */}
       {!listLoading && (
         <>

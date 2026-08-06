@@ -1,5 +1,5 @@
 /**
- * E2E: Responsive navigation — CarouselNav (mobile) + desktop sidebars.
+ * E2E: Responsive navigation, CarouselNav (mobile) + desktop sidebars.
  * Components: frontend/src/components/CarouselNav.tsx, DemoSidebar.tsx (MobileBottomNav),
  *             merchant/MerchantNav.tsx.
  * Guarantees: edge chevrons appear ONLY on overflow, active item auto-centers,

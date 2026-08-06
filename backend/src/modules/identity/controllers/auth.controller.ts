@@ -122,7 +122,7 @@ Password for all demo users: \`demo-password\``,
     }
   });
 
-  // POST /api/v1/auth/register — public self-registration for local domains that enable it.
+  // POST /api/v1/auth/register: public self-registration for local domains that enable it.
   // Reuses createUser (SD-91 + linked SD-13 party). Role is always the lowest-privilege `customer`
   // (never client-selectable). Status is `pending` unless the domain auto-approves, in which case
   // it is `active`. This gates login only; it does NOT imply KYC approval (a separate process).
@@ -201,7 +201,7 @@ Password for all demo users: \`demo-password\``,
     return reply.status(200).send({ loggedOut: true });
   });
 
-  // POST /api/v1/auth/password/change — the authenticated user changes their own password.
+  // POST /api/v1/auth/password/change: the authenticated user changes their own password.
   // Requires the current password plus the new one (server also re-checks the policy). Confirmation
   // matching is a client-side concern, but the API accepts only `currentPassword` + `newPassword`.
   // On success every OTHER session is invalidated (epoch bump) and a fresh token is returned for
@@ -349,7 +349,7 @@ a \`customerAgreement\` record.`,
     }
 
     // Load the SD-13 Party record (KYC-typical demographics: name, DOB, nationality, postal
-    // address, contact points) so every role — staff included — has a populated profile.
+    // address, contact points) so every role: staff included, has a populated profile.
     // fastify.db is the L2 client, so QE fields (email/phone) return decrypted for the caller.
     let party: Record<string, unknown> | null = null;
     if (partyInstanceReference) {

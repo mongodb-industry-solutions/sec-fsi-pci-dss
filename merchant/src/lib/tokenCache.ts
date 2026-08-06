@@ -2,8 +2,8 @@
 //
 // Why: on the render/read path a PspClient cannot persist a rotated token to the
 // session cookie (Set-Cookie is illegal during RSC render). Without a shared cache
-// every render — and every helper that builds its own client (page fetch +
-// loadAccountOptions + userinfo) — re-refreshes via POST /auth/token, producing a
+// every render, and every helper that builds its own client (page fetch +
+// loadAccountOptions + userinfo): re-refreshes via POST /auth/token, producing a
 // token storm and 30 to 60s pile-ups against the encrypted PSP backend.
 //
 // This module keeps the freshest access token per user (session `sub`) in memory for

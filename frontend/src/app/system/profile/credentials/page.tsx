@@ -1,5 +1,5 @@
 'use client';
-// "Passwordless credentials / security keys" — the user's enrolled authenticators (WebAuthn-style).
+// "Passwordless credentials / security keys": the user's enrolled authenticators (WebAuthn-style).
 // Self-scoped (the caller's own `sub`). Enroll generates a real ECDSA P-256 key pair in the browser with
 // a NON-EXTRACTABLE private key stored in IndexedDB; only the public key is sent to the server. Revoke
 // forces re-enrollment; rotate replaces the key. Revoking a credential removes it from the passwordless

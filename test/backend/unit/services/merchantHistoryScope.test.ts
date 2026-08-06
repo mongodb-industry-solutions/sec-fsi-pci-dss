@@ -30,7 +30,7 @@ import { getPartyCardTransactions } from '../../../../backend/src/modules/transa
 const ACCOUNT = 'ACCT-REF-1';
 const MERCHANT = 'MERCH-AGREEMENT-1';
 
-describe('getPartyCardTransactions — merchant data isolation (SD-89)', () => {
+describe('getPartyCardTransactions: merchant data isolation (SD-89)', () => {
   beforeEach(() => {
     h.find.mockClear();
   });

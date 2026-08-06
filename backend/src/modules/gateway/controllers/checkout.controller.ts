@@ -22,7 +22,7 @@ export async function checkoutController(fastify: FastifyInstance) {
   fastify.post('/sessions', {
     // Dual-auth (v28): a merchant integration authenticates with its own client_credentials
     // RS256 token (scope write:payments); the PSP simulator authenticates as the selected demo
-    // persona (session JWT). Never public — creation always requires a valid credential.
+    // persona (session JWT). Never public: creation always requires a valid credential.
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'merchants', action: 'view', scope: 'write:payments' }),
     schema: {
@@ -50,7 +50,7 @@ export async function checkoutController(fastify: FastifyInstance) {
           returnUrl: { type: 'string', description: 'URL buyer is redirected to after successful payment.' },
           cancelUrl: { type: 'string', description: 'URL buyer is redirected to on cancellation or failure.' },
           merchantReference: { type: 'string', maxLength: 100, description: "Merchant's own order/cart ID (idempotency key)." },
-          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only — creation stays merchant-authenticated. Lets the resulting purchase land in the payer payment history + operations view.' },
+          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only, creation stays merchant-authenticated. Lets the resulting purchase land in the payer payment history + operations view.' },
         },
       },
       response: {
@@ -172,7 +172,7 @@ export async function checkoutController(fastify: FastifyInstance) {
   // NOTE: there is deliberately NO session-scoped saved-cards endpoint. Cards are shown only for the
   // AUTHENTICATED viewer of the browser (GET /customer/me/cards, resolved from the PSP portal token).
   // Resolving cards from the session's stored acting party would reveal that user's cards to ANYONE who
-  // opens the checkout URL without being logged in — a security/PCI/GDPR leak. Both the redirect
+  // opens the checkout URL without being logged in: a security/PCI/GDPR leak. Both the redirect
   // checkout and the payment link are browser-token-only: no logged-in viewer → new-card form only.
 
   // POST /api/v1/checkout/sessions/:id/pay
@@ -203,7 +203,7 @@ export async function checkoutController(fastify: FastifyInstance) {
           cardExpiryMonth: { type: 'string', pattern: '^(0[1-9]|1[0-2])$' },
           cardExpiryYear: { type: 'string', pattern: '^20[2-9][0-9]$' },
           cardCvv: { type: 'string', pattern: '^[0-9]{3,4}$', description: 'Card verification value. Forwarded to the issuer for verification ONLY; never persisted (PCI DSS Req 3.2). A wrong/missing CVV declines.' },
-          cardholderEmail: { type: 'string', format: 'email', description: 'Customer email — used as accountReference to link transaction to customer record.' },
+          cardholderEmail: { type: 'string', format: 'email', description: 'Customer email, used as accountReference to link transaction to customer record.' },
           saveCard: { type: 'boolean', description: 'When true, saves the card token to the customer\'s SD-57 paymentCardManagement record.' },
           cardAuthOutcome: { type: 'string', enum: ['approved', 'declined', 'challenge'], description: 'Simulator-only: drives stub card auth result.' },
         },

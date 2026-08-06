@@ -1,4 +1,4 @@
-// SD-16: Party Authentication — OAuth 2.0 Authorization Codes (BQ:Exchange)
+// SD-16: Party Authentication, OAuth 2.0 Authorization Codes (BQ:Exchange)
 // TTL index on expiresAt ensures automatic expiry after 5 minutes.
 
 export const PARTY_AUTHORIZATION_CODE_COLLECTION = 'partyAuthorizationCode';

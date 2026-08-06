@@ -5,7 +5,7 @@ import { getAdminToken, LogEntry, downloadText, readSSE } from '../../../../lib/
 import { Download, Copy, CheckCheck, Play, Square } from 'lucide-react';
 
 // ---------------------------------------------------------------------------
-//  Module-level stream manager — persists across tab switches (mount/unmount)
+//  Module-level stream manager: persists across tab switches (mount/unmount)
 // ---------------------------------------------------------------------------
 
 const LOGS_KEY = 'admin_server_logs';
@@ -105,7 +105,7 @@ function getLogsSnapshot() { return _logs; }
 function getStreamingSnapshot() { return _streaming; }
 
 // ---------------------------------------------------------------------------
-//  Component — subscribes to the module-level store via useSyncExternalStore
+//  Component: subscribes to the module-level store via useSyncExternalStore
 // ---------------------------------------------------------------------------
 
 export default function LogsPage() {

@@ -9,7 +9,7 @@
  *  - provider indifference: registering an external provider in a category still routes the flow
  *    (domain untouched), and removing it is idempotent.
  *
- * Requires TEST_MONGODB_URI — skips gracefully when not set. Real Fastify app + seeded test cluster.
+ * Requires TEST_MONGODB_URI: skips gracefully when not set. Real Fastify app + seeded test cluster.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
@@ -125,7 +125,7 @@ describe('dev.v30 FT: card-payment multi-provider event flow (R10 / FR-30.11)', 
     expect(serialized).not.toContain(PROBE_PAN);
     expect(serialized).not.toContain(PROBE_CVV);
 
-    // No cleartext SAD/CHD keys on the wire — only the opaque encrypted `chd` carrier is allowed.
+    // No cleartext SAD/CHD keys on the wire, only the opaque encrypted `chd` carrier is allowed.
     const walk = (v: unknown): void => {
       if (Array.isArray(v)) { v.forEach(walk); return; }
       if (v && typeof v === 'object') {

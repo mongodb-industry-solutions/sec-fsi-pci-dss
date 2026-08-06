@@ -1,4 +1,4 @@
-// Cardholder-data (CHD) scrubbing — the canonical PCI DSS Req 3.2 boundary, owned by the eventbus
+// Cardholder-data (CHD) scrubbing: the canonical PCI DSS Req 3.2 boundary, owned by the eventbus
 // vendor so every publisher/logger shares ONE blocklist (no duplication, single source of truth).
 // Keys are stripped at ANY nesting depth before an event/payload is persisted or delivered.
 

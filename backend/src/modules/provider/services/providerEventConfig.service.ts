@@ -66,7 +66,7 @@ export function resolveEventInbound(vendor: ExternalProviderArrangement, event: 
   };
 }
 
-/** The events a vendor handles — the per-event configs if present, else the legacy trigger list. */
+/** The events a vendor handles: the per-event configs if present, else the legacy trigger list. */
 export function listVendorEvents(vendor: ExternalProviderArrangement): string[] {
   if (vendor.externalProviderEvents?.length) return vendor.externalProviderEvents.map((e) => e.event);
   return vendor.externalProviderTriggerEvents ?? [];

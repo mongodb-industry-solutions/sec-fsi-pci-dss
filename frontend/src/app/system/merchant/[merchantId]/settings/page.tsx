@@ -23,7 +23,7 @@ export default function SettingsSectionPage() {
   const merchantId = merchant?.merchantAgreementInstanceReference ?? '';
   const ownerPartyRef = (merchant as unknown as Record<string, unknown> | null)?.merchantOwnerPartyReference as string | undefined;
 
-  // v18 B-09: commission rate is editable only for roles with merchants:manage — the merchant
+  // v18 B-09: commission rate is editable only for roles with merchants:manage, the merchant
   // owner (customer) or PSP staff (merchant_officer / security_auditor). Others see it read-only.
   const canManageCommission = role === 'customer' || role === 'merchant_officer' || role === 'security_auditor';
 
@@ -184,11 +184,11 @@ export default function SettingsSectionPage() {
           </select>
         </div>
 
-        {/* Commission per operation (v18 B-07 — BIAN SD-89) */}
+        {/* Commission per operation (v18 B-07: BIAN SD-89) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Commission per operation</label>
           <p className="text-xs text-gray-500 mb-2">
-            The fee this merchant charges per operation, recognized as commission revenue (BIAN SD-89 · SD-65 fee).
+            The fee this merchant charges per operation, recognized as commission revenue.
           </p>
           {canManageCommission ? (
             <>
@@ -221,7 +221,7 @@ export default function SettingsSectionPage() {
           )}
         </div>
 
-        {/* Default Payout Account (E3 — BIAN SD-89 / SD-66) */}
+        {/* Default Payout Account (E3: BIAN SD-89 / SD-66) */}
         {ownerPartyRef && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -231,7 +231,7 @@ export default function SettingsSectionPage() {
               </span>
             </label>
             <p className="text-xs text-gray-500 mb-2">
-              All customer payments and settlements will be credited to this bank account (BIAN SD-66 · SD-89). Choose from your registered active accounts.
+              All customer payments and settlements will be credited to this bank account. Choose from your registered active accounts.
             </p>
             {!payoutAccountsLoaded ? (
               <div className="text-xs text-gray-400">Loading accounts…</div>
@@ -272,7 +272,7 @@ export default function SettingsSectionPage() {
             )}
             {debugMode && (
               <p className="text-[10px] font-mono text-gray-400 mt-1">
-                merchantDefaultPayoutAccountReference → payoutAccountArrangement (SD-66). Guard: account.partyInstanceReference must equal merchantOwnerPartyReference.
+                merchantDefaultPayoutAccountReference → payoutAccountArrangement. Guard: account.partyInstanceReference must equal merchantOwnerPartyReference.
               </p>
             )}
           </div>
@@ -334,7 +334,7 @@ export default function SettingsSectionPage() {
         )}
       </div>
 
-      {/* Business verification (KYB) — read-only, active merchants */}
+      {/* Business verification (KYB): read-only, active merchants */}
       {merchant.merchantAgreementKybCheck && (() => {
         const kyb = merchant.merchantAgreementKybCheck;
         const KYB_COLORS: Record<string, string> = {
@@ -389,7 +389,7 @@ export default function SettingsSectionPage() {
             </div>
             {debugMode && (
               <p className="text-[10px] font-mono text-gray-400 pt-1">
-                SD-89 · KybCheck · PCI Req 12.8
+                KybCheck · PCI Req 12.8
               </p>
             )}
           </div>

@@ -1,4 +1,4 @@
-// BIAN SD-66: Payout Account Credit Log — immutable ledger of inbound balance credits.
+// BIAN SD-66: Payout Account Credit Log, immutable ledger of inbound balance credits.
 // Captures initial deposits, bank-in transfers, refund reversals, and admin adjustments.
 // PCI DSS Req 10: every fund credit is an auditable record.
 

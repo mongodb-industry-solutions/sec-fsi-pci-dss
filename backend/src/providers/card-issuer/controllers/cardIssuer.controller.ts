@@ -48,7 +48,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
       body: {
         type: 'object',
         additionalProperties: true,
-        description: 'Card validation payload. May include maskedPan, network, cvv (validated and immediately discarded — never stored). Forwarded by the integration router.',
+        description: 'Card validation payload. May include maskedPan, network, cvv (validated and immediately discarded, never stored). Forwarded by the integration router.',
       },
       response: {
         200: {
@@ -207,7 +207,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     },
   };
 
-  // GET /cards — global paginated list (display-safe; no expiry).
+  // GET /cards: global paginated list (display-safe; no expiry).
   fastify.get('/cards', {
     preHandler: [requirePermission('cards', 'view'), gate],
     schema: {
@@ -271,7 +271,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send(result);
   });
 
-  // GET /cards/:cardId — global per-card detail (includes QE:none expiry; audited).
+  // GET /cards/:cardId, global per-card detail (includes QE:none expiry; audited).
   fastify.get('/cards/:cardId', {
     preHandler: [requirePermission('cards', 'view'), gate],
     schema: {
@@ -312,7 +312,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send({ ...card, paymentCardMaskedPanDisplay: maskedPan, fundingAccount, ownerName });
   });
 
-  // GET /agreements — owner picker for card registration: search customer agreements by owner name.
+  // GET /agreements: owner picker for card registration: search customer agreements by owner name.
   // Returns ONLY the agreement ref + owner name (need-to-know; no other PII). cards:view + gate.
   fastify.get('/agreements', {
     preHandler: [requirePermission('cards', 'view'), gate],
@@ -329,7 +329,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send({ results });
   });
 
-  // POST /cards — register a card for an agreement (reuses the domain service; rejects CVV/PIN by schema).
+  // POST /cards: register a card for an agreement (reuses the domain service; rejects CVV/PIN by schema).
   fastify.post('/cards', {
     preHandler: [requirePermission('cards', 'manage'), gate],
     schema: {
@@ -398,7 +398,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.status(201).send(result);
   });
 
-  // PATCH /cards/:cardId — update alias/note metadata.
+  // PATCH /cards/:cardId, update alias/note metadata.
   fastify.patch('/cards/:cardId', {
     preHandler: [requirePermission('cards', 'manage'), gate],
     schema: {
@@ -441,7 +441,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send(updated);
   });
 
-  // PATCH /cards/:cardId/status — activate / suspend.
+  // PATCH /cards/:cardId/status, activate / suspend.
   fastify.patch('/cards/:cardId/status', {
     preHandler: [requirePermission('cards', 'manage'), gate],
     schema: {
@@ -471,7 +471,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send(updated);
   });
 
-  // DELETE /cards/:cardId — revoke (soft-delete; record retained for audit).
+  // DELETE /cards/:cardId, revoke (soft-delete; record retained for audit).
   fastify.delete('/cards/:cardId', {
     preHandler: [requirePermission('cards', 'manage'), gate],
     schema: {
@@ -499,7 +499,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return reply.send({ removed: true });
   });
 
-  // PATCH /cards/:cardId/funding — reassign the funding payout account. The card owner follows the
+  // PATCH /cards/:cardId/funding, reassign the funding payout account. The card owner follows the
   // new account's party (invariant), so this is also how ownership is reassigned. Audited.
   fastify.patch('/cards/:cardId/funding', {
     preHandler: [requirePermission('cards', 'manage'), gate],

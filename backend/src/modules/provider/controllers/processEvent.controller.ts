@@ -36,7 +36,7 @@ export async function processEventController(fastify: FastifyInstance) {
           entityType: { type: 'string', enum: ['fraud_case', 'transaction', 'customer', 'merchant', 'integration'] },
           outcome:    { type: 'string' },
           q:          { type: 'string' },
-          ref:        { type: 'string', description: 'Related reference — finds every event for a transaction id, case id, merchant, customer/account ref, or card token.' },
+          ref:        { type: 'string', description: 'Related reference, finds every event for a transaction id, case id, merchant, customer/account ref, or card token.' },
           minScore:   { type: 'integer', minimum: 0, maximum: 100 },
           from:       { type: 'string', format: 'date-time' },
           to:         { type: 'string', format: 'date-time' },

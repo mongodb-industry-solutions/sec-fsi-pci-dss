@@ -9,7 +9,7 @@ export type ConsentRevokedBy = 'user' | 'merchant' | 'psp';
 export interface PartyAuthConsentRecord {
   consentId: string;                                  // UUID, primary key
 
-  // Subject — the authenticated party who granted consent
+  // Subject: the authenticated party who granted consent
   partyAuthenticationInstanceReference: string;       // FK → customerAuthenticationAssessment.sub
 
   // OAuth client that was granted consent

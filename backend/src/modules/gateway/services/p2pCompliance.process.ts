@@ -36,7 +36,7 @@ export class P2PComplianceProcess {
     const transferRef = p.transferRef ?? e.correlationId;
     const { amount, currency, initiatorPartyRef, sourceAccountRef } = p;
 
-    // Run FDS, HRP, AML in parallel — none block the completed transfer
+    // Run FDS, HRP, AML in parallel: none block the completed transfer
     const [fds, hrp, aml] = await Promise.allSettled([
       this.runFds(transferRef, amount, currency),
       this.runHrp(transferRef, initiatorPartyRef),

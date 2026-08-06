@@ -124,7 +124,7 @@ the Merchant Name selector. No authentication required (public, simulator mode).
           },
           merchantAgreementInstanceReference: {
             type: 'string',
-            description: 'Acquiring-side link (BIAN SD-89): the merchant this payment was made to. Optional; set by checkout/payment-link flows and the simulator. Not CHD/PII — stored plaintext and indexed so the merchant owner can list received payments.',
+            description: 'Acquiring-side link (BIAN SD-89): the merchant this payment was made to. Optional; set by checkout/payment-link flows and the simulator. Not CHD/PII, stored plaintext and indexed so the merchant owner can list received payments.',
           },
           paymentCardExpirationDate: {
             type: 'string',
@@ -296,7 +296,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
           limit: { type: 'number', default: 20, maximum: 100 },
         },
       },
-      // No strict 200 response schema: this route now serves TWO shapes — the session card-token list
+      // No strict 200 response schema: this route now serves TWO shapes, the session card-token list
       // (`{ results:[cardTransaction…], count }`) AND the OAuth merchant merged history
       // (`{ results:[{ grossAmount, paymentExecutionStatus, … }], total, page, limit }`). A strict
       // per-shape schema would make fast-json-stringify silently DROP the other shape's fields.
@@ -318,7 +318,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       if (!owner.ownerPartyRef) return reply.send({ results: [], total: 0, page, limit });
 
       const merchantId = request.merchantContext.merchantId;
-      // Source 1 — SD-65 executions the party made THROUGH THIS merchant (isolation by SD-89 ref).
+      // Source 1: SD-65 executions the party made THROUGH THIS merchant (isolation by SD-89 ref).
       const filter = {
         merchantAgreementReference: merchantId,
         $or: [{ initiatorPartyReference: owner.ownerPartyRef }, { beneficiaryPartyReference: owner.ownerPartyRef }],
@@ -340,7 +340,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
         _sortAt: d.completedAt ?? d.initiatedAt ?? null,
       }));
 
-      // Source 2 — the party's OWN card transactions made in THIS merchant (masked PAN, no CHD).
+      // Source 2: the party's OWN card transactions made in THIS merchant (masked PAN, no CHD).
       const accountReference = await resolveAccountReferenceForParty(fastify.db, owner.ownerPartyRef);
       const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference, 200, merchantId) : [];
       const cardRows = cardTxns.map((t) => ({

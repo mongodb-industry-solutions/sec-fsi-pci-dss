@@ -5,7 +5,7 @@ export default function AccountInformationPage() {
     <IntegrationCategoryPage meta={{
       type: 'account_information',
       label: 'Account Information (AIS)',
-      description: 'Payout account status validation and internal ledger balance (PSD2 AIS / SD-36 Open Banking)',
+      description: 'Payout account status validation and internal ledger balance (PSD2 AIS)',
       bianSd: 'SD-36',
     }} />
   );

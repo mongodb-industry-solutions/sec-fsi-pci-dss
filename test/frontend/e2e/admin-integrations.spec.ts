@@ -2,7 +2,7 @@
  * E2E: Admin Integration Hub portal (FR-v6-01, FR-v6-02, FR-v6-03, FR-v6-06)
  * Routes: /system/admin, /system/admin/providers, /system/admin/providers/vendors/new
  *
- * Auth: injected via demo_token cookie using loginAs (NOT localStorage — app reads cookies only).
+ * Auth: injected via demo_token cookie using loginAs (NOT localStorage, app reads cookies only).
  */
 import { test, expect } from '@playwright/test';
 import { loginAs, json, stubPermissions } from './support/auth';
@@ -116,7 +116,7 @@ test.describe('FR-v6-06: Register integration wizard', () => {
     await page.goto('/system/admin/providers/vendors/new');
     // Use heading role to avoid strict-mode: page has both an <h1> and a submit button with this text
     await expect(page.getByRole('heading', { name: 'Register Provider' })).toBeVisible({ timeout: 8_000 });
-    // Use exact placeholder — URL input also matches /provider/i but we want the name field
+    // Use exact placeholder: URL input also matches /provider/i but we want the name field
     await expect(page.getByPlaceholder('e.g. Sardine Fraud API')).toBeVisible({ timeout: 8_000 });
   });
 

@@ -96,7 +96,7 @@ export function SavedCardsPanel({ agreementId, token }: { agreementId: string | 
         </div>
         <div className="flex items-center gap-2 flex-wrap min-w-0">
           {debugMode && (
-            <DebugChip label="SD-88 · paymentCardManagement · PCI Req 3.4" />
+            <DebugChip label="paymentCardManagement · PCI Req 3.4" />
           )}
           <button
             onClick={() => router.push('/system/cards/new')}

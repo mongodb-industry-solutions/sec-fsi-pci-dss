@@ -715,7 +715,7 @@ export default function AccountDetailPage() {
                     <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700">
                       <Lock size={13} className="mt-0.5 shrink-0" />
                       <span>
-                        <strong>IBAN is immutable</strong> per BIAN SD-66, it uniquely identifies the account. Use the eye icon in the read-only view to reveal it. To correct an IBAN, close this account and register a new one.
+                        <strong>IBAN is immutable</strong>: it uniquely identifies the account. Use the eye icon in the read-only view to reveal it. To correct an IBAN, close this account and register a new one.
                       </span>
                     </div>
                   </div>
@@ -969,7 +969,7 @@ export default function AccountDetailPage() {
                   <div>
                     <p className="text-sm font-medium text-gray-700">Close this account</p>
                     <p className="text-xs text-gray-500 mt-0.5">
-                      Closes the account permanently (BIAN SD-66 lifecycle). No payout will be sent to a closed account.
+                      Closes the account permanently. No payout will be sent to a closed account.
                     </p>
                   </div>
                   <button

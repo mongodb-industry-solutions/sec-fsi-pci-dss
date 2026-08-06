@@ -11,7 +11,7 @@ const CHD_FIELDS = new Set([
   'expirydate', 'cardexpirydate', 'expiry', 'cardholdername',
 ]);
 
-// Secrets — never mappable, for any provider.
+// Secrets, never mappable, for any provider.
 const SECRET_FIELDS = new Set([
   'externalproviderapikeyhash', 'externalprovidercallbacksecrethash',
 ]);
@@ -59,7 +59,7 @@ function deleteNestedValue(obj: Record<string, unknown>, path: string): void {
 export function applyTransform(value: unknown, transform: FieldTransform): unknown {
   switch (transform.type) {
     case 'rename':
-      // rename is handled at the mapping level (move key) — no value change
+      // rename is handled at the mapping level (move key), no value change
       return value;
 
     case 'value_map': {
@@ -75,11 +75,11 @@ export function applyTransform(value: unknown, transform: FieldTransform): unkno
     }
 
     case 'nested_extract':
-      // value is already the extracted value from sourcePath — no further transform
+      // value is already the extracted value from sourcePath, no further transform
       return value;
 
     case 'nested_wrap':
-      // wrapping is handled at the mapping level via targetPath — no value change
+      // wrapping is handled at the mapping level via targetPath, no value change
       return value;
 
     default:

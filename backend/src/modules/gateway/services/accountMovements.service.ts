@@ -33,19 +33,19 @@ export async function listAccountMovements(
   const toIso = (d: Date | string): string =>
     d instanceof Date ? d.toISOString() : new Date(d).toISOString();
 
-  // 1a. Merchant/non-P2P disbursements — this account receives the payout (credit)
+  // 1a. Merchant/non-P2P disbursements: this account receives the payout (credit)
   const merchantExecs = await executionCol.find({
     resolvedPayoutAccountReference: accountRef,
     beneficiaryType: { $ne: 'user' },
   }).toArray();
 
-  // 1b. P2P received — this account is the recipient of a user-to-user transfer (credit)
+  // 1b. P2P received: this account is the recipient of a user-to-user transfer (credit)
   const p2pReceivedExecs = await executionCol.find({
     resolvedPayoutAccountReference: accountRef,
     beneficiaryType: 'user',
   }).toArray();
 
-  // 1c. P2P sent — this account is the source of a user-to-user transfer (debit)
+  // 1c. P2P sent: this account is the source of a user-to-user transfer (debit)
   const p2pSentExecs = await executionCol.find({
     sourcePayoutAccountReference: accountRef,
     beneficiaryType: 'user',
@@ -149,7 +149,7 @@ export async function listAccountMovements(
   // 4. Merge all movements
   let all: AccountMovement[] = [...disbursements, ...cardMovements, ...creditMovements];
 
-  // 4b. Running available balance — per settled movement, "balance after this movement".
+  // 4b. Running available balance: per settled movement, "balance after this movement".
   //
   //     Only movements that actually SETTLED (funds moved) affect the available balance.
   //     A failed/exception/reversed transfer or a still-pending card authorisation never
@@ -161,7 +161,7 @@ export async function listAccountMovements(
   //     newest settled movement's balanceAfter equals the current balance; each older row is
   //     the balance before the newer one settled. This keeps the ledger consistent with the
   //     authoritative stored balance even if historical execution records are incomplete or
-  //     were reseeded independently — rather than reconstructing forward from zero.
+  //     were reseeded independently: rather than reconstructing forward from zero.
   const SETTLED_STATUSES = new Set(['completed', 'settled']);
   const isSettled = (m: AccountMovement): boolean =>
     m.movementType === 'balance_credit' || SETTLED_STATUSES.has(m.status);

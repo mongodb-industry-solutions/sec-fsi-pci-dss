@@ -13,7 +13,7 @@ function getUser(request: unknown): JwtUserPayload | undefined {
 }
 
 export async function qrController(fastify: FastifyInstance) {
-  // POST /represent — issue a QR for any subject (rtp_request / payment_link / checkout_session).
+  // POST /represent: issue a QR for any subject (rtp_request / payment_link / checkout_session).
   fastify.post('/represent', {
     config: { dualAuth: true },
     // State-changing (issues a new QR record) → write-level (PCI DSS Req 7 least privilege). Resolve
@@ -59,7 +59,7 @@ export async function qrController(fastify: FastifyInstance) {
     }
   });
 
-  // GET /:ref — resolve a QR payload (marks single-use consumed). Session or merchant OAuth.
+  // GET /:ref, resolve a QR payload (marks single-use consumed). Session or merchant OAuth.
   fastify.get('/:ref', {
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'paymentRequests', action: 'view', scope: 'read:rtp' }),

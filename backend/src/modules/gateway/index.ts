@@ -7,7 +7,7 @@
 //   /payment/links          → paymentLink.controller           (SD-64: Shareable Payment Links)
 //   /accounts               → payoutAccount.controller         (SD-66: Payout Account Arrangement)
 //   /executions             → paymentExecution.controller      (SD-65: Payment Execution Procedure)
-//   /beneficiaries          → beneficiary.controller           (SD-54: Counterparty Admin — dual-auth: staff JWT + merchant OAuth)
+//   /beneficiaries          → beneficiary.controller           (SD-54: Counterparty Admin, dual-auth: staff JWT + merchant OAuth)
 
 import { FastifyInstance } from 'fastify';
 import { merchantController }             from './controllers/merchant.controller';
@@ -49,7 +49,7 @@ export async function gatewayModule(fastify: FastifyInstance) {
   // SD-65: Payment Execution Procedure  (v17)
   await fastify.register(paymentExecutionController,    { prefix: '/executions' });
 
-  // SD-54: Counterparty Admin — dual-auth capability surface (v23). One home for beneficiaries:
+  // SD-54: Counterparty Admin, dual-auth capability surface (v23). One home for beneficiaries:
   // first-party staff/customer (session JWT + RBAC) AND merchant OAuth on-behalf-of (scope + subject
   // binding). No separate /merchant/* tree; auth is a cross-cutting concern, not a forked API.
   await fastify.register(beneficiaryController,         { prefix: '/beneficiaries' });

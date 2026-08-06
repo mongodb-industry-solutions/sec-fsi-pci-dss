@@ -27,7 +27,7 @@ This document covers the implementation-level detail that the PRD deliberately o
 
 All models live in `backend/src/modules/*/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant. All collections follow strict BIAN Service Domain (SD) naming.
 
-### `party.model.ts` (SD-13 — new)
+### `party.model.ts` (SD-13: new)
 
 ```typescript
 // BIAN SD-13: Party Data Management
@@ -37,16 +37,16 @@ export const PARTY_COLLECTION = 'party';
 
 export interface PartyControlRecord {
   partyInstanceReference: string;        // PK, UUID; referenced as FK by SD-53, SD-91
-  partyEmailAddress: string;             // QE:equality — primary investigation search key
-  partyMobilePhoneNumber?: string;       // QE:equality — secondary investigation search key (optional: self-registered parties may omit it)
-  partyMobilePhoneNumberDigest?: string; // Blind index (keyed HMAC, NOT encrypted) — unique key for the phone (absent when no phone; partial unique index)
-  partyName: string;                     // v27: QE:substring (DEK-party-name) — "contains" search over ciphertext
+  partyEmailAddress: string;             // QE:equality, primary investigation search key
+  partyMobilePhoneNumber?: string;       // QE:equality, secondary investigation search key (optional: self-registered parties may omit it)
+  partyMobilePhoneNumberDigest?: string; // Blind index (keyed HMAC, NOT encrypted), unique key for the phone (absent when no phone; partial unique index)
+  partyName: string;                     // v27: QE:substring (DEK-party-name), "contains" search over ciphertext
   partyType: PartyType;
-  partyDateOfBirth?: Date;               // v27: BSON Date, QE:range (DEK-party-dob) — was ISO string / QE:none
+  partyDateOfBirth?: Date;               // v27: BSON Date, QE:range (DEK-party-dob), was ISO string / QE:none
   partyNationality?: string;             // v27: QE:equality contention 8 (DEK-party-nationality). ISO 3166-1 alpha-2
-  partyPlaceOfBirth?: string;            // v27: QE:equality contention 8 (DEK-party-place-of-birth) — city
+  partyPlaceOfBirth?: string;            // v27: QE:equality contention 8 (DEK-party-place-of-birth), city
   partySex?: PartySex;                   // QE:equality contention 8 (DEK-party-sex). GDPR PII. 'male'|'female'|'other'|'unspecified'
-  partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point — GDPR PII, QE:none (DEK-party-address, L2 only)
+  partyPostalAddress?: PartyPostalAddress; // SD-13 postal contact point, GDPR PII, QE:none (DEK-party-address, L2 only)
                                          // KYC-typical demographics apply to EVERY party (customer + employee),
                                          // so staff profiles are as complete as customers'. Address + DOB are
                                          // encrypted at rest and decrypted only for the L2 client / the party themselves.
@@ -64,17 +64,17 @@ export type PartySex = 'male' | 'female' | 'other' | 'unspecified';
 > **Blind index for phone uniqueness.** `partyMobilePhoneNumber` is a QE:equality field, and
 > MongoDB Queryable Encryption **cannot enforce a unique index on an encrypted field**. To
 > guarantee that a phone number identifies exactly one party, we store `partyMobilePhoneNumberDigest`
-> — a keyed HMAC-SHA256 of the *normalized* phone (leading `+` preserved, all other non-digits
-> stripped), keyed by the blind-index key — in plaintext and put a **unique index** on it. The
+>: a keyed HMAC-SHA256 of the *normalized* phone (leading `+` preserved, all other non-digits
+> stripped), keyed by the blind-index key: in plaintext and put a **unique index** on it. The
 > key is resolved in order: `PSP_BLIND_INDEX_KEY` if set; otherwise an HKDF-SHA256 subkey derived
-> from `KMS_LOCAL_MASTER_KEY` (the QE master key is never reused verbatim — domain separation);
+> from `KMS_LOCAL_MASTER_KEY` (the QE master key is never reused verbatim: domain separation);
 > otherwise a dev-only default. Whichever source is active must stay stable (changing it invalidates
 > all digests → re-seed/backfill). The
 > HMAC is irreversible without the key, so indexing it in the clear leaks nothing. The digest is
 > derived server-side (`digest.ts` → `phoneDigest`) on seed and on any phone update; clients never
 > set it. The same pattern applies to any other encrypted field that must be unique (e.g. email).
 
-### `customerAuthentication.model.ts` (SD-91 — new)
+### `customerAuthentication.model.ts` (SD-91: new)
 
 ```typescript
 // BIAN SD-91: Customer Authentication
@@ -86,7 +86,7 @@ export const CUSTOMER_AUTHENTICATION_COLLECTION = 'customerAuthenticationAssessm
 export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationInstanceReference: string;    // PK, UUID; used as JWT sub
   partyInstanceReference: string;                     // FK to party (SD-13)
-  customerAuthenticationEmailAddress: string;         // QE:equality — login lookup
+  customerAuthenticationEmailAddress: string;         // QE:equality, login lookup
   customerAuthenticationCredentialHash: string;       // bcrypt 12-round; NOT QE (hash is not PII)
   customerAuthenticationUserRole: CustomerAuthRole;
   customerAuthenticationUserName: string;             // Denormalized from party for JWT name claim
@@ -105,10 +105,10 @@ export type CustomerAuthRole =
   | 'level1_analyst'
   | 'level2_investigator'
   | 'security_auditor'
-  | 'merchant_officer';   // SD-89 Merchant Relations — Merchant Acquiring bank employee
+  | 'merchant_officer';   // SD-89 Merchant Relations: Merchant Acquiring bank employee
 ```
 
-### `customerAgreement.model.ts` (SD-53 — v3 updated)
+### `customerAgreement.model.ts` (SD-53: v3 updated)
 
 > **v2 change**: `customerAgreementProcedureSensitive` collection removed. Sensitive QE:none fields are now **inline** in `customerAgreementProcedure`. The QE tier (Level 1 / Level 2 client) controls whether they are returned as Binary or decrypted.
 >
@@ -122,16 +122,16 @@ export type CustomerAuthRole =
 export const CUSTOMER_AGREEMENT_COLLECTION = 'customerAgreementProcedure';
 // CUSTOMER_AGREEMENT_SENSITIVE_COLLECTION removed in v2
 
-// BQ:Step — KYC identity verification (BIAN SD-53 Behavior Qualifier type Step).
+// BQ:Step, KYC identity verification (BIAN SD-53 Behavior Qualifier type Step).
 // Status vocabulary follows BIAN lifecycle: initiated | verified | rejected | expired.
-// PCI DSS Req 8.1 — unique user identity verification at onboarding.
+// PCI DSS Req 8.1: unique user identity verification at onboarding.
 export type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
 export interface CustomerAgreementKycCheck {
   customerAgreementKycCheckStatus: KycCheckStatus;
   customerAgreementKycCheckCompletedDate?: Date;
   customerAgreementKycCheckReference?: string;  // External AML/ID verification reference
-  customerAgreementKycCheckNotes?: string;      // @deprecated v27 — replaced by structured verdicts
+  customerAgreementKycCheckNotes?: string;      // @deprecated v27, replaced by structured verdicts
   // v27 provider (HRP) verdicts, structured + auditable. Nested scalar leaves (parent sub-doc plaintext):
   customerAgreementKycCheckRiskScore?: number;                        // QE:range int 0-100 (DEK-kyc-risk-score)
   customerAgreementKycCheckRiskRating?: 'low' | 'medium' | 'high';    // QE:equality c8 (DEK-kyc-risk-rating)
@@ -152,16 +152,16 @@ export interface CustomerAgreementControlRecord {
   customerAgreementInstanceReference: string;         // PK, UUID
   partyInstanceReference: string;                     // FK to party (SD-13)
 
-  // QE:equality — direct search key
+  // QE:equality, direct search key
   customerAgreementReference: string;
 
-  // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
+  // QE:none (DEK-sensitive tier), returned as Binary by L1 client; decrypted by L2
   customerAgreementResidentialAddress?: ResidentialAddress;
   governmentIdentificationReference?: string;  // @deprecated v27, LEGACY READ-ONLY since v32 (ADR-050):
                                                // never written (removed from the seeder and fixtures) and never
                                                // returned by any response. Use customerAgreementGovernmentID,
                                                // the single source of truth and the only searchable one.
-  customerAgreementRiskNotes?: string;         // @deprecated v27 — use structured KYC verdicts
+  customerAgreementRiskNotes?: string;         // @deprecated v27, use structured KYC verdicts
 
   // v27 KYC identity (user-supplied). Structured gov ID leaves are QE-searchable (see GovernmentID).
   customerAgreementGovernmentID?: GovernmentID;
@@ -177,7 +177,7 @@ export interface CustomerAgreementControlRecord {
   customerAgreementPreferredLanguage: string;          // ISO 639-1
   customerAgreementPreferredPaymentCardReference?: string; // FK to paymentCardManagement UUID
 
-  // Ch-06: BQ:Step — KYC identity check (BIAN SD-53). PCI DSS Req 8.1.
+  // Ch-06: BQ:Step, KYC identity check (BIAN SD-53). PCI DSS Req 8.1.
   customerAgreementKycCheck?: CustomerAgreementKycCheck;
 
   bianServiceDomain: 'Customer Agreement';
@@ -213,7 +213,7 @@ export type AgreementStatus =
   | 'closed';
 ```
 
-### `paymentCard.model.ts` (SD-88 — updated)
+### `paymentCard.model.ts` (SD-88: updated)
 
 ```typescript
 // BIAN SD-88: Payment Card
@@ -256,7 +256,7 @@ export type PaymentCardStatus =
   | 'expired';
 ```
 
-### `cardTransaction.model.ts` (SD-254 — v2 updated)
+### `cardTransaction.model.ts` (SD-254: v2 updated)
 
 > **v2 change**: `cardTransactionLogSensitive` collection removed. Sensitive QE:none fields are now **inline** in `cardTransactionLog`. The QE tier controls whether they are returned as Binary or decrypted.
 
@@ -269,9 +269,9 @@ export const CARD_TRANSACTION_COLLECTION = 'cardTransactionLog';
 export interface CardTransactionLogControlRecord {
   cardTransactionInstanceReference: string;           // PK, UUID
   paymentCardReference: string;                       // Indexed plaintext (surrogate, not CHD)
-  cardTransactionAccountReference: string;            // QE:equality — investigator search key
+  cardTransactionAccountReference: string;            // QE:equality, investigator search key
 
-  // QE:none (DEK-sensitive tier) — returned as Binary by L1 client; decrypted by L2
+  // QE:none (DEK-sensitive tier), returned as Binary by L1 client; decrypted by L2
   rawGatewayPayload?: object;
   processorTransactionMetadata?: object;
 
@@ -327,7 +327,7 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisInstanceReference: string;               // UUID, primary key
   fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
-  // Links to protected records — BIAN *InstanceReference FK naming pattern
+  // Links to protected records: BIAN *InstanceReference FK naming pattern
   cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
   customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
 
@@ -438,7 +438,7 @@ export type ActionType =
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';
 ```
 
-**Collection:** `fraudDiagnosisCaseEvents` (SD-83) — append-only audit and notes log. Every case event (including notes) is stored here. Indexed on `(fraudDiagnosisInstanceReference, actionDateTime)` for ordered retrieval. See §5 for index definitions.
+**Collection:** `fraudDiagnosisCaseEvents` (SD-83), append-only audit and notes log. Every case event (including notes) is stored here. Indexed on `(fraudDiagnosisInstanceReference, actionDateTime)` for ordered retrieval. See §5 for index definitions.
 
 Document shape:
 
@@ -451,7 +451,7 @@ Document shape:
 | `actionDetails` | `Record<string, unknown>` | Shape varies by `actionType` |
 | `schemaVersion` | `number` | Schema version |
 
-**`NoteEntry` — API response shape for note records (used by note endpoints in §6.4):**
+**`NoteEntry`: API response shape for note records (used by note endpoints in §6.4):**
 
 ```typescript
 export interface NoteEntry {
@@ -470,7 +470,7 @@ export interface NoteEntry {
 
 ---
 
-### `partyAuthentication.model.ts` (SD-16 — updated)
+### `partyAuthentication.model.ts` (SD-16: updated)
 
 ```typescript
 // BIAN SD-16: Party Authentication
@@ -490,12 +490,12 @@ export interface PartyAuthenticationAssessmentRecord {
 }
 ```
 
-> **Auth credentials live in SD-91.** `customerAuthenticationAssessment` owns bcrypt hashes, roles, and login state. SD-16 (`partyAuthenticationAssessment`) is reserved for formal identity verification events (document scan, OTP, biometric) — v4+ scope.
+> **Auth credentials live in SD-91.** `customerAuthenticationAssessment` owns bcrypt hashes, roles, and login state. SD-16 (`partyAuthenticationAssessment`) is reserved for formal identity verification events (document scan, OTP, biometric): v4+ scope.
 
 ### `authenticationDomain.model.ts`
 
 ```typescript
-// BIAN SD-16: Party Authentication — Authentication Domain configuration registry
+// BIAN SD-16: Party Authentication, Authentication Domain configuration registry
 
 export const AUTHENTICATION_DOMAIN_COLLECTION = 'authenticationDomain';
 
@@ -518,9 +518,9 @@ export interface AuthenticationDomainRecord {
 }
 ```
 
-**Collection:** `authenticationDomain` — plaintext, no QE (domain config contains no CHD or PII).
-**Seed file:** `backend/data/authDomains.json` — 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
-**API:** `GET /api/v1/auth/domains` (public) — returns only domains with `partyAuthenticationDomainEnabled: true` (each item includes `selfRegistration` for local domains).
+**Collection:** `authenticationDomain`, plaintext, no QE (domain config contains no CHD or PII).
+**Seed file:** `backend/data/authDomains.json`, 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
+**API:** `GET /api/v1/auth/domains` (public), returns only domains with `partyAuthenticationDomainEnabled: true` (each item includes `selfRegistration` for local domains).
 
 **Self-registration (local domains).** When `partyAuthenticationDomainSelfRegistrationEnabled` is true, the login screen shows a Register link and `POST /api/v1/auth/register` (public) accepts `{ name, email, password, phone?, domain }`. The account is always created with role `customer` (server-enforced, never client-selectable) and a linked SD-13 party (name/email, plus phone when given). Status is `active` when the domain auto-approves, otherwise `pending`; a manager approves (`pending → active`) or rejects (`→ suspended`) it from the domain's Users panel. Non-active accounts are blocked at login with a 403. Registration is orchestrated by `registerSelfServiceUser` (service, not controller) which publishes a `auth.register` compliance event (EDA, PCI DSS Req 10; no PII in the event summary). This gates login only and does NOT perform or imply KYC (a separate process).
 
@@ -531,7 +531,7 @@ export interface AuthenticationDomainRecord {
 ### `creditRating.model.ts`
 
 ```typescript
-// BIAN SD-60: Customer Credit Rating — HRPC risk classification state per customer account
+// BIAN SD-60: Customer Credit Rating, HRPC risk classification state per customer account
 
 export const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
@@ -577,17 +577,17 @@ export interface CustomerCreditRatingStateControlRecord {
 }
 ```
 
-**Collection:** `customerCreditRatingState` — plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
-**Seed file:** `backend/data/customerCreditRatings.json` — 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
-**API:** `GET /api/v1/fraud/hrpc/check?accountRef=<ref>` — see §6.6.
+**Collection:** `customerCreditRatingState`, plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
+**Seed file:** `backend/data/customerCreditRatings.json`, 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
+**API:** `GET /api/v1/fraud/hrpc/check?accountRef=<ref>`, see §6.6.
 **Link key:** `customerAgreementReference` (a QE:equality field in `customerAgreementProcedure`) is used as the join key. The API looks up the fraud case's `customerAgreementInstanceReference`, resolves the account reference, then queries this collection. This avoids a cross-QE-collection `$lookup` (per ADR-001).
 
 ---
 
-### 1.13 SD-193 — `externalProviderArrangement` (ExternalProviderArrangement)
+### 1.13 SD-193: `externalProviderArrangement` (ExternalProviderArrangement)
 
-> **Schema v2** — Updated 2026-06-11. Adds `generic` type, enhanced config sub-documents, multi-provider routing, and default routing groups.
-> **dev.v7 Fase 2 (2026-06-14)** — Collections renamed to pure BIAN SD-193 control-record names; added `capabilityModuleConfiguration` (internal Module engine config, ADR-029). Constant identifiers keep `INTEGRATION_*` until the module rename (Fase 3).
+> **Schema v2**: Updated 2026-06-11. Adds `generic` type, enhanced config sub-documents, multi-provider routing, and default routing groups.
+> **dev.v7 Fase 2 (2026-06-14)**: Collections renamed to pure BIAN SD-193 control-record names; added `capabilityModuleConfiguration` (internal Module engine config, ADR-029). Constant identifiers keep `INTEGRATION_*` until the module rename (Fase 3).
 
 ```typescript
 export const INTEGRATION_REGISTRY_COLLECTION       = 'externalProviderArrangement';
@@ -618,20 +618,20 @@ export interface ExternalProviderArrangement {
   externalProviderArrangementType: IntegrationProviderType;
   externalProviderArrangementStatus: IntegrationStatus;
 
-  // Internal provider flag — pre-seeded, cannot be deleted or suspended
+  // Internal provider flag: pre-seeded, cannot be deleted or suspended
   externalProviderIsInternal: boolean;
   externalProviderInternalHandler?: string;               // e.g. "fraudDiagnosis.internalFraudScoring"
 
   // Outbound REST (external providers only)
   externalProviderApiEndpoint?: string;
-  externalProviderApiKeyHash?: string;                    // bcrypt — NEVER returned in API responses
+  externalProviderApiKeyHash?: string;                    // bcrypt, NEVER returned in API responses
   externalProviderApiKeyPrefix?: string;                  // visible prefix for UI (e.g. "fds_live_...")
   externalProviderAuthScheme?: IntegrationAuth;
 
   // Inbound callback config (async providers)
   externalProviderCallbackEnabled: boolean;
   externalProviderCallbackPath?: string;                  // /webhooks/{type}/{arrangementId}/callback
-  externalProviderCallbackSecretHash?: string;            // bcrypt — never returned
+  externalProviderCallbackSecretHash?: string;            // bcrypt, never returned
 
   // Event routing
   externalProviderTriggerEvents: string[];                // ['transaction.authorized', 'kyc.initiated']
@@ -651,10 +651,10 @@ export interface ExternalProviderArrangement {
   // v2: Structured authentication config
   authConfig?: IntegrationAuthConfig;
 
-  // v2: Field mapping — outbound (pre-dispatch) and inbound (post-callback)
+  // v2: Field mapping, outbound (pre-dispatch) and inbound (post-callback)
   fieldMappingConfig?: FieldMappingConfig;
 
-  // v2: Multi-provider routing — auto-set on creation to default group of the type
+  // v2: Multi-provider routing, auto-set on creation to default group of the type
   routingGroupId?: string;                                // FK to integrationRoutingGroups
   routingPriority?: number;                               // lower = higher priority; internals use 999
   routingWeight?: number;                                 // 0–100 for weighted strategy
@@ -707,14 +707,14 @@ export interface BusinessContextRef {
 
 // ── Event Audit Log ─────────────────────────────────────────────────────────
 // ADR-025: integrationEvents is a timeseries collection (timeField: recordCreatedDateTime).
-// Unique secondary index removed — incompatible with MongoDB timeseries.
+// Unique secondary index removed: incompatible with MongoDB timeseries.
 
 export interface IntegrationEvent {
   integrationEventInstanceReference: string;              // UUID
   externalProviderArrangementInstanceReference: string;   // FK to integrationRegistry
   integrationEventType: 'dispatch' | 'callback' | 'health_check' | 'test';
   integrationEventStatus: 'sent' | 'received' | 'error' | 'timeout';
-  integrationEventPayloadHash?: string;                   // sha256 of payload — never the payload itself
+  integrationEventPayloadHash?: string;                   // sha256 of payload, never the payload itself
   integrationEventResponseCode?: number;
   integrationEventLatencyMs?: number;
   integrationEventErrorMessage?: string;
@@ -728,12 +728,12 @@ export interface IntegrationEvent {
 ```
 
 **Collections:**
-- `integrationRegistry` — plaintext, no QE. Provider configuration, key hashes, health state.
-- `integrationRoutingGroups` — plaintext, no QE. One default group per type + user-created groups.
-- `integrationEvents` — **timeseries** (ADR-025), no QE. Append-only audit log; timeField=`recordCreatedDateTime`, TTL 90 days.
+- `integrationRegistry`: plaintext, no QE. Provider configuration, key hashes, health state.
+- `integrationRoutingGroups`: plaintext, no QE. One default group per type + user-created groups.
+- `integrationEvents`: **timeseries** (ADR-025), no QE. Append-only audit log; timeField=`recordCreatedDateTime`, TTL 90 days.
 
 **Seed files:**
-- `backend/data/integrationRegistry.json` — 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
+- `backend/data/integrationRegistry.json`: 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
 - Default routing groups seeded programmatically by `seedRoutingGroups.ts` (called from `seedIntegrations`).
 
 **Default group invariant:**
@@ -742,16 +742,16 @@ export interface IntegrationEvent {
 - External providers auto-join on creation: `memberPriority = max(external priorities) + 10`, minimum 10.
 
 **Security notes:**
-- `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are bcrypt hashes — never returned in API responses.
+- `externalProviderApiKeyHash` and `externalProviderCallbackSecretHash` are bcrypt hashes, never returned in API responses.
 - Plaintext API key returned exactly once at creation and once at rotation.
 - Payload content is never logged; only a SHA-256 hash is stored for audit reference.
 - Field mapping engine enforces a PCI DSS blocklist: PAN, CVV, expiryDate, cardholderName cannot be mapped.
 
 ---
 
-### 1.14 Business Process Events — timeseries audit layer (ADR-025)
+### 1.14 Business Process Events: timeseries audit layer (ADR-025)
 
-> **Schema v1** — Added 2026-06-13. Unified append-only business process audit trail; two TTL-differentiated timeseries collections.
+> **Schema v1**: Added 2026-06-13. Unified append-only business process audit trail; two TTL-differentiated timeseries collections.
 
 ```typescript
 // ── Business Process Event Log ───────────────────────────────────────────────
@@ -779,13 +779,13 @@ export type ComplianceProcessType =
 export type ProcessEventOutcome = 'approved' | 'rejected' | 'pending' | 'failed' | 'escalated';
 
 export interface ProcessEventMeta {
-  integrationEventRefs?: string[];      // integrationEventInstanceReference[] — correlated dispatch events
+  integrationEventRefs?: string[];      // integrationEventInstanceReference[], correlated dispatch events
   ruleIds?: string[];                   // compliance rule identifiers
   thresholds?: Record<string, number>;  // e.g. { riskScoreThreshold: 75 }
   [key: string]: unknown;
 }
 
-// Shared shape — used by both businessProcessEvent and complianceProcessEvent
+// Shared shape: used by both businessProcessEvent and complianceProcessEvent
 export interface BusinessProcessEvent {
   // Timeseries fields
   eventDateTime: Date;                                    // timeField
@@ -804,7 +804,7 @@ export interface BusinessProcessEvent {
   performedByPartyReference: string | null;               // null = system-initiated
   performedByRole: string | null;
 
-  // Audit summary (CHD blocklist applied — no PAN, CVV, cardholderName, expiryDate, trackData)
+  // Audit summary (CHD blocklist applied, no PAN, CVV, cardholderName, expiryDate, trackData)
   eventSummary: Record<string, unknown>;
 
   // BIAN
@@ -814,7 +814,7 @@ export interface BusinessProcessEvent {
   // Meta
   processMeta?: ProcessEventMeta;
 
-  // v18 (SD-16 audit attribution) — optional, backwards-compatible. Set when an action originates from
+  // v18 (SD-16 audit attribution): optional, backwards-compatible. Set when an action originates from
   // a merchant OAuth request (request.merchantContext). Powers the "user × merchant × action" activity
   // view without a new collection. Session (non-OAuth) actions leave these unset.
   clientId?: string;                    // OAuth client_id that originated the action
@@ -825,7 +825,7 @@ export interface BusinessProcessEvent {
 
 // ── Typed Payload Contracts per Integration Category ─────────────────────────
 // Each category has an Outbound (dispatch body) and Inbound (callback body) interface.
-// CHD blocklist enforced — PAN, CVV, expiryDate, cardholderName, trackData NEVER appear.
+// CHD blocklist enforced: PAN, CVV, expiryDate, cardholderName, trackData NEVER appear.
 
 // fraud_detection (SD-83)
 export interface FdsOutboundPayload {
@@ -953,46 +953,46 @@ export interface GenericInboundPayload {
 ```
 
 **Collections:**
-- `businessProcessEvent` — **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 90 days, granularity=`hours`.
-- `complianceProcessEvent` — **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 365 days, granularity=`hours`.
+- `businessProcessEvent`: **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 90 days, granularity=`hours`.
+- `complianceProcessEvent`: **timeseries**, no QE. timeField=`eventDateTime`, metaField=`processType`, TTL 365 days, granularity=`hours`.
 
 **CHD blocklist** (enforced in `eventSummary` at service layer): `pan`, `cardNumber`, `cvv`, `cvv2`, `cvc`, `expiryDate`, `cardExpiry`, `cardholderName`, `trackData`, `track1`, `track2`, `pinBlock`.
 
-**Emission pattern** (fire-and-forget — never blocks request path):
+**Emission pattern** (fire-and-forget, never blocks request path):
 ```typescript
 void db.collection(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(() => {});
 ```
 
 ---
 
-### 1.15 RBAC/ACL — data-driven permission model (ADR-030, SD-16)
+### 1.15 RBAC/ACL: data-driven permission model (ADR-030, SD-16)
 
 Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission **catalog** (resource × action) is static code (`backend/src/shared/models/acl.model.ts`, mirrored in `frontend/src/config/acl.ts`); the role→permission **assignment** is data in the **`role`** collection (CRUD by the `manager`).
 
 **Resources** (→ BIAN SD): `transactions`(SD-254) · `customers`(SD-53) · `cards`(SD-88) · `accounts`(SD-66) · `fraudCases`(SD-83) · `merchants`(SD-89) · `providers`(SD-193) · `modules`(ADR-029) · `authDomains`(SD-16) · `roles` · `auditEvents`(ADR-025) · `consents`.
-**Actions** (PCI levels): `view` · `viewSensitive` (CHD/PII — Req 3/7, bound to the escalation flow) · `manage` · `investigate`. Scope `own` for `customer`.
+**Actions** (PCI levels): `view` · `viewSensitive` (CHD/PII, Req 3/7, bound to the escalation flow) · `manage` · `investigate`. Scope `own` for `customer`.
 
-**`role` collection** — `{ roleName (PK, unique), roleLabel, roleDescription, rolePermissions: {[resource]: action[]}, roleScope: 'own'|'all', roleIsBuiltin, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime }`. Builtin roles are editable (permissions) but not deletable; custom roles support any subset, including full-manage.
+**`role` collection**: `{ roleName (PK, unique), roleLabel, roleDescription, rolePermissions: {[resource]: action[]}, roleScope: 'own'|'all', roleIsBuiltin, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime }`. Builtin roles are editable (permissions) but not deletable; custom roles support any subset, including full-manage.
 
 **Builtin role matrix (seed):**
 
 | Role | transactions | customers | cards | fraudCases | merchants | providers | modules | authDomains | roles | auditEvents | consents |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| **customer** (own) | view | — | view·manage | — | view | — | — | — | — | — | view |
-| **level1_analyst** | view | view | view | view·investigate | view | — | — | — | — | **—** | — |
-| **level2_investigator** | view·**viewSensitive** | view·**viewSensitive** | view·**viewSensitive** | view·investigate | view | — | — | — | — | view | — |
-| **security_auditor** | view·viewSensitive | view·viewSensitive | view·viewSensitive | view·viewSensitive | view | view | view | — | — | view | — |
-| **merchant_officer** | — | — | — | — | view·manage | — | — | — | — | **—** | — |
-| **operations_officer** | — | — | view·manage | — | — | view | view·manage | — | — | view | — |
-| **manager** | **—** | **—** | **—** | **—** | — | view·manage | view | view·manage | view·manage | view | — |
+| **customer** (own) | view |: | view·manage |, | view |, |, |, |, |, | view |
+| **level1_analyst** | view | view | view | view·investigate | view |: |, |, |, | **, ** |, |
+| **level2_investigator** | view·**viewSensitive** | view·**viewSensitive** | view·**viewSensitive** | view·investigate | view |: |, |, |, | view |, |
+| **security_auditor** | view·viewSensitive | view·viewSensitive | view·viewSensitive | view·viewSensitive | view | view | view |: |, | view |, |
+| **merchant_officer** |: |, |, |, | view·manage |, |, |, |, | **, ** |, |
+| **operations_officer** |: |, | view·manage |, |, | view | view·manage |, |, | view |, |
+| **manager** | **, ** | **, ** | **, ** | **, ** |: | view·manage | view | view·manage | view·manage | view |, |
 
 > `auditEvents:view` (the platform-wide event stream, ADR-025) is held by `level2_investigator`, `security_auditor`, `operations_officer` and `manager` only. `level1_analyst` and `merchant_officer` are excluded: the stream is cross-entity, and neither first-line triage nor KYB review has a job-related need for it (PCI DSS Req 10.5.1 "limit viewing of audit log files to those with a job-related need" + Req 7.2.2, NIST SP 800-53 AU-9, ISO/IEC 27001:2022 A.8.15). L1 keeps the per-case trail through `fraudCases:investigate`; a merchant officer sees the KYB decision history on the merchant record.
 
 > The `operations_officer` (v29, BIAN SD-88 PaymentCardManagement + SD-66 PayoutAccountArrangement, department "Operations") also holds **`accounts: view·manage`** (SD-66; the `accounts` resource is not a column above). It is the global back-office administrator of the card inventory and payout accounts exposed by the built-in modules (§6.13). Scope `all`; permissions `cards:[view,manage]`, `accounts:[view,manage]`, `modules:[view,manage]`, `providers:[view]`, `auditEvents:[view]`. Via `modules:[view,manage]` it is the sole role that **manages** the configuration and policies of **all internal modules** (fds, aml, hrp, kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation, vop). `providers:[view]` is **read-only**: its administration landing shows which provider serves each capability (internal vs external / `managed_externally`), but provider CRUD stays with `manager`. This reflects the confirmed role philosophy: **`operations_officer` owns internal business logic and financial processes** (cards SD-88, accounts SD-66, the internal engines FDS/AML/HRP/card-issuer/AIS/PISP, audit, plus read-only provider visibility), whereas **`manager` owns system and platform** (integrations/providers, auth domains, roles, general config, security), never business or cardholder data. By separation of duties (PCI DSS Req 7) it is **distinct from `manager`**: `operations_officer` has **no** `providers:manage`, `authDomains` or `roles`; auth (SD-16, resource `authDomains`) stays exclusive to `manager`; `modules` no longer overlaps at the `manage` level (only `manager` retains `modules:view` for system/security oversight, editing of module config is exclusive to `operations_officer`). It is also distinct from `customer` (scope `own`, self-service).
 
-> The `manager` (SD-193 platform admin) has **no** access to business/cardholder data — separation of duties (PCI Req 7). `can('manager','transactions','view') === false` ⇒ **403 backend** (`requirePermission` preHandler) + **`<AccessDenied>` frontend** (`<RequirePermission>`), with the role's responsibilities rendered from the live ACL. As of v29.2 the `manager` relation to `modules` is **read-only** (`modules:view`), for system and security oversight; editing internal module config/policies is exclusive to `operations_officer`.
+> The `manager` (SD-193 platform admin) has **no** access to business/cardholder data: separation of duties (PCI Req 7). `can('manager','transactions','view') === false` ⇒ **403 backend** (`requirePermission` preHandler) + **`<AccessDenied>` frontend** (`<RequirePermission>`), with the role's responsibilities rendered from the live ACL. As of v29.2 the `manager` relation to `modules` is **read-only** (`modules:view`), for system and security oversight; editing internal module config/policies is exclusive to `operations_officer`.
 
-**Enforcement & API:** `requirePermission(resource, action)` (Fastify preHandler, default-deny, cached role load + builtin fallback). `GET /api/v1/acl/effective` returns the caller's resolved permissions (frontend `can()` — permissions never live in the JWT). Roles CRUD: `GET/POST /api/v1/roles`, `GET/PUT/DELETE /api/v1/roles/:roleName` (`roles:manage`; builtin not deletable). Users (local): `GET/POST /api/v1/users`, `PUT/DELETE /api/v1/users/:id` (`authDomains:manage`). Remote role mappings: `partyAuthenticationDomainRoleMappings` on `authenticationDomain` (claim/group → role).
+**Enforcement & API:** `requirePermission(resource, action)` (Fastify preHandler, default-deny, cached role load + builtin fallback). `GET /api/v1/acl/effective` returns the caller's resolved permissions (frontend `can()`, permissions never live in the JWT). Roles CRUD: `GET/POST /api/v1/roles`, `GET/PUT/DELETE /api/v1/roles/:roleName` (`roles:manage`; builtin not deletable). Users (local): `GET/POST /api/v1/users`, `PUT/DELETE /api/v1/users/:id` (`authDomains:manage`). Remote role mappings: `partyAuthenticationDomainRoleMappings` on `authenticationDomain` (claim/group → role).
 
 ---
 
@@ -1000,26 +1000,26 @@ Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission *
 
 Structured investigator→customer questions on a fraud case, answered by the customer on the related transaction; **immutable once answered** (PCI DSS Req 10).
 
-**Collection `fraudDiagnosisCustomerQuestion`** (plaintext, no CHD) — `{ customerQuestionInstanceReference (PK), fraudDiagnosisInstanceReference, fraudDiagnosisCaseReference, cardTransactionInstanceReference, customerAgreementInstanceReference, partyInstanceReference, questionText, questionOptions[], allowOther, questionStatus('pending'|'closed'), askedBy{InstanceReference,Name,Role}, askedDateTime, responseOption?, responseText?, respondedByInstanceReference?, respondedDateTime?, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime, schemaVersion }`. Indexes: unique `customerQuestionInstanceReference`; `cardTransactionInstanceReference`; `{fraudDiagnosisInstanceReference, askedDateTime}`; `{partyInstanceReference, questionStatus}`.
+**Collection `fraudDiagnosisCustomerQuestion`** (plaintext, no CHD): `{ customerQuestionInstanceReference (PK), fraudDiagnosisInstanceReference, fraudDiagnosisCaseReference, cardTransactionInstanceReference, customerAgreementInstanceReference, partyInstanceReference, questionText, questionOptions[], allowOther, questionStatus('pending'|'closed'), askedBy{InstanceReference,Name,Role}, askedDateTime, responseOption?, responseText?, respondedByInstanceReference?, respondedDateTime?, bianServiceDomain, bianControlRecordType, recordCreated/UpdatedDateTime, schemaVersion }`. Indexes: unique `customerQuestionInstanceReference`; `cardTransactionInstanceReference`; `{fraudDiagnosisInstanceReference, askedDateTime}`; `{partyInstanceReference, questionStatus}`.
 
 **API:**
-- `POST /api/v1/fraud/:id/questions` (L1/L2) — body `{ questionText, options[], allowOther }`; creates a pending question on the case.
-- `GET /api/v1/fraud/:id/questions` (investigation roles) — list questions + responses.
-- `GET /api/v1/transactions/:id/questions` (`transactions:view`; customers scoped to own party) — customer-facing list.
-- `POST /api/v1/transactions/:id/questions/:questionId/response` — customer answers `{ option, text? }`; atomic pending→closed (immutable; 409 if already closed; 403 if not the owner; 400 if the option is not valid / "Other" without text).
-- `GET /api/v1/notifications` — the caller's pending questions (drives the menu badge).
+- `POST /api/v1/fraud/:id/questions` (L1/L2), body `{ questionText, options[], allowOther }`; creates a pending question on the case.
+- `GET /api/v1/fraud/:id/questions` (investigation roles), list questions + responses.
+- `GET /api/v1/transactions/:id/questions` (`transactions:view`; customers scoped to own party), customer-facing list.
+- `POST /api/v1/transactions/:id/questions/:questionId/response`, customer answers `{ option, text? }`; atomic pending→closed (immutable; 409 if already closed; 403 if not the owner; 400 if the option is not valid / "Other" without text).
+- `GET /api/v1/notifications`: the caller's pending questions (drives the menu badge).
 
 **Events (Req 10):** create/answer emit `businessProcessEvent` (`fraud.question.created` / `fraud.question.answered`) and append `fraudDiagnosisCaseEvents` (`question_created` / `question_answered`). No CHD is ever stored in the question or response.
 
 ---
 
-### 1.17 PSP Payout Orchestration Models (v17 — SD-54/65/66)
+### 1.17 PSP Payout Orchestration Models (v17: SD-54/65/66)
 
 Three new collections added in v17 to support the end-to-end payout pipeline.
 
 ---
 
-#### `payoutAccountArrangement` (SD-66 — Payment Initiation)
+#### `payoutAccountArrangement` (SD-66: Payment Initiation)
 
 PSP-internal bank account record for each party. IBAN and routing number are encrypted at rest with `QE:none` (PCI DSS Req 3.3). Balance sub-document is updated atomically via `$inc`.
 
@@ -1035,7 +1035,7 @@ export interface PayoutAccountBalance {
   pendingAmount:   number;   // authorized, awaiting settlement
   availableAmount: number;   // settled funds available for withdrawal
   reservedAmount:  number;   // held for disputes / chargebacks
-  currency:        string;   // ISO 4217 — must match payoutAccountCurrency
+  currency:        string;   // ISO 4217, must match payoutAccountCurrency
   lastUpdatedDateTime: Date;
 }
 
@@ -1047,13 +1047,13 @@ export interface PayoutAccountArrangement {
   payoutAccountStatus:       PayoutAccountStatus;
   payoutAccountIsDefault:    boolean;  // at most one true per party (partial unique index)
 
-  // QE:none (DEK-payout-iban / DEK-payout-routing) — L1 returns Binary; L2 auto-decrypts
-  payoutAccountIban?:          string;  // IBAN — GDPR Art. 32 / PSD2 (bank data, not PCI-scoped card data)
-  payoutAccountRoutingNumber?: string;  // BIC / SWIFT / sort code — GDPR Art. 32 / PSD2
+  // QE:none (DEK-payout-iban / DEK-payout-routing), L1 returns Binary; L2 auto-decrypts
+  payoutAccountIban?:          string;  // IBAN, GDPR Art. 32 / PSD2 (bank data, not PCI-scoped card data)
+  payoutAccountRoutingNumber?: string;  // BIC / SWIFT / sort code, GDPR Art. 32 / PSD2
 
   payoutAccountAlias?:          string;  // phone or email alias for lookup
   payoutAccountBankName?:       string;
-  payoutAccountHolderName?:        string;  // account holder legal name (from party) — SD-66 (max 140)
+  payoutAccountHolderName?:        string;  // account holder legal name (from party), SD-66 (max 140)
   payoutAccountBicSwift?:          string;  // ISO 9362 BIC/SWIFT: /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/ (8 or 11 chars)
   payoutAccountCorrespondentBic?:  string;  // correspondent bank BIC for international wires (8 or 11 chars, same pattern)
   payoutAccountBankAddress?:       string;  // bank branch/HQ address (max 200)
@@ -1061,7 +1061,7 @@ export interface PayoutAccountArrangement {
   payoutAccountCountryCode:     string;  // ISO 3166-1 alpha-2
   payoutAccountPreferredRail:   PayoutRail;
 
-  payoutAccountBalance: PayoutAccountBalance;  // PSP internal ledger — $inc only
+  payoutAccountBalance: PayoutAccountBalance;  // PSP internal ledger, $inc only
 
   bianServiceDomain:      'Payment Initiation';
   bianControlRecordType:  'PayoutAccountArrangement';
@@ -1073,7 +1073,7 @@ export interface PayoutAccountArrangement {
 
 ---
 
-#### `paymentExecutionProcedure` (SD-65 — Payment Execution)
+#### `paymentExecutionProcedure` (SD-65: Payment Execution)
 
 Lifecycle record for each payout. Created after card authorization; tracks the full journey from beneficiary resolution to final settlement. `resolutionLog` is append-only (PCI DSS Req 10).
 
@@ -1106,7 +1106,7 @@ export interface PaymentExecutionProcedure {
 
   beneficiaryType:               BeneficiaryType;  // 'merchant' | 'user' | 'anonymous'
   beneficiaryPartyReference?:    string;            // FK → party (SD-13) for user payouts
-  beneficiaryArrangementReference?: string;         // FK → counterpartyArrangement (SD-54) — links the detail page to the saved beneficiary
+  beneficiaryArrangementReference?: string;         // FK → counterpartyArrangement (SD-54), links the detail page to the saved beneficiary
   resolvedPayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66)
   // v18 (SD-89): the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
   // Set only for merchant-originated transfers; PSP-direct customer transfers leave it unset. Enables
@@ -1115,11 +1115,11 @@ export interface PaymentExecutionProcedure {
   merchantAgreementReference?: string;              // FK → merchantAgreementInstanceReference (SD-89)
 
   // Recipient identity for a bank transfer to an UNREGISTERED external account (SEPA/ACH/SWIFT).
-  // Bank data under GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is
+  // Bank data under GDPR Art. 32 / PSD2 (NOT PCI DSS: that governs card data). destinationIban is
   // QE:none (DEK-exec-dest-iban), encrypted at rest and shown full to the account owner; the masked
   // form is plaintext for list views. Registered destinations link via the FKs above instead.
   beneficiaryName?:          string;   // holder legal name as entered at initiation
-  destinationIban?:          string;   // full destination IBAN — QE:none (L2 only)
+  destinationIban?:          string;   // full destination IBAN, QE:none (L2 only)
   destinationAccountMasked?: string;   // masked IBAN / account, e.g. "ES12••••5477"
   destinationCountry?:       string;   // ISO 3166-1 alpha-2 destination banking country
 
@@ -1143,7 +1143,7 @@ export interface PaymentExecutionProcedure {
 
   paymentExecutionRail?: PayoutRail;
   routingNote?:          string;
-  paymentExecutionRemittanceInformation?: string; // ISO 20022 RemittanceInformation — payment concept/reference (bank transfer / P2P note); first-class + queryable for AML/FDS. Not CHD → NOT QE.
+  paymentExecutionRemittanceInformation?: string; // ISO 20022 RemittanceInformation, payment concept/reference (bank transfer / P2P note); first-class + queryable for AML/FDS. Not CHD → NOT QE.
 
   paymentExecutionStatus: PaymentExecutionStatus;
   failureReason?:  string;
@@ -1163,7 +1163,7 @@ export interface PaymentExecutionProcedure {
 
 ---
 
-#### Commission settlement (v34 — SD-89 pricing → SD-66 balances)
+#### Commission settlement (v34: SD-89 pricing → SD-66 balances)
 
 Where a collected merchant commission actually goes. Without this leg `feeAmount` would be a one-sided
 annotation: the merchant would be credited the gross while an event claimed a commission was collected.
@@ -1235,22 +1235,22 @@ acquiring counterpart (`cardTransactionInstanceReference` absent). Otherwise the
 
 ---
 
-#### `counterpartyArrangement` (SD-54 — Counterparty Administration)
+#### `counterpartyArrangement` (SD-54: Counterparty Administration)
 
-Beneficiary registry entry. Raw phone/email is **never stored** — only the resolved `partyInstanceReference` and a masked display hint. The opaque `counterpartyArrangementReference` is the "beneficiary token" shared with merchants for payment initiation.
+Beneficiary registry entry. Raw phone/email is **never stored**, only the resolved `partyInstanceReference` and a masked display hint. The opaque `counterpartyArrangementReference` is the "beneficiary token" shared with merchants for payment initiation.
 
 ```typescript
 // backend/src/modules/identity/models/counterpartyArrangement.model.ts
 export const COUNTERPARTY_COLLECTION = 'counterpartyArrangement';
 
-// Max beneficiaries per user — configurable via PSP_BENEFICIARY_MAX_PER_USER (default: 100)
+// Max beneficiaries per user: configurable via PSP_BENEFICIARY_MAX_PER_USER (default: 100)
 export const COUNTERPARTY_MAX_PER_USER = config.payout.beneficiaryMaxPerUser;
 
 export type CounterpartyArrangementStatus = 'active' | 'removed';
 export type CounterpartyLookupType        = 'phone' | 'email';
 
 export interface CounterpartyArrangement {
-  counterpartyArrangementReference: string;  // UUID v4 — the opaque beneficiary token
+  counterpartyArrangementReference: string;  // UUID v4, the opaque beneficiary token
   ownerPartyReference:              string;  // FK → party: who owns this contact
   counterpartyPartyReference:       string;  // FK → party: the resolved beneficiary (PSP internal)
 
@@ -1283,8 +1283,8 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 |---|---|---|
 | `deks.partyEmail` | `DEK-party-email` | `party.partyEmailAddress` |
 | `deks.partyPhone` | `DEK-party-phone` | `party.partyMobilePhoneNumber` |
-| `deks.partyAddress` | `DEK-party-address` | `party.partyPostalAddress` (QE:none — GDPR PII, L2 only) |
-| `deks.partyDob` | `DEK-party-dob` | `party.partyDateOfBirth` (QE:none — GDPR PII, L2 only) |
+| `deks.partyAddress` | `DEK-party-address` | `party.partyPostalAddress` (QE:none, GDPR PII, L2 only) |
+| `deks.partyDob` | `DEK-party-dob` | `party.partyDateOfBirth` (QE:none, GDPR PII, L2 only) |
 | `deks.authEmail` | `DEK-auth-email` | `customerAuthenticationAssessment.customerAuthenticationEmailAddress` |
 | `deks.customerAccountRef` | `DEK-customer-account-ref` | `customerAgreementProcedure.customerAgreementReference` |
 | `deks.txAccountRef` | `DEK-tx-account-ref` | `cardTransactionLog.cardTransactionAccountReference` |
@@ -1294,10 +1294,10 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 | `deks.txRawPayload` | `DEK-tx-raw-payload` | `cardTransactionLog.rawGatewayPayload` (QE:none, inline v2) |
 | `deks.txProcessorMeta` | `DEK-tx-processor-meta` | `cardTransactionLog.processorTransactionMetadata` (QE:none, inline v2) |
 | `deks.cardExpiry` | `DEK-card-expiry` | `paymentCardManagement.paymentCardExpirationDate` |
-| `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none — GDPR Art. 32 / PSD2) |
-| `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none — GDPR Art. 32 / PSD2) |
-| `deks.execDestIban` | `DEK-exec-dest-iban` | `paymentExecutionProcedure.destinationIban` — unregistered external destination (QE:none — GDPR Art. 32 / PSD2) |
-| `deks.partyName` | `DEK-party-name` | `party.partyName` (v27, QE:substring — lookup tier) |
+| `deks.payoutIban` | `DEK-payout-iban` | `payoutAccountArrangement.payoutAccountIban` (QE:none, GDPR Art. 32 / PSD2) |
+| `deks.payoutRouting` | `DEK-payout-routing` | `payoutAccountArrangement.payoutAccountRoutingNumber` (QE:none, GDPR Art. 32 / PSD2) |
+| `deks.execDestIban` | `DEK-exec-dest-iban` | `paymentExecutionProcedure.destinationIban`: unregistered external destination (QE:none, GDPR Art. 32 / PSD2) |
+| `deks.partyName` | `DEK-party-name` | `party.partyName` (v27, QE:substring, lookup tier) |
 | `deks.partyNationality` | `DEK-party-nationality` | `party.partyNationality` (v27, QE:equality c8) |
 | `deks.partyPlaceOfBirth` | `DEK-party-place-of-birth` | `party.partyPlaceOfBirth` (v27, QE:equality c8) |
 | `deks.partySex` | `DEK-party-sex` | `party.partySex` (QE:equality c8, GDPR PII) |
@@ -1317,7 +1317,7 @@ All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `k
 
 > **Regulatory note:** IBAN / routing / BIC are **bank account data → GDPR Art. 32 + PSD2**, not PCI DSS. PCI DSS scope is card data (PAN / CHD). Both are QE-encrypted at rest here, but for distinct regulatory drivers.
 
-### 2.1 v27 — QE search showcase (equality / range / substring / prefix / suffix)
+### 2.1 v27: QE search showcase (equality / range / substring / prefix / suffix)
 
 v27 adds searchable KYC fields to demonstrate every QE query type over encrypted GDPR PII (never
 card data). These fields are **lookup-tier** (present in both L1 and L2 maps), so L1 analysts can
@@ -1411,7 +1411,7 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
       fields: [
         { keyId: deks.partyEmail,  path: 'partyEmailAddress',      bsonType: 'string', queries: { queryType: 'equality' } },
         { keyId: deks.partyPhone,  path: 'partyMobilePhoneNumber', bsonType: 'string', queries: { queryType: 'equality' } },
-        // GDPR PII — QE:none, Level 2 only (postal address + date of birth)
+        // GDPR PII: QE:none, Level 2 only (postal address + date of birth)
         ...(includeSensitive ? [
           { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
           { keyId: deks.partyDob,     path: 'partyDateOfBirth',   bsonType: 'string' },
@@ -1461,7 +1461,7 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
     // fraudDiagnosisCase: no QE (operational metadata only, no PII or CHD)
 
     // ── payoutAccountArrangement (SD-66) ──────────────────────────────
-    // QE:none only — IBAN and routing number are sensitive bank data at rest (GDPR Art. 32 / PSD2)
+    // QE:none only, IBAN and routing number are sensitive bank data at rest (GDPR Art. 32 / PSD2)
     // but NOT searchable (accounts looked up by payoutAccountInstanceReference, not IBAN).
     // L1 map omits this block → driver returns Binary. L2 map includes it → auto-decrypts.
     ...(includeSensitive ? {
@@ -1658,7 +1658,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
   // ── party (SD-13) ─────────────────────────────────────────────────
   await db.collection('party').createIndexes([
     { key: { partyInstanceReference: 1 }, unique: true },
-    // Note: partyEmailAddress and partyMobilePhoneNumber are QE:equality —
+    // Note: partyEmailAddress and partyMobilePhoneNumber are QE:equality,
     // QE manages its own __safeContent__ index; do NOT add manual indexes on these fields
     // Uniqueness on the (encrypted) phone is enforced via its blind-index digest instead.
     // Partial: phone is optional (self-registered parties may omit it), so only documents that
@@ -1699,7 +1699,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
   // v27: the QE-encrypted KYC leaves (riskScore, riskRating, pepStatus, sanctionsResult,
   // govID.number/type/issuingCountry/expiryDate, taxID, occupation, partyName, partyDateOfBirth)
   // are searched via QE queries only. They take NO btree indexes and NO unique index
-  // (QE fields cannot be unique — use the blind-index HMAC pattern if uniqueness is ever needed).
+  // (QE fields cannot be unique: use the blind-index HMAC pattern if uniqueness is ever needed).
 
   // ── paymentCardManagement (SD-88) ─────────────────────────────────
   await db.collection('paymentCardManagement').createIndexes([
@@ -1742,7 +1742,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { customerAgreementReference: 1 } },           // HRPC lookup by account reference
   ]);
 
-  // ── consentAgreement (SD-36) — Open Banking v3 stub ──────────────
+  // ── consentAgreement (SD-36): Open Banking v3 stub ──────────────
   await db.collection('consentAgreement').createIndexes([
     { key: { consentAgreementInstanceReference: 1 }, unique: true },
     { key: { partyInstanceReference: 1 } },
@@ -1750,7 +1750,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { consentStatus: 1, consentExpiryDateTime: 1 } },
   ]);
 
-  // ── consentAccessLog (SD-36) — Open Banking audit trail ──────────
+  // ── consentAccessLog (SD-36): Open Banking audit trail ──────────
   await db.collection('consentAccessLog').createIndexes([
     { key: { consentAccessLogInstanceReference: 1 }, unique: true },
     { key: { consentAgreementInstanceReference: 1, accessDateTime: -1 } },
@@ -1767,7 +1767,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
     { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
     { key: { externalProviderIsInternal: 1 } },
-    // Non-unique: multi-provider support — multiple providers can share the same type+endpoint
+    // Non-unique: multi-provider support, multiple providers can share the same type+endpoint
     { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, sparse: true },
     { key: { routingGroupId: 1 }, sparse: true },
     { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
@@ -1781,28 +1781,28 @@ async function createIndexes(client: MongoClient, dbName: string) {
     { key: { isDefaultGroup: 1 }, sparse: true },
   ]);
 
-  // ── integrationEvents (SD-193 Action Log) — TIMESERIES (ADR-025) ────────
+  // ── integrationEvents (SD-193 Action Log): TIMESERIES (ADR-025) ────────
   // Timeseries collection created in createCollections.ts with expireAfterSeconds: 7776000 (90d).
   // TTL is set on the collection, NOT via a manual TTL index.
-  // Unique index on integrationEventInstanceReference removed — incompatible with timeseries.
+  // Unique index on integrationEventInstanceReference removed: incompatible with timeseries.
   await db.collection('integrationEvents').createIndexes([
     { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
     { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
     { key: { 'businessContext.entityType': 1, 'businessContext.entityId': 1, recordCreatedDateTime: -1 }, sparse: true },
   ]);
 
-  // ── businessProcessEvent (ADR-025) — TIMESERIES ──────────────────────────
+  // ── businessProcessEvent (ADR-025): TIMESERIES ──────────────────────────
   // Timeseries collection created in createCollections.ts with expireAfterSeconds: 7776000 (90d).
   // Timeseries collections do NOT support unique secondary indexes.
   await db.collection('businessProcessEvent').createIndexes([
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
-    // v18: "user × merchant × action" activity view (SD-16). Sparse — only OAuth-attributed events.
+    // v18: "user × merchant × action" activity view (SD-16). Sparse, only OAuth-attributed events.
     { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 }, sparse: true },
   ]);
 
-  // ── complianceProcessEvent (ADR-025) — TIMESERIES ────────────────────────
+  // ── complianceProcessEvent (ADR-025): TIMESERIES ────────────────────────
   // Timeseries collection created in createCollections.ts with expireAfterSeconds: 31536000 (365d).
   await db.collection('complianceProcessEvent').createIndexes([
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
@@ -1813,7 +1813,7 @@ async function createIndexes(client: MongoClient, dbName: string) {
 **Timeseries collection creation** (in `createCollections.ts`, not `createIndexes.ts`):
 
 ```typescript
-// integrationEvents — timeseries (ADR-025: replaces standard collection)
+// integrationEvents: timeseries (ADR-025: replaces standard collection)
 await db.createCollection('integrationEvents', {
   timeseries: {
     timeField: 'recordCreatedDateTime',
@@ -1823,7 +1823,7 @@ await db.createCollection('integrationEvents', {
   expireAfterSeconds: 7776000,  // 90 days
 });
 
-// businessProcessEvent — timeseries (ADR-025)
+// businessProcessEvent: timeseries (ADR-025)
 await db.createCollection('businessProcessEvent', {
   timeseries: {
     timeField: 'eventDateTime',
@@ -1833,7 +1833,7 @@ await db.createCollection('businessProcessEvent', {
   expireAfterSeconds: 7776000,  // 90 days (transactional)
 });
 
-// complianceProcessEvent — timeseries (ADR-025)
+// complianceProcessEvent: timeseries (ADR-025)
 await db.createCollection('complianceProcessEvent', {
   timeseries: {
     timeField: 'eventDateTime',
@@ -1843,7 +1843,7 @@ await db.createCollection('complianceProcessEvent', {
   expireAfterSeconds: 31536000, // 365 days (KYC/KYB regulatory)
 });
 
-// merchantAgreementEvents — standard collection (ADR-025: was lazily created, now explicit)
+// merchantAgreementEvents: standard collection (ADR-025: was lazily created, now explicit)
 await db.createCollection('merchantAgreementEvents');
 ```
 
@@ -1868,9 +1868,9 @@ await ensureIndexes(db, 'paymentExecutionProcedure', [
   { key: { paymentOrderInstanceReference: 1 } },
   { key: { cardTransactionInstanceReference: 1 } },
   { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
-  // v18: commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing executions.
+  // v18: commission revenue aggregation (SD-89 dashboard). Sparse, only fee-bearing executions.
   { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
-  // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+  // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse, only merchant-initiated execs.
   { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
 ]);
 
@@ -1878,7 +1878,7 @@ await ensureIndexes(db, 'paymentExecutionProcedure', [
 await ensureIndexes(db, 'counterpartyArrangement', [
   { key: { counterpartyArrangementReference: 1 }, unique: true },
   { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
-  // Unique (owner, counterparty) pair — prevents duplicate beneficiary entries.
+  // Unique (owner, counterparty) pair: prevents duplicate beneficiary entries.
   { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
 ]);
 ```
@@ -1894,7 +1894,7 @@ Role is passed via `X-Demo-Role` header (v2+). Omitted defaults to `level1_analy
 
 ---
 
-### 6.1 Transactions — `module: transactions` (SD-254 · SD-88)
+### 6.1 Transactions: `module: transactions` (SD-254 · SD-88)
 
 > Base path: `/api/v1/transactions`
 
@@ -1915,7 +1915,7 @@ Creates a transaction and optionally a fraud case.
   "cardTransactionMaskedPanDisplay": "****-****-****-1234",
   "cardTransactionType": "purchase",
   "cardTransactionDescription": "ONLINE STORE INC.",
-  "cardTransactionNarrative": "PURCHASE at Online Store Inc. — ref AB12CD34",
+  "cardTransactionNarrative": "PURCHASE at Online Store Inc., ref AB12CD34",
   "gatewayPayload": { "raw": "..." }
 }
 ```
@@ -1954,7 +1954,7 @@ Returns transaction by ID (no QE field values returned to Level 1).
   "cardTransactionMerchantCategoryCode": "5999",
   "cardTransactionMaskedPanDisplay": "****-****-****-1234",
   "cardTransactionDescription": "ONLINE STORE INC.",
-  "cardTransactionNarrative": "PURCHASE at Online Store Inc. — ref AB12CD34"
+  "cardTransactionNarrative": "PURCHASE at Online Store Inc., ref AB12CD34"
 }
 ```
 
@@ -1974,7 +1974,7 @@ Standard index query on `paymentCardReference` (plaintext field: token is a card
 
 ---
 
-### 6.2 Customer — `module: customer` (SD-53)
+### 6.2 Customer: `module: customer` (SD-53)
 
 > Base path: `/api/v1/customer`
 
@@ -2015,15 +2015,15 @@ QE equality search on the corresponding encrypted field.
 
 ---
 
-### 6.3 Cards — `module: customer` (SD-88)
+### 6.3 Cards: `module: customer` (SD-88)
 
-> Base path: `/api/v1/customer/:customerId/cards` — cards as sub-resource of Customer Agreement (SD-53)
+> Base path: `/api/v1/customer/:customerId/cards`, cards as sub-resource of Customer Agreement (SD-53)
 
 #### `GET /customer/me/cards`
 
-Returns the **authenticated caller's own** saved cards (SD-88), resolved server-side from the JWT (`request.user.partyRef` → own agreement via `getOwnAgreementId`). Takes **no id** from the client, so it cannot be used to read another party's cards. Used by the hosted checkout and payment-link pages to offer the *viewer's* saved cards, gated purely on the browser's PSP session token (never the session/link's stored acting party — that would leak the creator's cards on a shared link).
+Returns the **authenticated caller's own** saved cards (SD-88), resolved server-side from the JWT (`request.user.partyRef` → own agreement via `getOwnAgreementId`). Takes **no id** from the client, so it cannot be used to read another party's cards. Used by the hosted checkout and payment-link pages to offer the *viewer's* saved cards, gated purely on the browser's PSP session token (never the session/link's stored acting party: that would leak the creator's cards on a shared link).
 
-**Response 200** (display-safe only — surrogate token + masked PAN; never full PAN, CVV or expiry):
+**Response 200** (display-safe only: surrogate token + masked PAN; never full PAN, CVV or expiry):
 ```json
 { "results": [
   { "paymentCardInstanceReference": "...", "cardToken": "pm_...", "paymentCardMaskedPanDisplay": "****-****-****-1234", "paymentCardNetwork": "VISA", "paymentCardAlias": "Personal", "paymentCardIsPreferred": true }
@@ -2035,7 +2035,7 @@ A caller with no customer agreement (e.g. staff) receives `{ "results": [] }`.
 
 Registers a tokenized card linked to a customer agreement.
 
-**Request body** (`customerAgreementInstanceReference` is taken from the `:customerId` path param — do not include it in the body):
+**Request body** (`customerAgreementInstanceReference` is taken from the `:customerId` path param, do not include it in the body):
 ```json
 {
   "cardToken": "pm_abc123",
@@ -2077,7 +2077,7 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 ---
 
-### 6.4 Fraud — `module: fraud` (SD-83)
+### 6.4 Fraud: `module: fraud` (SD-83)
 
 > Base path: `/api/v1/fraud`
 
@@ -2099,7 +2099,7 @@ Returns cards linked to a customer (plaintext lookup by FK).
 
 #### `GET /fraud/stats`
 
-Investigation analytics for the L1 / L2 / auditor dashboards. MongoDB aggregation returning case `total`, counts by lifecycle (`open`, `underReview`, `escalated`, `resolvedFraud`, `resolvedCleared`), and breakdowns `byStatus`, `bySeverity`, `byMonth`. Aggregates over operational case metadata only — `fraudDiagnosisCase` holds no cardholder PII (PCI DSS Req 3/7). Registered before `/:id` so `stats` is not matched as a case id. (Customers are blocked from `/fraud` by middleware.)
+Investigation analytics for the L1 / L2 / auditor dashboards. MongoDB aggregation returning case `total`, counts by lifecycle (`open`, `underReview`, `escalated`, `resolvedFraud`, `resolvedCleared`), and breakdowns `byStatus`, `bySeverity`, `byMonth`. Aggregates over operational case metadata only: `fraudDiagnosisCase` holds no cardholder PII (PCI DSS Req 3/7). Registered before `/:id` so `stats` is not matched as a case id. (Customers are blocked from `/fraud` by middleware.)
 
 ---
 
@@ -2121,11 +2121,11 @@ Investigation analytics for the L1 / L2 / auditor dashboards. MongoDB aggregatio
 }
 ```
 
-`escalationAcceptedAt` (`string | null`) — ISO 8601 timestamp set by L2 when they approve an escalation (`POST /fraud/:id/escalate/approve`). Cleared (set to `null`) when L2 rejects the escalation.
+`escalationAcceptedAt` (`string | null`): ISO 8601 timestamp set by L2 when they approve an escalation (`POST /fraud/:id/escalate/approve`). Cleared (set to `null`) when L2 rejects the escalation.
 
 ---
 
-#### `POST /fraud/:id/escalate` *(v2 — L1 triggers escalation)*
+#### `POST /fraud/:id/escalate` *(v2, L1 triggers escalation)*
 
 **Request header:** `X-Demo-Role: level1_analyst`
 
@@ -2147,7 +2147,7 @@ Side effects: case status set to `escalated`; `escalated` event appended to `fra
 
 ---
 
-#### `POST /fraud/:id/escalate/approve` *(v2 — L2 approves and gets token)*
+#### `POST /fraud/:id/escalate/approve` *(v2, L2 approves and gets token)*
 
 **Request header:** `X-Demo-Role: level2_investigator`
 
@@ -2184,7 +2184,7 @@ operator's access.
 
 ---
 
-#### `POST /fraud/:id/notes` *(Ch-03 — BIAN SD-83 append-only)*
+#### `POST /fraud/:id/notes` *(Ch-03, BIAN SD-83 append-only)*
 
 Creates a note on a fraud case. Appends a `note_added` event to `fraudDiagnosisCaseEvents`.
 
@@ -2214,7 +2214,7 @@ Creates a note on a fraud case. Appends a `note_added` event to `fraudDiagnosisC
 
 ---
 
-#### `DELETE /fraud/:id/notes/:noteId` *(Ch-03 — retraction, not physical delete)*
+#### `DELETE /fraud/:id/notes/:noteId` *(Ch-03, retraction, not physical delete)*
 
 Retracts a note by appending a `note_retracted` event to `fraudDiagnosisCaseEvents`. The original `note_added` event is never deleted (BIAN SD-83 append-only).
 
@@ -2234,9 +2234,9 @@ Retracts a note by appending a `note_retracted` event to `fraudDiagnosisCaseEven
 ```
 
 **Error responses:**
-- **403** — requesting role differs from the role that created the note
-- **404** — `noteId` not found on this case
-- **409** — note has already been retracted
+- **403**: requesting role differs from the role that created the note
+- **404**: `noteId` not found on this case
+- **409**: note has already been retracted
 
 ---
 
@@ -2268,13 +2268,13 @@ Returns all notes for a fraud case, including retracted entries (visible to anal
 
 ---
 
-#### ~~`fraudDiagnosisCaseNotes`~~ and ~~`fraudDiagnosisCustomerSubjectNotes`~~ — **Deprecated**
+#### ~~`fraudDiagnosisCaseNotes`~~ and ~~`fraudDiagnosisCustomerSubjectNotes`~~: **Deprecated**
 
-> **Deprecated** — These legacy note fields/collections are superseded by `POST /api/v1/fraud/:id/notes`. Legacy data stored under these paths remains **readable** for backward compatibility. **Write operations to these fields are rejected with HTTP 400.** Use the note endpoints above for all new note creation and retraction.
+> **Deprecated**: These legacy note fields/collections are superseded by `POST /api/v1/fraud/:id/notes`. Legacy data stored under these paths remains **readable** for backward compatibility. **Write operations to these fields are rejected with HTTP 400.** Use the note endpoints above for all new note creation and retraction.
 
 ---
 
-### 6.5 Fraud — Audit Events *(v2)*
+### 6.5 Fraud: Audit Events *(v2)*
 
 > Base path: `/api/v1/fraud`
 
@@ -2305,7 +2305,7 @@ Returns the chronological event log for a single case.
 
 ---
 
-#### `GET /fraud/audit-events` *(v2 — Security Auditor)*
+#### `GET /fraud/audit-events` *(v2: Security Auditor)*
 
 Returns all events across all cases, sorted descending by `actionDateTime`. Joins `fraudDiagnosisCaseReference` from `fraudDiagnosisCase` via aggregation.
 
@@ -2333,7 +2333,7 @@ Returns all events across all cases, sorted descending by `actionDateTime`. Join
 
 ---
 
-### 6.6 Fraud — HRPC Check *(v2)*
+### 6.6 Fraud: HRPC Check *(v2)*
 
 > Base path: `/api/v1/fraud`
 
@@ -2341,7 +2341,7 @@ Returns all events across all cases, sorted descending by `actionDateTime`. Join
 
 Checks whether a customer account appears in any HRPC (High-Risk Person and Counterparty) category. Queries `customerCreditRatingState` (SD-60) collection by `customerAgreementReference`.
 
-**Query params:** `accountRef` (required) — the customer's account reference (e.g. `ACC-003`).
+**Query params:** `accountRef` (required), the customer's account reference (e.g. `ACC-003`).
 
 **Response 200:**
 ```json
@@ -2363,7 +2363,7 @@ Checks whether a customer account appears in any HRPC (High-Risk Person and Coun
 }
 ```
 
-Returns `hrpcMatch: false` and empty `hrpcFlags` when no profile exists for the given account reference. No 404 is returned — absence of a profile is a valid and expected result.
+Returns `hrpcMatch: false` and empty `hrpcFlags` when no profile exists for the given account reference. No 404 is returned, absence of a profile is a valid and expected result.
 
 ---
 
@@ -2442,7 +2442,7 @@ Pass `?featured=true` to return only the curated demo roster (`customerAuthentic
 
 #### `GET /fraud/integrity` *(security_auditor only)*
 
-Data-integrity oversight for the auditor dashboard (PCI DSS Req 10). Returns `totalCases`, `duplicateCount` + `duplicateReferences[]` (case references on more than one case — must be 0; enforced by the unique index, ADR-024), `orphanTransactionRefs`, `orphanCustomerRefs`, and a `healthy` flag. Aggregates only — no PII. Non-auditor roles receive 403.
+Data-integrity oversight for the auditor dashboard (PCI DSS Req 10). Returns `totalCases`, `duplicateCount` + `duplicateReferences[]` (case references on more than one case: must be 0; enforced by the unique index, ADR-024), `orphanTransactionRefs`, `orphanCustomerRefs`, and a `healthy` flag. Aggregates only, no PII. Non-auditor roles receive 403.
 
 **Response 200:**
 ```json
@@ -2461,7 +2461,7 @@ Data-integrity oversight for the auditor dashboard (PCI DSS Req 10). Returns `to
 
 #### `GET /auth/domains`
 
-Returns only enabled authentication domains from the `authenticationDomain` collection (BIAN SD-16). Public endpoint — no Bearer token required. Used by the Application Mode login screen to populate the domain selector dynamically.
+Returns only enabled authentication domains from the `authenticationDomain` collection (BIAN SD-16). Public endpoint, no Bearer token required. Used by the Application Mode login screen to populate the domain selector dynamically.
 
 **Response 200:**
 ```json
@@ -2478,7 +2478,7 @@ Returns only enabled authentication domains from the `authenticationDomain` coll
 
 #### `GET /transactions/merchants`
 
-Returns unique `{ name, mcc }` pairs aggregated from the `cardTransactionLog` collection, sorted alphabetically. Public endpoint — used by the Simulator STEP 1 form to populate the Merchant Name selector.
+Returns unique `{ name, mcc }` pairs aggregated from the `cardTransactionLog` collection, sorted alphabetically. Public endpoint: used by the Simulator STEP 1 form to populate the Merchant Name selector.
 
 **Response 200:**
 ```json
@@ -2653,7 +2653,7 @@ All internal stub endpoints follow the same request/response shape (typed per ca
 
 ---
 
-### 6.10 Payout Accounts — `module: accounts` (SD-66 · v17)
+### 6.10 Payout Accounts: `module: accounts` (SD-66 · v17)
 
 > Base path: `/api/v1/accounts`  
 > Auth: Bearer JWT  
@@ -2691,7 +2691,7 @@ Lists payout accounts for a party.
 }
 ```
 
-Note: `payoutAccountIban` and `payoutAccountRoutingNumber` are **never returned to L1 clients** — they remain as BSON Binary ciphertext and are stripped by `safeAccount()`.
+Note: `payoutAccountIban` and `payoutAccountRoutingNumber` are **never returned to L1 clients**, they remain as BSON Binary ciphertext and are stripped by `safeAccount()`.
 
 #### `POST /accounts/:partyRef`
 
@@ -2724,13 +2724,13 @@ Sets the account as the party's default. Atomic: clears the prior default. Requi
 
 #### `DELETE /accounts/:partyRef/:accountRef`
 
-Closes a payout account (soft delete — status → `'closed'`). Requires `accounts:manage`.
+Closes a payout account (soft delete: status → `'closed'`). Requires `accounts:manage`.
 
 **Response 200:** `{ "payoutAccountInstanceReference": "...", "payoutAccountStatus": "closed" }`
 
 ---
 
-### 6.11 Payment Executions — `module: executions` (SD-65 · v17)
+### 6.11 Payment Executions: `module: executions` (SD-65 · v17)
 
 > Base path: `/api/v1/executions`  
 > Auth: Bearer JWT  
@@ -2774,7 +2774,7 @@ Returns a single execution by reference. Includes full `resolutionLog`.
 
 ---
 
-### 6.12 Merchant Beneficiary API — SD-54
+### 6.12 Merchant Beneficiary API: SD-54
 
 > **v32 (ADR-048): this is a SEARCH surface, not an enumeration surface.**
 >
@@ -2937,7 +2937,7 @@ FRAUD_AMOUNT_THRESHOLD=500
 RISK_MCC_LIST=5812,6011,7995
 ESCALATION_TOKEN_TTL_SECONDS=3600
 
-# ── Payout Orchestration (v17 — PSP_ prefix) ───────────────────────
+# ── Payout Orchestration (v17: PSP_ prefix) ───────────────────────
 # All read via pspEnv('NAME', 'default') helper in backend/src/config.ts
 PSP_BENEFICIARY_MAX_PER_USER=100          # Max beneficiaries per user (SD-54)
 PSP_BENEFICIARY_RATE_LIMIT_RPM=20        # Max lookups/min per merchant+user pair
@@ -2981,10 +2981,10 @@ Counts are the v33 population.
 | `backend/data/parties.json` | `party` (SD-13) | 68 (57 customers + 11 employees) | `bin/seed-generate.ts` (additive) |
 | `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 68 (one per party; 14 `customerAuthenticationDemoFeatured`) | `bin/seed-generate.ts` (additive) |
 | `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual (the `local` domain ships with self-registration on, manual approval) |
-| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 57 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 57 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
 | `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
 | `backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
-| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts` — includes inline QE:none fields (v2) |
+| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
 | `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
@@ -3112,7 +3112,7 @@ backend/
     │   │   ├── identity.model.ts   # UserRole · AnalystRole · JwtDemoPayload
     │   │   └── transaction.model.ts # TransactionSnapshot (defined in fraud, built in transactions)
     │   └── services/
-    │       └── fraudTrigger.service.ts  # [v4] triggerFraudEvaluation() — shared when gateway also triggers fraud
+    │       └── fraudTrigger.service.ts  # [v4] triggerFraudEvaluation(): shared when gateway also triggers fraud
     │
     ├── vendors/                    # Infrastructure shared by all modules (no business logic)
     │   ├── encryption/
@@ -3140,7 +3140,7 @@ backend/
     │       ├── seedCreditRatings.ts  # BIAN SD-60: upserts customerCreditRatings.json
     │       └── seedMerchants.ts    # [v4]
     │
-    ├── modules/                    # Domain modules — one per BIAN SD cluster
+    ├── modules/                    # Domain modules: one per BIAN SD cluster
     │   │
     │   ├── identity/               # BIAN SD-16: Party Authentication
     │   │   ├── controllers/
@@ -3260,11 +3260,11 @@ After a payment is processed (hosted checkout **or** payment link), the PSP noti
 1. **The merchant's own webhook** (per-merchant): `deliverWebhook` POSTs the HMAC-signed event to the
    merchant's `merchantWebhookEndpoint` using `merchantWebhookSecret`. Each merchant has a **distinct**
    endpoint (seeded), so the correct merchant is notified per its configuration (ADR-028).
-2. **The Integration Hub** OUTBOUND event (`dispatchIntegration`, type `generic` — the seeded
+2. **The Integration Hub** OUTBOUND event (`dispatchIntegration`, type `generic`: the seeded
    "Merchant Payment Notifications" provider) as the auditable inbound/outbound record.
 
 **Single chokepoint (ADR-028/PM-4).** The **approved** callback is fired inside `createTransaction`,
-so it covers EVERY merchant-attributed payment — app/api-card, hosted checkout and payment link — not
+so it covers EVERY merchant-attributed payment: app/api-card, hosted checkout and payment link, not
 just the gateway flows. A third effect is added: a unified-audit **businessProcessEvent**
 `payment.callback` (entityType=transaction) so the outcome is visible/searchable in `/system/audit-events`
 for manager/auditor (previously only `transaction.authorized` appeared). The webhook payload always
@@ -3273,12 +3273,12 @@ includes the **transactionId**. Declines fire the callback per-flow (a decline n
 
 **Webhook test + lifecycle events (PM-5).** `POST /merchants/:id/webhooks/test` (owner/officer) delivers
 a simulated `payment.completed` (HMAC-signed, `test:true`) to the merchant's endpoint so they can verify
-their integration without a payment — returns the payload + delivery outcome (status, attempts, response).
+their integration without a payment: returns the payload + delivery outcome (status, attempts, response).
 The `payment.callback` audit event now records the actual webhook **method/headers/body + the merchant's
 response** (delivered/statusCode/attempts), not just `webhookConfigured`. Each payment also emits a
 `payment.card.validation` (card_issuer integrator) before charging, and a `card.registered` (new) or
-`card.matched` (existing) compliance event — full card lifecycle behind a transaction for the auditor.
-(If `webhookConfigured` is false, the merchant has no endpoint in the DB — set it in
+`card.matched` (existing) compliance event: full card lifecycle behind a transaction for the auditor.
+(If `webhookConfigured` is false, the merchant has no endpoint in the DB: set it in
 `/system/merchant/webhooks` or re-seed.)
 
 **Auditable search + capture (PM-4).** `/events/audit` adds a `ref` deep-match filter (entityId +
@@ -3295,15 +3295,15 @@ The event carries on **both** outcomes:
   deactivated/removed) and a human `declineReason`. The decline path also returns a `redirectUrl`
   and the real `code`/reason (no longer hard-coded `0190`).
 
-PCI DSS Req 3: the callback carries only the surrogate token + masked PAN — never the PAN/CVV
+PCI DSS Req 3: the callback carries only the surrogate token + masked PAN, never the PAN/CVV
 (`logEvent` also applies the CHD blocklist). The browser return URL receives the same outcome via
 `{result}`, `{card_token}`, `{response_code}`, `{reason}` placeholders. The integration event is
 auditable in the events stream (Req 10). Saving the card is the merchant's decision on receiving
-this callback — not a checkbox in the PSP-hosted payment UI.
+this callback, not a checkbox in the PSP-hosted payment UI.
 
 ### 8.1 New TypeScript Models
 
-#### `CheckoutSessionRecord` (SD-64 — `checkoutSessionLog`)
+#### `CheckoutSessionRecord` (SD-64: `checkoutSessionLog`)
 
 ```typescript
 // backend/src/modules/gateway/models/checkoutSession.model.ts
@@ -3327,12 +3327,12 @@ export interface CheckoutSessionRecord {
   checkoutSessionMerchantReference: string;        // Merchant's own order ID
   // v18 on-behalf-of attribution (optional): who the merchant app acted for when it created the session,
   // so the resulting card transaction lands under the payer and the purchase is auditable. Identity refs
-  // only — never CHD/PAN, never PII beyond the id.
+  // only, never CHD/PAN, never PII beyond the id.
   checkoutSessionActingSubjectReference?: string;  // SD-91 OAuth subject (customerAuthenticationInstanceReference)
   checkoutSessionActingPartyReference?: string;    // SD-13 partyInstanceReference (resolved from the subject)
   checkoutSessionActingClientId?: string;          // OAuth client_id of the acting merchant app
   checkoutSessionCreatedDateTime: Date;
-  checkoutSessionExpiresAt: Date;                  // TTL index target — 30 min default
+  checkoutSessionExpiresAt: Date;                  // TTL index target, 30 min default
   checkoutSessionCompletedDateTime?: Date;
   cardTransactionInstanceReference?: string;       // Set on completion
   recordCreatedDateTime: Date;
@@ -3340,7 +3340,7 @@ export interface CheckoutSessionRecord {
 }
 ```
 
-#### `PaymentLinkRecord` (SD-64 — `paymentLinkRecord`)
+#### `PaymentLinkRecord` (SD-64: `paymentLinkRecord`)
 
 ```typescript
 // backend/src/modules/gateway/models/paymentLink.model.ts
@@ -3366,14 +3366,14 @@ export interface PaymentLinkRecord {
   paymentLinkCurrentUses: number;
   paymentLinkMaxUses?: number;                     // multi_use cap
   paymentLinkCreatedDateTime: Date;
-  paymentLinkExpiresAt?: Date;                     // Sparse TTL index — optional
+  paymentLinkExpiresAt?: Date;                     // Sparse TTL index, optional
   paymentLinkTransactionReferences: string[];      // FK array → cardTransactionLog
   recordCreatedDateTime: Date;
   recordUpdatedDateTime: Date;
 }
 ```
 
-#### `MerchantAgreementControlRecord` update (SD-89 — `merchantAgreementProcedure`)
+#### `MerchantAgreementControlRecord` update (SD-89: `merchantAgreementProcedure`)
 
 > **Ch-06 update**: Added `merchantAgreementKybCheck` as a **BIAN BQ:Step** sub-document. This replaces the loose top-level review fields as the authoritative KYB record. Top-level fields (`merchantReviewNote`, `merchantReviewedByPartyReference`, `merchantReviewedDateTime`) are retained for backward compatibility. `schemaVersion` bumped to 2.
 
@@ -3381,9 +3381,9 @@ Added to the existing merchant model:
 
 ```typescript
 export interface MerchantApiKeyRecord {
-  keyId: string;           // UUID — used for revocation
+  keyId: string;           // UUID, used for revocation
   keyPrefix: string;       // First 12 chars for display (e.g., "lbpk_live_ab")
-  keyHashBcrypt: string;   // bcrypt hash — NEVER store plaintext
+  keyHashBcrypt: string;   // bcrypt hash, NEVER store plaintext
   keyStatus: 'active' | 'revoked';
   keyCreatedDateTime: Date;
   keyLastUsedDateTime?: Date;
@@ -3393,7 +3393,7 @@ export interface MerchantApiKeyRecord {
 merchantApiKeys: MerchantApiKeyRecord[];
 merchantWebhookSecret?: string;          // HMAC signing secret for webhook delivery
 
-// D-21 (BIAN audit 2026-06-10): Party owner link — canonical BIAN cross-domain reference.
+// D-21 (BIAN audit 2026-06-10): Party owner link, canonical BIAN cross-domain reference.
 // Points to the partyInstanceReference (SD-13) of the individual or legal entity that owns
 // this merchant agreement. Enables the dual-role pattern: the same Party can hold both a
 // CustomerAgreement (SD-53) and a MerchantAgreement (SD-89).
@@ -3401,12 +3401,12 @@ merchantWebhookSecret?: string;          // HMAC signing secret for webhook deli
 // 'customer' is a role-scoped concept (SD-53 contract), while 'Party' is the identity anchor.
 merchantOwnerPartyReference?: string;    // FK → party.partyInstanceReference (SD-13)
 
-// Ch-05: Review metadata (top-level) — kept for backward compat. Set by merchant_officer.
+// Ch-05: Review metadata (top-level), kept for backward compat. Set by merchant_officer.
 merchantReviewNote?: string;                     // Officer's comment for audit trail
 merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13) of reviewing employee
 merchantReviewedDateTime?: Date;                 // When the review decision was made
 
-// Ch-06: BQ:Step — KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+// Ch-06: BQ:Step, KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
 // Authoritative KYB record. Status vocabulary: initiated | verified | rejected | expired.
 // All fields use BIAN-canonical BQ naming prefix: merchantAgreementKybCheck*.
 merchantAgreementKybCheck?: MerchantAgreementKybCheck;
@@ -3416,7 +3416,7 @@ merchantAgreementKybCheck?: MerchantAgreementKybCheck;
 // default. Consumed by computeFee() to populate paymentExecution.feeAmount + fee attribution (SD-65).
 merchantCommissionRate?: number;
 
-// v18 (OIDC client metadata, RFC 7591) on MerchantOAuthClientConfig — branding on the consent/login
+// v18 (OIDC client metadata, RFC 7591) on MerchantOAuthClientConfig: branding on the consent/login
 // page and the user's "Authorized Applications" listing. Validated as https on the OAuth-client PATCH.
 // oauthLogoUri?: string;    // merchant logo/icon URL (OIDC logo_uri)
 // oauthClientUri?: string;  // merchant home page URL (OIDC client_uri)
@@ -3429,11 +3429,11 @@ type MerchantAgreementStatus =
   | 'agreed'         // KYB passed; T&C presented to applicant (Control: approve)
   | 'active'         // Applicant accepted T&C; API key issued; can process payments
   | 'amended'        // Terms updated by merchant_officer (Update)
-  | 'suspended'      // Temporarily blocked — fraud investigation or compliance hold
+  | 'suspended'      // Temporarily blocked: fraud investigation or compliance hold
   | 'rejected'       // KYB failed or compliance issue (Control: reject)
   | 'closed';        // Agreement terminated (Terminate)
 
-// Ch-06: BQ:Step — KYB business verification types
+// Ch-06: BQ:Step, KYB business verification types
 type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
 interface MerchantAgreementKybCheck {
@@ -3445,7 +3445,7 @@ interface MerchantAgreementKybCheck {
 }
 ```
 
-Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation; only bcrypt hash persisted.
+Key format: `lbpk_live_<32 hex chars>`, plaintext returned once on generation; only bcrypt hash persisted.
 
 ---
 
@@ -3456,7 +3456,7 @@ Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation
 { merchantAgreementInstanceReference: 1 }  // unique
 { merchantAgreementStatus: 1 }
 { merchantCategoryCode: 1 }
-{ merchantOwnerPartyReference: 1 }         // Ch-05: dual-role lookup — find merchant by owner Party
+{ merchantOwnerPartyReference: 1 }         // Ch-05: dual-role lookup, find merchant by owner Party
 
 // checkoutSessionLog
 { checkoutSessionInstanceReference: 1 }    // unique
@@ -3478,7 +3478,7 @@ Key format: `lbpk_live_<32 hex chars>` — plaintext returned once on generation
 
 All routes are under the `/api/v1` prefix.
 
-#### Redirect Checkout (Method A) — prefix `/checkout`
+#### Redirect Checkout (Method A): prefix `/checkout`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
@@ -3533,7 +3533,7 @@ All routes are under the `/api/v1` prefix.
 
 Error codes: 404 not found, 409 already completed, 410 expired/cancelled.
 
-#### Payment Links (Method B) — prefix `/payment-links`
+#### Payment Links (Method B): prefix `/payment-links`
 
 | Method | Route | Auth | Description |
 |---|---|---|---|
@@ -3566,41 +3566,41 @@ Error codes: 404 not found, 409 already completed, 410 expired/cancelled.
 
 Error codes: 404 merchant not found, 410 link expired/deactivated/completed.
 
-#### Merchant Onboarding & Review — prefix `/merchants`
+#### Merchant Onboarding & Review: prefix `/merchants`
 
 | Method | Route | Auth | Roles | Description |
 |---|---|---|---|---|
 | `POST` | `/merchants` | JWT | `customer` | Submit new merchant application (BIAN Action: Initiate). Sets status `under_review`. Initialises `merchantAgreementKybCheck.status = 'initiated'`. |
 | `GET` | `/merchants/me` | JWT | `customer` | Return the merchant agreement owned by the caller's `partyRef`. Returns `{ found: false }` when none exists. Enables role-based state machine in frontend. |
 | `GET` | `/merchants/:id` | JWT | `customer`, `merchant_officer`, `security_auditor` | Retrieve merchant agreement details. Response includes `merchantAgreementKybCheck` sub-document. |
-| `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. Query: `page`, `limit`, `status`, `search` (case-insensitive on masked PAN / descriptor / merchant name). PCI DSS Req 3/7 — payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
-| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. **v18:** also returns `commissionRevenue { total, count, byMonth[] }` — the UNION of two fee-attribution sources filtered by `fee.feeMerchantReference`: seeded payout executions (`paymentExecutionProcedure.fee`, SD-65) **and** runtime acquiring card payments (`cardTransactionLog.fee`, SD-254, populated at authorization by A-06). No double-counting (a payment lives in exactly one source). Aggregates only — no payer PII. Powers the merchant Overview dashboard. |
+| `GET` | `/merchants/:id/transactions` | JWT | owner (`partyRef` = `merchantOwnerPartyReference`), `merchant_officer`, `security_auditor` | Acquiring-side view (SD-89): payments the merchant **received**, newest first. Query: `page`, `limit`, `status`, `search` (case-insensitive on masked PAN / descriptor / merchant name). PCI DSS Req 3/7, payer PII (account ref, email, raw gateway payload) is **never** returned; only masked PAN, amount, status, type, channel, descriptor, timestamp. Non-owner customers get 403. |
+| `GET` | `/merchants/:id/stats` | JWT | owner, `merchant_officer`, `security_auditor` | Acquiring analytics (BIAN Merchant Activity Analysis): MongoDB aggregation returning totals, average ticket, breakdown by status, by currency, and operations per month. **v18:** also returns `commissionRevenue { total, count, byMonth[] }`, the UNION of two fee-attribution sources filtered by `fee.feeMerchantReference`: seeded payout executions (`paymentExecutionProcedure.fee`, SD-65) **and** runtime acquiring card payments (`cardTransactionLog.fee`, SD-254, populated at authorization by A-06). No double-counting (a payment lives in exactly one source). Aggregates only, no payer PII. Powers the merchant Overview dashboard. |
 | `PATCH` | `/merchants/:id` | JWT | owner (own merchant), `merchant_officer`, `security_auditor` | Partial update of operational settings. Owner-editable: `merchantAllowedCurrencies`, `merchantSettlementSchedule`, `merchantWebhookEndpoint`, `merchantDefaultPayoutAccountReference`, **v18** `merchantCommissionRate` (SD-89, number 0..1, max 4 decimals; validated; change audited via `merchant.commission_rate.updated` event). Risk-governed fields (`merchantTransactionLimitAmount`, `merchantAgreementStatus`) are PSP staff only. |
-| `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only — no cardholder data. |
-| `GET` | `/merchants/:id/activity` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-01/B-12) — activity view "user × merchant × action".** Reads `businessProcessEvent` where `merchantAgreementReference == :id` (OAuth-originated actions tagged in the activity attribution). Query filters: `user` (`actingPartyReference` exact), `q` (free text on `processAction` / `entityId` / `processType` / user), `dateFrom` / `dateTo` (ISO 8601), `page` / `limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. **Display-safe** — never returns CHD or raw IBAN (PCI DSS Req 3/7 · Req 10). |
-| `GET` | `/merchants/:id/authorizations` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-10) — users who authorized this merchant.** Reads `partyAuthConsent` filtered by `merchantAgreementInstanceReference` (SD-16 ConsentGrant), joined to the user's display-safe identity (SD-13). Query filters: `q` (search by user name / email / party ref), `page` / `limit`. Response `{ authorizations[{ consentId, partyAuthenticationInstanceReference, userName, userEmail, grantedScopes, consentStatus, consentGrantedAt, lastUsedAt }], total, page, limit }`. Display-safe — no CHD, no raw IBAN. |
+| `GET` | `/merchants/:id/events` | JWT | owner, `merchant_officer`, `security_auditor` | Merchant lifecycle **audit trail** (BIAN SD-89, PCI DSS Req 10): append-only `merchantAgreementEvents` log of `submitted` / `approved` / `rejected` / `updated` actions with actor and timestamp. Operational metadata only, no cardholder data. |
+| `GET` | `/merchants/:id/activity` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-01/B-12), activity view "user × merchant × action".** Reads `businessProcessEvent` where `merchantAgreementReference == :id` (OAuth-originated actions tagged in the activity attribution). Query filters: `user` (`actingPartyReference` exact), `q` (free text on `processAction` / `entityId` / `processType` / user), `dateFrom` / `dateTo` (ISO 8601), `page` / `limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. **Display-safe**, never returns CHD or raw IBAN (PCI DSS Req 3/7 · Req 10). |
+| `GET` | `/merchants/:id/authorizations` | JWT | owner, `merchant_officer`, `security_auditor`, `level1_analyst`, `level2_investigator` | **v18 (B-10), users who authorized this merchant.** Reads `partyAuthConsent` filtered by `merchantAgreementInstanceReference` (SD-16 ConsentGrant), joined to the user's display-safe identity (SD-13). Query filters: `q` (search by user name / email / party ref), `page` / `limit`. Response `{ authorizations[{ consentId, partyAuthenticationInstanceReference, userName, userEmail, grantedScopes, consentStatus, consentGrantedAt, lastUsedAt }], total, page, limit }`. Display-safe, no CHD, no raw IBAN. |
 | `GET` | `/merchants` | JWT | `merchant_officer`, `security_auditor` | List all merchant applications (officer review queue) |
 | `PATCH` | `/merchants/:id/review` | JWT | `merchant_officer`, `security_auditor` | Approve or reject application (BIAN Action: Control). Transitions status to `agreed` or `rejected`. Writes `merchantAgreementKybCheck` BQ:Step. |
 | `POST` | `/merchants/:id/keys` | JWT | `customer` | Generate new API key (plaintext returned once; `keyOrigin: 'generated'`) |
 | `POST` | `/merchants/:id/keys/import` | JWT | `customer` | Register an EXISTING key from the merchant's own system. Hashed server-side (bcrypt), plaintext never stored/returned; only the prefix is shown. `keyOrigin: 'imported'`. 400 if too short, 409 if already registered |
-| `PATCH` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Rename (relabel) a key — `{ label }`; empty label clears it. Label is never a secret |
+| `PATCH` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Rename (relabel) a key, `{ label }`; empty label clears it. Label is never a secret |
 | `DELETE` | `/merchants/:id/keys/:keyId` | JWT | `customer` | Revoke API key |
 
 `MerchantApiKeyRecord` adds `keyOrigin?: 'generated' | 'imported'` (display only; absent = generated). Both generate and import store only the bcrypt hash + display prefix (PCI DSS Req 3).
 
-**v18 — OAuth client branding + consent grants payload (OIDC).**
+**v18: OAuth client branding + consent grants payload (OIDC).**
 - `PATCH /merchants/:id/oauth-client` accepts `logo_uri` and `client_uri` (OIDC client metadata, RFC 7591); both validated as **https** URLs (empty string clears). Persisted as `merchantOAuthClient.oauthLogoUri` / `oauthClientUri`.
-- `GET /auth/grants` (self-scoped — the caller's own consent grants) payload now includes `merchantAgreementInstanceReference` and `oauthLogoUri` (nullable) alongside the existing `merchantName`, `grantedScopes`, `consentGrantedAt`, `lastUsedAt`. Used by the user's "Authorized Applications" listing.
+- `GET /auth/grants` (self-scoped: the caller's own consent grants) payload now includes `merchantAgreementInstanceReference` and `oauthLogoUri` (nullable) alongside the existing `merchantName`, `grantedScopes`, `consentGrantedAt`, `lastUsedAt`. Used by the user's "Authorized Applications" listing.
 
-**v18 — Authorized Applications: connected-app detail + per-app operations (D-01…D-02, self-scoped).**
-These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) and are **always scoped to the caller's own `sub`** (any PSP session token; no elevated role). A `consentId` that does not belong to the caller returns **404** (existence is never leaked). Display-safe — no CHD, no raw IBAN.
+**v18: Authorized Applications: connected-app detail + per-app operations (D-01…D-02, self-scoped).**
+These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) and are **always scoped to the caller's own `sub`** (any PSP session token; no elevated role). A `consentId` that does not belong to the caller returns **404** (existence is never leaked). Display-safe, no CHD, no raw IBAN.
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/auth/grants/:consentId` | JWT (own session) | **D-01 — one authorized app (detail).** Returns `{ consentId, oauthClientId, merchantAgreementInstanceReference, merchantName, oauthLogoUri, oauthClientUri, grantedScopes[{ scope, description, required }], consentStatus, consentGrantedAt, lastUsedAt }`. `grantedScopes` expands each scope with its human-readable description from `SCOPE_CATALOG`. Branding (`oauthLogoUri`/`oauthClientUri`) from the merchant's `merchantOAuthClient` (OIDC client metadata). 404 if the grant is not the caller's. |
-| `GET` | `/auth/grants/:consentId/operations` | JWT (own session) | **D-02 — operations the caller executed through this app.** Reads `businessProcessEvent` where `actingPartyReference == caller.sub` **AND** (`clientId == grant.oauthClientId` **OR** `merchantAgreementReference == grant.merchantAgreementInstanceReference`). Query filters: `q` (free text on `processAction`/`entityId`/`processType`), `dateFrom`/`dateTo` (ISO 8601), `page`/`limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. Ownership of `:consentId` is verified first (404 otherwise). Display-safe (PCI DSS Req 3/7 · Req 10). |
+| `GET` | `/auth/grants/:consentId` | JWT (own session) | **D-01, one authorized app (detail).** Returns `{ consentId, oauthClientId, merchantAgreementInstanceReference, merchantName, oauthLogoUri, oauthClientUri, grantedScopes[{ scope, description, required }], consentStatus, consentGrantedAt, lastUsedAt }`. `grantedScopes` expands each scope with its human-readable description from `SCOPE_CATALOG`. Branding (`oauthLogoUri`/`oauthClientUri`) from the merchant's `merchantOAuthClient` (OIDC client metadata). 404 if the grant is not the caller's. |
+| `GET` | `/auth/grants/:consentId/operations` | JWT (own session) | **D-02, operations the caller executed through this app.** Reads `businessProcessEvent` where `actingPartyReference == caller.sub` **AND** (`clientId == grant.oauthClientId` **OR** `merchantAgreementReference == grant.merchantAgreementInstanceReference`). Query filters: `q` (free text on `processAction`/`entityId`/`processType`), `dateFrom`/`dateTo` (ISO 8601), `page`/`limit`. Response `{ events[{ id, eventDateTime, processType, processAction, processOutcome, entityType, entityId, clientId, actingPartyReference, actingChannel, summary }], total, page, limit }`. Ownership of `:consentId` is verified first (404 otherwise). Display-safe (PCI DSS Req 3/7 · Req 10). |
 
-**v18 — Granular consent (OAuth scope selection, E-01…E-13).**
+**v18: Granular consent (OAuth scope selection, E-01…E-13).**
 - **Scope catalog** (`SCOPE_CATALOG`, single source of truth in `merchantOAuth.service.ts`): each scope maps to `{ description, required }`. `openid` is the only **required** scope; all others are optional/de-selectable (least-privilege, OAuth 2.0 Security BCP):
 
   Scopes follow the PSP `verb:resource` convention. As of **v23** they are enforced on the SHARED
@@ -3610,17 +3610,17 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
   | Scope | Description | Required | Enforced by (shared module endpoint) |
   |---|---|---|---|
   | `openid` | Verify your identity | ✅ | OIDC baseline |
-  | `profile` | Read your name and username | — | userinfo |
-  | `read:beneficiaries` | View your saved beneficiaries | — | `GET /beneficiaries` |
-  | `write:beneficiaries` | Add and manage your beneficiaries | — | `POST /beneficiaries`, `DELETE /beneficiaries/:beneficiaryRef` |
-  | `write:transfers` | Send money and bank transfers | — | `POST /beneficiaries/:beneficiaryRef/transfer`, `POST /gateway/transfers/{preview,bank}` |
-  | `read:transactions` | View your transaction and operation history | — | `GET /transactions` |
-  | `read:accounts` | View your bank accounts (masked IBAN) | — | `GET /accounts` |
-  | `read:merchant_profile` | View the merchant profile | — | `GET /auth/userinfo` |
-  | `read:notifications` | View your notifications | — | `GET /notifications`, `POST /notifications/:id/read` |
+  | `profile` | Read your name and username |: | userinfo |
+  | `read:beneficiaries` | View your saved beneficiaries |, | `GET /beneficiaries` |
+  | `write:beneficiaries` | Add and manage your beneficiaries |, | `POST /beneficiaries`, `DELETE /beneficiaries/:beneficiaryRef` |
+  | `write:transfers` | Send money and bank transfers |, | `POST /beneficiaries/:beneficiaryRef/transfer`, `POST /gateway/transfers/{preview,bank}` |
+  | `read:transactions` | View your transaction and operation history |, | `GET /transactions` |
+  | `read:accounts` | View your bank accounts (masked IBAN) |, | `GET /accounts` |
+  | `read:merchant_profile` | View the merchant profile |, | `GET /auth/userinfo` |
+  | `read:notifications` | View your notifications |, | `GET /notifications`, `POST /notifications/:id/read` |
   | `write:payments` | Create payments (server-to-server merchant charge) | machine only (`client_credentials`) | `POST /gateway/payments` |
 
-- **v23 — Dual-auth capability surface (unify merchant onto the existing API).** The external merchant
+- **v23: Dual-auth capability surface (unify merchant onto the existing API).** The external merchant
   app consumes the SAME endpoints as first-party callers. Auth is a cross-cutting concern, resolved by
   `vendors/middleware/dualAuth.ts` (+ the `config: { dualAuth: true }` flag in the global `authMiddleware`):
   a route accepts EITHER a PSP session JWT (HS256 → RBAC) OR a merchant OAuth Bearer (RS256 → scope +
@@ -3650,9 +3650,9 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
   > (SD-65 executions + own card transactions scoped by `merchantAgreementReference`); `/api/v1/transactions`
   > is a PUBLIC_EXACT path (simulator), so it detects the OAuth Bearer best-effort rather than via `dualAuth`.
 
-- **v18 Item 2 — Server-to-server API payment (`POST /api/v1/gateway/payments`, `payment.controller.ts`).** Authenticated with the merchant's OWN OAuth **`client_credentials`** token (RS256, scope `write:payments`) — NOT a user session (HS256) and NOT the user `authorization_code` token. `config: { skipAuth: true }` + in-handler `validateMerchantToken(req, reply, 'write:payments')`; the acquiring merchant is bound to the token (a body `merchantAgreementInstanceReference` must match or is rejected 403). The PSP charges a **tokenised** card (test token vault, `PSP_API_PAYMENT_TEST_TOKEN`) so no PAN/CVV ever reaches the merchant (PCI SAQ A). Persists the SD-64 order + drives an SD-254 card transaction attributed to the merchant, so the commission fee (A-06) is applied and the merchant dashboard revenue reflects the API payment. Emits attributed `businessProcessEvent` (`merchant.payment.api`). Rejects 401 when no credential is presented, 403 without `write:payments`.
+- **v18 Item 2: Server-to-server API payment (`POST /api/v1/gateway/payments`, `payment.controller.ts`).** Authenticated with the merchant's OWN OAuth **`client_credentials`** token (RS256, scope `write:payments`), NOT a user session (HS256) and NOT the user `authorization_code` token. `config: { skipAuth: true }` + in-handler `validateMerchantToken(req, reply, 'write:payments')`; the acquiring merchant is bound to the token (a body `merchantAgreementInstanceReference` must match or is rejected 403). The PSP charges a **tokenised** card (test token vault, `PSP_API_PAYMENT_TEST_TOKEN`) so no PAN/CVV ever reaches the merchant (PCI SAQ A). Persists the SD-64 order + drives an SD-254 card transaction attributed to the merchant, so the commission fee (A-06) is applied and the merchant dashboard revenue reflects the API payment. Emits attributed `businessProcessEvent` (`merchant.payment.api`). Rejects 401 when no credential is presented, 403 without `write:payments`.
 
-- `GET /auth/authorize` (consent render) now returns `scope_details` (array of `{ scope, description, required }`), `logo_uri`/`client_uri` (merchant branding), and — when called with `_psp_sub` — `previously_granted_scopes` (for re-consent highlighting).
+- `GET /auth/authorize` (consent render) now returns `scope_details` (array of `{ scope, description, required }`), `logo_uri`/`client_uri` (merchant branding), and: when called with `_psp_sub`, `previously_granted_scopes` (for re-consent highlighting).
 - `GET /auth/authorize` (grant) accepts `_psp_scopes` (space/comma-separated user selection). The effective grant = `userSelected ⊆ allowedScopes` with all `required` scopes force-included. A requested scope **outside the client allowlist** returns `invalid_scope` (RFC 6749 §4.1.2.1) rather than being silently dropped.
 - The authorization code and issued token scope derive from the user's selection (`grantedScopes`), not the raw request.
 - **Incremental consent:** on token exchange, if a prior active consent grant exists, the added/removed scope delta is computed and audited on `businessProcessEvent` (`processType: consent_management`, actions `oauth.consent.granted|updated|reused`, SD-16) with merchant attribution. `grantedScopes` always reflects the freshly-consented set. Downstream (`GET /auth/grants`, "Authorized Applications") consumes the real `grantedScopes`.
@@ -3685,14 +3685,14 @@ These live under the OAuth consent-grant controller (`/api/v1/auth/grants/*`) an
 ```json
 {
   "action": "approve",
-  "reviewNote": "KYB passed — business registered, tax ID verified, no adverse media"
+  "reviewNote": "KYB passed, business registered, tax ID verified, no adverse media"
 }
 ```
 or
 ```json
 {
   "action": "reject",
-  "reviewNote": "KYB failed — tax ID not found in business registry"
+  "reviewNote": "KYB failed, tax ID not found in business registry"
 }
 ```
 
@@ -3710,7 +3710,7 @@ Status transitions: `approve` → `agreed` (KYB `verified`); `reject` → `rejec
 
 Error codes: 404 merchant not found, 403 insufficient role, 400 invalid status transition.
 
-#### Merchant Key Management — prefix `/merchants`
+#### Merchant Key Management: prefix `/merchants`
 
 **POST `/merchants/:id/keys` response (201):**
 ```json
@@ -3727,18 +3727,18 @@ Error codes: 404 merchant not found, 403 insufficient role, 400 invalid status t
 
 New seed files required for the merchant onboarding + debug mode features.
 
-#### `backend/data/parties.json` — Additional Party records
+#### `backend/data/parties.json`: Additional Party records
 
 | partyInstanceReference | partyName | partyType | Notes |
 |---|---|---|---|
-| `PTY-056` | `Rachel Torres` | `employee` | Merchant Acquiring officer — has `merchant_officer` auth role |
-| `PTY-057` | `David Chen` | `customer` | Customer 2 — no merchant, simple cardholder |
-| `PTY-058` | `Amara Okafor` | `customer` | Customer 3 — has a pending merchant application |
-| `PTY-059` | `Lena Fischer` | `customer` | Customer 4 — dual-role (customer + active merchant) |
+| `PTY-056` | `Rachel Torres` | `employee` | Merchant Acquiring officer: has `merchant_officer` auth role |
+| `PTY-057` | `David Chen` | `customer` | Customer 2, no merchant, simple cardholder |
+| `PTY-058` | `Amara Okafor` | `customer` | Customer 3: has a pending merchant application |
+| `PTY-059` | `Lena Fischer` | `customer` | Customer 4: dual-role (customer + active merchant) |
 
-> Note: `partyType` must be one of the defined values: `'customer' | 'employee' | 'service_account'`. The value `'individual'` does not exist in the project model — it is a BIAN term, not a project-level enum value.
+> Note: `partyType` must be one of the defined values: `'customer' | 'employee' | 'service_account'`. The value `'individual'` does not exist in the project model, it is a BIAN term, not a project-level enum value.
 
-#### `backend/data/customerAuthentications.json` — Additional auth records
+#### `backend/data/customerAuthentications.json`: Additional auth records
 
 | login | role | linkedPartyRef | Notes |
 |---|---|---|---|
@@ -3747,23 +3747,23 @@ New seed files required for the merchant onboarding + debug mode features.
 | `customer3@demo.com` / *(password redacted)* | `customer` | `PTY-058` | Customer with pending merchant app |
 | `customer4@demo.com` / *(password redacted)* | `customer` | `PTY-059` | Dual-role customer + merchant |
 
-#### `backend/data/merchants.json` — Demo merchant records (`schemaVersion: 2`)
+#### `backend/data/merchants.json`: Demo merchant records (`schemaVersion: 2`)
 
 | merchantName | status | kybCheckStatus | owner | Purpose |
 |---|---|---|---|---|
-| `Espresso Works Ltd` | `active` | `verified` | `PTY-001` | Dual-role demo — main customer also owns an active merchant |
-| `Okafor Digital Services` | `under_review` | `initiated` | `PTY-058` | Pending approval — demonstrates review queue for `merchant_officer` |
-| `Fischer Web Studio` | `active` | `verified` | `PTY-059` | Active merchant — customer4 owns this |
+| `Espresso Works Ltd` | `active` | `verified` | `PTY-001` | Dual-role demo: main customer also owns an active merchant |
+| `Okafor Digital Services` | `under_review` | `initiated` | `PTY-058` | Pending approval: demonstrates review queue for `merchant_officer` |
+| `Fischer Web Studio` | `active` | `verified` | `PTY-059` | Active merchant: customer4 owns this |
 
 All merchant records include `merchantOwnerPartyReference`, `merchantCategoryCode`, `merchantLegalEntityReference`, `merchantSettlementSchedule`, and `merchantAgreementKybCheck` (Ch-06 BQ:Step).
 
-#### `backend/data/customerAgreements.json` — KYC seed distribution (`schemaVersion: 3`)
+#### `backend/data/customerAgreements.json`: KYC seed distribution (`schemaVersion: 3`)
 
 | customerAgreementKycCheckStatus | Count | Notes |
 |---|---|---|
-| `verified` | 48 | Standard onboarded customers — KYC passed at enrollment |
-| `expired` | 1 | `b0000049` — KYC completed >12 months ago with no renewal |
-| `initiated` | 1 | `b0000050` — KYC in progress (onboarding not yet complete) |
+| `verified` | 48 | Standard onboarded customers: KYC passed at enrollment |
+| `expired` | 1 | `b0000049`: KYC completed >12 months ago with no renewal |
+| `initiated` | 1 | `b0000050`: KYC in progress (onboarding not yet complete) |
 
 All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-document (Ch-06).
 
@@ -3773,7 +3773,7 @@ All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-documen
 
 | Concern | Implementation |
 |---|---|
-| SAQ A scope | Card data entered only on `{PSP_URL_FRONTEND}/checkout/` and `{PSP_URL_FRONTEND}/pay/` — merchant domain never handles CHD |
+| SAQ A scope | Card data entered only on `{PSP_URL_FRONTEND}/checkout/` and `{PSP_URL_FRONTEND}/pay/`: merchant domain never handles CHD |
 | Card tokenization | Frontend generates `pm_<random>` surrogate; raw PAN never sent to backend API |
 | API key storage | bcrypt hash only (`bcryptjs`, 10 rounds); plaintext returned once at generation, never stored |
 | Webhook integrity | `X-Webhook-Signature: sha256=<hmac>` signed with per-merchant secret; constant-time comparison |
@@ -3795,13 +3795,13 @@ Debug Mode is a demo-only UX toggle that switches from the business narrative to
 | Component | Purpose |
 |---|---|
 | `DebugBadge` | Chip showing BIAN Service Domain (e.g., `SD-89 · Merchant Relations`) and PCI DSS requirement |
-| `DebugInfo` | Expandable info panel on action buttons — shows BIAN Action Term, HTTP method, MongoDB op, PCI DSS control |
-| `DebugRawDoc` | Raw MongoDB document viewer — fetches from `/api/v1/system/raw/:collection/:id`; shows encrypted fields as Binary hex |
+| `DebugInfo` | Expandable info panel on action buttons: shows BIAN Action Term, HTTP method, MongoDB op, PCI DSS control |
+| `DebugRawDoc` | Raw MongoDB document viewer: fetches from `/api/v1/system/raw/:collection/:id`; shows encrypted fields as Binary hex |
 | `DebugFieldLabel` | Field wrapper showing QE mode (`QE:equality`, `QE:none`, `unencrypted`) and PCI classification |
 
 **When debug mode is ON:**
 - Every entity card shows a `DebugBadge` with BIAN SD and collection name
-- Every encrypted field has a lock icon tooltip: `"QE:equality — BSON Binary subtype 6 · PCI DSS Req 3.5.1"`
+- Every encrypted field has a lock icon tooltip: `"QE:equality, BSON Binary subtype 6 · PCI DSS Req 3.5.1"`
 - Every action button has an `[ℹ]` icon expanding a `DebugInfo` panel
 - Key entity pages (merchant, transaction, case, checkout) show a `DebugRawDoc` panel with live ciphertext
 - Login screen shows all demo users as cards (role badge + click-to-fill)
@@ -3821,7 +3821,7 @@ Defaults to `http://localhost:8080` when not set.
 
 ---
 
-## 9. Integration Hub (SD-193) — API Contracts & Implementation
+## 9. Integration Hub (SD-193): API Contracts & Implementation
 
 ### 9.1 Integration Registry Routes (requires role: `system_admin`)
 
@@ -3861,7 +3861,7 @@ GET    /api/v1/integrations/:id/events?page=1&limit=20
 - `externalProviderApiKeyPrefix` (first 12 chars of the plaintext key) is always returned for UI identification.
 - Plaintext key is returned exactly once in the `apiKey` field of POST and POST /rotate-key responses.
 
-### 9.2 Inbound Callback Routes (no JWT — HMAC validated)
+### 9.2 Inbound Callback Routes (no JWT: HMAC validated)
 
 All callbacks require `X-Webhook-Signature: sha256=<hmac-sha256-of-body>` header.
 
@@ -3893,7 +3893,7 @@ See §5 above for the full `integrationRegistry` and `integrationEvents` index d
 
 ---
 
-## 10. Stored Payment Card Management (SD-88) — customer card-on-file
+## 10. Stored Payment Card Management (SD-88): customer card-on-file
 
 Customer-managed card-on-file (view / add / remove). Aligns with BIAN SD-88 (Payment Card) and
 PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate token), Req 7
@@ -3905,7 +3905,7 @@ PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate t
 | GET | `/api/v1/customer/:customerId/cards` | owner (customer) **or** L1/L2/auditor (read) | Lists non-revoked cards; masked PAN + network + status + surrogate token + alias + registration date. Sorted preferred-first. Expiry (QE:none) NOT returned. |
 | GET | `/api/v1/customer/:customerId/cards/:cardId` | **owner only** | Self-service detail: surrogate token, expiry (QE:none, **owner-visible**), lifecycle dates, status, mandate, alias/note. Emits `card.accessed`. |
 | POST | `/api/v1/customer/:customerId/cards` | owner only | Registers a card (token + expiry + masked PAN + network + optional alias). **No CVV accepted.** Emits `card.registered`. |
-| PATCH | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Edits the **only** mutable attributes — `paymentCardAlias` (≤40) and `paymentCardCustomerNote` (≤280). Emits `card.updated`. |
+| PATCH | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Edits the **only** mutable attributes, `paymentCardAlias` (≤40) and `paymentCardCustomerNote` (≤280). Emits `card.updated`. |
 | PATCH | `/api/v1/customer/:customerId/cards/:cardId/status` | owner only | Deactivate/reactivate (`active`↔`suspended`). A suspended card stays on file but is declined by the PSP. Emits `card.deactivated`/`card.reactivated`. |
 | DELETE | `/api/v1/customer/:customerId/cards/:cardId` | owner only | Soft-delete: `paymentCardStatus='revoked'`, mandate `cancelled`; record retained. Emits `card.removed`. |
 
@@ -3913,19 +3913,19 @@ PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate t
 - **Registration (client-side tokenization).** `POST` never receives the PAN or CVV. The browser
   (`frontend/src/lib/cardTokenize.ts`) validates the PAN (Luhn + network), expiry (future MM/YY) and
   CVV (3, or 4 for AMEX), then derives the masked PAN + a surrogate token and sends only those. The
-  **CVV (SAD) is validated and discarded — never transmitted or stored** at any layer (PCI DSS Req 3.2).
+  **CVV (SAD) is validated and discarded, never transmitted or stored** at any layer (PCI DSS Req 3.2).
   UI: `/system/cards/new`.
 - **Deactivation = PSP-level decline.** A `suspended` card is retained (never physically deleted) but
   the PSP **declines every authorization** with it regardless of the issuer's decision. Enforced at two
-  points via `getCardByToken`: the gateway authorizer (`authorizeCard`, BIAN SD-15 — response code
+  points via `getCardByToken`: the gateway authorizer (`authorizeCard`, BIAN SD-15, response code
   `0540`, provider `psp-policy`, *before* any issuer/provider call) and the app-mode transaction path
   (`createTransaction` throws `CardNotActiveError` → HTTP 422). `revoked` (removed) cards are likewise
   declined. New/unsaved tokens have no card-on-file and pass through. Only `active`↔`suspended` are
   customer-toggleable; `expired`/issuer-`blocked`/`revoked` are not.
 - **Auto-registration on every payment (any source).** `createTransaction` is the single chokepoint
-  for all payment flows — app-mode, hosted checkout, payment links, the simulator, and any external
+  for all payment flows: app-mode, hosted checkout, payment links, the simulator, and any external
   system integrating with the PSP. It **unconditionally** calls `upsertCardByToken` (idempotent) for
-  the resolved customer, so **using a card to pay IS the registration** — there is no "save card"
+  the resolved customer, so **using a card to pay IS the registration**: there is no "save card"
   opt-in (the old `saveCard` flag is gone). Expiry/network are stored when the source reports them
   (`paymentCardExpirationDate` + `paymentCardNetwork`, both optional); otherwise the card is still
   registered (masked PAN + surrogate token) and the customer can complete the details later. Cards
@@ -3941,7 +3941,7 @@ PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate t
   the query filter (defense in depth). The auth middleware carves the own-card path out of the
   customer block (`CUSTOMER_OWN_CARD_PATH`, which also matches `/cards/:cardId`).
 - **Editable attributes:** only `paymentCardAlias` (nickname) and `paymentCardCustomerNote` are
-  customer-editable — non-CHD display metadata (BIAN SD-88 presentation attributes). The PAN, token,
+  customer-editable: non-CHD display metadata (BIAN SD-88 presentation attributes). The PAN, token,
   expiry, network and status are immutable from the customer side. The alias/note MUST NOT contain a
   PAN/CVV (free-text labels only).
 - **Surrogate token in the list:** `paymentCardReference` is returned in the list so the payment
@@ -3963,13 +3963,13 @@ and makes `paymentCardNetwork` / `paymentCardExpirationDate` optional (external 
 - **Deterministic token.** The browser derives the surrogate token as a keyed HMAC-SHA256 of the PAN
   (`deriveCardToken`), so the same PAN → the same token. PCI: irreversible (keyed), not a bare hash.
   Production tokenizes server-side / in a vault; the demo key is a `NEXT_PUBLIC` stand-in.
-  **Every payment surface uses it** — wallet add (`/system/cards/new`), wallet payment
+  **Every payment surface uses it**: wallet add (`/system/cards/new`), wallet payment
   (`/system/payment`), hosted checkout (`/gateway/checkout`), payment link (`/gateway/pay`) and the
   simulator. This is what makes dedup work end-to-end: paying repeatedly with the same card (any
   channel) always yields the same token, so the registry/arrangement never duplicates it. (Earlier,
   these flows minted a *random* token per payment, which created a new card-on-file each time.)
 - **Two entities (no duplicated card).** `paymentCardManagement` = per-customer arrangement (unique
-  compound index `(customerAgreementInstanceReference, paymentCardReference)` — a customer can't hold a
+  compound index `(customerAgreementInstanceReference, paymentCardReference)`: a customer can't hold a
   card twice). **`paymentCardRegistry`** (new, plaintext, token unique) = the physical card, with
   `cardHolderAgreementReferences[]` + `cardHolderCount`. The card is stored once; the registry counts
   distinct holders. `syncCardRegistry` recomputes on register/auto-register/revoke; crossing
@@ -4005,9 +4005,9 @@ unique alias per customer, one preferred card each, with a few non-active (expir
 list-filter realism.
 
 ### 10.5 Frontend
-- `/system/cards` — list with search (nickname / last-4), network + status filters, pagination
+- `/system/cards`: list with search (nickname / last-4), network + status filters, pagination
   (`Pagination`), rows link to detail. Customer-only (own section, not part of the profile).
-- `/system/cards/[cardId]` — owner self-service detail: token, expiry, dates, status; inline edit
+- `/system/cards/[cardId]`: owner self-service detail: token, expiry, dates, status; inline edit
   of alias/note; remove (soft-delete with confirm). Technical labels (QE/token) only in debug mode.
 
 *Added 2026-06-13; detail/edit/seed/payment-integration extension same day (doc + code together per repo rules).*
@@ -4022,7 +4022,7 @@ compliance ledger (`emitComplianceEvent` + `LedgerProjection`); no new store. Vi
 audit (`/system/audit-events`), which is gated to **`security_auditor` or `manager`**
 (`processEvent.controller.ts`).
 
-**Helper.** `modules/identity/services/oauthAudit.service.ts` — `auditOAuth(db, action, opts)` emits a
+**Helper.** `modules/identity/services/oauthAudit.service.ts`: `auditOAuth(db, action, opts)` emits a
 `complianceProcessEvent` with `processType: 'authentication'`, `bianServiceDomain: 'SD-16 Party
 Authentication'`, `bianControlRecordType: 'AuthenticationSession'`. `classifyOAuthFailure(err, msg)`
 maps a raw OAuth error to a human cause (`bad_client_secret`, `missing_client_secret`,
@@ -4060,7 +4060,7 @@ The webhook (callback) delivery also keeps its detailed `merchantWebhookLog` row
 `redactSecrets(value)` used by the audit helper and the merchant logger. `state`/`nonce` are logged
 only as a hash, never raw. CHD stays under the separate `CHD_BLOCKLIST` (Req 3.2).
 
-**Merchant logging.** `merchant/src/lib/logger.ts` — server-only structured JSON logger with the same
+**Merchant logging.** `merchant/src/lib/logger.ts`: server-only structured JSON logger with the same
 redaction and a `flowId` field. Instruments `login.initiated`, `callback.received`,
 `callback.token_exchanged`, `callback.login_success`, `callback.invalid_state`, `callback.no_subject`,
 `callback.psp_error`, `callback.failed`, `discover.unreachable/failed`, `token.exchange.failed`,
@@ -4075,7 +4075,7 @@ fire-and-forget and never blocks the auth response (Req 10.2.1).
 
 **EventBus vendor** (`backend/src/vendors/eventbus`). One bus for all events behind the `EventBus` port (`publish`/`subscribe`); default adapter `EventBusInProcess` (Node `EventEmitter`). Swap to Kafka/RabbitMQ = change the adapter in `initEventBus` only. `DomainEvent` envelope: `eventId` (idempotency), `eventType` (dotted, module-prefixed), `occurredAt`, `correlationId` (the journey; = `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey`, `source`, `actor?`, `bian?`, `payload` (CHD stripped on publish), `schemaVersion`, `transient?` (delivered, not persisted).
 
-**Collection `domainEvent`** (regular, not time-series — carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
+**Collection `domainEvent`** (regular, not time-series: carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
 
 **Async payment authorization.** `POST /api/v1/transactions` returns `202 { cardTransactionInstanceReference, cardTransactionStatus: 'pending' }`. The client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, `skipAuth`, no PII/CHD, race-safe) for the terminal `authorized`/`declined`. Transient `cardVerification { cardNumber, cvv, expiry }` on create is forwarded to the issuer only and never stored or logged.
 - **Phase 1 gate** (parallel, out-of-band): `card-issuer` + `fds` + `hrp` (sanctions). Each publishes its `*.completed` verdict; `PaymentAuthorizationSaga` aggregates, any hard decline gives `payment.declined`, all approve gives `payment.authorized`.
@@ -4086,7 +4086,7 @@ fire-and-forget and never blocks the auth response (Req 10.2.1).
 
 ---
 
-## v17 — Funds-Availability Gate, Currency Exchange & Balance Reconciliation
+## v17: Funds-Availability Gate, Currency Exchange & Balance Reconciliation
 
 Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-movement cycle precision.
 
@@ -4102,13 +4102,13 @@ Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-mov
 
 **Currency Exchange** (`providers/currency-exchange/services/currencyExchange.service.ts`, capability `currency_exchange` added to `IntegrationProviderType` + `bianMetaFor`): `convert(amount, from, to, config)` mid cross-rate + spread; `resolveAndConvert(db, …)` reads `capabilityModuleConfiguration('currency-exchange')`. Used at card hold/settle, merchant debit/credit, P2P credit, refund.
 
-**Post-auth** (`postAuthorization.process.ts`): debit hold removed (now in the gate — no double-hold); only refund `creditDirect` remains (FX-aware).
+**Post-auth** (`postAuthorization.process.ts`): debit hold removed (now in the gate, no double-hold); only refund `creditDirect` remains (FX-aware).
 
 **Seeders**: all currencies normalized to EUR (`payoutAccounts.json`, `cardTransactions.json`, `merchants.json`, `fraudCases.json`, `seed-generate.ts`); `pending/reserved` zeroed; `seedBalanceCredits` opening deposit == total balance (reconciled start).
 
 *Added 2026-07-03 (v17; doc + code together per repo rules).*
 
-## v17.1 — Bank Transfers (ACH / SEPA / SWIFT)
+## v17.1: Bank Transfers (ACH / SEPA / SWIFT)
 
 **Rail engine** (`backend/src/shared/services/bankTransfer/`): `RailResolver.resolve(destination, override?)`
 + `.validate(rail, destination)`, `FeeCalculator`, pure validators `isValidIban` (ISO 13616 mod-97),
@@ -4119,8 +4119,8 @@ Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-mov
 sync). `InitiateTransferInput` accepts optional `rail`, `destination`, `recurring`.
 
 **API:**
-- `POST /api/v1/gateway/transfers/preview` — derive rail, validate coordinates, quote fee (stateless).
-- `POST /api/v1/gateway/transfers/bank` — execute a transfer to an external account; validates via the
+- `POST /api/v1/gateway/transfers/preview`: derive rail, validate coordinates, quote fee (stateless).
+- `POST /api/v1/gateway/transfers/bank`: execute a transfer to an external account; validates via the
   rail engine, persists an SD-65 `PaymentExecutionProcedure` (routing -> in_flight), and dispatches to
   the `payment_initiation` provider. Returns `202` (submitted) or `422` (exception/failed).
 
@@ -4129,7 +4129,7 @@ emits business + compliance events correlated by the execution reference (PCI DS
 
 *Added 2026-07-04 (v17.1; doc + code together per repo rules).*
 
-### v17.1 — Bank transfer config (G7)
+### v17.1: Bank transfer config (G7)
 
 Env vars (config.payout): `PAYOUT_SANDBOX` (default true; transfers simulated end to end),
 `PAYOUT_FEE_SEPA` (0), `PAYOUT_FEE_ACH` (0.25), `PAYOUT_FEE_SWIFT` (15), `PAYOUT_FEE_LOCAL_BANK` (0),
@@ -4139,17 +4139,17 @@ Env vars (config.payout): `PAYOUT_SANDBOX` (default true; transfers simulated en
 
 *Added 2026-07-04 (v17.1/G7).*
 
-### v17.1 — Recurring mandates (ACH SDD / SEPA SDD)
+### v17.1: Recurring mandates (ACH SDD / SEPA SDD)
 
 Collection `recurringMandateProcedure` (SD-66). Endpoints:
-- `POST /api/v1/gateway/transfers/mandates` — create a mandate (scheme, amount, currency, destination, frequency, optional maxRuns). Destination validated by the rail engine.
-- `GET /api/v1/gateway/transfers/mandates` — list the caller's mandates.
-- `DELETE /api/v1/gateway/transfers/mandates/:ref` — cancel a mandate.
-- `POST /api/v1/gateway/transfers/mandates/run-due` — scheduler hook: runs all mandates with nextRunAt <= now, each via executeBankTransfer (rail engine + provider dispatch + risk gate), advancing nextRunAt (UTC) and completing at maxRuns.
+- `POST /api/v1/gateway/transfers/mandates`: create a mandate (scheme, amount, currency, destination, frequency, optional maxRuns). Destination validated by the rail engine.
+- `GET /api/v1/gateway/transfers/mandates`: list the caller's mandates.
+- `DELETE /api/v1/gateway/transfers/mandates/:ref`, cancel a mandate.
+- `POST /api/v1/gateway/transfers/mandates/run-due`: scheduler hook: runs all mandates with nextRunAt <= now, each via executeBankTransfer (rail engine + provider dispatch + risk gate), advancing nextRunAt (UTC) and completing at maxRuns.
 
 *Added 2026-07-04 (v17.1).*
 
-## 12. v24 — CIBA + Passwordless Enrollment (SD-91/SD-16)
+## 12. v24: CIBA + Passwordless Enrollment (SD-91/SD-16)
 
 CIBA (OIDC Client-Initiated Backchannel Authentication, Core 1.0) + WebAuthn-style passwordless
 credential enrollment. Extends the existing OAuth 2.0 / OIDC server in `module: identity`. No browser
@@ -4158,13 +4158,13 @@ challenge with an enrolled private key; the server verifies against the stored p
 
 ### 12.1 Data models (§1 addendum)
 
-`partyEnrolledCredential.model.ts` (SD-91/SD-16 — new, PLAINTEXT: public keys only, no CHD/PII):
+`partyEnrolledCredential.model.ts` (SD-91/SD-16: new, PLAINTEXT: public keys only, no CHD/PII):
 - `partyEnrolledCredentialInstanceReference` (PK), `customerAuthenticationInstanceReference` (owner sub),
   `credentialId` (unique), `publicKeyPem` (SPKI, public only), `alg` (`RS256`|`ES256`), `signCount`
   (monotonic anti-replay), `authenticatorMetadata` { deviceName?, aaguid?, transports?, createdVia? },
   `status` (`active`|`revoked`), `createdAt`, `lastUsedAt?`, `revokedAt?`, BIAN meta + `schemaVersion`.
 
-`partyBackchannelAuthentication.model.ts` (SD-91 — new, TTL-expiring, patterned on partyAuthorizationCode):
+`partyBackchannelAuthentication.model.ts` (SD-91: new, TTL-expiring, patterned on partyAuthorizationCode):
 - `authReqId` (PK, unique), `clientId` (BOUND: only this client redeems), `customerAuthenticationInstanceReference`
   (sub from hint), `scopes`, `challenge` (server nonce), `bindingMessage?`, `deliveryMode`
   (`poll`|`ping`|`push`), `clientNotificationToken?`, `status`
@@ -4187,27 +4187,27 @@ enrollment audit, PCI Req.8/10, timeseries 365d via `emitComplianceEvent`).
 ### 12.3 API contracts (§6 addendum)
 
 Enrollment (tag `auth:enrollment`, SESSION-gated, owner-scoped):
-- `POST /api/v1/auth/enroll/challenge` — issue a stateless HMAC-bound registration challenge.
-- `POST /api/v1/auth/enroll` — register a public key + signed challenge (proof of possession). Returns credential.
-- `GET  /api/v1/auth/enroll` — list the caller's credentials (owner-scoped; never another user's).
-- `POST /api/v1/auth/enroll/:credentialId/rotate` — register replacement, revoke old.
-- `DELETE /api/v1/auth/enroll/:credentialId` — revoke (foreign id 404s).
+- `POST /api/v1/auth/enroll/challenge`: issue a stateless HMAC-bound registration challenge.
+- `POST /api/v1/auth/enroll`: register a public key + signed challenge (proof of possession). Returns credential.
+- `GET  /api/v1/auth/enroll`: list the caller's credentials (owner-scoped; never another user's).
+- `POST /api/v1/auth/enroll/:credentialId/rotate`, register replacement, revoke old.
+- `DELETE /api/v1/auth/enroll/:credentialId`, revoke (foreign id 404s).
 
 CIBA (tag `auth:ciba`):
-- `POST /api/v1/auth/bc-authorize` — client-authenticated (client_secret_basic). Body: exactly one of
+- `POST /api/v1/auth/bc-authorize`: client-authenticated (client_secret_basic). Body: exactly one of
   `login_hint`/`login_hint_token`/`id_token_hint`, `scope`, optional `binding_message`/`requested_expiry`;
   `client_notification_token` required for ping/push. Returns `{ auth_req_id, expires_in, interval }`.
-- `GET  /api/v1/auth/bc-authorize/pending` — SESSION-gated decoupled in-app AD list (owner-scoped).
-- `GET  /api/v1/auth/bc-authorize/:authReqId` — fetch challenge + binding_message + client name (public by
+- `GET  /api/v1/auth/bc-authorize/pending`: SESSION-gated decoupled in-app AD list (owner-scoped).
+- `GET  /api/v1/auth/bc-authorize/:authReqId`, fetch challenge + binding_message + client name (public by
   reference; approval still needs the signature).
-- `POST /api/v1/auth/bc-authorize/:authReqId/approve` — assertion-authenticated (signature over challenge IS
+- `POST /api/v1/auth/bc-authorize/:authReqId/approve`, assertion-authenticated (signature over challenge IS
   the auth). Verifies signature vs stored public key, owner==hint sub, bumps signCount.
-- `POST /api/v1/auth/bc-authorize/:authReqId/deny` — assertion or owner session (anti-DoS).
-- `POST /api/v1/auth/token` (existing route, new grant branch) — `grant_type=urn:openid:params:grant-type:ciba`,
+- `POST /api/v1/auth/bc-authorize/:authReqId/deny`, assertion or owner session (anti-DoS).
+- `POST /api/v1/auth/token` (existing route, new grant branch): `grant_type=urn:openid:params:grant-type:ciba`,
   `auth_req_id`. Verifies the client owns the auth_req_id (else `invalid_grant`). Errors:
   `authorization_pending`, `slow_down`, `expired_token`, `access_denied`, `invalid_grant`. Mints tokens via
   `issueTokens()`, marks `consumed`.
-- `GET/POST /api/v1/auth/ciba/notify` — DEMO-ONLY ping/push stub receiver (Bearer = client_notification_token),
+- `GET/POST /api/v1/auth/ciba/notify`: DEMO-ONLY ping/push stub receiver (Bearer = client_notification_token),
   in-memory ring buffer for demo visualisation. Not part of the CIBA protocol; not for production.
 
 Discovery (`/.well-known/openid-configuration`) adds: `backchannel_authentication_endpoint`,
@@ -4235,7 +4235,7 @@ Consent detail (`GET /api/v1/auth/grants/:consentId`) adds `cibaEnabled` (client
 
 *Added 2026-07-09 (v24; doc + code together per repo rules).*
 
-## 13. v25 — Merchant app passwordless login (CIBA client, browser authenticator)
+## 13. v25: Merchant app passwordless login (CIBA client, browser authenticator)
 
 The external merchant app (`merchant/`, DB-less) consumes the v24 PSP CIBA capability to offer redirect-free
 passwordless login, alongside the existing Authorization Code + PKCE SSO (SSO stays the default/fallback).
@@ -4245,14 +4245,14 @@ Decisions: AD calls proxied server-side (no CORS), ES256 browser default, `login
 no raw PII), profile hosts enroll + generator.
 
 ### 13.1 Client libraries (`merchant/src/lib`)
-- `authenticator.ts` (`use client`) — the LOGIN credential: ES256 (`ECDSA`/`P-256`), private key
+- `authenticator.ts` (`use client`): the LOGIN credential: ES256 (`ECDSA`/`P-256`), private key
   `extractable:false` in IndexedDB (`ew-merchant-passwordless`), plus a metadata record (`credentialId`,
   `alg`, `sub`, `email`, `createdAt`). Exposes `hasCredential`/`createCredential`/`saveMeta`/`sign`/
   `signWithCredential`/`getMeta`/`loginHintToken`/`deleteCredential`. Raw r||s signatures (PSP verifier
   normalizes raw→DER). Never exported, never in localStorage.
-- `keygen.ts` (`use client`) — standalone THROWAWAY ES256 generator (extractable, downloadable JWK/PEM),
+- `keygen.ts` (`use client`): standalone THROWAWAY ES256 generator (extractable, downloadable JWK/PEM),
   NOT stored in the login store, NOT enrolled, NOT used for auth. Distinct from the login credential.
-- `oauth.ts` (server) — adds `backchannelAuthorize()` (confidential client → PSP `bc-authorize`, discovers
+- `oauth.ts` (server): adds `backchannelAuthorize()` (confidential client → PSP `bc-authorize`, discovers
   `backchannel_authentication_endpoint`) and `cibaTokenPoll()` (maps `authorization_pending`/`slow_down`/
   `access_denied`/`expired_token`). `env.ts` adds `pspCredentialsUrl` (link to the PSP keys page).
 
@@ -4265,24 +4265,24 @@ OAuth Bearer (RS256, via `tryMerchantContext`). `enrollment.controller.getSubFro
 stores public key material only. This is the single PSP-side change in v25.
 
 ### 13.2 Merchant route handlers (`merchant/src/app/api/auth/ciba/`, `server-only`)
-- `POST /api/auth/ciba/enroll/challenge` — session-gated relay to PSP `POST /enroll/challenge` (Bearer attached;
+- `POST /api/auth/ciba/enroll/challenge`: session-gated relay to PSP `POST /enroll/challenge` (Bearer attached;
   sends `{}` body since the PSP derives the owner from the token, and Fastify rejects an empty JSON body).
-- `POST /api/auth/ciba/enroll` — session-gated relay to PSP `POST /enroll` (public key only).
-- `POST /api/auth/ciba/start` — session-LESS; confidential client → PSP `bc-authorize` with `login_hint_token`
+- `POST /api/auth/ciba/enroll`: session-gated relay to PSP `POST /enroll` (public key only).
+- `POST /api/auth/ciba/start`: session-LESS; confidential client → PSP `bc-authorize` with `login_hint_token`
   + REQUESTED_SCOPES; returns `{ auth_req_id, interval, expires_in, binding_message }`.
-- `POST /api/auth/ciba/poll` — session-LESS; polls PSP `/token` (ciba grant); on approval verifies id_token,
+- `POST /api/auth/ciba/poll`: session-LESS; polls PSP `/token` (ciba grant); on approval verifies id_token,
   builds the same `ew_session` cookie as SSO callback, returns `{ status }`.
-- `GET  /api/auth/ciba/challenge?auth_req_id=` — session-LESS relay to PSP `GET /bc-authorize/:id` (AD step).
-- `POST /api/auth/ciba/approve` — session-LESS relay to PSP `POST /bc-authorize/:id/approve` (assertion auth).
+- `GET  /api/auth/ciba/challenge?auth_req_id=`: session-LESS relay to PSP `GET /bc-authorize/:id` (AD step).
+- `POST /api/auth/ciba/approve`: session-LESS relay to PSP `POST /bc-authorize/:id/approve` (assertion auth).
 
 NOTE: the AD relays are session-less because passwordless login happens when logged out; the shared
 allowlist proxy `api/psp/[...path]` requires a session and is unsuitable for the login path. Approval is
 gated by the signature at the PSP, so serving the challenge to the `auth_req_id` holder is safe.
 
 ### 13.3 UI (`merchant/src/components`, `merchant/src/app`)
-- `PasswordlessLoginButton.tsx` — on landing, renders ONLY when a credential exists (else SSO only); runs
+- `PasswordlessLoginButton.tsx`: on landing, renders ONLY when a credential exists (else SSO only); runs
   start → challenge → sign → approve → poll → redirect; on revoked credential clears IndexedDB + falls back.
-- `EnrollPasswordless.tsx` + `Es256KeyTool.tsx` — hosted on `app/profile/page.tsx` (enroll/status + Sec4
+- `EnrollPasswordless.tsx` + `Es256KeyTool.tsx`: hosted on `app/profile/page.tsx` (enroll/status + Sec4
   Pay keys link + throwaway generator). `app/page.tsx` renders the login button in the logged-out branch.
 
 ### 13.4 Seed / compliance
@@ -4294,7 +4294,7 @@ gated by the signature at the PSP, so serving the challenge to the `auth_req_id`
 
 *Added 2026-07-10 (v25; doc + code together per repo rules).*
 
-## 14. v28 — Request to Pay (RTP) + shared QR + Verification of Payee (VoP)
+## 14. v28: Request to Pay (RTP) + shared QR + Verification of Payee (VoP)
 
 > Delivered under development plan `tmp/dev.v28.plan.md`. RTP is a BIAN-aligned **intent domain**
 > (SD-65) kept strictly separate from payment execution. Model: a transfer that requires the payer's
@@ -4359,7 +4359,7 @@ settles (`settleCardDebit` + `creditDirect`). Preconditions: payee needs an acti
 request (`422 no_payout_account`); payer needs an active funding account to approve (`422 no_funding_account`).
 Durable `authorizationContext` (session/subject/device/timestamp/result) persisted immutably.
 
-### 14.4 VoP capability (`vop` / `vop_verification`) — additional, independent (ADR-v28-01)
+### 14.4 VoP capability (`vop` / `vop_verification`): additional, independent (ADR-v28-01)
 First-class provider capability mirroring FDS/AML/HRP: registry (`capabilities.ts`), built-in module
 (`providers/vop/*`, engine `verifyPayee`: exact / normalized / token-order / Levenshtein + thresholds +
 decision policy + market gate → `match|close_match|no_match|not_supported`), provider-group reactor
@@ -4381,7 +4381,7 @@ stays read-level. Read-only oversight roles (`level1_analyst`, `security_auditor
 
 *Added 2026-07-17 (v28).*
 
-## 15. v30 — Realistic per-card CVV, issuer CVK, and the card-issuer PAN vault (SD-88)
+## 15. v30: Realistic per-card CVV, issuer CVK, and the card-issuer PAN vault (SD-88)
 
 v30 raises the fidelity of the built-in `card-issuer` module so the CVV behaves as it does in a real
 issuer (derived per card from an issuer key, never stored), while keeping a global escape-hatch CVV for
@@ -4429,7 +4429,7 @@ KMS / master key  →  DEK (wrapped in encryption.__keyVault)  →  CVK (HKDF fr
   for v30.
 - No new business collection and no new CHD are introduced by the CVV feature itself.
 
-### 15.3 `cardIssuerVault` — module-owned PAN vault (BIAN Card Administration)
+### 15.3 `cardIssuerVault`: module-owned PAN vault (BIAN Card Administration)
 
 Module-owned CDE collection, only present / used while the built-in `card-issuer` is the active provider.
 BIAN control record: **Card Administration** (the issued device of the issuer), confirmed in F0, not
@@ -4442,15 +4442,15 @@ export interface CardIssuerVaultControlRecord {
   issuedCardInstanceReference: string;        // PK, UUID (module key)
   paymentCardReference: string;               // FK token; join to the core via the Card Reference port
   paymentCardInstanceReference: string;       // FK to the core arrangement
-  paymentCardNumber: string;                  // full PAN (CHD) — QE:equality
-  cardServiceCode: string;                    // issuer data, CVV derivation input — QE:equality
+  paymentCardNumber: string;                  // full PAN (CHD), QE:equality
+  cardServiceCode: string;                    // issuer data, CVV derivation input, QE:equality
   cardIssuerCvkKeyId: string;                 // reference to the DEK/CVK (not the key itself)
   issuedCardStatus: string;
   bianServiceDomain: 'Card Administration';
   bianControlRecordType: 'CardAdministration';
   recordCreatedDateTime: Date;
   schemaVersion: number;
-  // CVV: SAD — never stored (derived)
+  // CVV: SAD, never stored (derived)
 }
 ```
 
@@ -4487,32 +4487,32 @@ without PAN CHD.
 ### 15.6 API surface (additive)
 
 Built-in `card-issuer` (`/api/v1/modules/card-issuer`):
-- `POST /score` — extended: validates network + format (Luhn + length) + registered (card-on-file via
+- `POST /score`: extended: validates network + format (Luhn + length) + registered (card-on-file via
   Card Reference port) + funding account known (Funding Account port) + CVV (global | per-card per
   `cvvMode`). Loopback (`skipAuth` + `X-Integration-Source`). No CVV in the response.
-- `POST /reveal` — new loopback: derives and returns the ephemeral CVV (owner provider flow only).
-- `POST /reveal-pan` — new loopback: returns the ephemeral PAN (owner provider flow only).
-- `GET /cards/:cardId/cvv` — new (JWT): direct reveal for `operations_officer`.
+- `POST /reveal`: new loopback: derives and returns the ephemeral CVV (owner provider flow only).
+- `POST /reveal-pan`: new loopback: returns the ephemeral PAN (owner provider flow only).
+- `GET /cards/:cardId/cvv`, new (JWT): direct reveal for `operations_officer`.
   `requirePermission('cards','manage')` + `requireInternalProvider('card_issuer')` + audit
   `card.cvv.revealed`. 409 `managed_externally` when external; 403 for other roles.
-- `GET /cards/:cardId/pan` — new (JWT): direct PAN reveal for `operations_officer`, same gate, audit
+- `GET /cards/:cardId/pan`, new (JWT): direct PAN reveal for `operations_officer`, same gate, audit
   `card.pan.revealed`.
-- `GET /cards/:cardId` — extended: includes a `fundingAccount` sub-object (QE-stripped: alias, bank,
+- `GET /cards/:cardId`, extended: includes a `fundingAccount` sub-object (QE-stripped: alias, bank,
   currency, status, `payoutAccountHasIban`) resolved via port. No CVV.
-- `GET /cards?last4=..&bin=..` — plaintext search on the core (last4 equality, BIN prefix).
-- `GET /cards?panExact=..` — QE equality search on the vault.
-- `GET|PUT /config` — adds `cvvMode` and derivation config (never exposes the CVK).
+- `GET /cards?last4=..&bin=..`: plaintext search on the core (last4 equality, BIN prefix).
+- `GET /cards?panExact=..`: QE equality search on the vault.
+- `GET|PUT /config`: adds `cvvMode` and derivation config (never exposes the CVK).
 
 Built-in `account-information` (`/api/v1/modules/account-information`):
-- `GET /accounts/:accountRef/cards` — new (JWT, `accounts:view` + gate): cards by funding account, via
+- `GET /accounts/:accountRef/cards`, new (JWT, `accounts:view` + gate): cards by funding account, via
   the Card-by-account port. Display-safe, no CVV.
-- `GET /accounts/:accountRef/iban` — new: IBAN reveal for `operations_officer` from the admin panel,
+- `GET /accounts/:accountRef/iban`, new: IBAN reveal for `operations_officer` from the admin panel,
   internal gate, audit `account.iban.revealed`. Ephemeral.
 
 Core PSP (owner self-service, never direct to the module):
-- `POST /api/v1/customer/:customerId/cards/:cardId/cvv` — owner reveal via
+- `POST /api/v1/customer/:customerId/cards/:cardId/cvv`, owner reveal via
   `dispatchProvider('card_issuer', 'card.cvv.reveal.requested')`. Owner-only + step-up + audit.
-- `POST /api/v1/customer/:customerId/cards/:cardId/pan` — owner PAN reveal via
+- `POST /api/v1/customer/:customerId/cards/:cardId/pan`, owner PAN reveal via
   `dispatchProvider('card_issuer', 'card.pan.reveal.requested')`. Owner-only + step-up + audit.
 
 Reveal gate decision (F0): `cards:manage` + mandatory audit, no new `viewSensitive` permission

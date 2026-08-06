@@ -33,7 +33,7 @@ function buildResponse(
   caseId?: string,
 ): Record<string, unknown> {
   // Least-privilege (PCI DSS Req 7 need-to-know · BIAN SD-53/SD-13): contact PII (email,
-  // phone) is QE:equality — searchable while encrypted — but is exposed in responses only to
+  // phone) is QE:equality, searchable while encrypted, but is exposed in responses only to
   // roles with an operational need to contact/verify the customer (L2 investigator, auditor).
   // L1 triages on non-identifying attributes (name, segment, status, KYC outcome) and never
   // receives the contact PII. Deeper QE:none PII (address, gov ID, risk notes) stays gated by
@@ -63,7 +63,7 @@ function buildResponse(
   };
 
   // Sensitive QE:none PII is attached ONLY when the role is explicitly authorized
-  // (auditor, or L2 with a valid escalation token) — never merely because the bytes came
+  // (auditor, or L2 with a valid escalation token), never merely because the bytes came
   // back decrypted. This is fail-closed: if the demo DB stores these fields in plaintext
   // (QE not active), an unauthorized role still does NOT receive them. PCI DSS Req 7.
   // QE:none values travel in the payload only on the audited escalation path (a caseId, which
@@ -212,7 +212,7 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
     customerAgreementOccupation: isSensitiveDecrypted(doc.customerAgreementOccupation) ? doc.customerAgreementOccupation : null,
     customerAgreementTaxIDNumber: isSensitiveDecrypted(doc.customerAgreementTaxIDNumber) ? doc.customerAgreementTaxIDNumber : null,
     customerAgreementGovernmentID: dec(doc.customerAgreementGovernmentID),
-    // QE:none (L2-only) — null unless the caller decrypted them; offered via the audited reveal endpoint.
+    // QE:none (L2-only), null unless the caller decrypted them; offered via the audited reveal endpoint.
     customerAgreementSourceOfFunds: dec(doc.customerAgreementSourceOfFunds),
     customerAgreementPurposeOfRelationship: dec(doc.customerAgreementPurposeOfRelationship),
     customerAgreementResidentialAddress: dec(doc.customerAgreementResidentialAddress),
@@ -221,7 +221,7 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
 }
 
 // v31: audited on-demand reveal of the QE:none (L2-only) KYC fields for the administration workbench.
-// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited — PCI Req 3.2/3.3
+// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited: PCI Req 3.2/3.3
 // for CHD-adjacent identity data, GDPR need-to-know, Req 10). Reads via the L2 QE client so the QE:none
 // fields decrypt, records a field-access compliance event (field NAMES only, no values), and returns the
 // plaintext to the caller for display only (never persisted). Gated by customers:manage at the route.
@@ -270,7 +270,7 @@ export async function revealKycSensitive(
 
 const KYC_COMPLETED_STATUSES = ['verified', 'rejected', 'expired'];
 
-// Paged list of parties that COMPLETED KYC. L1 (masked) by default — QE:none sensitive leaves come back
+// Paged list of parties that COMPLETED KYC. L1 (masked) by default: QE:none sensitive leaves come back
 // as ciphertext and are never projected here. Index-backed: the ESR compound
 // { kycCheckStatus, customerSegment, recordUpdatedDateTime } serves the filter + sort (no COLLSCAN).
 export async function listKycAdmin(
@@ -284,7 +284,7 @@ export async function listKycAdmin(
       : { $in: KYC_COMPLETED_STATUSES },
   };
   if (filters.segment) query.customerSegment = filters.segment;
-  // riskRating is QE:equality — queryable on the QE client via a plain equality predicate.
+  // riskRating is QE:equality, queryable on the QE client via a plain equality predicate.
   if (filters.riskRating) query['customerAgreementKycCheck.customerAgreementKycCheckRiskRating'] = filters.riskRating;
 
   // v31: party-side search. partyType/email/phone/nationality live on the `party` record and are
@@ -357,7 +357,7 @@ const KYC_EDITABLE_FIELDS = new Set([
 export type KycPatchResult = { status: 'not_found' } | { status: 'invalid'; error: string } | { status: 'ok' };
 
 // Correct KYC data. Writes through the L2 QE client so QE leaves encrypt on write. Rejects any write to
-// customerAgreementKycCheckStatus (verdict is not editable here — decision 2). Emits kyc.record.amended
+// customerAgreementKycCheckStatus (verdict is not editable here: decision 2). Emits kyc.record.amended
 // with changed FIELD NAMES only (no before/after PII in the ledger, GDPR minimization).
 export async function patchKycData(
   db: Db,
@@ -479,7 +479,7 @@ export async function updateSelfProfile(
         { $set: partyPatch }
       );
     } catch (e: any) {
-      // Concurrent writer won the race for this phone — unique index rejected it.
+      // Concurrent writer won the race for this phone: unique index rejected it.
       if (e?.code === 11000 || e?.code === 11001) {
         throw Object.assign(new Error('Phone number already in use by another party'), { statusCode: 409 });
       }
@@ -586,7 +586,7 @@ const ENC_ENDS = '$encStrEndsWith';
 // All searchable fields are QE lookup-tier (L1+ can decrypt + search). QE:none sensitive fields
 // (address, sourceOfFunds, purpose, screeningRef) are never searchable, so they are not listed.
 const KYC_SEARCH_FIELDS: KycSearchFieldDef[] = [
-  // Contact / account keys (QE:equality) — the same fields as the L1 blind lookup, exposed here so
+  // Contact / account keys (QE:equality), the same fields as the L1 blind lookup, exposed here so
   // L2/auditor can do everything the simple lookup does from the one advanced surface (exact match).
   { key: 'email',                label: 'Email',             collection: 'party',     path: 'partyEmailAddress',      baseMode: 'equality', bsonType: 'string' },
   { key: 'phone',                label: 'Phone',             collection: 'party',     path: 'partyMobilePhoneNumber', baseMode: 'equality', bsonType: 'string' },

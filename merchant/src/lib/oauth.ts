@@ -156,7 +156,7 @@ export async function clientCredentialsToken(scope = 'write:payments'): Promise<
   return (await res.json()) as TokenResponse;
 }
 
-// ── CIBA (OIDC Client-Initiated Backchannel Authentication) — v25 passwordless login ──────────────
+// ── CIBA (OIDC Client-Initiated Backchannel Authentication): v25 passwordless login ──────────────
 // The merchant is a confidential CIBA client. It initiates the backchannel request (bc-authorize) and
 // polls the token endpoint with the ciba grant. The browser (Authentication Device) fetches + signs the
 // challenge out-of-band; the merchant server never sees the private key.
@@ -262,7 +262,7 @@ export async function revoke(token: string): Promise<void> {
 }
 
 // Call the PSP UserInfo endpoint with a freshly-issued access token (used at callback time,
-// before a session cookie exists). Returns only the claims the granted scopes allow — the PSP
+// before a session cookie exists). Returns only the claims the granted scopes allow: the PSP
 // gates `name`/`preferred_username` behind `profile` and `email` behind `email`. Non-fatal:
 // resolves to null on any failure so login still completes from id_token claims alone.
 export async function fetchUserinfo(
@@ -293,7 +293,7 @@ export async function verifyIdToken(idToken: string, expectedNonce?: string): Pr
     audience: ENV.clientId(),
   });
   // If the authorize request carried a nonce, the id_token MUST echo the same value. A missing nonce
-  // claim is a mismatch (not a pass) — otherwise a token without a nonce would be accepted for a
+  // claim is a mismatch (not a pass): otherwise a token without a nonce would be accepted for a
   // request that required one, weakening replay protection (OIDC Core §3.1.3.7).
   if (expectedNonce && payload.nonce !== expectedNonce) {
     throw new Error('id_token nonce mismatch');

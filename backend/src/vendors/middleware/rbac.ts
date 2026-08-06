@@ -11,12 +11,12 @@ export const VALID_USER_ROLES: ReadonlySet<UserRole> = new Set([
 ]);
 
 export function extractUserRole(request: FastifyRequest): UserRole {
-  // The x-user-role header is UNTRUSTED (simulator convenience, no token) — restrict it to builtins.
+  // The x-user-role header is UNTRUSTED (simulator convenience, no token): restrict it to builtins.
   const header = request.headers['x-user-role'] as string | undefined;
   if (header && VALID_USER_ROLES.has(header as UserRole)) {
     return header as UserRole;
   }
-  // A JWT role is signed by us at login from the stored user record, so it is TRUSTED — return it
+  // A JWT role is signed by us at login from the stored user record, so it is TRUSTED: return it
   // as-is even when it is a custom role (ADR-030). Authorization is enforced by the ACL (`can()`),
   // not by this union, so custom roles resolve correctly without widening the type everywhere.
   const user = (request as FastifyRequest & { user?: JwtUserPayload }).user;

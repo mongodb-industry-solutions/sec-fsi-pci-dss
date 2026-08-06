@@ -48,7 +48,7 @@ export interface CustomerAgreementControlRecord {
   // v4: recurring payment mandate
   customerAgreementPreferredPaymentCardReference?: string;
 
-  // Ch-06: BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+  // Ch-06: BQ:Step, KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
   customerAgreementKycCheck?: CustomerAgreementKycCheck;
 
   bianServiceDomain: 'Customer Agreement';
@@ -82,7 +82,7 @@ export function isSensitiveDecrypted(field: unknown): boolean {
   return true;
 }
 
-// BQ:Step — KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
+// BQ:Step, KYC identity verification (BIAN SD-53 BQ:Step). PCI DSS Req 8.1.
 export type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
 export interface CustomerAgreementKycCheck {

@@ -71,7 +71,7 @@ export function RequestMoneyModal({ beneficiary, token, onClose }: RequestMoneyM
                 <Check size={24} className="text-green-600" />
               </div>
               <p className="font-semibold text-gray-900">Requested {fmtAmount(success.amount, success.currency)}</p>
-              <p className="text-sm text-gray-500 mt-1">from {beneficiary.counterpartyLabel} — awaiting their approval</p>
+              <p className="text-sm text-gray-500 mt-1">from {beneficiary.counterpartyLabel}: awaiting their approval</p>
               <p className="text-xs font-mono text-gray-400 mt-2">Ref: {success.ref.slice(0, 8)}…</p>
             </div>
             {success.qr && <QrRepresentation encodedPayload={success.qr.encodedPayload} payloadFormat={success.qr.payloadFormat} label="Let them scan to approve" />}

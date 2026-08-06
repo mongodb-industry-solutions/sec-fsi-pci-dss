@@ -24,7 +24,7 @@ export interface JwtUserPayload {
   role: UserRole;
   name: string;
   domain: string;
-  partyRef?: string;  // Ch-05: partyInstanceReference (SD-13) — present for all users with a Party record
+  partyRef?: string;  // Ch-05: partyInstanceReference (SD-13), present for all users with a Party record
   iat: number;
   exp: number;
 }

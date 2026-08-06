@@ -148,7 +148,7 @@ function KycStatusBadge({ kyc, debugMode }: { kyc: CustomerAgreementKycCheck; de
       </span>
       {debugMode && (
         <>
-          <DebugChip label="SD-53 · BQ:Step · KycCheck" />
+          <DebugChip label="BQ:Step · KycCheck" />
           <DebugChip label="PCI Req 8.1" tone="standard" />
         </>
       )}
@@ -202,7 +202,7 @@ function CopyButton({ value, label }: { value: string; label: string }) {
           setCopied(true);
           if (timeoutRef.current) clearTimeout(timeoutRef.current);
           timeoutRef.current = setTimeout(() => setCopied(false), 1200);
-        } catch { /* clipboard unavailable — no-op */ }
+        } catch { /* clipboard unavailable, no-op */ }
       }}
       title={copied ? 'Copied' : `Copy ${label}`}
       aria-label={`Copy ${label}`}
@@ -280,7 +280,7 @@ export default function ProfilePage() {
   const [editLang, setEditLang] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
-  const [editAddress, setEditAddress] = useState({ streetAddress: '', city: '', postalCode: '', countryCode: '' });
+  const [editAddress, setEditAddress] = useState({ streetAddress : '', city : '', postalCode : '', countryCode: '' });
 
   // QE reference accordion state
   const [qeExpanded, setQeExpanded] = useState<Record<string, boolean>>({});
@@ -405,7 +405,7 @@ export default function ProfilePage() {
   if (!profile) return null;
 
   const ag = profile.agreement;
-  // SD-13 Party demographics — populated for every role (staff included), so non-customer
+  // SD-13 Party demographics: populated for every role (staff included), so non-customer
   // profiles are not empty. Customers get these from the agreement above; staff from party.
   const pty = profile.party as {
     partyMobilePhoneNumber?: string;
@@ -622,7 +622,7 @@ export default function ProfilePage() {
           )}
           {ag?.partyNationality && <PlainField label="Nationality" value={countryLabel(ag.partyNationality)} qe="qe-equality" collection="party" info="Your nationality (ISO country code). Encrypted at rest; searchable by exact match (QE:equality)." />}
           {ag?.partyPlaceOfBirth && <PlainField label="Place of birth" value={ag.partyPlaceOfBirth} qe="qe-equality" collection="party" info="City/country where you were born. Encrypted at rest; searchable by exact match (QE:equality)." />}
-          {ag?.partySex && <PlainField label="Sex" value={sexLabel(ag.partySex)} qe="qe-equality" collection="party" info="Sex/gender demographic (SD-13, GDPR PII). Encrypted at rest; searchable by exact match (QE:equality)." />}
+          {ag?.partySex && <PlainField label="Sex" value={sexLabel(ag.partySex)} qe="qe-equality" collection="party" info="Sex/gender demographic. Encrypted at rest; searchable by exact match (QE:equality)." />}
           {ag?.customerAgreementTaxIDNumber && (
             <RevealField label="Tax ID (TIN)" plainValue={ag.customerAgreementTaxIDNumber} type="qe-prefix" collection="customerAgreementProcedure" info="Your tax identification number. Encrypted at rest; supports encrypted starts-with queries (QE:prefix)." />
           )}
@@ -630,7 +630,7 @@ export default function ProfilePage() {
           {sourceOfFunds && <PlainField label="Source of funds" value={humanize(sourceOfFunds)} qe="qe-none" collection="customerAgreementProcedure" info="Declared origin of your funds (AML/KYC). Encrypted at rest and not searchable (QE:none)." />}
           {purpose && <PlainField label="Purpose of relationship" value={humanize(purpose)} qe="qe-none" collection="customerAgreementProcedure" info="Why you opened this account (AML/KYC). Encrypted at rest and not searchable (QE:none)." />}
 
-          {/* SD-13 Party demographics — shown for staff (no customer agreement), so their profile
+          {/* SD-13 Party demographics: shown for staff (no customer agreement), so their profile
               carries the same KYC-typical detail as customers: phone, DOB, nationality, address.
               Phone/DOB/address are GDPR PII (QE-encrypted at rest), shown with a reveal toggle. */}
           {!ag && pty && (() => {
@@ -692,7 +692,7 @@ export default function ProfilePage() {
               <InfoHint text="The government-issued identity document you provided at onboarding (KYC). Each field is encrypted at rest in MongoDB with Queryable Encryption." />
             </div>
             {debugMode && (
-              <DebugChip label="SD-53 · customerAgreementGovernmentID" />
+              <DebugChip label="customerAgreementGovernmentID" />
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm items-start">
@@ -754,7 +754,7 @@ export default function ProfilePage() {
               <h2 className="font-semibold text-gray-800 text-sm">Identity Verification (KYC)</h2>
             </div>
             {debugMode && (
-              <DebugChip label="SD-53 · BQ:Step · KycCheck · PCI Req 8.1" />
+              <DebugChip label="BQ:Step · KycCheck · PCI Req 8.1" />
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-start">
@@ -802,7 +802,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Change password — local accounts only (remote IdP accounts manage their own credentials) */}
+      {/* Change password: local accounts only (remote IdP accounts manage their own credentials) */}
       {profile.domain === 'local' && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -876,7 +876,7 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* OAuth Authorized Apps — visible to any user; shows granted consent via OIDC */}
+      {/* OAuth Authorized Apps: visible to any user; shows granted consent via OIDC */}
       {(grants.length > 0 || grantsLoading) && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -885,7 +885,7 @@ export default function ProfilePage() {
               <h2 className="font-semibold text-gray-800 text-sm">Authorized Applications</h2>
             </div>
             {debugMode && (
-              <DebugChip label="SD-16 · ConsentGrant · OAuth 2.0 · OIDC" />
+              <DebugChip label="ConsentGrant · OAuth 2.0 · OIDC" />
             )}
           </div>
           <p className="text-xs text-gray-500">Apps and merchants you have authorized to access your account via OIDC. You can revoke access at any time.</p>
@@ -972,7 +972,7 @@ export default function ProfilePage() {
               id: profile.sub,
               label: 'customerAuthenticationAssessment',
               labelColor: 'text-yellow-400',
-              description: 'SD-91 - login identity, role, QE:equality (email), bcrypt hash',
+              description: 'login identity, role, QE:equality (email), bcrypt hash',
             },
             ...(profile.partyInstanceReference ? [{
               kind: 'mongo' as const,
@@ -980,7 +980,7 @@ export default function ProfilePage() {
               id: profile.partyInstanceReference,
               label: 'party',
               labelColor: 'text-emerald-400',
-              description: 'SD-13 PII store - QE:equality (email, phone) + plaintext (name, segment)',
+              description: 'PII store - QE:equality (email, phone) + plaintext (name, segment)',
             }] : []),
             ...(profile.agreement?.customerAgreementInstanceReference ? [{
               kind: 'mongo' as const,

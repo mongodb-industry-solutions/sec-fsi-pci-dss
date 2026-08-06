@@ -167,7 +167,7 @@ export interface WebhookDeliveryLog {
 // v16: Merchant OAuth 2.0 client registration (SD-89 BQ:Grant)
 export interface MerchantOAuthClient {
   oauthClientId: string;
-  oauthClientSecretPrefix: string;          // First 8 chars — plaintext never returned
+  oauthClientSecretPrefix: string;          // First 8 chars, plaintext never returned
   oauthRedirectUris: string[];
   oauthGrantTypes: ('authorization_code' | 'client_credentials' | 'refresh_token')[];
   oauthScopes: string[];
@@ -178,8 +178,8 @@ export interface MerchantOAuthClient {
   oauthRequirePkce: boolean;
   oauthPostLogoutRedirectUris?: string[];
   oauthClaimMapping?: Record<string, string>;
-  oauthLogoUri?: string;   // v18: OIDC logo_uri (https) — branding on the consent page + app listings
-  oauthClientUri?: string; // v18: OIDC client_uri (https) — merchant home page link
+  oauthLogoUri?: string;   // v18: OIDC logo_uri (https), branding on the consent page + app listings
+  oauthClientUri?: string; // v18: OIDC client_uri (https), merchant home page link
 }
 
 // v16: OAuth consent grants (user-authorized apps)
@@ -207,7 +207,7 @@ export interface EnrolledCredential {
   lastUsedAt?: string | null;
 }
 
-// v18 D-01: detail of one authorized app — scopes expanded with human-readable descriptions + branding.
+// v18 D-01: detail of one authorized app, scopes expanded with human-readable descriptions + branding.
 export interface ConsentGrantScope {
   scope: string;
   description: string;
@@ -668,9 +668,9 @@ export interface RtpRequestDTO {
   paymentRequestInstanceReference: string;
   requesterPartyReference: string;
   payerPartyReference?: string;
-  payerCounterpartyReference?: string; // the requester's beneficiary (SD-54) representing the payer
+  payerCounterpartyReference?: string; // the requester's beneficiary representing the payer
   payeeName?: string;         // requester's own name (authorized to the payer on request)
-  payerName?: string;         // payer's real name — only returned once the payer consented (accepted+)
+  payerName?: string;         // payer's real name, only returned once the payer consented (accepted+)
   payerAlias?: string;        // payer display the requester provided (beneficiary label); for the payee's view
   payeeReceivingAccountReference: string;
   payerFundingAccountReference?: string;
@@ -799,7 +799,7 @@ export const api = {
     logout: (token: string) =>
       apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
     // Note: the demo-user roster utility lives at GET /api/v1/system/users (api.system.users).
-    // The duplicate /api/v1/auth/users was removed — a demo access convenience belongs under /system,
+    // The duplicate /api/v1/auth/users was removed: a demo access convenience belongs under /system,
     // not under /auth (real authentication). See api.system.users.
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
@@ -925,7 +925,7 @@ export const api = {
   customer: {
     // v27: encrypted-KYC search. The field registry drives which controls the UI renders;
     // the search runs QE over ciphertext server-side. Sensitive result fields are returned
-    // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
+    // only to L2 (with a valid escalation token) / auditor: the server is the boundary.
     searchFields: (token: string) =>
       apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
     // `signal` lets the caller abort a superseded query.
@@ -993,7 +993,7 @@ export const api = {
       );
     },
     // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
-    // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
+    // from the token (partyRef), never a client-supplied id, so a caller only ever sees their own
     // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
     // Display-safe only: surrogate token + masked PAN + network + alias + preferred. No PAN/CVV/expiry.
     getMyCards: (token: string) =>
@@ -1389,7 +1389,7 @@ export const api = {
           byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
         };
       }>(`/api/v1/merchants/${merchantId}/stats`, {}, token),
-    // v18 B-03: merchant activity view — who did what through this merchant (SD-16 audit). Display-safe.
+    // v18 B-03: merchant activity view, who did what through this merchant (SD-16 audit). Display-safe.
     activity: (
       merchantId: string,
       filters: { user?: string; q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
@@ -1560,7 +1560,7 @@ export const api = {
         error?: string;
       }>(`/api/v1/merchants/${merchantId}/webhooks/test`, { method: 'POST', body: JSON.stringify(body ?? {}) }, token),
 
-    // v16: Typed webhook registry (ADR-038) — per-event-type webhooks
+    // v16: Typed webhook registry (ADR-038), per-event-type webhooks
     listTypedWebhooks: (merchantId: string, token: string) =>
       apiFetch<{ webhooks: TypedWebhookConfig[] }>(`/api/v1/merchants/${merchantId}/webhooks/registry`, {}, token),
     registerTypedWebhook: (merchantId: string, token: string, body: {
@@ -2278,7 +2278,7 @@ export const api = {
     },
   },
 
-  // SD-54 Counterparty Administration — staff-facing beneficiary registry (v18)
+  // SD-54 Counterparty Administration: staff-facing beneficiary registry (v18)
   beneficiaries: {
     list: (
       token: string,
@@ -2356,7 +2356,7 @@ export const api = {
       ),
   },
 
-  // v17.1: bank transfers (ACH / SEPA / SWIFT) — rail engine preview + execute.
+  // v17.1: bank transfers (ACH / SEPA / SWIFT), rail engine preview + execute.
   transfers: {
     preview: (
       body: { destination: BankDestination; amountCurrency?: string; rail?: string },
@@ -2394,7 +2394,7 @@ export const api = {
       ),
   },
 
-  // v28: Request to Pay (RTP) — a transfer that requires the payer's in-app approval + shared QR.
+  // v28: Request to Pay (RTP), a transfer that requires the payer's in-app approval + shared QR.
   rtp: {
     create: (
       body: {
@@ -2464,7 +2464,7 @@ export const api = {
         total: number; page: number; limit: number; capped: boolean;
       }>(`/api/v1/events/audit${qs}`, {}, token);
     },
-    // dev.v8: correlated journey — every DomainEvent for one business-process instance, in order.
+    // dev.v8: correlated journey, every DomainEvent for one business-process instance, in order.
     trail: (correlationId: string, token: string) =>
       apiFetch<{ correlationId: string; count: number; events: Array<{ eventId: string; eventType: string; occurredAt: string; correlationId: string; causationId?: string; businessProcess: string; source: string; payload: Record<string, unknown>; bian?: { serviceDomain: string; controlRecord: string } }> }>(
         `/api/v1/events/trail/${encodeURIComponent(correlationId)}`, {}, token,

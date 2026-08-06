@@ -107,7 +107,7 @@ export default function MerchantActivityPage() {
       <SectionHeader
         icon={ListChecks}
         title="Activity"
-        description="Who did what through this merchant — actions attributed to the merchant's app (SSO)."
+        description="Who did what through this merchant: actions attributed to the merchant's app (SSO)."
         debugInfo="businessProcessEvent (SD-16 audit) · attribution merchantAgreementReference/actingPartyReference · PCI DSS Req 10"
       />
 

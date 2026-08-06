@@ -133,7 +133,7 @@ export default async function HistoryPage() {
       direction: (t.direction ?? 'n/a') as string,
       amount: money(gross, t.currency),
       // feeAmount is only persisted when a commission is charged (a zero fee is not written), so an
-      // absent value means no fee, i.e. 0 — show it as a real 0.00 amount rather than n/a.
+      // absent value means no fee, i.e. 0: show it as a real 0.00 amount rather than n/a.
       fee: money(t.feeAmount ?? 0, t.currency),
       commission: commission != null ? money(commission, t.currency) : 'n/a',
       rail: (t.paymentExecutionRail ?? 'n/a') as string,

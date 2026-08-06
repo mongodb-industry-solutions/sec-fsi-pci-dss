@@ -1,5 +1,5 @@
 /**
- * P2 (dev.v8) — CHD envelope encryption (architecture §7.8). node:crypto only, no DB.
+ * P2 (dev.v8): CHD envelope encryption (architecture §7.8). node:crypto only, no DB.
  * Validates round-trip, AAD/journey binding, tamper detection, token format, and that the token
  * leaks no plaintext.
  */

@@ -41,7 +41,7 @@ export interface WebhookDeliveryResult {
 
 /**
  * Deliver an HMAC-signed webhook with retry, capturing the request and the merchant's response.
- * `opts.maxAttempts` bounds the retries — pass 1 for inline delivery (e.g. during a payment) so a
+ * `opts.maxAttempts` bounds the retries: pass 1 for inline delivery (e.g. during a payment) so a
  * slow/unreachable endpoint never blocks the payment response; omit for background delivery.
  */
 export async function deliverWebhook(

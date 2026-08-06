@@ -500,13 +500,13 @@ export default function CustomerDetailPage() {
             ? `Contact PII (email, phone) is restricted at the L1 access level${debugMode ? ' (PCI DSS Req 7, need-to-know)' : ''}. Available to L2 investigators and the security auditor.`
             : undefined}
         >
-          <RecordField label="Email" tier="lookup" value={c.customerEmailAddress ? String(c.customerEmailAddress) : ''} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-          <RecordField label="Phone" tier="lookup" value={c.customerMobilePhoneNumber ? String(c.customerMobilePhoneNumber) : ''} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-          <RecordField label="Account reference" tier="lookup" mono value={c.customerAgreementReference ? String(c.customerAgreementReference) : ''} info="Internal reference for the customer agreement (SD-53), used for lookups. QE:equality encrypted at rest." />
+          <RecordField label="Email" tier="lookup" value={c.customerEmailAddress ? String(c.customerEmailAddress) : ''} info="Contact email. QE:equality encrypted at rest (exact-match searchable)." />
+          <RecordField label="Phone" tier="lookup" value={c.customerMobilePhoneNumber ? String(c.customerMobilePhoneNumber) : ''} info="Contact mobile phone. QE:equality encrypted at rest (exact-match searchable)." />
+          <RecordField label="Account reference" tier="lookup" mono value={c.customerAgreementReference ? String(c.customerAgreementReference) : ''} info="Internal reference for the customer agreement, used for lookups. QE:equality encrypted at rest." />
           <RecordField label="Segment" value={SEGMENT_LABELS[String(c.customerSegment)] ?? humanize(c.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
-          <RecordField label="Status" value={humanize(c.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status. Plaintext." />
+          <RecordField label="Status" value={humanize(c.customerAgreementStatus)} info="Agreement lifecycle status. Plaintext." />
           <RecordField label="Enrolled" value={fmtDate(c.customerAgreementEnrollmentDate)} info="Date the customer agreement was enrolled. Plaintext business metadata." />
-          <RecordField label="Language" value={humanize(c.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
+          <RecordField label="Language" value={humanize(c.customerAgreementPreferredLanguage)} info="Preferred communication language. Plaintext business metadata." />
         </RecordGroup>
 
         {/* v32 B4: the same identity document the KYC administration page shows, from the same
@@ -520,7 +520,7 @@ export default function CustomerDetailPage() {
         <RecordGroup
           icon={ShieldCheck}
           title={`KYC check${debugMode ? ' (SD-53)' : ''}`}
-          info="Outcome of the Know Your Customer verification step (SD-53 BQ:Step): lifecycle status, provider reference and completion date."
+          info="Outcome of the Know Your Customer verification step: lifecycle status, provider reference and completion date."
           badge={canOpenKycRecord ? (
             <Link
               href={`/system/admin/modules/kyc/${encodeURIComponent(partyRef)}`}
@@ -533,7 +533,7 @@ export default function CustomerDetailPage() {
           {kyc ? (
             <>
               <RecordField label="Status" value={humanize(kyc.customerAgreementKycCheckStatus)} info="KYC lifecycle status derived from the screening verdict (initiated / verified / rejected / expired)." />
-              <RecordField label="Reference" tier="lookup" mono value={kyc.customerAgreementKycCheckReference ? String(kyc.customerAgreementKycCheckReference) : ''} info="Provider-side reference for the KYC check (SD-53)." />
+              <RecordField label="Reference" tier="lookup" mono value={kyc.customerAgreementKycCheckReference ? String(kyc.customerAgreementKycCheckReference) : ''} info="Provider-side reference for the KYC check." />
               <RecordField label="Completed" value={fmtDate(kyc.customerAgreementKycCheckCompletedDate)} info="Date the KYC check completed. Plaintext business metadata." />
               {kyc.customerAgreementKycCheckNotes ? (
                 <RecordField label="Notes" value={String(kyc.customerAgreementKycCheckNotes)} info="Free-text notes recorded with the KYC outcome." />
@@ -567,7 +567,7 @@ export default function CustomerDetailPage() {
           <RecordField
             label="Residential address"
             tier="sensitive"
-            info="Full residential address (SD-53). QE:none: encrypted at rest and not searchable."
+            info="Full residential address. QE:none: encrypted at rest and not searchable."
             {...(sensitiveAvailable ? { fetchValue: async () => fmtAddress(sensitive?.customerAgreementResidentialAddress ?? (await revealKyc()).customerAgreementResidentialAddress) || 'n/a' } : {})}
           />
           <RecordField

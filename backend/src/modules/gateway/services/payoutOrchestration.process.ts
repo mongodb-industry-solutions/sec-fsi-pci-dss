@@ -81,7 +81,7 @@ export class PayoutOrchestrationProcess {
     const db = this.db;
     const patch = input.status === 'exception' ? { routingNote: input.reason } : { failureReason: input.reason };
     const transitioned = await transitionExecution(db, input.execRef, input.status, patch);
-    if (!transitioned) return; // already terminal — a previous run already compensated
+    if (!transitioned) return; // already terminal: a previous run already compensated
     if (!input.payoutAccountRef || !(input.heldAmount && input.heldAmount > 0)) return;
 
     const released = await releasePendingCredit(db, input.payoutAccountRef, input.heldAmount);
@@ -152,7 +152,7 @@ export class PayoutOrchestrationProcess {
     }
 
     if (!payoutAccount) {
-      // No payout account configured — create exception execution
+      // No payout account configured: create exception execution
       await this.createExceptionExecution(txnId, merchantRef, amount, currency, 'no_payout_account');
       return;
     }
@@ -351,7 +351,7 @@ export class PayoutOrchestrationProcess {
           await settleCardDebit(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? execution.netAmount);
           await creditDirect(db, execution.resolvedPayoutAccountReference, creditAmount);
         } else {
-          // Merchant settlement: pending was debited at authorization — move pending -> available.
+          // Merchant settlement: pending was debited at authorization, move pending -> available.
           await creditAvailable(db, execution.resolvedPayoutAccountReference, creditAmount);
           // Second leg of the commission: withhold the fee from the same hold and credit the PSP.
           // Derived as grossConverted − netConverted (not converted on its own) so the pending hold,
@@ -508,7 +508,7 @@ export class PayoutOrchestrationProcess {
   // On settlement, clear the pending hold on the cardholder's funding payout account.
   // At authorization, the funds gate (holdCardFunds) moved amount available → pending IN THE ACCOUNT
   // CURRENCY. Settlement finalizes that same debit, so we convert the settlement amount back to the
-  // funding-account currency (FX) before clearing pending — otherwise a mismatched-currency hold would
+  // funding-account currency (FX) before clearing pending: otherwise a mismatched-currency hold would
   // never fully clear. Same static rate table → the cleared amount matches the held amount exactly.
   private async clearCardholderPendingHold(txnId: string, amount: number, settlementCurrency: string): Promise<void> {
     const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');

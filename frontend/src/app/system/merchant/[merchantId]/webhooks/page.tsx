@@ -64,7 +64,7 @@ function KVEditor({
         </div>
         <button
           type="button"
-          onClick={() => onChange([...entries, { key: '', value: '' }])}
+          onClick={() => onChange([...entries, { key : '', value: '' }])}
           className="flex items-center gap-1 text-xs text-[#001E2B] hover:underline"
         >
           <Plus size={11} /> Add
@@ -606,7 +606,7 @@ export default function WebhooksSectionPage() {
           <p className="font-semibold text-[#001E2B]">How it works</p>
           <p>Each event type has its own URL, signing secret, optional custom headers, and body field mapping. The PSP posts a signed <code className="font-mono">application/json</code> payload. Verify with <code className="font-mono">X-Webhook-Signature: sha256=HMAC-SHA256(rawBody, secret)</code>.</p>
           <p className="text-gray-500">Custom headers are sent with every delivery request. Body field mapping renames PSP fields before delivery, server-side. Test payloads use the canonical ISO 20022 schema for each event and are persisted in the delivery log.</p>
-          <p className="font-mono text-gray-400 pt-1">BIAN SD-89 BQ:Notification, ADR-038, PCI DSS Req 12.8, ISO 20022 pacs.002</p>
+          <p className="font-mono text-gray-400 pt-1">BQ:Notification, ADR-038, PCI DSS Req 12.8, ISO 20022 pacs.002</p>
         </div>
       )}
     </div>

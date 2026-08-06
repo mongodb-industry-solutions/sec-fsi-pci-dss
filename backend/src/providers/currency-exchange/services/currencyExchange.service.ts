@@ -3,7 +3,7 @@
 // spread (bps) is applied on every conversion to mimic a real FX provider. Replaceable by a real FX
 // rate provider via the capability config / dispatch without changing callers.
 //
-// BIAN: adjunct to SD-66 Payment Initiation / SD-15 Card Authorization — the money-movement gates
+// BIAN: adjunct to SD-66 Payment Initiation / SD-15 Card Authorization, the money-movement gates
 // convert the transaction amount into the funding/destination account currency before holding or
 // crediting, so no balance is ever mutated in a mismatched currency.
 

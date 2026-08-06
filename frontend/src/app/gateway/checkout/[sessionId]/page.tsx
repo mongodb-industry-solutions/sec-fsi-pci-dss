@@ -135,7 +135,7 @@ function CheckoutPageInner() {
     setState('paying');
     setError('');
 
-    // Saved card: pay with the stored surrogate TOKEN (never a PAN — we never held it). New card:
+    // Saved card: pay with the stored surrogate TOKEN (never a PAN, we never held it). New card:
     // derive the deterministic token from the entered number (same PAN → same token, so re-paying
     // never duplicates a card-on-file). The name is cosmetic (the issuer never validates it, PCI
     // does not require it); for a saved card we send its alias/network as the display label.

@@ -67,7 +67,7 @@ export async function getCustomerTransactions(
   const partyRef = agreement.partyInstanceReference;
   const accountReference = agreement.customerAgreementReference;
 
-  // Source 1 — SD-65 executions (sent/received) for the party, across all merchants/rails.
+  // Source 1: SD-65 executions (sent/received) for the party, across all merchants/rails.
   const execDocs = await listPartyExecutions(db, partyRef, 200);
   const execRows: ActivityRow[] = execDocs.map((d) => ({
     kind: 'transfer',
@@ -86,7 +86,7 @@ export async function getCustomerTransactions(
     completedAt: d.completedAt?.toISOString() ?? null,
   }));
 
-  // Source 2 — the party's OWN card transactions (SD-254), masked PAN only, across all merchants.
+  // Source 2: the party's OWN card transactions (SD-254), masked PAN only, across all merchants.
   const acctRef = accountReference ?? (await resolveAccountReferenceForParty(db, partyRef));
   const cardTxns = acctRef ? await getPartyCardTransactions(db, acctRef, 200) : [];
   const cardRows: ActivityRow[] = cardTxns.map((t) => ({

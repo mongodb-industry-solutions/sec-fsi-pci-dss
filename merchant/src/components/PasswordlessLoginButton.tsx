@@ -1,6 +1,6 @@
 'use client';
 // Passwordless login (v25). Shown ONLY when an enrolled credential exists in this browser (else nothing,
-// so the SSO button remains the sole option — graceful fallback). Runs the CIBA same-device flow entirely
+// so the SSO button remains the sole option: graceful fallback). Runs the CIBA same-device flow entirely
 // redirect-free: start → fetch challenge → sign (IndexedDB key) → approve → poll → redirect. If the PSP
 // says the credential is gone (revoked), we clear the local key and fall back to SSO.
 import { useEffect, useState } from 'react';

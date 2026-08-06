@@ -1,4 +1,4 @@
-// Internal FDS (Fraud Detection) engine — the built-in scorer used when no external fraud vendor is
+// Internal FDS (Fraud Detection) engine: the built-in scorer used when no external fraud vendor is
 // active (internal-first, ADR-010/029). Distinct from Fraud Diagnosis (SD-83). The engine is
 // DATA-DRIVEN: its rules live in the Module config (capabilityModuleConfiguration.moduleConfig for
 // `fds`) so an operator can add/edit rules from the admin UI without code (P13.2/P13.5). Pure function.
@@ -13,7 +13,7 @@
 //     fraudFlag       = recommendation !== 'approve'
 //     rulesFired      = the ids of the rules that actually fired (no hardcoded list)
 //
-// CONFIG SHORTHANDS — when `rules` is not provided, the default rule set is synthesised from the
+// CONFIG SHORTHANDS: when `rules` is not provided, the default rule set is synthesised from the
 // `amount` / `riskyMcc` / `velocity` shorthands so the simple admin form keeps working. A power user
 // can instead supply an explicit `rules[]`. Both feed the same evaluator.
 import { FdsInboundPayload } from '../../../modules/provider/models/externalProviderArrangement.model';

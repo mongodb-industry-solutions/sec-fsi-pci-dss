@@ -54,7 +54,7 @@ export class PostAuthorizationProcess {
       await this.enrichCase(txnId, p.fraudDiagnosisInstanceReference);
     }
     // A5: Debit card funding account balance (BIAN SD-88 cardAccountReference, PCI Req 3.2)
-    // Uses only the UUID reference — IBAN is never read here.
+    // Uses only the UUID reference: IBAN is never read here.
     void this.decrementCardFundingBalance(txnId).catch(() => {});
   }
 
@@ -113,9 +113,9 @@ export class PostAuthorizationProcess {
 
   // A5: After a card event, update the PSP internal ledger balance for the funding payout account.
   // v17: DEBIT holds now happen atomically in the funds-check GATE (providerGroups.onFunds) BEFORE the
-  // payment is authorized — so this post-auth step no longer holds for purchases (that would double-debit).
+  // payment is authorized, so this post-auth step no longer holds for purchases (that would double-debit).
   // It only handles the REFUND credit path (return funds to the cardholder's available balance).
-  // Uses only UUID references — IBAN is never accessed (PCI DSS Req 3.2).
+  // Uses only UUID references: IBAN is never accessed (PCI DSS Req 3.2).
   private async decrementCardFundingBalance(txnId: string): Promise<void> {
     const txn = await this.db.collection<{
       cardTransactionAmount?: { amount: number; currency: string };

@@ -1,5 +1,5 @@
 /**
- * E2E: Customer Lookup — QE equality search (FR-v1-04, FR-v2-13).
+ * E2E: Customer Lookup, QE equality search (FR-v1-04, FR-v2-13).
  * Route: /system/users. Roles: analysts/auditor; customer redirected out.
  */
 import { test, expect, Page } from '@playwright/test';

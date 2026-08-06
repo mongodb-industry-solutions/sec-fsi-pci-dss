@@ -1,5 +1,5 @@
 /**
- * Unit tests (v18 Item 1 — A-06/A-07): merchant commission fee.
+ * Unit tests (v18 Item 1: A-06/A-07): merchant commission fee.
  * Source: backend/src/modules/gateway/services/paymentExecution.service.ts (computeFee, resolveMerchantFee)
  *
  * computeFee is the single source of the commission calculation (DRY) reused by BOTH the payout

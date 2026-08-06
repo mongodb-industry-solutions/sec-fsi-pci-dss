@@ -40,12 +40,12 @@ export interface CardTransactionLogControlRecord {
   cardTransactionMaskedPanDisplay: string;
 
   // Acquiring-side link (BIAN SD-89 Merchant Relations): the merchant the payment
-  // was made TO. Plaintext + indexed — a merchant identifier, not CHD/PII — so the
+  // was made TO. Plaintext + indexed: a merchant identifier, not CHD/PII, so the
   // merchant owner can list their received payments. Optional: legacy/direct
   // transactions created without a merchant context omit it.
   merchantAgreementInstanceReference?: string;
 
-  // v17: FK → paymentExecutionProcedure (SD-65) — set when payout orchestration creates the execution
+  // v17: FK → paymentExecutionProcedure (SD-65), set when payout orchestration creates the execution
   paymentExecutionInstanceReference?: string;
 
   // v18 (SD-254 acquiring / SD-89 pricing): merchant-commission captured on an ACQUIRING card payment.

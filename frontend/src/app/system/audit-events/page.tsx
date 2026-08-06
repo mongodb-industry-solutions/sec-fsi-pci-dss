@@ -13,6 +13,7 @@ import { DateTimeRangeFilter } from '../../../components/search/DateTimeRangeFil
 import { Combobox, type ComboOption } from '../../../components/ui/Combobox';
 import { downloadJsonFile, appliedFilters } from '../../../lib/downloadJson';
 
+import { serviceDomainLabel } from '../../../lib/serviceDomain';
 type AuditRow = {
   id: string;
   source: string;
@@ -65,12 +66,12 @@ const OUTCOME_GROUPS: Array<{ label: string; values: string[] }> = [
 ];
 
 const OUTCOME_OPTIONS: ComboOption[] = [
-  { value: '', label: 'All' },
+  { value : '', label: 'All' },
   ...OUTCOME_GROUPS.flatMap((g) => g.values.map((v) => ({ value: v, label: v.replace(/_/g, ' '), group: g.label }))),
 ];
 
 const ENTITY_OPTIONS: ComboOption[] = [
-  { value: '', label: 'All entities' },
+  { value : '', label: 'All entities' },
   { value: 'fraud_case', label: 'Investigation case' },
   { value: 'transaction', label: 'Transaction' },
   { value: 'customer', label: 'Customer (KYC)' },
@@ -398,7 +399,7 @@ function AuditEventsView() {
                           {ev.entityType && <span className="font-medium">{ENTITY_LABEL[ev.entityType] ?? ev.entityType}</span>}
                           {ev.entityId && <> · <span className="font-mono">{ev.entityId.slice(0, 16)}…</span></>}
                           {ev.performedByRole && <> · <span>{ev.performedByRole}</span></>}
-                          {ev.bianServiceDomain && <> · <span className="text-gray-400">{ev.bianServiceDomain}</span></>}
+                          {ev.bianServiceDomain && <> · <span className="text-gray-400">{serviceDomainLabel(ev.bianServiceDomain)}</span></>}
                         </div>
                       </div>
                       <div className="text-xs text-gray-400 shrink-0 tabular-nums">{new Date(ev.eventDateTime).toLocaleString()}</div>

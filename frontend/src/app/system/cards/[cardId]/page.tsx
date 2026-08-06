@@ -364,7 +364,7 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Funding account chip — in header */}
+            {/* Funding account chip: in header */}
             {card.fundingPayoutAccountInstanceReference && (
               <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 w-fit">
                 <Landmark size={11} />
@@ -387,7 +387,7 @@ export default function CardDetailPage() {
             )}
           </div>
 
-          {/* Funding Account — BIAN SD-88 cardAccountReference (standalone panel) */}
+          {/* Funding Account: BIAN SD-88 cardAccountReference (standalone panel) */}
           {card.fundingPayoutAccountInstanceReference && (
             <div className="bg-white rounded-xl border p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -395,7 +395,7 @@ export default function CardDetailPage() {
                   <Landmark size={14} className="text-blue-600" />
                 </div>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Funding Bank Account</h2>
-                <span className="text-xs text-gray-400 font-mono hidden sm:inline">BIAN SD-88 cardAccountReference</span>
+                <span className="text-xs text-gray-400 font-mono hidden sm:inline">cardAccountReference</span>
               </div>
               {fundingAccount ? (
                 <Link
@@ -581,7 +581,7 @@ export default function CardDetailPage() {
           </div>
           )}
 
-          {/* Transaction list — only rendered when this card has a card token to filter by */}
+          {/* Transaction list, only rendered when this card has a card token to filter by */}
           {card.paymentCardReference && (
             <div className="bg-white rounded-xl border p-5 space-y-4">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transactions on this card</h2>

@@ -10,7 +10,7 @@ import {
 } from '../models/externalProviderArrangement.model';
 import { bianMetaFor } from './integrationRegistry.service';
 
-// Rolling counter for round_robin — in-memory, resets on restart (acceptable for demo)
+// Rolling counter for round_robin: in-memory, resets on restart (acceptable for demo)
 const roundRobinCounters: Record<string, number> = {};
 
 export interface CreateRoutingGroupInput {
@@ -160,7 +160,7 @@ export interface DeleteRoutingGroupResult {
 }
 
 // Delete a routing group and detach its members (clear their routingGroupId). The default
-// group for a provider type cannot be deleted — it is the fallback target for dispatch.
+// group for a provider type cannot be deleted: it is the fallback target for dispatch.
 export async function deleteRoutingGroup(
   db: Db,
   groupId: string

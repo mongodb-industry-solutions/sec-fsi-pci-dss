@@ -39,20 +39,20 @@ export const ACTION_LABELS: Record<string, string> = {
 
 // BIAN service-domain hint per resource (shown in the matrix editor / AccessDenied for traceability).
 export const RESOURCE_BIAN: Record<string, string> = {
-  transactions: 'SD-254 Card Transaction',
-  customers: 'SD-53 Customer Agreement',
-  cards: 'SD-88 Payment Card',
-  fraudCases: 'SD-83 Fraud Diagnosis',
-  merchants: 'SD-89 Merchant Relations',
-  providers: 'SD-193 External Provider Arrangements',
+  transactions: 'Card Transaction',
+  customers: 'Customer Agreement',
+  cards: 'Payment Card',
+  fraudCases: 'Fraud Diagnosis',
+  merchants: 'Merchant Relations',
+  providers: 'External Provider Arrangements',
   modules: 'ADR-029 Capability Modules',
-  authDomains: 'SD-16 Party Authentication',
-  roles: 'SD-16 RBAC',
+  authDomains: 'Party Authentication',
+  roles: 'RBAC',
   auditEvents: 'ADR-025 · PCI Req 10',
   consents: 'Open Banking Consent',
-  accounts: 'SD-66 Payout Account Arrangement',
-  beneficiaries: 'SD-54 Counterparty Administration',
-  paymentRequests: 'SD-65 Payment Order (Request to Pay)',
+  accounts: 'Payout Account Arrangement',
+  beneficiaries: 'Counterparty Administration',
+  paymentRequests: 'Payment Order (Request to Pay)',
 };
 
 export type AclPermissionMap = Record<string, string[]>;

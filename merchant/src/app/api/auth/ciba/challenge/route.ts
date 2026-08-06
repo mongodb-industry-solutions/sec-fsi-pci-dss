@@ -1,4 +1,4 @@
-// GET /api/auth/ciba/challenge?auth_req_id=… — session-less relay to the PSP challenge endpoint.
+// GET /api/auth/ciba/challenge?auth_req_id=…: session-less relay to the PSP challenge endpoint.
 // Served server-side (no CORS surface). Safe without a session: approval is gated by the signature, not
 // by holding the auth_req_id. Returns { challenge, binding_message, client_name, scopes, status }.
 import { NextRequest, NextResponse } from 'next/server';

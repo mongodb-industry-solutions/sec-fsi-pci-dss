@@ -1,5 +1,5 @@
 /**
- * E2E: Customer payment (FR-v1-01/03) — new-payment wizard + history.
+ * E2E: Customer payment (FR-v1-01/03), new-payment wizard + history.
  * Routes: /system/payment, /system/payment/history.
  *
  * The payment wizard was redesigned: step 1 no longer offers preset saved-card

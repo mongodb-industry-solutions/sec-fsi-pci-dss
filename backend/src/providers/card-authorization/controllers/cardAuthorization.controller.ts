@@ -1,4 +1,4 @@
-// Card Authorization capability module controller — STATIC routes (ADR-029).
+// Card Authorization capability module controller: STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { authorizeCard } from '../services/cardAuthorization.service';

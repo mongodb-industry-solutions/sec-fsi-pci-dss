@@ -9,8 +9,8 @@ import { listProcessEvents } from '../../provider/services/businessProcessEvent.
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 
-// Read-model (BFF) for the investigation case detail. Composes — at read time, over the
-// event-driven core — a single, role-gated, consistently-redacted SUMMARY of the case:
+// Read-model (BFF) for the investigation case detail. Composes: at read time, over the
+// event-driven core: a single, role-gated, consistently-redacted SUMMARY of the case:
 // operation, SDF (score + indicators + fraud_evaluation event history), HRP flags, KYC and
 // KYB summaries. Sensitive PII (QE:none) is NOT duplicated here: it is returned only when a
 // valid escalation token already unlocked it via the existing role-aware services; otherwise
@@ -110,7 +110,7 @@ export async function getCaseEnrichment(
     enrollmentDate: customer.customerAgreementEnrollmentDate ?? null,
     kycCheck: customer.customerAgreementKycCheck ?? null,
     accountRef: accountRef ?? null,
-    // Contact PII (QE:equality) — present only for L2/auditor (redacted server-side for L1).
+    // Contact PII (QE:equality), present only for L2/auditor (redacted server-side for L1).
     email: (customer.customerEmailAddress as string | undefined) ?? null,
     phone: (customer.customerMobilePhoneNumber as string | undefined) ?? null,
     contactRestricted: customer.contactPiiRestricted === true,

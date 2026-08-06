@@ -204,7 +204,7 @@ export default function UsersPage() {
         debugInfo="BIAN SD-53 Customer Agreement / SD-91 · PCI DSS Req 3/7/12.3 · MongoDB Queryable Encryption (no plaintext leaves the app)"
       />
 
-      {/* Blind single-record lookup — L1 only. L2/auditor use the advanced search below. */}
+      {/* Blind single-record lookup: L1 only. L2/auditor use the advanced search below. */}
       {isL1 && (<>
       <div className="bg-white rounded-xl border p-5 space-y-4">
         <h2 className="font-semibold">Search by encrypted field</h2>

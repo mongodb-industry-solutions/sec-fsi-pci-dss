@@ -1,4 +1,4 @@
-// Internal HRP (High-Risk Person / sanctions / PEP) engine — generates an evaluation of an
+// Internal HRP (High-Risk Person / sanctions / PEP) engine: generates an evaluation of an
 // individual. Built-in screener used when no external sanctions vendor is active (ADR-010/029).
 // Stub: clean result; lists/threshold overridable from the Module config.
 import { HrpInboundPayload } from '../../../modules/provider/models/externalProviderArrangement.model';

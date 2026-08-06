@@ -1,6 +1,6 @@
 // Transport abstraction the broker EventBus adapters delegate IO to. Keeping it separate lets the
 // adapter logic (envelope mapping, fan-out, dedup, ordering) be unit-tested with a fake transport,
-// and keeps the broker client libraries optional — they are loaded only when their engine is selected.
+// and keeps the broker client libraries optional: they are loaded only when their engine is selected.
 
 export interface BrokerMessage {
   key: string;                       // partition / ordering key (the journey correlationId)

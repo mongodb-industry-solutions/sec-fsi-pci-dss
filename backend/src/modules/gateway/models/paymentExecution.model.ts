@@ -1,4 +1,4 @@
-// BIAN SD-65: Payment Execution — settlement lifecycle record
+// BIAN SD-65: Payment Execution, settlement lifecycle record
 // Created after authorization; tracks the full journey from routing to completion.
 // resolutionLog is append-only and captures every beneficiary resolution step for PCI audit.
 
@@ -27,7 +27,7 @@ export interface PaymentExecutionResolutionStep {
 }
 
 // v18 (SD-65 / SD-89): merchant-commission ATTRIBUTION sub-doc. The numeric commission amount stays
-// in the flat `feeAmount` field (single source of truth — do NOT duplicate it here); this sub-doc only
+// in the flat `feeAmount` field (single source of truth: do NOT duplicate it here); this sub-doc only
 // records WHO the fee belongs to and HOW it was derived, so the merchant dashboard can aggregate
 // commission revenue (SD-89) from the execution record (SD-65). Not CHD → NOT QE-encrypted.
 export interface PaymentExecutionFee {
@@ -44,7 +44,7 @@ export interface PaymentExecutionProcedure {
   beneficiaryType: BeneficiaryType;
   beneficiaryPartyReference?: string;             // FK → party (SD-13) for user payouts
   initiatorPartyReference?: string;               // FK → party (SD-13); set for P2P transfers (enables customer-scoped history)
-  sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66); sender's account — enables per-account movement ledger
+  sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66); sender's account, enables per-account movement ledger
   resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement (SD-66); recipient's account
 
   beneficiaryArrangementReference?: string;       // FK → counterpartyArrangement (SD-54); set for P2P-to-beneficiary transfers → enables link to the beneficiary
@@ -56,11 +56,11 @@ export interface PaymentExecutionProcedure {
   merchantAgreementReference?: string;            // FK → merchantAgreementInstanceReference (SD-89)
 
   // External bank-transfer recipient identity (SEPA/ACH/SWIFT to an unregistered account).
-  // GDPR Art. 32 / PSD2 (NOT PCI DSS — that governs card data). destinationIban is QE:none
+  // GDPR Art. 32 / PSD2 (NOT PCI DSS: that governs card data). destinationIban is QE:none
   // (encrypted at rest, L2-only), shown full to the account owner; the masked form stays
   // plaintext for list views. beneficiaryName/destinationCountry are display metadata.
   beneficiaryName?: string;                       // holder legal name as entered at initiation
-  destinationIban?: string;                       // full destination IBAN — QE:none (DEK-exec-dest-iban), L2 only
+  destinationIban?: string;                       // full destination IBAN, QE:none (DEK-exec-dest-iban), L2 only
   destinationAccountMasked?: string;              // masked IBAN / account, e.g. "ES12••••5477"
   destinationCountry?: string;                    // ISO 3166-1 alpha-2 (destination banking country)
 
@@ -68,16 +68,16 @@ export interface PaymentExecutionProcedure {
   netAmount: number;
   feeAmount: number;                              // commission/processing amount (numeric source of truth)
   fee?: PaymentExecutionFee;                      // v18: merchant-commission attribution (see PaymentExecutionFee)
-  currency: string;                               // ISO 4217 — sender's currency
+  currency: string;                               // ISO 4217, sender's currency
 
-  // FX fields — populated only for cross-currency transfers
-  recipientCurrency?: string;                     // ISO 4217 — recipient's account currency
+  // FX fields: populated only for cross-currency transfers
+  recipientCurrency?: string;                     // ISO 4217, recipient's account currency
   recipientAmount?: number;                       // amount credited after FX conversion
   fxRate?: number;                                // sender → recipient rate at execution time
 
   paymentExecutionRail?: PayoutRail;
   routingNote?: string;
-  // ISO 20022 RemittanceInformation — the payment concept/purpose/reference as entered by the
+  // ISO 20022 RemittanceInformation: the payment concept/purpose/reference as entered by the
   // initiator (bank-transfer reference, P2P note). First-class and queryable so AML/FDS narrative
   // analysis and transaction history can read the clean concept (routingNote stays operational).
   // Not CHD → NOT QE-encrypted.

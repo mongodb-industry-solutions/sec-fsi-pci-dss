@@ -1,4 +1,4 @@
-// Auth Domains internal module — full CRUD over the authenticationDomain collection (BIAN SD-16).
+// Auth Domains internal module: full CRUD over the authenticationDomain collection (BIAN SD-16).
 // A Module with NO Provider counterpart (ADR-029): the PSP's own authentication-domain registry.
 import { Db, Filter, Document } from 'mongodb';
 import { randomUUID } from 'crypto';

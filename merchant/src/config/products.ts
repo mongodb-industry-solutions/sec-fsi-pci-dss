@@ -1,4 +1,4 @@
-// Static demo catalogue — 4 products, one per PSP payment method. No DB (KISS).
+// Static demo catalogue: 4 products, one per PSP payment method. No DB (KISS).
 export type PaymentMethod = 'payment_link' | 'redirect' | 'api_payment' | 'subscription';
 
 export interface Product {

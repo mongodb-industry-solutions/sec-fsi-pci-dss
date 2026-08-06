@@ -99,7 +99,7 @@ test.describe('Admin Panel: Setup Page', () => {
   });
 
   test('without admin token redirects to /admin', async ({ context }) => {
-    // Fresh page — addInitScript from beforeEach does NOT apply to pages opened later
+    // Fresh page: addInitScript from beforeEach does NOT apply to pages opened later
     const guest = await context.newPage();
     await guest.goto('/admin/panel/setup');
     await expect(guest).toHaveURL(/\/admin$/, { timeout: 6_000 });

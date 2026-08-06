@@ -519,20 +519,20 @@ const QA_DATA: QAItem[] = [
     question: 'How does the save card / recurring payment feature align with BIAN Service Domains?',
     answer: (
       <div>
-        <P>The save card feature does not require a new BIAN Service Domain. A customer&apos;s authorization to charge a card for future payments is a behavioral capability of the <Em>Customer Agreement (SD-53)</Em>, not a standalone entity.</P>
+        <P>The save card feature does not require a new BIAN Service Domain. A customer&apos;s authorization to charge a card for future payments is a behavioral capability of the <Em>Customer Agreement</Em>, not a standalone entity.</P>
         <Table
           headers={['Action', 'BIAN Service Domain', 'Collection', 'Field additions']}
           rows={[
-            ['Customer saves a card as preferred payment method', 'Payment Card (SD-88)', <Code>paymentCardQE</Code>, 'isPreferredPaymentMethod, mandateStatus, cardholderConsentTimestamp, mandateExpiryDate'],
-            ['Customer grants consent for future charges', 'Customer Agreement (SD-53)', <Code>customerAgreementQE</Code>, 'preferredPaymentCardReference (link to the saved card)'],
-            ['Recurring charge is executed', 'Card Transaction (SD-254)', <Code>cardTransactionQE</Code>, 'cardTransactionInitiationType (customerInitiated / merchantInitiated)'],
+            ['Customer saves a card as preferred payment method', 'Payment Card', <Code>paymentCardQE</Code>, 'isPreferredPaymentMethod, mandateStatus, cardholderConsentTimestamp, mandateExpiryDate'],
+            ['Customer grants consent for future charges', 'Customer Agreement', <Code>customerAgreementQE</Code>, 'preferredPaymentCardReference (link to the saved card)'],
+            ['Recurring charge is executed', 'Card Transaction', <Code>cardTransactionQE</Code>, 'cardTransactionInitiationType (customerInitiated / merchantInitiated)'],
           ]}
         />
         <P>This means v4 save card is <Em>three field extensions across existing collections</Em> with no new collection needed. The mandate is expressed through the link between <Code>customerAgreementQE.preferredPaymentCardReference</Code> and <Code>paymentCardQE.mandateStatus</Code>.</P>
         <P>Under Visa and Mastercard rules, merchant-initiated transactions have a different authorization flow: they do not require CVV re-entry, they carry a specific network flag affecting interchange rates and chargeback rules, and they reference the stored consent instead. Storing <Code>cardTransactionInitiationType</Code> makes the transaction type explicit to any downstream compliance or dispute resolution system.</P>
       </div>
     ),
-    tags: ['BIAN', 'SD-88', 'SD-53', 'SD-254', 'recurring payment', 'mandate', 'merchant-initiated'],
+    tags: ['BIAN', 'payment card', 'customer agreement', 'card transaction', 'recurring payment', 'mandate', 'merchant-initiated'],
   },
   {
     id: 24, category: 4,

@@ -5,7 +5,7 @@
 // the in-process bus (like the saga's journeys map); a broker deployment swaps the store, not the API.
 import type { PendingCorrelation } from '../../../shared/models/events/wire.contracts';
 
-const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 min — abandoned entries are swept (saga times out, fail-open)
+const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 min: abandoned entries are swept (saga times out, fail-open)
 const registry = new Map<string, PendingCorrelation>();
 
 /** Record a pending correlation at dispatch, indexed by its wire reference. */

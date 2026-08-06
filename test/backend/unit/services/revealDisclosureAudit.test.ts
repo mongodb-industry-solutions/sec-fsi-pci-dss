@@ -160,7 +160,7 @@ describe('no hardcoded role in sensitive-tier client selection (test 27)', () =>
 
   it('never calls getDbForRole with a literal role string', () => {
     const offenders: string[] = [];
-    // getDbForRole('<literal>' ...) — a quoted first argument is a hardcoded tier grant.
+    // getDbForRole('<literal>' ...): a quoted first argument is a hardcoded tier grant.
     const pattern = /getDbForRole\(\s*['"]/;
     for (const file of walk(SRC)) {
       const rel = file.slice(SRC.length + 1);

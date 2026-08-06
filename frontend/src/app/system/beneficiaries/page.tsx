@@ -424,7 +424,7 @@ export default function BeneficiariesPage() {
       downloadJsonFile('beneficiaries', {
         generatedAt: new Date().toISOString(),
         generatedByRole: role,
-        bianServiceDomain: 'SD-54 Counterparty Administration',
+        bianServiceDomain: 'Counterparty Administration',
         note: 'Contact details are stored masked (PCI DSS Req 3.4). Each read is recorded in the compliance ledger.',
         filtersApplied: appliedFilters(filters),
         totalMatching: grandTotal,
@@ -719,7 +719,7 @@ export default function BeneficiariesPage() {
 
       {debugMode && (
         <p className="text-[10px] font-mono text-gray-400">
-          GET /api/v1/beneficiaries · SD-54 · scope: {isCustomer ? 'own (forced server-side)' : 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}` : ownerFilter.trim() ? `ownerRef=${ownerFilter.trim()}` : search.trim().length >= MIN_QUERY ? `q=${search.trim()}` : 'none (no request issued)'}
+          GET /api/v1/beneficiaries · scope: {isCustomer ? 'own (forced server-side)': 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}`: ownerFilter.trim ? `ownerRef=${ownerFilter.trim}`: search.trim.length >= MIN_QUERY ? `q=${search.trim}`: 'none (no request issued)'}
         </p>
       )}
 

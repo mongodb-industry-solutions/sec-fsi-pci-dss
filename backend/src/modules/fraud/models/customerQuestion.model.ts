@@ -1,7 +1,7 @@
 // BIAN SD-83 (Fraud Diagnosis): structured customer questions raised by L1/L2 investigators on a
 // case, answered by the customer on the related transaction. Append-only / immutable once answered
 // (PCI DSS Req 10 traceability; no edit after submission). The QUESTION and the customer's RESPONSE
-// carry no cardholder data (CHD) — only free text the customer chooses to provide.
+// carry no cardholder data (CHD), only free text the customer chooses to provide.
 import type { AnalystRole } from '../../../shared/models/identity.model';
 
 export const CUSTOMER_QUESTION_COLLECTION = 'fraudDiagnosisCustomerQuestion';
@@ -36,7 +36,7 @@ export interface CustomerQuestionRecord {
 }
 
 // Client-facing shape. Deliberately omits internal refs (case/agreement/party instance references)
-// the caller does not need — data minimization (PCI DSS Req 7).
+// the caller does not need: data minimization (PCI DSS Req 7).
 export interface CustomerQuestionDTO {
   questionId: string;
   caseReference: string;

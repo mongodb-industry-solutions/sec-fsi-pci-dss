@@ -29,7 +29,7 @@ const EXPECTED_COLLECTIONS = [
   'customerCreditRatingState',
   'consentAgreement',
   'consentAccessLog',
-  // SD-193 External Provider Arrangements (dev.v7 Fase 2 — BIAN-pure rename + new module config)
+  // SD-193 External Provider Arrangements (dev.v7 Fase 2: BIAN-pure rename + new module config)
   'externalProviderArrangement',
   'externalProviderArrangementActionLog',
   'externalProviderArrangementPortfolio',
@@ -67,7 +67,7 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   payoutAccountArrangement:             'payoutAccountInstanceReference',
   paymentExecutionProcedure:            'paymentExecutionInstanceReference',
   counterpartyArrangement:              'counterpartyArrangementReference',
-  // externalProviderArrangementActionLog is timeseries — no unique index (checked by presence only)
+  // externalProviderArrangementActionLog is timeseries, no unique index (checked by presence only)
 };
 
 // v18: representative NON-unique secondary indexes that must exist (first key checked by presence).
@@ -155,7 +155,7 @@ function checkEnvVars(): boolean {
   }
 
   // PSP_JWT_SECRET is optional for local/demo: the app falls back to a built-in demo default
-  // (auth, escalation tokens, admin). Warn (not fail) when unset or when it equals that default —
+  // (auth, escalation tokens, admin). Warn (not fail) when unset or when it equals that default,
   // a strong secret is required only before any non-local deployment.
   if (!process.env.PSP_JWT_SECRET) {
     check('warn', 'PSP_JWT_SECRET', 'not set - app uses the built-in demo default; set a strong secret before any non-local deployment');

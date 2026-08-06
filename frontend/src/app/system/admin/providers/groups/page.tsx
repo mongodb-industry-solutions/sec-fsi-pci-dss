@@ -16,7 +16,7 @@ function capabilityHref(providerType: string): string | null {
   return cap && cap !== 'generic' ? `/system/admin/providers/${cap}` : null;
 }
 
-// Derived from capabilities.ts — single source of truth; no manual sync needed.
+// Derived from capabilities.ts: single source of truth; no manual sync needed.
 const PROVIDER_TYPES = CAPABILITY_LIST.map((c) => c.providerType);
 const TYPE_LABEL: Record<string, string> = Object.fromEntries(
   CAPABILITY_LIST.map((c) => [c.providerType, c.label])

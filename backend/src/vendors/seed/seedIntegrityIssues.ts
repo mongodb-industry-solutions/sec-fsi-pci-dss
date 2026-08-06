@@ -2,7 +2,7 @@ import { MongoClient } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../../config';
 
-// Deliberate duplicate plan — each entry creates N additional documents that share
+// Deliberate duplicate plan: each entry creates N additional documents that share
 // the same fraudDiagnosisCaseReference as an existing canonical seed record.
 // The duplicates have divergent status/score to make the audit demo interesting.
 const DUPLICATE_PLAN: Array<{
@@ -62,7 +62,7 @@ export async function seedIntegrityIssues(client: MongoClient): Promise<{
   }
 
   // Card duplicated by ERROR (SD-88): the same customer ends up holding the same physical card
-  // (same masked PAN + network) under TWO different tokens — exactly what inconsistent/non-
+  // (same masked PAN + network) under TWO different tokens: exactly what inconsistent/non-
   // deterministic tokenization would produce. The auditor's Data Integrity tool surfaces this as a
   // `tokenizationDuplicate`. (Deterministic tokens prevent it going forward; this is legacy bad data.)
   const cardCol = db.collection('paymentCardManagement');

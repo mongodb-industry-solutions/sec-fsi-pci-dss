@@ -50,7 +50,7 @@ export function CaseQuestionsPanel({ caseId, token, role, onActivity, refreshSig
       <div className="flex items-center gap-2">
         <HelpCircle size={16} className="text-[#001E2B]" />
         <h2 className="font-semibold text-sm text-gray-800">Customer questions</h2>
-        <span className="text-[10px] text-gray-400 ml-auto">SD-83 · answers are immutable (PCI Req 10)</span>
+        <span className="text-[10px] text-gray-400 ml-auto">answers are immutable (PCI Req 10)</span>
       </div>
 
       {canWrite && (

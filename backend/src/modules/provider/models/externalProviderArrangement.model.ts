@@ -1,5 +1,5 @@
 // Collection names migrated to pure BIAN SD-193 control records (dev.v7 plan, Fase 2). The constant
-// IDENTIFIERS keep their INTEGRATION_* names until the module rename in Fase 3 — only the stored
+// IDENTIFIERS keep their INTEGRATION_* names until the module rename in Fase 3, only the stored
 // collection VALUES change here, so no importer needs touching and the DB is BIAN-clean.
 export const EXTERNAL_PROVIDER_ARRANGEMENT_COLLECTION        = 'externalProviderArrangement';
 export const EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION          = 'externalProviderArrangementActionLog';
@@ -18,10 +18,10 @@ export type IntegrationProviderType =
   | 'credit_bureau'
   | 'card_authorization'
   | 'card_issuer'
-  | 'account_information'    // SD-36 Open Banking AIS — external bank account identity/balance (PSD2)
-  | 'payment_initiation'     // SD-66 PISP — executes bank transfers (PSD2)
-  | 'currency_exchange'      // v17 FX — converts amounts between ISO-4217 currencies (mid rate + spread)
-  | 'vop_verification'       // v28 Verification of Payee — name-vs-account confirmation (EPC VoP / UK CoP)
+  | 'account_information'    // SD-36 Open Banking AIS: external bank account identity/balance (PSD2)
+  | 'payment_initiation'     // SD-66 PISP: executes bank transfers (PSD2)
+  | 'currency_exchange'      // v17 FX: converts amounts between ISO-4217 currencies (mid rate + spread)
+  | 'vop_verification'       // v28 Verification of Payee: name-vs-account confirmation (EPC VoP / UK CoP)
   | 'generic';
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
@@ -94,7 +94,7 @@ export interface HmacInboundConfig {
 
 export interface OAuth2Config {
   clientId: string;
-  clientSecretPlaintext?: string; // Demo only — production: AWS Secrets Manager
+  clientSecretPlaintext?: string; // Demo only, production: AWS Secrets Manager
   tokenEndpoint: string;
   scopes: string[];
   tokenCachingEnabled: boolean;
@@ -245,7 +245,7 @@ export interface RetryPolicy {
 
 // ── Per-event wire configuration (§2.4 / §7.7) ────────────────────────────────
 // Each event a vendor handles has its OWN outbound + inbound config, including its own URLs. URLs,
-// mapping, auth, retries and timeout are NEVER vendor-global — always per event. There is no vendor
+// mapping, auth, retries and timeout are NEVER vendor-global, always per event. There is no vendor
 // base URL. The inbound callback is per event+vendor (§7.7).
 export interface ProviderEventOutboundConfig {
   url?: string;                          // outbound endpoint the PSP calls for THIS event
@@ -278,16 +278,16 @@ export interface ExternalProviderArrangement {
   externalProviderInternalHandler?: string;
 
   externalProviderApiEndpoint?: string;
-  externalProviderApiKeyHash?: string;       // bcrypt — never returned
+  externalProviderApiKeyHash?: string;       // bcrypt, never returned
   externalProviderApiKeyPrefix?: string;
   externalProviderAuthScheme?: IntegrationAuth;
 
   externalProviderCallbackEnabled: boolean;
   externalProviderCallbackPath?: string;
-  externalProviderCallbackSecretHash?: string; // bcrypt — never returned
+  externalProviderCallbackSecretHash?: string; // bcrypt, never returned
 
   externalProviderTriggerEvents: string[];
-  // §2.4: per-event wire config — the AUTHORITATIVE source for url/method/mapping/auth/retries/timeout
+  // §2.4: per-event wire config, the AUTHORITATIVE source for url/method/mapping/auth/retries/timeout
   // and the inbound callback. The seeder populates it for every vendor (deriveEventConfigs), the
   // dispatcher (resolveEventOutbound) and the callback handlers (resolveEventInbound) read it, and the
   // admin Outbound/Inbound tabs edit it. The vendor-global fields below are a DEPRECATED migration
@@ -342,7 +342,7 @@ export type ComplianceProcessType =
   | 'kyb_verification'
   | 'merchant_onboarding'
   | 'customer_onboarding'
-  | 'card_management'       // SD-88 stored-card lifecycle (register / remove) — PCI DSS Req 10
+  | 'card_management'       // SD-88 stored-card lifecycle (register / remove): PCI DSS Req 10
   | 'payment_processing'    // SD-65/SD-36 payout execution + AIS/PISP audit trail (v17)
   | 'authentication';       // SD-91 CIBA + passwordless enrollment audit trail (PCI DSS Req 8/10)
 
@@ -518,7 +518,7 @@ export interface IntegrationEvent {
   integrationEventErrorMessage?: string;
   integrationEventTriggeredBy: string;
   integrationEventMeta?: Record<string, unknown>;
-  // Full request/response capture for outbound dispatch and inbound callbacks (PCI DSS Req 10.7 —
+  // Full request/response capture for outbound dispatch and inbound callbacks (PCI DSS Req 10.7,
   // reconstruct what happened). Sanitized: auth/CHD values are redacted before storage.
   integrationEventRequest?: { method: string; url?: string; headers?: Record<string, string>; body?: unknown };
   integrationEventResponse?: { status?: number; headers?: Record<string, string>; body?: unknown };

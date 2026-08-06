@@ -1,9 +1,9 @@
 /**
- * Integration tests: v18 Fase B — Merchant Activity + Authorizations views
+ * Integration tests: v18 Fase B, Merchant Activity + Authorizations views
  * Source: backend/src/modules/gateway/controllers/merchant.controller.ts
  *         (GET /merchants/:id/activity, GET /merchants/:id/authorizations)
  *
- * Requires TEST_MONGODB_URI env var — skips gracefully when not set (matches rbac.test.ts).
+ * Requires TEST_MONGODB_URI env var: skips gracefully when not set (matches rbac.test.ts).
  *
  * Covers:
  *  - B-01/B-10 RBAC: security_auditor may view; a non-owner customer is denied (403); no token → 401.
@@ -66,7 +66,7 @@ describe('v18 Fase B: Merchant Activity + Authorizations', () => {
       .get(`/api/v1/merchants/${ESPRESSO_MERCHANT_ID}/activity?limit=100`)
       .set('Authorization', `Bearer ${auditorToken}`);
     const withParty = (all.body.events as Array<{ actingPartyReference?: string }>).find((e) => e.actingPartyReference);
-    if (!withParty?.actingPartyReference) return; // no attributed activity seeded — nothing to assert
+    if (!withParty?.actingPartyReference) return; // no attributed activity seeded: nothing to assert
     const filtered = await supertest(app.server)
       .get(`/api/v1/merchants/${ESPRESSO_MERCHANT_ID}/activity?user=${encodeURIComponent(withParty.actingPartyReference)}`)
       .set('Authorization', `Bearer ${auditorToken}`);

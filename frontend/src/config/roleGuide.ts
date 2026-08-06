@@ -107,11 +107,11 @@ export const ROLE_GUIDE: Record<string, RoleGuide> = {
   },
   operations_officer: {
     icon: Wallet,
-    tagline: 'Operations: administer customer cards (SD-88), payout accounts (SD-66) and KYC/KYB records via the built-in modules.',
+    tagline: 'Operations: administer customer cards, payout accounts and KYC/KYB records via the built-in modules.',
     responsibilities: [
       'Administer the global card inventory: register, edit, activate/suspend, and revoke customer cards via the built-in card-issuer module.',
       'Administer payout accounts: create, edit, and close party payout accounts via the built-in account-information module.',
-      'KYC/KYB data administration: review and correct KYC records (SD-53) and KYB records + beneficial owners (SD-89). Data correction only, NOT the KYB approve/reject decision (that stays with the Merchant Officer, SoD).',
+      'KYC/KYB data administration: review and correct KYC records and KYB records + beneficial owners. Data correction only, NOT the KYB approve/reject decision (that stays with the Merchant Officer, SoD).',
       'Keep the card, account, KYC and KYB registries accurate for downstream operations.',
     ],
     dataAccess: [

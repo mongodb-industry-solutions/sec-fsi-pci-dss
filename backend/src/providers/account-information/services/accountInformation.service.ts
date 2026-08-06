@@ -6,8 +6,8 @@ import type { PayoutAccountArrangement } from '../../../modules/gateway/models/p
 import type { AisValidationInbound } from '../../../shared/models/events/wire.contracts';
 
 export interface AccountInformationConfig {
-  alwaysVerifyActive: boolean;    // default: true — only 'active' accounts pass
-  returnInternalBalance: boolean; // default: true — balance sourced from PSP internal ledger
+  alwaysVerifyActive: boolean;    // default: true, only 'active' accounts pass
+  returnInternalBalance: boolean; // default: true, balance sourced from PSP internal ledger
   identityCheckEnabled: boolean;  // default: true
 }
 

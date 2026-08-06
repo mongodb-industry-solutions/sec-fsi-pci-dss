@@ -51,12 +51,12 @@ export async function createCollections(
     { name: 'cardIssuerVault',                  map: maps.cardIssuerVault },
     // SD-91: Customer Authentication
     { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
-    // SD-66: Payout Account Arrangement (IBAN/routing QE:none, L2 only — PCI DSS Req 3.3)
+    // SD-66: Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS Req 3.3)
     ...(maps.payoutAccountArrangement
       ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
       : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
     ),
-    // SD-65: Payment Execution Procedure (destinationIban QE:none, L2 only — GDPR Art. 32 / PSD2)
+    // SD-65: Payment Execution Procedure (destinationIban QE:none, L2 only, GDPR Art. 32 / PSD2)
     ...(maps.paymentExecutionProcedure
       ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
       : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
@@ -385,7 +385,7 @@ export async function createCollections(
     console.log('  skip:    domainEvent (already exists)');
   }
 
-  // v16 (ADR-036): SD-16 RSA public key registry — public keys only, never private. JWKS + rotation audit.
+  // v16 (ADR-036): SD-16 RSA public key registry, public keys only, never private. JWKS + rotation audit.
   if (!existingNames.has('partyAuthenticationKey') || reset) {
     if (existingNames.has('partyAuthenticationKey') && reset) {
       await db.collection('partyAuthenticationKey').drop();
@@ -397,7 +397,7 @@ export async function createCollections(
     console.log('  skip:    partyAuthenticationKey (already exists)');
   }
 
-  // v16 (ADR-033): SD-16 OAuth 2.0 authorization codes — TTL 5 minutes (expiresAt index)
+  // v16 (ADR-033): SD-16 OAuth 2.0 authorization codes, TTL 5 minutes (expiresAt index)
   if (!existingNames.has('partyAuthorizationCode') || reset) {
     if (existingNames.has('partyAuthorizationCode') && reset) {
       await db.collection('partyAuthorizationCode').drop();
@@ -409,7 +409,7 @@ export async function createCollections(
     console.log('  skip:    partyAuthorizationCode (already exists)');
   }
 
-  // v16 (ADR-033): SD-16 Issued OAuth tokens — refresh tokens + revocation registry. TTL on expiresAt.
+  // v16 (ADR-033): SD-16 Issued OAuth tokens, refresh tokens + revocation registry. TTL on expiresAt.
   if (!existingNames.has('partyIssuedToken') || reset) {
     if (existingNames.has('partyIssuedToken') && reset) {
       await db.collection('partyIssuedToken').drop();
@@ -421,7 +421,7 @@ export async function createCollections(
     console.log('  skip:    partyIssuedToken (already exists)');
   }
 
-  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant — per-user per-client consent with revocation support.
+  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant, per-user per-client consent with revocation support.
   if (!existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) || reset) {
     if (existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) && reset) {
       await db.collection(PARTY_AUTH_CONSENT_COLLECTION).drop();
@@ -433,7 +433,7 @@ export async function createCollections(
     console.log(`  skip:    ${PARTY_AUTH_CONSENT_COLLECTION} (already exists)`);
   }
 
-  // SD-91/SD-16: PartyEnrolledCredential — user authenticator registry (public keys only, no CHD).
+  // SD-91/SD-16: PartyEnrolledCredential, user authenticator registry (public keys only, no CHD).
   if (!existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) || reset) {
     if (existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) && reset) {
       await db.collection(PARTY_ENROLLED_CREDENTIAL_COLLECTION).drop();
@@ -445,7 +445,7 @@ export async function createCollections(
     console.log(`  skip:    ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (already exists)`);
   }
 
-  // SD-91: PartyBackchannelAuthentication — CIBA auth_req_id lifecycle (TTL-expiring, one-time).
+  // SD-91: PartyBackchannelAuthentication, CIBA auth_req_id lifecycle (TTL-expiring, one-time).
   if (!existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) || reset) {
     if (existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) && reset) {
       await db.collection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).drop();
@@ -457,7 +457,7 @@ export async function createCollections(
     console.log(`  skip:    ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (already exists)`);
   }
 
-  // merchantWebhookDeliveryLog — persisted delivery attempt records (ADR-038)
+  // merchantWebhookDeliveryLog: persisted delivery attempt records (ADR-038)
   const logColls = await db.listCollections({ name: MERCHANT_WEBHOOK_LOG_COLLECTION }).toArray();
   if (logColls.length === 0) {
     await db.createCollection(MERCHANT_WEBHOOK_LOG_COLLECTION);
@@ -466,10 +466,10 @@ export async function createCollections(
     console.log(`  skip:    ${MERCHANT_WEBHOOK_LOG_COLLECTION} (already exists)`);
   }
 
-  // SD-65: Payment Execution Procedure — created above as a QE-encrypted collection
+  // SD-65: Payment Execution Procedure, created above as a QE-encrypted collection
   // (destinationIban QE:none). See the qeCollections loop; no plaintext creation here.
 
-  // SD-54: Counterparty Arrangement — plaintext (beneficiary registry, no raw PII stored)
+  // SD-54: Counterparty Arrangement, plaintext (beneficiary registry, no raw PII stored)
   if (!existingNames.has(COUNTERPARTY_COLLECTION) || reset) {
     if (existingNames.has(COUNTERPARTY_COLLECTION) && reset) {
       await db.collection(COUNTERPARTY_COLLECTION).drop();
@@ -492,7 +492,7 @@ export async function createCollections(
     console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
   }
 
-  // SD-65 (v28): QR Payment Representation — plaintext. No QE: TTL forbids it (v35 CH-1).
+  // SD-65 (v28): QR Payment Representation, plaintext. No QE: TTL forbids it (v35 CH-1).
   if (!existingNames.has(QR_REPRESENTATION_COLLECTION) || reset) {
     if (existingNames.has(QR_REPRESENTATION_COLLECTION) && reset) {
       await db.collection(QR_REPRESENTATION_COLLECTION).drop();
@@ -504,7 +504,7 @@ export async function createCollections(
     console.log(`  skip:    ${QR_REPRESENTATION_COLLECTION} (already exists)`);
   }
 
-  // Directory Entry (v28): RTP alias resolution cache — plaintext (aliasHash only, no plaintext alias)
+  // Directory Entry (v28): RTP alias resolution cache, plaintext (aliasHash only, no plaintext alias)
   if (!existingNames.has(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION) || reset) {
     if (existingNames.has(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION) && reset) {
       await db.collection(RTP_ALIAS_DIRECTORY_CACHE_COLLECTION).drop();
@@ -516,7 +516,7 @@ export async function createCollections(
     console.log(`  skip:    ${RTP_ALIAS_DIRECTORY_CACHE_COLLECTION} (already exists)`);
   }
 
-  // SD-65 (v28): Payment Request Event — timeseries, TTL 365 days (per-request lifecycle trail).
+  // SD-65 (v28): Payment Request Event, timeseries, TTL 365 days (per-request lifecycle trail).
   // Timeseries collections cannot be converted; drop + recreate always on reset.
   if (!existingNames.has(PAYMENT_REQUEST_EVENT_COLLECTION) || reset) {
     if (existingNames.has(PAYMENT_REQUEST_EVENT_COLLECTION) && reset) {

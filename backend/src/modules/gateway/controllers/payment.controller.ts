@@ -26,7 +26,7 @@ export async function paymentController(fastify: FastifyInstance) {
 
   // POST /api/v1/gateway/payments
   // Item 2 (v18): SERVER-TO-SERVER merchant charge. Authenticated with the merchant's OAuth
-  // client_credentials token (RS256, scope write:payments) — NOT a user session (HS256) and NOT the
+  // client_credentials token (RS256, scope write:payments), NOT a user session (HS256) and NOT the
   // user authorization_code token. `skipAuth` bypasses the global HS256 preHandler; validateMerchantToken
   // verifies the machine token in-handler and resolves the acquiring merchant, so the charge is always
   // attributed to that merchant and the commission fee (Item 1) is applied to it. No CHD ever reaches the
@@ -35,7 +35,7 @@ export async function paymentController(fastify: FastifyInstance) {
     config: { skipAuth: true },
     schema: {
       tags: ['gateway'],
-      summary: 'Create a payment order (SD-64) — server-to-server merchant charge',
+      summary: 'Create a payment order (SD-64), server-to-server merchant charge',
       description: `Creates a \`paymentOrder\` (BIAN SD-64) with initial status \`initiated\`.
 
 **Idempotency:** The \`X-Idempotency-Key\` header is **required**. _(v5: duplicate-key detection and 409 enforcement are not yet implemented in this prototype.)_
@@ -75,7 +75,7 @@ initiated → confirmed → authorized → captured → settled
           amount: { type: 'number', description: 'Payment amount in the specified currency.' },
           currency: { type: 'string', description: 'ISO 4217 three-letter currency code.' },
           paymentOrderDescription: { type: 'string', description: 'Optional human-readable description.' },
-          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only — the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
+          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only, the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
         },
       },
       response: {

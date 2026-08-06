@@ -1,4 +1,4 @@
-// POST /api/auth/ciba/enroll/challenge — session-gated relay to the PSP enrollment challenge.
+// POST /api/auth/ciba/enroll/challenge: session-gated relay to the PSP enrollment challenge.
 // The browser needs the HMAC-bound challenge to sign with its freshly generated key. We attach the
 // server-held Bearer so the PSP binds the challenge to the logged-in user's sub.
 import { NextResponse } from 'next/server';

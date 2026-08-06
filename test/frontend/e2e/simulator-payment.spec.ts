@@ -21,7 +21,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
     await expect(page.locator('input').first()).toBeVisible();
   });
 
-  test('01.2 masks PAN — pre-filled demo card is already shown masked', async ({ page }) => {
+  test('01.2 masks PAN: pre-filled demo card is already shown masked', async ({ page }) => {
     // Page initialises maskedCard from simulatorConfig.defaultCard → ****-****-****-XXXX
     await expect(page.locator('text=/\\*{4}/').first()).toBeVisible({ timeout: 2_000 });
     // Static help text is always visible beneath the card selector

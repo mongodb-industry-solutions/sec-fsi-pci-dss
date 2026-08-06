@@ -14,7 +14,7 @@ export interface GovernmentIdView {
 }
 
 export const IDENTITY_DOCUMENT_INFO =
-  'The government-issued identity document verified at KYC (SD-53). Each leaf is QE-encrypted at rest: '
+  'The government-issued identity document verified at KYC. Each leaf is QE-encrypted at rest: '
   + 'number by suffix search, type and issuing country by equality, expiry by range. The Tax ID (TIN) is a '
   + 'separate QE:prefix field.';
 

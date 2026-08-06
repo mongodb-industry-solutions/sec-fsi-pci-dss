@@ -59,7 +59,7 @@ export async function dispatchProvider(
     if (group) {
       const resolved = await resolveProviderFromGroup(db, group);
       if (resolved) {
-        // ADR-025: endpoint-first — if resolved provider has an endpoint, dispatch externally
+        // ADR-025: endpoint-first, if resolved provider has an endpoint, dispatch externally
         if (resolved.externalProviderApiEndpoint) {
           return dispatchExternal(db, resolved, triggeredBy, payload, businessContext);
         }
@@ -96,7 +96,7 @@ function buildAuthHeaders(authConfig?: IntegrationAuthConfig): Record<string, st
   const { scheme, bearer, apiKey } = authConfig;
 
   if (scheme === 'bearer' && bearer) {
-    // API key is bcrypt-hashed — we can't recover the plaintext in a demo.
+    // API key is bcrypt-hashed: we can't recover the plaintext in a demo.
     // In production, the plaintext key would be in AWS Secrets Manager.
     const headerName = bearer.tokenHeaderName ?? 'Authorization';
     const prefix = bearer.tokenPrefix ?? 'Bearer';
@@ -130,13 +130,13 @@ async function dispatchExternal(
   const start = Date.now();
   const arrangementId = provider.externalProviderArrangementInstanceReference;
 
-  // §2.4: resolve the wire config for THIS event (url, method, mapping, auth, timeout) — per-event when
+  // §2.4: resolve the wire config for THIS event (url, method, mapping, auth, timeout), per-event when
   // configured, vendor-global as the migration fallback. `triggeredBy` is the bus event name.
   const wire = resolveEventOutbound(provider, triggeredBy);
 
   // Apply outbound field mapping before sending. The MAPPED payload goes to the connector (it may
   // rename CHD, e.g. cardNumber -> card_value, for a card issuer). PCI DSS Req 3.2/10.7: we log the
-  // ORIGINAL (pre-mapping) payload, where CHD lives under known keys that sanitizeDeep strips — the
+  // ORIGINAL (pre-mapping) payload, where CHD lives under known keys that sanitizeDeep strips: the
   // mapped body (with aliased CHD) is NEVER persisted, only transmitted.
   const mappedPayload = wire.mapping.length
     ? applyMappings(payload, wire.mapping)
@@ -270,7 +270,7 @@ export async function logEvent(
     integrationEventErrorMessage: opts.error,
     integrationEventTriggeredBy: opts.triggeredBy,
     integrationEventMeta: opts.meta,
-    // Sanitized request/response capture (auth/CHD redacted) — PCI DSS Req 10.7.
+    // Sanitized request/response capture (auth/CHD redacted): PCI DSS Req 10.7.
     ...(opts.request ? { integrationEventRequest: sanitizeDeep(opts.request) as IntegrationEvent['integrationEventRequest'] } : {}),
     ...(opts.response ? { integrationEventResponse: sanitizeDeep(opts.response) as IntegrationEvent['integrationEventResponse'] } : {}),
     businessContext: opts.businessContext,
@@ -281,7 +281,7 @@ export async function logEvent(
 
   void db.collection<IntegrationEvent>(EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION).insertOne(event).catch(() => {});
 
-  // §5.0: the action log is the HTTP wire I/O record only — it NEVER originates or relays domain
+  // §5.0: the action log is the HTTP wire I/O record only, it NEVER originates or relays domain
   // events. (Removed the legacy mirror-to-bus: per-gate *.requested/*.completed are published by the
   // provider groups directly, §9.2/P5, so the journey trail is fed from the bus, not from this log.)
 }
@@ -400,7 +400,7 @@ async function readResponseBody(res: Response): Promise<unknown> {
   } catch { return undefined; }
 }
 
-// "Run Test" — a REAL execution (distinct from test-mapping/Validate Params which only
+// "Run Test": a REAL execution (distinct from test-mapping/Validate Params which only
 // transforms). Outbound: applies outbound mapping and POSTs to the override URL or the
 // configured endpoint, recording an integrationEvent. Inbound: applies inbound mapping and
 // records a callback event, mirroring real reception. Results surface in the events stream.
@@ -434,7 +434,7 @@ export async function runIntegrationTest(
     return { direction, executed: true, status: 'received', latencyMs: 0, transformed, appliedRules: rules.length };
   }
 
-  // outbound — real HTTP dispatch to the override URL or the configured endpoint
+  // outbound: real HTTP dispatch to the override URL or the configured endpoint
   const rawTarget = overrideUrl?.trim() || provider.externalProviderApiEndpoint;
   if (!rawTarget) {
     return { direction, executed: false, status: 'error', latencyMs: 0, transformed, appliedRules: rules.length, error: 'No endpoint configured and no override URL provided.' };

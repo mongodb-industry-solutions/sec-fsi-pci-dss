@@ -52,7 +52,7 @@ export async function validateCallback(
   return { valid, provider: valid ? provider : undefined, errorCode: valid ? undefined : 401 };
 }
 
-// Apply inbound field mapping to a callback body. §2.4: mapping is per event — when `event` is given
+// Apply inbound field mapping to a callback body. §2.4: mapping is per event, when `event` is given
 // the per-event inbound mapping is used (falling back to vendor-global via the resolver); the legacy
 // (event-less) callback routes keep using the vendor-global mapping directly.
 function applyInboundMapping(

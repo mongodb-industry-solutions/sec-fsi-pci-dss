@@ -89,7 +89,7 @@ function CardIssuerConfigPanel() {
     setNetworks((prev) => prev.map((n, idx) => (idx === i ? { ...n, ...patch } : n)));
   }
   function addNetwork() {
-    setNetworks((prev) => [...prev, { name: '', prefixes: '', lengths: '16', cvvLength: 3, enabled: true }]);
+    setNetworks((prev) => [...prev, { name : '', prefixes : '', lengths: '16', cvvLength: 3, enabled: true }]);
   }
   function removeNetwork(i: number) {
     setNetworks((prev) => prev.filter((_, idx) => idx !== i));
@@ -263,7 +263,7 @@ function CardIssuerModule() {
       <SectionHeader
         icon={CreditCard}
         title="Card Issuer; Internal Module"
-        description="Card validation policies plus global card administration (SD-88), unified in one module surface."
+        description="Card validation policies plus global card administration, unified in one module surface."
         debugInfo="capability=card-issuer · SD-88 Payment Card · PCI DSS Req 3.2/3.3 (no SAD stored) · Req 7 · Req 10"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />

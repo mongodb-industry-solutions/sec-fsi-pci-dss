@@ -232,7 +232,7 @@ export function validateCard(
   }
 
   // D1 (P13.1): on a CVV-bearing channel (interactive checkout / payment-link / simulator), the PSP
-  // sets `cvvExpected`. A missing CVV there is a decline (82) — the card-present-style verification
+  // sets `cvvExpected`. A missing CVV there is a decline (82): the card-present-style verification
   // was required but absent. Card-on-file / recurring tokenized payments do not set the flag, so they
   // keep approving without a CVV.
   const cvvExpected = input.cvvExpected === true || input.cvvExpected === 'true';

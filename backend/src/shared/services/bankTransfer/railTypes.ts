@@ -1,4 +1,4 @@
-// v17.1 Bank Transfer rail engine — shared types, requirements and standard return-code maps.
+// v17.1 Bank Transfer rail engine: shared types, requirements and standard return-code maps.
 // Single source of truth (DRY): rail unions, error codes and requirements are defined once here
 // and imported everywhere (providers, orchestrator, API, tests). No duplication per flow.
 //
@@ -12,7 +12,7 @@ export type BankRail = Extract<PayoutRail, 'sepa' | 'ach' | 'swift' | 'local_ban
 
 export const BANK_RAILS: readonly BankRail[] = ['sepa', 'ach', 'swift', 'local_bank'] as const;
 
-// EEA / SEPA participating country codes (ISO 3166-1 alpha-2) — abbreviated to the core scheme area.
+// EEA / SEPA participating country codes (ISO 3166-1 alpha-2): abbreviated to the core scheme area.
 export const SEPA_COUNTRIES: ReadonlySet<string> = new Set([
   'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE',
   'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE',

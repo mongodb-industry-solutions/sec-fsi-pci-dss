@@ -2,11 +2,11 @@
  * CIBA (OIDC Client-Initiated Backchannel Authentication) API (tag auth:ciba).
  *
  * Routes:
- *   POST /api/v1/auth/bc-authorize                 — start a backchannel request (client-authenticated)
- *   GET  /api/v1/auth/bc-authorize/pending          — decoupled in-app AD list (SESSION-gated)
- *   GET  /api/v1/auth/bc-authorize/:authReqId        — fetch the challenge (public by reference)
- *   POST /api/v1/auth/bc-authorize/:authReqId/approve — approve (assertion-authenticated)
- *   POST /api/v1/auth/bc-authorize/:authReqId/deny    — deny (assertion or session)
+ *   POST /api/v1/auth/bc-authorize: start a backchannel request (client-authenticated)
+ *   GET  /api/v1/auth/bc-authorize/pending: decoupled in-app AD list (SESSION-gated)
+ *   GET  /api/v1/auth/bc-authorize/:authReqId, fetch the challenge (public by reference)
+ *   POST /api/v1/auth/bc-authorize/:authReqId/approve, approve (assertion-authenticated)
+ *   POST /api/v1/auth/bc-authorize/:authReqId/deny, deny (assertion or session)
  *
  * The ciba grant on POST /api/v1/auth/token lives in oauth.controller.ts (shared token endpoint).
  *
@@ -68,7 +68,7 @@ function replyError(reply: FastifyReply, err: unknown) {
 }
 
 export async function cibaController(fastify: FastifyInstance) {
-  // POST /bc-authorize — client-authenticated backchannel request
+  // POST /bc-authorize: client-authenticated backchannel request
   fastify.post('/bc-authorize', {
     config: { skipAuth: true },
     schema: {
@@ -105,7 +105,7 @@ export async function cibaController(fastify: FastifyInstance) {
     } catch (err) { return replyError(reply, err); }
   });
 
-  // GET /bc-authorize/pending — decoupled in-app AD, session-gated (NOT skipAuth)
+  // GET /bc-authorize/pending: decoupled in-app AD, session-gated (NOT skipAuth)
   fastify.get('/bc-authorize/pending', {
     schema: {
       tags: ['auth:ciba'],
@@ -121,7 +121,7 @@ export async function cibaController(fastify: FastifyInstance) {
     } catch (err) { return replyError(reply, err); }
   });
 
-  // GET /bc-authorize/:authReqId — fetch the challenge (public by reference; approval needs the signature)
+  // GET /bc-authorize/:authReqId, fetch the challenge (public by reference; approval needs the signature)
   fastify.get('/bc-authorize/:authReqId', {
     config: { skipAuth: true },
     schema: {
@@ -137,7 +137,7 @@ export async function cibaController(fastify: FastifyInstance) {
     } catch (err) { return replyError(reply, err); }
   });
 
-  // POST /bc-authorize/:authReqId/approve — assertion-authenticated
+  // POST /bc-authorize/:authReqId/approve, assertion-authenticated
   fastify.post('/bc-authorize/:authReqId/approve', {
     config: { skipAuth: true },
     schema: {
@@ -162,7 +162,7 @@ export async function cibaController(fastify: FastifyInstance) {
     } catch (err) { return replyError(reply, err); }
   });
 
-  // POST /bc-authorize/:authReqId/deny — assertion or session (anti-DoS)
+  // POST /bc-authorize/:authReqId/deny, assertion or session (anti-DoS)
   fastify.post('/bc-authorize/:authReqId/deny', {
     config: { skipAuth: true },
     schema: {

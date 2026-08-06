@@ -21,7 +21,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   // POST /api/v1/payment-links
   fastify.post('/', {
     // Dual-auth (v28): merchant client_credentials token (scope write:payments) OR PSP simulator
-    // persona session JWT. Never public — creation always requires a valid credential.
+    // persona session JWT. Never public: creation always requires a valid credential.
     config: { dualAuth: true },
     preHandler: dualPermission({ resource: 'merchants', action: 'view', scope: 'write:payments' }),
     schema: {

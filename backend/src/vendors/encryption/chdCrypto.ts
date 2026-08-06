@@ -4,7 +4,7 @@
 import { createCipheriv, createDecipheriv, randomBytes, hkdfSync } from 'node:crypto';
 import { config } from '../../config';
 
-// Cleartext CHD shape — the minimal fields the issuer needs (§7.8). On the tokenized payment path the
+// Cleartext CHD shape: the minimal fields the issuer needs (§7.8). On the tokenized payment path the
 // PAN/expiry are not present (the card was tokenized client-side); only the CVV is carried, still as
 // the opaque `chd` token. cvv is the always-present verification value; cardNumber/expiry are optional.
 export interface ChdCleartext {
@@ -13,7 +13,7 @@ export interface ChdCleartext {
   expiry?: string;                          // MM/YY
 }
 
-// Journey binding for the AAD — a token cannot be replayed onto another event/journey (§7.8).
+// Journey binding for the AAD: a token cannot be replayed onto another event/journey (§7.8).
 export interface ChdContext {
   correlationId: string;
   eventType: string;
@@ -27,7 +27,7 @@ export interface ChdCrypto {
   decrypt(token: string, ctx: ChdContext): Promise<ChdCleartext>;
 }
 
-// KMS abstraction — local now (default), AWS/Azure/GCP/KMIP wired here later without touching ChdCrypto.
+// KMS abstraction: local now (default), AWS/Azure/GCP/KMIP wired here later without touching ChdCrypto.
 export interface KmsDataKey { dek: Buffer; wrappedDEK: Buffer; kid: string }
 export interface KmsKeyProvider {
   /** Mint a fresh 256-bit DEK and its CMK-wrapped form (KMS.GenerateDataKey). */

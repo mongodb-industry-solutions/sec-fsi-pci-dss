@@ -1,12 +1,12 @@
 /**
- * OAuth Consent Grant API (SD-16 Party Authentication — ADR-038)
+ * OAuth Consent Grant API (SD-16 Party Authentication: ADR-038)
  * Lets authenticated users view and revoke their consent grants to merchant OAuth clients.
  *
- * Routes (all require internal PSP JWT — the user's own session):
- *   GET  /api/v1/auth/grants          — list active grants for the calling user
- *   GET  /api/v1/auth/grants/:consentId — detail of one grant owned by the caller (v18 D-01)
- *   GET  /api/v1/auth/grants/:consentId/operations — the caller's operations via that app (v18 D-02)
- *   DELETE /api/v1/auth/grants/:consentId — revoke a grant (tokens immediately invalidated)
+ * Routes (all require internal PSP JWT: the user's own session):
+ *   GET  /api/v1/auth/grants: list active grants for the calling user
+ *   GET  /api/v1/auth/grants/:consentId, detail of one grant owned by the caller (v18 D-01)
+ *   GET  /api/v1/auth/grants/:consentId/operations, the caller's operations via that app (v18 D-02)
+ *   DELETE /api/v1/auth/grants/:consentId, revoke a grant (tokens immediately invalidated)
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { listUserConsentGrants, getUserConsentGrantDetail, revokeConsentGrant, reactivateConsentGrant, resolveSubForParty } from '../services/oauth.service';
@@ -39,12 +39,12 @@ export async function resolveTargetSub(
 }
 
 export async function consentGrantsController(fastify: FastifyInstance) {
-  // GET /api/v1/auth/grants — list the calling user's active OAuth consent grants
+  // GET /api/v1/auth/grants: list the calling user's active OAuth consent grants
   fastify.get('/grants', {
     schema: {
       tags: ['auth:oauth'],
       summary: 'List my authorized apps (OAuth consent grants)',
-      description: 'Returns the authenticated user\'s OAuth consent grants — the merchant apps authorized via OIDC. Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve; filter with `status` (active | revoked | all, default all). Requires a valid PSP session token (any role). **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to list THAT party\'s grants; this is restricted to `level2_investigator` and `security_auditor` (else 403).',
+      description: 'Returns the authenticated user\'s OAuth consent grants, the merchant apps authorized via OIDC. Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve; filter with `status` (active | revoked | all, default all). Requires a valid PSP session token (any role). **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to list THAT party\'s grants; this is restricted to `level2_investigator` and `security_auditor` (else 403).',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
@@ -113,7 +113,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     };
   });
 
-  // GET /api/v1/auth/grants/:consentId — detail of ONE authorized app owned by the caller (D-01)
+  // GET /api/v1/auth/grants/:consentId, detail of ONE authorized app owned by the caller (D-01)
   fastify.get('/grants/:consentId', {
     schema: {
       tags: ['auth:oauth'],
@@ -179,7 +179,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     };
   });
 
-  // GET /api/v1/auth/grants/:consentId/operations — the caller's operations executed via this app (D-02)
+  // GET /api/v1/auth/grants/:consentId/operations, the caller's operations executed via this app (D-02)
   fastify.get('/grants/:consentId/operations', {
     schema: {
       tags: ['auth:oauth'],
@@ -229,7 +229,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     });
   });
 
-  // DELETE /api/v1/auth/grants/:consentId — revoke a specific consent grant
+  // DELETE /api/v1/auth/grants/:consentId, revoke a specific consent grant
   fastify.delete('/grants/:consentId', {
     schema: {
       tags: ['auth:oauth'],
@@ -302,12 +302,12 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     }
   });
 
-  // POST /api/v1/auth/grants/:consentId/reactivate — re-approve a previously revoked grant
+  // POST /api/v1/auth/grants/:consentId/reactivate, re-approve a previously revoked grant
   fastify.post('/grants/:consentId/reactivate', {
     schema: {
       tags: ['auth:oauth'],
       summary: 'Re-approve a revoked OAuth consent grant',
-      description: 'Reverts an earlier revocation from the Authorized Applications view: restores the consent record and its previously granted scopes. Mints NO tokens — the merchant must run the OAuth authorization_code flow again to obtain fresh tokens (the prior scopes now count as granted, so re-consent is smooth). Emits an oauth.authorization_granted webhook. Self-scoped; a foreign consentId returns 404. Idempotent when already active.',
+      description: 'Reverts an earlier revocation from the Authorized Applications view: restores the consent record and its previously granted scopes. Mints NO tokens, the merchant must run the OAuth authorization_code flow again to obtain fresh tokens (the prior scopes now count as granted, so re-consent is smooth). Emits an oauth.authorization_granted webhook. Self-scoped; a foreign consentId returns 404. Idempotent when already active.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',

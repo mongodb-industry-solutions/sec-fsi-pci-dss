@@ -1,4 +1,4 @@
-// BIAN SD-66: Payout Account Arrangement — REST controller (v17)
+// BIAN SD-66: Payout Account Arrangement, REST controller (v17)
 // Routes mounted at /accounts → /api/v1/accounts/:partyRef
 // Scope: customer can only access own accounts; staff roles can view all.
 
@@ -65,7 +65,7 @@ function safeMerchantAccount(doc: Record<string, unknown>) {
 
 export async function payoutAccountController(fastify: FastifyInstance) {
 
-  // ── GET /accounts (+ /:partyRef) — list a party's payout accounts ─────────────────────────────
+  // ── GET /accounts (+ /:partyRef), list a party's payout accounts ─────────────────────────────
   // Session: staff any party, customer own; QE-stripped with reveal hints.
   // OAuth: owner from token.sub, masked-IBAN projection. Scope read:accounts.
   const listHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -149,7 +149,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
           payoutAccountBicSwift: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
           payoutAccountCorrespondentBic: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
           payoutAccountBankAddress: { type: 'string', maxLength: 200 },
-          // QE-encrypted — omit entirely when not provided (null triggers error 31041)
+          // QE-encrypted: omit entirely when not provided (null triggers error 31041)
           payoutAccountIban: { type: 'string', minLength: 15, maxLength: 34 },
           payoutAccountRoutingNumber: { type: 'string', maxLength: 50 },
         },
@@ -360,7 +360,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     preHandler: requirePermission('accounts', 'view'),
     schema: {
       tags: ['accounts'],
-      summary: 'Reveal decrypted IBAN — account owner, L2 investigator or security auditor only (PCI DSS Req 3.3)',
+      summary: 'Reveal decrypted IBAN, account owner, L2 investigator or security auditor only (PCI DSS Req 3.3)',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -609,7 +609,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     );
 
     // Fallback: if the execution predates the sourcePayoutAccountReference field, look up
-    // the initiator's primary active account (PCI DSS Req 10 — source must always be traceable).
+    // the initiator's primary active account (PCI DSS Req 10: source must always be traceable).
     let sourceAccountRef = exec.sourcePayoutAccountReference ?? null;
     if (!sourceAccountRef && exec.initiatorPartyReference) {
       const fallback = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
@@ -636,13 +636,13 @@ export async function payoutAccountController(fastify: FastifyInstance) {
           recipientCurrency = destCcy;
           recipientAmount   = fx.amount;
           fxRate            = fx.rate;
-        } catch { /* no FX config — leave null */ }
+        } catch { /* no FX config: leave null */ }
       }
     }
 
     // Sender display fields (PSD2/SEPA: the payee legitimately sees the debtor name + a source account
     // identifier). initiatorName from SD-13 party; sourceAccountMasked is the origin IBAN masked to
-    // last-4 (GDPR minimisation — the recipient never gets the full IBAN or an openable account link).
+    // last-4 (GDPR minimisation: the recipient never gets the full IBAN or an openable account link).
     let initiatorName: string | null = null;
     if (exec.initiatorPartyReference) {
       const p = await db.collection<{ partyName?: string }>(PARTY_COLLECTION)
@@ -713,7 +713,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     preHandler: requirePermission('accounts', 'manage'),
     schema: {
       tags: ['accounts'],
-      summary: 'Credit a payout account balance (BIAN SD-66 — bank deposit / admin)',
+      summary: 'Credit a payout account balance (BIAN SD-66, bank deposit / admin)',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
       body: {
