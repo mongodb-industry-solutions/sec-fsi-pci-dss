@@ -595,7 +595,7 @@ export default function PaymentPage() {
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 CVV
-                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS Req 3.2). The demo issuer accepts 123; any other value is declined." />
+                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS). The demo issuer accepts 123; any other value is declined." />
               </label>
               <div className="relative">
                 <input

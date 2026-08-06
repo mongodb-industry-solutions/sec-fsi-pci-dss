@@ -1,4 +1,4 @@
-// BIAN SD-89: Merchant Relations  -  REST controller
+// Merchant Relations  -  REST controller
 // Routes mounted at /merchants → /api/v1/merchants
 
 import { FastifyInstance } from 'fastify';
@@ -16,8 +16,8 @@ import { isMerchantOwner } from '../services/merchantBeneficialOwner';
 
 // Roles allowed to READ a merchant's business detail (profile, payments, analytics, audit trail).
 // PSP staff: `merchant_officer` and `security_auditor`. Fraud-investigation roles
-// (`level1_analyst`, `level2_investigator`) need this in the context of a case (SD-89 Merchant
-// Relations is referenced from SD-83 Fraud Diagnosis): PCI DSS Req 7 still excludes the
+// (`level1_analyst`, `level2_investigator`) need this in the context of a case (Merchant
+// Relations is referenced from Fraud Diagnosis): PCI DSS still excludes the
 // administrative `manager` role, which has no business need-to-know. Credential routes (API keys)
 // keep the stricter officer/auditor/owner set and are NOT widened here.
 const MERCHANT_DETAIL_READ_ROLES = new Set([
@@ -317,8 +317,8 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(merchant);
   });
 
-  // GET /api/v1/merchants/:id/transactions, Acquiring-side view (BIAN SD-89)
-  // Lists payments the merchant RECEIVED. PCI DSS Req 3/7: the payer's PII
+  // GET /api/v1/merchants/:id/transactions, Acquiring-side view 
+  // Lists payments the merchant RECEIVED. PCI DSS: the payer's PII
   // (account reference / email / raw gateway payload) is never returned, only
   // masked PAN, amount, status, type, channel, descriptor and timestamp.
   fastify.get('/:id/transactions', {
@@ -329,7 +329,7 @@ Used by customers to detect their onboarding state: no application / under_revie
 
 **Authorization:** the merchant **owner** (JWT \`partyRef\` matches \`merchantOwnerPartyReference\`), a \`merchant_officer\`, or a \`security_auditor\`. Any other caller receives 403.
 
-**PCI DSS Req 3 / Req 7 (data minimization):** the payer's PII is **never** included, no account reference, email, or raw gateway payload. Only acquiring essentials (masked PAN, amount, status, type, channel, descriptor, timestamp).`,
+**PCI DSS (data minimization):** the payer's PII is **never** included, no account reference, email, or raw gateway payload. Only acquiring essentials (masked PAN, amount, status, type, channel, descriptor, timestamp).`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string', description: '`merchantAgreementInstanceReference` UUID.' } } },
       querystring: {
@@ -400,7 +400,7 @@ Used by customers to detect their onboarding state: no application / under_revie
   });
 
   // GET /api/v1/merchants/:id/transactions/:tid, Single transaction detail (acquiring-side)
-  // PCI DSS Req 3/7: same data-minimization projection as the list, no payer PII.
+  // PCI DSS: same data-minimization projection as the list, no payer PII.
   fastify.get('/:id/transactions/:tid', {
     schema: {
       tags: ['merchants'],
@@ -409,7 +409,7 @@ Used by customers to detect their onboarding state: no application / under_revie
 
 **Authorization:** same as the list endpoint, merchant owner, \`merchant_officer\`, or \`security_auditor\`.
 
-**PCI DSS Req 3 / Req 7 (data minimization):** the payer's PII is **never** included.`,
+**PCI DSS (data minimization):** the payer's PII is **never** included.`,
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -514,7 +514,7 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(stats);
   });
 
-  // GET /api/v1/merchants/:id/events, Merchant lifecycle audit trail (SD-89, PCI DSS Req 10)
+  // GET /api/v1/merchants/:id/events, Merchant lifecycle audit trail (PCI DSS)
   // Append-only log of submitted / approved / rejected / updated actions. No PII.
   // Same authorization as /:id/transactions (owner / merchant_officer / security_auditor).
   fastify.get('/:id/events', {
@@ -580,7 +580,7 @@ Used by customers to detect their onboarding state: no application / under_revie
 
 **Authorization:** merchant owner, \`merchant_officer\`, \`security_auditor\`, \`level1_analyst\`, \`level2_investigator\`.
 
-**PCI DSS Req 3/7 (data minimization):** never returns CHD or raw IBAN.`,
+**PCI DSS (data minimization):** never returns CHD or raw IBAN.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       querystring: {
@@ -653,9 +653,7 @@ Used by customers to detect their onboarding state: no application / under_revie
     return reply.send(result);
   });
 
-  // GET /api/v1/merchants/:id/authorizations, v18 B-10: users who granted consent to this merchant.
-  // Reads partyAuthConsent filtered by merchantAgreementInstanceReference. Display-safe user identity
-  // (SD-13), scopes, status, grant/last-used timestamps. Search by user, paginated. Same authorization.
+  // GET /:id/authorizations: users who granted consent to this merchant, from partyAuthConsent.
   fastify.get('/:id/authorizations', {
     schema: {
       tags: ['merchants'],
@@ -733,8 +731,8 @@ Display-safe, no CHD, no raw IBAN.`,
 Transitions a \`merchantAgreementProcedure\` in \`under_review\` status to \`agreed\` (approve) or \`rejected\` (reject).
 The reviewing officer's partyRef is recorded for audit trail.
 
-**PCI DSS:** Req 7.1 (least privilege), only \`merchant_officer\` role may approve/reject.
-**PCI DSS:** Req 12.8, documented agreement approval by authorized officer.`,
+**PCI DSS:** (least privilege), only \`merchant_officer\` role may approve/reject.
+**PCI DSS:** documented agreement approval by authorized officer.`,
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -830,7 +828,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     const patch = request.body as Record<string, unknown>;
     const isStaff = user?.role === 'merchant_officer' || user?.role === 'security_auditor';
 
-    // v18: validate the commission rate (SD-89). number, 0 ≤ rate ≤ 1, max 4 decimals.
+    // v18: validate the commission rate . number, 0 ≤ rate ≤ 1, max 4 decimals.
     if (patch.merchantCommissionRate !== undefined) {
       const rate = patch.merchantCommissionRate;
       if (typeof rate !== 'number' || !isFinite(rate) || rate < 0 || rate > 1) {
@@ -862,7 +860,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     }
 
     // E4: Ownership guard, selected default payout account must belong to the merchant's owner party.
-    // Prevents a merchant from routing payouts to a bank account they don't own (BIAN SD-66 / PCI Req 7).
+    // Prevents a merchant from routing payouts to a bank account they don't own (/ PCI DSS).
     if (patch.merchantDefaultPayoutAccountReference) {
       const merchant = await getMerchantById(fastify.db, id);
       if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
@@ -876,7 +874,7 @@ Risk-governed fields (\`merchantTransactionLimitAmount\`, \`merchantAgreementSta
     const result = await updateMerchant(fastify.db, id, patch as never);
     if (!result) return reply.status(404).send({ error: 'Merchant not found' });
 
-    // v18: audit the commission-rate change explicitly (SD-89, PCI DSS Req 10).
+    // v18: audit the commission-rate change explicitly (PCI DSS).
     if (patch.merchantCommissionRate !== undefined) {
       const actor = user?.partyRef ?? user?.sub ?? 'unknown';
       await appendMerchantEvent(fastify.db, id, 'merchant.commission_rate.updated', {
@@ -1057,7 +1055,7 @@ payload sent + the delivery outcome (status, attempts, the merchant's response).
   });
 
   // GET /api/v1/merchants/:id/keys, list API key METADATA (no secret/hash)
-  // BIAN SD-89 credential management. Owner / merchant_officer / security_auditor.
+  // credential management. Owner / merchant_officer / security_auditor.
   fastify.get('/:id/keys', {
     schema: {
       tags: ['merchants'],

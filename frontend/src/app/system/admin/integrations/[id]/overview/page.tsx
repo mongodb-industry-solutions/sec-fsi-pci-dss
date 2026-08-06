@@ -178,12 +178,6 @@ export default function OverviewPage() {
               <dt className="text-xs text-gray-500">Control Record Type</dt>
               <dd className="text-gray-800 mt-0.5">{integration.bianControlRecordType}</dd>
             </div>
-            {integration.pciDssRequirements?.length > 0 && (
-              <div className="sm:col-span-2">
-                <dt className="text-xs text-gray-500">PCI DSS Requirements</dt>
-                <dd className="font-mono text-gray-700 mt-0.5 text-xs">{integration.pciDssRequirements.join(', ')}</dd>
-              </div>
-            )}
           </dl>
         </Card>
       )}

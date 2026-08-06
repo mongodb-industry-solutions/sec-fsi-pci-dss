@@ -1,4 +1,4 @@
-// BIAN SD-66: Payout Account Arrangement service
+// Payout Account Arrangement service
 // CRUD for PSP payout accounts + atomic default-account management.
 
 import { Db } from 'mongodb';
@@ -91,7 +91,7 @@ export async function listPayoutAccounts(
   return { results, total };
 }
 
-// v29 admin (SD-66, built-in module account-information): cross-party GLOBAL payout-account list for
+// v29 admin (built-in module account-information): cross-party GLOBAL payout-account list for
 // the operations officer. Returns raw arrangements (caller strips QE fields via safeAccount, adding
 // payoutAccountHasIban/payoutAccountHasRoutingNumber hints: PCI/GDPR minimization). Paginated +
 // filterable by status / party / currency.
@@ -253,7 +253,7 @@ export interface UpdatePayoutAccountInput {
   // Preferences
   payoutAccountAlias?: string;
   payoutAccountIsDefault?: boolean;
-  // Mutable banking metadata (BIAN SD-66: IBAN / currency / type are immutable)
+  // Mutable banking metadata (IBAN / currency / type are immutable)
   payoutAccountBankName?: string;
   payoutAccountHolderName?: string;
   payoutAccountBicSwift?: string;
@@ -268,7 +268,7 @@ export async function updatePayoutAccount(
 ): Promise<PayoutAccountArrangement | null> {
   const col = db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION);
   const now = new Date();
-  // BIAN SD-66: payoutAccountIban, payoutAccountRoutingNumber, payoutAccountCurrency,
+  // payoutAccountIban, payoutAccountRoutingNumber, payoutAccountCurrency,
   // payoutAccountType, partyInstanceReference are immutable after creation.
   const safePatch: Record<string, unknown> = { recordUpdatedDateTime: now };
   if (patch.payoutAccountAlias !== undefined) safePatch.payoutAccountAlias = patch.payoutAccountAlias;

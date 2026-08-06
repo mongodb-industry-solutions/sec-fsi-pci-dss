@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order - Checkout Session REST controller
+// Payment Order - Checkout Session REST controller
 // Routes mounted at /checkout → /api/v1/checkout
 
 import { FastifyInstance } from 'fastify';
@@ -37,7 +37,7 @@ export async function checkoutController(fastify: FastifyInstance) {
 4. Buyer is redirected back to \`returnUrl?status=success\` or \`cancelUrl?status=failed\`
 5. Merchant optionally verifies via \`GET /checkout/sessions/:id\`
 
-**PCI DSS:** The merchant never receives cardholder data. Only the hosted page on the PSP domain handles card entry. Qualifies for SAQ A compliance.`,
+**PCI DSS:** The merchant never receives cardholder data. Only the hosted page on the PSP domain handles card entry. Qualifies for compliance.`,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',

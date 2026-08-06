@@ -13,7 +13,7 @@ import { Tooltip } from '../../../../../components/Tooltip';
 // Dedicated config UI for the internal FDS (fraud-detection) engine (overrides the generic module
 // editor for this capability). The rules are DATA-DRIVEN and stored in the capability moduleConfig;
 // the backend /modules/fds/score endpoint evaluates them on every transaction. An operator can add
-// or edit rules here without code (P13.5). PCI DSS Req 12.8 / Req 10 (config change is audited).
+// or edit rules here without code (P13.5). PCI DSS (config change is audited).
 
 const CAP = 'fds';
 
@@ -162,7 +162,7 @@ export default function FdsModulePage() {
         icon={ShieldAlert}
         title="Fraud Detection (FDS); Internal Module"
         description="Data-driven fraud scoring. Each rule fires when a transaction field meets its condition, contributing points; the total maps to approve / review / decline via the score bands. Add or edit rules to tune the engine without code."
-        debugInfo="capability=fds · SD-63 Fraud Evaluation · PCI DSS Req 12.8 / Req 10 (config audited)"
+        debugInfo="capability=fds Fraud Evaluation · PCI DSS (config audited)"
       />
 
       {loading ? (
@@ -283,7 +283,7 @@ export default function FdsModulePage() {
           </fieldset>
 
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mt-5">
-            <strong>How it scores: </strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS Req 3.2).
+            <strong>How it scores: </strong> every transaction is evaluated against the enabled rules. The fired rules&rsquo; scores sum to the risk score; the bands map it to approve / review / decline, and any forced action wins. The verdict drives the fraud case (its score and severity), and the rules that fired are recorded in the audit trail. No PAN or CVV is ever used in scoring (PCI DSS).
           </div>
         </>
       )}

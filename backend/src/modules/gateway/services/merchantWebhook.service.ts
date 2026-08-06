@@ -1,5 +1,5 @@
 /**
- * WebhookService: SD-89 BQ:Notification, ADR-038
+ * WebhookService: BQ:Notification, ADR-038
  * OOP class encapsulating the typed webhook registry: registration, delivery,
  * ISO 20022-aligned test payloads, HMAC-SHA256 signing, body mapping, and
  * persistent delivery log.

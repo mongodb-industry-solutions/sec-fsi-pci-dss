@@ -30,7 +30,7 @@ const UserObjectFull = {
   },
 };
 
-// ADR-030 / SD-91: managed user administration (local domains). Reads need authDomains:view,
+// ADR-030 / managed user administration (local domains). Reads need authDomains:view,
 // mutations need authDomains:manage (manager). Passwords are never returned.
 export async function usersController(fastify: FastifyInstance) {
   const tags = ['users'];

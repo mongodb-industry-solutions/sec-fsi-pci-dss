@@ -24,7 +24,7 @@ export interface JwtPayload {
   role: string;
   name: string;
   domain: string;
-  partyRef?: string; // Ch-05: partyInstanceReference (SD-13), present for all users with a Party record
+  partyRef?: string; // Ch-05: partyInstanceReference , present for all users with a Party record
   epoch?: number;    // session validity epoch current at sign time (server-side logout invalidation)
 }
 
@@ -389,8 +389,8 @@ export async function resolveSelfRegistrationDomain(db: Db, name: string): Promi
 /**
  * Self-service account registration (public). Domain logic lives here (Hexagonal): validate the
  * domain policy, force the lowest-privilege role, derive status from the auto-approve policy, create
- * the SD-91 account + linked SD-13 party (reuses createUser), then publish a compliance event so the
- * onboarding is auditable (EDA / PCI DSS Req 10). No PII is placed in the event summary.
+ * the account + linked party (reuses createUser), then publish a compliance event so the
+ * onboarding is auditable (EDA / PCI DSS). No PII is placed in the event summary.
  */
 // Server-side password policy (mirrors the frontend PasswordFields checklist) so a direct API
 // caller cannot bypass the UI and create a weak account. Shared by self-service registration

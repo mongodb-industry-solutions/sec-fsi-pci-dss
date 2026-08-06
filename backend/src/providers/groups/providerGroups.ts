@@ -41,7 +41,7 @@ export class ProviderGroups {
     // VOP is dispatched synchronously via dispatchProvider in the RTP screening flow (never emitted on
     // the bus), so there is intentionally NO 'vop.verification.requested' subscription here.
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
-    // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
+    // v27 Phase 6: KYC/HRP customer screening (->). A customer profile validation
     // completing triggers a re-screen; the request event is a first-class Integration Hub gate.
     this.bus.subscribe('profile.validation.completed', (e) => this.onProfileValidated(e));
     this.bus.subscribe('kyc.screening.requested', (e) => this.onKycScreening(e));
@@ -196,7 +196,7 @@ export class ProviderGroups {
     }));
   }
 
-  // v17 funds-availability gate (SD-36 AIS). Resolves the funding account from the card token, reads
+  // v17 funds-availability gate (AIS). Resolves the funding account from the card token, reads
   // the balance via the account_information capability (provider-indifferent: built-in module reads the
   // internal ledger, an external PSD2 AIS substitutes it), converts the amount to the account currency
   // (FX), and performs the ATOMIC hold. The hold ($gte-conditional $inc) is the authoritative decision:

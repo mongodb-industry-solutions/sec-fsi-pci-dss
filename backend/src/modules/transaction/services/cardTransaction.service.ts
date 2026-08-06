@@ -33,16 +33,16 @@ export interface CreateTransactionInput {
   cardTransactionType: string;
   cardTransactionDescription: string;
   cardTransactionNarrative?: string;
-  // Acquiring-side link (SD-89): the merchant this payment was made to. Optional.
+  // Acquiring-side link : the merchant this payment was made to. Optional.
   merchantAgreementInstanceReference?: string;
-  // Card-on-file auto-registration (SD-88): present for a NEW card so the PSP can save it to the
+  // Card-on-file auto-registration : present for a NEW card so the PSP can save it to the
   // payer's wallet after a successful payment. Omitted when paying with an already-saved card.
   paymentCardExpirationDate?: string;
   paymentCardNetwork?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'ELO';
   gatewayPayload: object;
   // Transient card verification values forwarded to the card issuer for authorization ONLY, as a real
   // authorization request would carry. NEVER persisted on the transaction and stripped from every
-  // audit log (PCI DSS Req 3.2 / Req 10.7). Used in-memory for the issuer decision, then discarded.
+  // audit log (PCI DSS). Used in-memory for the issuer decision, then discarded.
   cardVerification?: { cardNumber?: string; cvv?: string; expiry?: string };
   // P13.1 (D1): set by CVV-bearing channels (interactive checkout / payment-link / simulator). When
   // true and no CVV reached the issuer, the issuer declines (a CVV was expected but missing). Left
@@ -51,7 +51,7 @@ export interface CreateTransactionInput {
 }
 
 // Thrown when a payment is attempted with a card-on-file the customer has deactivated (suspended)
-// or removed (revoked). The PSP rejects it regardless of the issuer's decision (BIAN SD-15).
+// or removed (revoked). The PSP rejects it regardless of the issuer's decision .
 export class CardNotActiveError extends Error {
   constructor(public readonly status: string) {
     super(`Card is ${status}: the PSP declined this operation`);
@@ -59,10 +59,7 @@ export class CardNotActiveError extends Error {
   }
 }
 
-// The card issuer (internal module or an external issuer integration) declined the card after
-// analysis. The issuer is AUTHORITATIVE: when it declines, the PSP does not authorize the payment.
-// This is the security gate that an external issuer would enforce in a real deployment (BIAN SD-15 /
-// SD-88). Carries the issuer's response code + reason for the audit and the customer-facing message.
+// The issuer is authoritative: when it declines, the PSP does not authorize the payment.
 export class CardIssuerDeclinedError extends Error {
   constructor(public readonly responseCode: string, public readonly reason: string, public readonly cardTransactionInstanceReference?: string) {
     super(`Card issuer declined the card (${responseCode}): ${reason}`);
@@ -127,7 +124,7 @@ export async function resolveCustomerAgreement(db: Db, accountReference: string)
 
 /**
  * Resolve a party's canonical account reference (customerAgreementReference, e.g. ACC-xxx) from its
- * SD-13 partyInstanceReference. Used to (a) stamp a checkout/API payment with the payer's account so it
+ * partyInstanceReference. Used to (a) stamp a checkout/API payment with the payer's account so it
  * lands under them in payment history, and (b) list a party's card transactions for the merchant history
  * union. The reference is a plaintext business key (not CHD), no QE decrypt needed for the read.
  */
@@ -158,7 +155,7 @@ export interface PartyCardTransactionRow {
 }
 
 /**
- * List a party's OWN card transactions (SD-254) by canonical account reference (QE:equality), projected
+ * List a party's OWN card transactions by canonical account reference (QE:equality), projected
  * display-safe for the merchant portal history. PCI DSS: exposes only amount, currency, status, merchant
  * name, the already-masked PAN, channel and date, never a full PAN/CVV or the raw gateway payload.
  */
@@ -170,7 +167,7 @@ export async function getPartyCardTransactions(
 ): Promise<PartyCardTransactionRow[]> {
   if (!accountReference) return [];
   const qeDb = await getDbForRole('level1_analyst', false);
-  // When a merchant is supplied (merchant portal), scope to that merchant's own purchases only (SD-89
+  // When a merchant is supplied (merchant portal), scope to that merchant's own purchases only (
   // data isolation): a merchant never sees the user's card purchases made in other merchants or the PSP.
   const query = {
     cardTransactionAccountReference: accountReference,
@@ -232,7 +229,7 @@ export async function initiateTransaction(
   const now = new Date();
   const txWriteDb = await getEncryptionWriteDb('cardTransaction.write');
 
-  // PSP-level control (BIAN SD-15): a deactivated/removed card-on-file is rejected up front,
+  // PSP-level control : a deactivated/removed card-on-file is rejected up front,
   // regardless of the issuer (new/unsaved tokens pass through).
   const onFile = await getCardByToken(db, input.cardToken);
   if (onFile && onFile.paymentCardStatus !== 'active') {
@@ -348,7 +345,7 @@ async function emitGateRequests(txnId: string, input: CreateTransactionInput, ca
     payload: { subjectPartyReference: input.accountReference, accountReference: input.accountReference, amount: input.amount, currency: input.currency, merchantName: input.cardTransactionMerchantName },
     bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
   }));
-  // v17 funds-availability gate (SD-36 AIS). Reference-led: only the card token + amount travel;
+  // v17 funds-availability gate (AIS). Reference-led: only the card token + amount travel;
   // the reactor resolves the funding account and performs the atomic hold. No CHD, no IBAN.
   void bus.publish(makeEvent({
     eventType: 'funds.check.requested', correlationId: txnId, businessProcess: 'card_payment', source: 'psp.core', causationId: causationParent,
@@ -372,10 +369,10 @@ export function publishIssuerValidationCompleted(txnId: string, decision: { appr
   }));
 }
 
-// v18 (A-06/A-07): apply the merchant's CURRENT commission (SD-89) to an authorized acquiring payment
-// (SD-254) and persist feeAmount + attribution on the cardTransactionLog. Idempotent: the `fee.$exists`
+// v18 (A-06/A-07): apply the merchant's CURRENT commission to an authorized acquiring payment
+// and persist feeAmount + attribution on the cardTransactionLog. Idempotent: the `fee.$exists`
 // filter makes a re-run a no-op, so the same transaction is never charged twice. Emits an attributed
-// businessProcessEvent (SD-16, PCI DSS Req 10) so the collection is auditable and shows in the merchant
+// businessProcessEvent (PCI DSS) so the collection is auditable and shows in the merchant
 // activity view. `fee` carries only amounts/attribution (no CHD) → not QE-encrypted.
 async function applyMerchantCommissionToCardTxn(
   db: Db,
@@ -424,7 +421,7 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
   );
 
   // v18 (A-06): merchant commission at RUNTIME. For a merchant-attributed acquiring payment, compute the
-  // fee from the merchant's CURRENT rate (SD-89) and persist it on this acquiring record (SD-254) so the
+  // fee from the merchant's CURRENT rate and persist it on this acquiring record so the
   // merchant dashboard's commissionRevenue reflects newly-created payments, not only seed data. DRY:
   // reuses computeFee (single source of the calc). Idempotent (fee.$exists guard); not CHD → no QE.
   if (input.merchantAgreementInstanceReference) {
@@ -433,7 +430,7 @@ export async function completeAuthorized(db: Db, txnId: string, fdsVerdict?: Fds
     } catch { /* commission accounting must never block the payment outcome */ }
   }
 
-  // Card-on-file auto-registration (SD-88): using a card to pay IS the registration. Idempotent.
+  // Card-on-file auto-registration : using a card to pay IS the registration. Idempotent.
   if (resolvedUuid) {
     try {
       const upsert = await upsertCardByToken(db, {
@@ -713,7 +710,7 @@ export async function getAllTransactions(
     readDb.collection(CARD_TRANSACTION_COLLECTION).countDocuments(query),
   ]);
 
-  // Enrich each row with its linked fraud case (BIAN SD-83). The fraud/risk status is a SEPARATE
+  // Enrich each row with its linked fraud case . The fraud/risk status is a SEPARATE
   // concept from the payment authorization status (cardTransactionStatus): a payment can be
   // "authorized" yet still flagged or confirmed fraud. The list surfaces both so they are not
   // conflated. Fraud-case fields are plaintext (not CHD), so the unencrypted client reads them.
@@ -744,10 +741,10 @@ export async function getAllTransactions(
 }
 
 /**
- * Acquiring-side view (BIAN SD-89 Merchant Relations): list the payments a merchant
+ * Acquiring-side view (Merchant Relations): list the payments a merchant
  * RECEIVED, scoped by merchantAgreementInstanceReference (plaintext, indexed).
  *
- * PCI DSS data minimization (Req 3 / Req 7): the projection deliberately EXCLUDES
+ * PCI DSS data minimization : the projection deliberately EXCLUDES
  * the payer's PII, no account reference / email, no rawGatewayPayload. The merchant
  * sees only the acquiring essentials: masked PAN, amount, status, type, channel,
  * descriptor and timestamp. No QE client needed (no encrypted field is queried).
@@ -805,7 +802,7 @@ export async function getMerchantTransactions(
 }
 
 /**
- * Single transaction for the acquiring-side view (BIAN SD-89).
+ * Single transaction for the acquiring-side view .
  * Same PCI DSS data-minimization projection as getMerchantTransactions, no payer PII.
  * Returns null if the transaction does not exist or does not belong to this merchant.
  */
@@ -847,9 +844,9 @@ export async function getMerchantStats(db: Db, merchantId: string) {
   const coll = db.collection(CARD_TRANSACTION_COLLECTION);
   const match = { merchantAgreementInstanceReference: merchantId };
 
-  // v18: commission revenue (SD-89) is the UNION of two fee-attribution sources, keyed by
-  // fee.feeMerchantReference, so BOTH seeded payout executions (SD-65) and runtime acquiring card
-  // payments (SD-254, A-06) count, with no double-counting (a payment lives in exactly one source).
+  // v18: commission revenue is the UNION of two fee-attribution sources, keyed by
+  // fee.feeMerchantReference, so BOTH seeded payout executions and runtime acquiring card
+  // payments (A-06) count, with no double-counting (a payment lives in exactly one source).
   const execColl = db.collection(PAYMENT_EXECUTION_COLLECTION);
   const commissionMatch = { 'fee.feeMerchantReference': merchantId };
   // A card-originated payout execution now carries the same fee as its acquiring record (the payout
@@ -886,7 +883,7 @@ export async function getMerchantStats(db: Db, merchantId: string) {
       { $group: { _id: { y: { $year: { $toDate: '$fee.feeCollectedDateTime' } }, m: { $month: { $toDate: '$fee.feeCollectedDateTime' } } }, amount: { $sum: '$feeAmount' }, count: { $sum: 1 } } },
       { $sort: { '_id.y': 1, '_id.m': 1 } },
     ]).toArray(),
-    // Runtime acquiring-side commission (SD-254, A-06): fee persisted on the card transaction itself.
+    // Runtime acquiring-side commission (A-06): fee persisted on the card transaction itself.
     coll.aggregate([
       { $match: commissionMatch },
       { $group: { _id: null, count: { $sum: 1 }, total: { $sum: '$feeAmount' } } },
@@ -899,7 +896,7 @@ export async function getMerchantStats(db: Db, merchantId: string) {
   ]);
 
   const totals = totalsAgg[0] ?? { count: 0, totalAmount: 0, avgAmount: 0 };
-  // Union the two commission sources (SD-65 executions + SD-254 acquiring payments) into one revenue view.
+  // Union the two commission sources (executions + acquiring payments) into one revenue view.
   const execCommission = execCommissionAgg[0] ?? { count: 0, total: 0 };
   const cardCommission = cardCommissionAgg[0] ?? { count: 0, total: 0 };
   const commission = { count: (execCommission.count ?? 0) + (cardCommission.count ?? 0), total: (execCommission.total ?? 0) + (cardCommission.total ?? 0) };
@@ -918,7 +915,7 @@ export async function getMerchantStats(db: Db, merchantId: string) {
     byStatus:   byStatus.map((s) => ({ status: s._id as string, count: s.count as number, amount: s.amount as number })),
     byMonth:    byMonth.map((s) => ({ year: (s._id as { y: number }).y, month: (s._id as { m: number }).m, count: s.count as number, amount: s.amount as number })),
     byCurrency: byCurrency.map((s) => ({ currency: s._id as string, count: s.count as number, amount: s.amount as number })),
-    // v18: commission revenue (SD-89), total + monthly breakdown.
+    // v18: commission revenue , total + monthly breakdown.
     commissionRevenue: {
       total: commission.total ?? 0,
       count: commission.count ?? 0,

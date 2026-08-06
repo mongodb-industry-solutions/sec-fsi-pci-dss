@@ -1,7 +1,7 @@
-// v17.1 BIAN SD-66: Recurring payment mandate (ACH Direct Debit / SEPA SDD).
+// v17.1 Recurring payment mandate (ACH Direct Debit / SEPA SDD).
 // A stored authorization to run a bank transfer on a schedule. Each due run reuses the
 // shared bank-transfer flow (rail engine + provider dispatch), so no logic is duplicated.
-// PCI DSS Req 3: destination banking coordinates are stored for the mandate the same way as a
+// PCI DSS: destination banking coordinates are stored for the mandate the same way as a
 // registered account (IBAN/routing QE-encrypted at rest); BIC is plaintext.
 
 import type { RailDestination, RecurringScheme } from '../../../shared/services/bankTransfer';

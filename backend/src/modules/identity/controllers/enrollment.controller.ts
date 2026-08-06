@@ -1,5 +1,5 @@
 /**
- * Passwordless credential enrollment API (SD-91/SD-16, tag auth:enrollment).
+ * Passwordless credential enrollment API (tag auth:enrollment).
  * WebAuthn-style registration ceremony. All routes are SESSION-GATED (the global authMiddleware
  * protects everything not in PUBLIC_EXACT; enrollment is intentionally NOT public). Owner-scoped:
  * every operation is bound to the caller's own sub.

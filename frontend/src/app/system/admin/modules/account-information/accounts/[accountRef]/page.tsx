@@ -13,10 +13,10 @@ import { Breadcrumb } from '../../../../../../../components/Breadcrumb';
 import { RequirePermission } from '../../../../../../../components/RequirePermission';
 import { useEffectivePermissions } from '../../../../../../../lib/permissions';
 
-// v29.2 global payout-account-administration DETAIL page (SD-66, built-in account-information module).
+// v29.2 global payout-account-administration DETAIL page (built-in account-information module).
 // Dedicated page (not a modal) so the operations officer sees every QE-stripped field with room to act.
 // QE/GDPR: IBAN and routing number are NEVER returned here (boolean presence hints only); the raw IBAN
-// reveal stays on its dedicated party-scoped route. PCI DSS Req 7 + Req 10 (mutations audited server-side).
+// reveal stays on its dedicated party-scoped route. PCI DSS + (mutations audited server-side).
 
 const LIST_HREF = '/system/admin/modules/account-information?tab=accounts';
 
@@ -293,7 +293,7 @@ function AccountAdminDetail() {
                 payoutAccountInstanceReference: {acct.payoutAccountInstanceReference}
               </p>
             )}
-            <p className="text-xs text-gray-400 pt-1">IBAN and routing number are QE-encrypted at rest. The IBAN reveal is on demand (need-to-know, re-hideable) and audited; the routing number is never returned (GDPR Art. 5/32, PCI DSS Req 10).</p>
+            <p className="text-xs text-gray-400 pt-1">IBAN and routing number are QE-encrypted at rest. The IBAN reveal is on demand (need-to-know, re-hideable) and audited; the routing number is never returned (GDPR Art. 5/32, PCI DSS).</p>
           </div>
 
           {/* Linked cards funded by this account (display-safe; no full PAN / CVV). */}

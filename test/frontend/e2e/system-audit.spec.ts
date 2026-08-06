@@ -1,5 +1,5 @@
 /**
- * E2E: Audit Log viewer (FR-v2-12, PCI DSS Req 10).
+ * E2E: Audit Log viewer (FR-v2-12, PCI DSS).
  * Route: /system/audit. Primary role: security_auditor.
  */
 import { test, expect, Page } from '@playwright/test';

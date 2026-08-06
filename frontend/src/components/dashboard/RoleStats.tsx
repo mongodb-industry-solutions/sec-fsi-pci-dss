@@ -129,7 +129,7 @@ function OfficerStats({ token }: { token: string }) {
   );
 }
 
-// ── Manager: integration portfolio (SD-193) ────────────────────────────────────
+// ── Manager: integration portfolio ────────────────────────────────────
 type IntegRow = { externalProviderArrangementType: string; externalProviderIsInternal: boolean; externalProviderHealthStatus?: string };
 function ManagerStats({ token }: { token: string }) {
   const [rows, setRows] = useState<IntegRow[] | null>(null);
@@ -158,7 +158,7 @@ function ManagerStats({ token }: { token: string }) {
   );
 }
 
-// ── Operations officer: card (SD-88) + payout-account (SD-66) inventory ─────────
+// ── Operations officer: card + payout-account inventory ─────────
 // Aggregates only (counts by lifecycle status). No CHD/PII: statuses, never PAN/IBAN. If a capability
 // is managed by an external provider the admin list returns 409 (managed_externally); that side is
 // simply omitted (Promise.allSettled), so the panel still renders whatever is internally administered.

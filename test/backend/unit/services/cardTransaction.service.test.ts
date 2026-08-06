@@ -196,7 +196,7 @@ describe('createTransaction', () => {
     vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received' } as any);
   });
 
-  // U-01: cardTransactionDescription accepted and function returns successfully (BIAN SD-254)
+  // U-01: cardTransactionDescription accepted and function returns successfully 
   it('U-01: accepts cardTransactionDescription and returns authorized status', async () => {
     const result = await createTransaction(txDb(), { ...baseInput, cardTransactionDescription: 'AMAZON.COM*ELECTRONI' });
     expect(result.cardTransactionStatus).toBe('authorized');

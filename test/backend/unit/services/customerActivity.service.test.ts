@@ -3,8 +3,8 @@
  * Source: backend/src/modules/customer/services/customerActivity.service.ts
  *
  * The QE client and the delegated transaction/gateway services are mocked, so we assert the
- * role gate (PCI DSS Req 7 least privilege), the customerId -> party resolution, and the
- * display-safe merge/pagination of SD-65 executions + SD-254 card transactions.
+ * role gate (PCI DSS least privilege), the customerId -> party resolution, and the
+ * display-safe merge/pagination of executions + card transactions.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 

@@ -117,7 +117,7 @@ export const ENV = {
   // AES-256-GCM key for the session cookie. Falls back to an ephemeral per-process key when unset
   // (dev convenience) rather than a predictable hardcoded value; set it explicitly in real deploys.
   sessionSecret: () => envVar('PSP_MERCHANT_SESSION_SECRET') ?? fallbackSessionSecret(),
-  // Espresso Works seeded SD-89 merchant agreement reference.
+  // Espresso Works seeded merchant agreement reference.
   merchantAgreementRef: () =>
     envVar('PSP_MERCHANT_AGREEMENT_REF') ?? 'm0000001-0000-4000-8000-000000000001',
 };

@@ -1,6 +1,6 @@
-// BIAN SD-66: Payout Account Credit Log, immutable ledger of inbound balance credits.
+// Payout Account Credit Log, immutable ledger of inbound balance credits.
 // Captures initial deposits, bank-in transfers, refund reversals, and admin adjustments.
-// PCI DSS Req 10: every fund credit is an auditable record.
+// PCI DSS: every fund credit is an auditable record.
 
 export const BALANCE_CREDIT_LOG_COLLECTION = 'balanceCreditLog';
 
@@ -9,12 +9,12 @@ export type CreditType =
   | 'bank_deposit'      // incoming bank transfer from external institution
   | 'admin_credit'      // PSP admin / operational credit
   | 'return'            // returned / reversed debit
-  | 'commission'        // merchant commission (SD-89) collected into the PSP revenue account
+  | 'commission'        // merchant commission collected into the PSP revenue account
   | 'interest';         // earned interest (future)
 
 export interface BalanceCreditLogEntry {
   creditId: string;                          // UUID, primary key
-  payoutAccountInstanceReference: string;    // FK → payoutAccountArrangement (SD-66)
+  payoutAccountInstanceReference: string;    // FK → payoutAccountArrangement 
   partyInstanceReference?: string;           // FK → party (denormalized for filtering)
   amount: number;                            // minor units (e.g. cents)
   currency: string;                          // ISO 4217

@@ -1,5 +1,5 @@
 // Payout Orchestration Bus Payload Contracts (v17)
-// BIAN SD-65 Payment Execution · SD-66 Payment Initiation · SD-36 Open Banking AIS
+// Payment Execution Payment Initiation Open Banking AIS
 //
 // Rule: IBAN NEVER travels on the bus. Adapters resolve IBAN from the QE vault
 // (L2 client) just before dispatching the wire. Bus events carry only opaque references.
@@ -18,7 +18,7 @@ export interface PayoutOrchestrationTriggered {
   currency: string;
 }
 
-// ── AIS: Account Information Service (SD-36 Open Banking) ───────────────────
+// ── AIS: Account Information Service (Open Banking) ───────────────────
 
 export interface AisAccountValidationRequested {
   paymentExecutionInstanceReference: string;
@@ -55,7 +55,7 @@ export interface PayoutExecutionCreated {
   exceptionReason?: string;
 }
 
-// ── Bank transfer: payment-initiation provider (SD-66 PISP) ─────────────────
+// ── Bank transfer: payment-initiation provider (PISP) ─────────────────
 
 export interface BankTransferSubmitted {
   paymentExecutionInstanceReference: string;

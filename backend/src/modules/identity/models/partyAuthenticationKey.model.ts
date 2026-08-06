@@ -1,4 +1,4 @@
-// SD-16: Party Authentication, RSA public key audit registry
+// Party Authentication, RSA public key audit registry
 // ADR-036 (FS-first): the OAuthKeyProvider (local filesystem / AWS KMS) is the single source
 // of truth for key material. This collection is an AUDIT MIRROR only: it records key status
 // and provenance (who rotated, when) and backs the admin dashboard listing. It is NOT read to

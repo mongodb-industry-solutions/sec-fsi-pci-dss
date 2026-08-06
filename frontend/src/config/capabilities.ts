@@ -78,7 +78,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   },
   'card-authorization': {
     capability: 'card-authorization', providerType: 'card_authorization', label: 'Card Authorization',
-    description: 'Card authorization request/response (no CVV passed; PCI DSS Req 3.3).',
+    description: 'Card authorization request/response (no CVV passed; PCI DSS).',
     callbackSegment: 'card/authorization', frontendFolder: 'card-authorization', moduleDomain: 'gateway', hasModule: true,
     bianServiceDomain: 'Card Authorization',
   },

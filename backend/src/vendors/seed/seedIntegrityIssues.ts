@@ -61,7 +61,7 @@ export async function seedIntegrityIssues(client: MongoClient): Promise<{
     }
   }
 
-  // Card duplicated by ERROR (SD-88): the same customer ends up holding the same physical card
+  // Card duplicated by ERROR : the same customer ends up holding the same physical card
   // (same masked PAN + network) under TWO different tokens: exactly what inconsistent/non-
   // deterministic tokenization would produce. The auditor's Data Integrity tool surfaces this as a
   // `tokenizationDuplicate`. (Deterministic tokens prevent it going forward; this is legacy bad data.)

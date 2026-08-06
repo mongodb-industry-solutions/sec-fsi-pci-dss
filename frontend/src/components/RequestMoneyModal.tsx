@@ -37,7 +37,7 @@ export function RequestMoneyModal({ beneficiary, token, onClose }: RequestMoneyM
         // The payer display the PAYEE will see is the beneficiary label THEY chose (their own data),
         // since the payer hasn't consented to share basic data until they approve.
         payerAlias: beneficiary.counterpartyLabel,
-        // Link back to the requester's own beneficiary (SD-54), so the payee's detail can open it.
+        // Link back to the requester's own beneficiary , so the payee's detail can open it.
         payerCounterpartyReference: beneficiary.counterpartyArrangementReference,
       }, token, `rtp-ben-${Date.now()}`);
       try { await api.rtp.present(req.paymentRequestInstanceReference, token); } catch { /* still created */ }

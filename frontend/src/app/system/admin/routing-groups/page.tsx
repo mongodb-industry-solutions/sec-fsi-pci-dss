@@ -185,7 +185,7 @@ export default function RoutingGroupsPage() {
         title="Routing Groups"
         description="Create and manage provider routing groups and their members."
         info="Routing groups decide which external provider handles each request per integration type, with strategies such as primary/fallback or round robin. The default group is the fallback target and cannot be deleted."
-        debugInfo="BIAN SD-193 ExternalProviderArrangementPortfolio · routing strategy + members · manager only"
+        debugInfo="ExternalProviderArrangementPortfolio · routing strategy + members · manager only"
       />
 
       {/* Create */}

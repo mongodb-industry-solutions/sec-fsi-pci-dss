@@ -267,7 +267,7 @@ export default function InvestigationPage() {
           icon={BriefcaseMedical}
           title="Cases"
           description="Review, escalate and resolve fraud cases."
-          debugInfo="BIAN SD-83 Fraud Diagnosis · PCI DSS Req 10.4 (audit trail)"
+          debugInfo="Fraud Diagnosis · PCI DSS (audit trail)"
         />
 
         {/* Search */}

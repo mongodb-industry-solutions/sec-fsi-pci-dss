@@ -6,7 +6,7 @@ import { Tooltip } from './Tooltip';
 // Shared on-demand reveal for a sensitive value (CVV, full PAN, IBAN). The value is HIDDEN by
 // default: only the masked display (if any) is shown. Clicking the eye fetches the ephemeral value
 // on demand; clicking again hides and discards it. The value is never persisted or logged; it lives
-// in component state only for as long as it is shown. PCI DSS Req 3.2/3.3 (CHD), GDPR (IBAN/PII).
+// in component state only for as long as it is shown. PCI DSS (CHD), GDPR (IBAN/PII).
 export function SensitiveReveal({
   label,
   masked,

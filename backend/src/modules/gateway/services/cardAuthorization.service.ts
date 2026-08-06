@@ -1,4 +1,4 @@
-// BIAN SD-15: Card Authorization, Stub adapter + Integration Hub routing
+// Card Authorization, Stub adapter + Integration Hub routing
 //
 // When no 'card_authorization' provider is registered, falls back to stub (always approve).
 // When a real provider is configured, delegates to integrationDispatch.service.ts.

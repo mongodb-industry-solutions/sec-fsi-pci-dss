@@ -273,7 +273,7 @@ export async function exchangeAuthorizationCode(
     outcome: 'verified',
   });
 
-  // Upsert consent grant record (SD-16). Created on first exchange; lastUsedAt updated on refresh.
+  // Upsert consent grant record . Created on first exchange; lastUsedAt updated on refresh.
   const consentCol = db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION);
   const existing = await consentCol.findOne({ partyAuthenticationInstanceReference: record.partyAuthenticationInstanceReference, oauthClientId: clientId });
   const now = new Date();
@@ -291,7 +291,7 @@ export async function exchangeAuthorizationCode(
       { consentId: existing.consentId },
       { $set: { grantedScopes: granted, consentStatus: 'active', lastUsedAt: now, recordUpdatedDateTime: now } },
     );
-    // Audit the (re)consent on the business ledger (SD-16). Attribution ties it to the merchant client.
+    // Audit the (re)consent on the business ledger . Attribution ties it to the merchant client.
     emitProcessEvent(db, {
       entityType: 'customer',
       entityId: sub,
@@ -331,7 +331,7 @@ export async function exchangeAuthorizationCode(
       scopes: record.scopes,
       grantedAt: now.toISOString(),
     }).catch(() => {});
-    // v18 E-07: audit the first-time consent grant on the business ledger (SD-16).
+    // v18 E-07: audit the first-time consent grant on the business ledger .
     emitProcessEvent(db, {
       entityType: 'customer',
       entityId: sub,
@@ -425,9 +425,9 @@ export async function refreshAccessToken(
   return tokens;
 }
 
-// ── Subject → Party resolution (SD-91 → SD-13) ─────────────────────────────────
-// An OAuth/session token `sub` is the SD-91 login-record id (customerAuthenticationInstanceReference).
-// Domain data (payout accounts, counterparties, executions) is keyed by the SD-13 partyInstanceReference.
+// ── Subject → Party resolution (→) ─────────────────────────────────
+// An OAuth/session token `sub` is the login-record id (customerAuthenticationInstanceReference).
+// Domain data (payout accounts, counterparties, executions) is keyed by the partyInstanceReference.
 // This bridges the two so merchant on-behalf-of endpoints (which bind on `sub`) can query domain data.
 // Returns null when the sub is unknown (handled gracefully by callers: empty results, no throw).
 export async function resolvePartyInstanceReference(db: Db, sub: string): Promise<string | null> {
@@ -647,7 +647,7 @@ export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> 
   }
 }
 
-// ── Consent Grant Management (SD-16) ─────────────────────────────────────────
+// ── Consent Grant Management ─────────────────────────────────────────
 
 // v18: consent grant enriched with the merchant's OIDC logo (branding on the "Authorized Apps" list).
 export type ConsentGrantWithBranding = PartyAuthConsentRecord & { oauthLogoUri?: string };
@@ -733,7 +733,7 @@ export async function getUserConsentGrantDetail(
 
 // v18 B-10: users who authorized a given merchant (cross-merchant audit for L1/L2/auditor).
 // Reads partyAuthConsent filtered by merchantAgreementInstanceReference, joins the user's display
-// name/email (SD-13) for a display-safe row. Search matches the user name/email/party ref. Paginated.
+// name/email for a display-safe row. Search matches the user name/email/party ref. Paginated.
 export interface MerchantAuthorizationRow {
   consentId: string;
   partyAuthenticationInstanceReference: string;
@@ -760,7 +760,7 @@ export async function listMerchantAuthorizations(
     .sort({ consentGrantedAt: -1 })
     .toArray();
 
-  // Resolve display-safe user identity (SD-13) in one batch, no CHD, no IBAN.
+  // Resolve display-safe user identity in one batch, no CHD, no IBAN.
   const subs = [...new Set(grants.map((g) => g.partyAuthenticationInstanceReference))];
   const users = subs.length
     ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
@@ -797,7 +797,7 @@ export async function listMerchantAuthorizations(
 }
 
 // v27: resolve a party's OAuth subject (customerAuthenticationInstanceReference == PartyAuthConsent
-// partyAuthenticationInstanceReference) from its SD-13 partyInstanceReference. Lets staff query/revoke
+// partyAuthenticationInstanceReference) from its partyInstanceReference. Lets staff query/revoke
 // a found customer's authorized apps by party ref without the client sending the auth subject. Returns
 // null when the party has no authentication identity (e.g. a party that never enrolled to log in).
 export async function resolveSubForParty(db: Db, partyRef: string): Promise<string | null> {

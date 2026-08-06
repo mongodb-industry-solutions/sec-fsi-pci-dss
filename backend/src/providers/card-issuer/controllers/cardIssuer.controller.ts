@@ -108,7 +108,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     }
     const result = validateCardIssuer(body, config, opts);
 
-    // Correlation keys for audit/monitoring (PCI DSS Req 10): link the validation to the
+    // Correlation keys for audit/monitoring (PCI DSS): link the validation to the
     // transaction and the fraud case when the caller provides them.
     const transactionId = (body.transactionId ?? body.cardTransactionInstanceReference) as string | undefined;
     const caseReference = (body.caseReference ?? body.fraudDiagnosisCaseReference ?? body.fraudDiagnosisInstanceReference) as string | undefined;
@@ -183,11 +183,11 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
   });
 
-  // ── v29 GLOBAL CARD ADMINISTRATION (SD-88, built-in module surface) ──────────────────────────
+  // ── v29 GLOBAL CARD ADMINISTRATION (built-in module surface) ──────────────────────────
   // Global cross-party administration of cardholder cards, distinct from the customer/staff
-  // self-service surface (/api/v1/customer/:customerId/cards). Gated to operations_officer (PCI Req 7)
+  // self-service surface (/api/v1/customer/:customerId/cards). Gated to operations_officer (PCI DSS)
   // and to the card-issuer capability resolving to its internal provider (409 managed_externally).
-  // PCI DSS: PAN always masked; CVV/PIN never accepted or returned; every mutation audited (Req 10).
+  // PCI DSS: PAN always masked; CVV/PIN never accepted or returned; every mutation audited .
 
   const cardListItem = {
     type: 'object',

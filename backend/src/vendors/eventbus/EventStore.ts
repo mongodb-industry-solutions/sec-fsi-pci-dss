@@ -1,6 +1,6 @@
 // Persistent, correlated record of every DomainEvent (dev.v8 D3). This is the unified audit/
 // investigation backbone: query by correlationId to replay a whole business-process journey in
-// order (PCI DSS Req 10). The interface is injectable so the bus can be unit-tested with a fake.
+// order (PCI DSS). The interface is injectable so the bus can be unit-tested with a fake.
 import { Db } from 'mongodb';
 import { DomainEvent, BusinessProcess } from './types';
 

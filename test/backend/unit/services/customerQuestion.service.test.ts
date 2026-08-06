@@ -1,7 +1,7 @@
 /**
- * Unit tests: customer questions service (ADR-031, SD-83).
+ * Unit tests: customer questions service (ADR-031).
  * Validates immutability (no answer after close), option validation, "Other" free-text rules,
- * and ownership enforcement: the core PCI DSS Req 7/10 guarantees of the feature.
+ * and ownership enforcement: the core PCI DSS guarantees of the feature.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 

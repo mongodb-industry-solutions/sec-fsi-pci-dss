@@ -2,7 +2,7 @@
 // Reference-led: no CHD, no IBAN, only the PSP-internal card token and journey correlationId.
 // correlationId = transactionId, matching the other card_payment gates (cardPayment.events.ts).
 //
-// BIAN: SD-36 Account Information (AIS). The gate is provider-indifferent: the built-in
+// BIAN: Account Information (AIS). The gate is provider-indifferent: the built-in
 // account-information module reads the PSP internal ledger; an external PSD2 AIS provider
 // substitutes it via dispatchProvider without changing these contracts.
 

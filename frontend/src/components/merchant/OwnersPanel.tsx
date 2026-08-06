@@ -1,5 +1,5 @@
 'use client';
-// v31 (SD-89 + SD-13): beneficial-owner / shareholder panel. Reused by the KYB administration detail
+// v31 (+): beneficial-owner / shareholder panel. Reused by the KYB administration detail
 // and the merchant detail Owners tab. Read-only unless `canManage` (merchants:manage). Enforces the
 // invariants client-side (sum ≤ 100 meter, one-primary) mirroring the server (which is authoritative).
 import { useEffect, useState, useCallback } from 'react';

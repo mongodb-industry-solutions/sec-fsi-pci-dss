@@ -11,11 +11,11 @@ const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_aud
 
 // Mounted at /customer  -  routes are /:customerId/cards
 //
-// Authorization model (PCI DSS Req 7 least privilege, BIAN SD-88 customer-centric):
+// Authorization model (PCI DSS least privilege, customer-centric):
 //  - A customer may VIEW / ADD / REMOVE only THEIR OWN cards (the path :customerId must match
 //    the agreement linked to their JWT partyRef: ownership enforced server-side).
 //  - Staff (L1/L2/auditor) may READ a customer's card list for investigation, but NOT add/remove.
-//  - Every add/remove emits a compliance audit event (Req 10). CVV/PIN are never accepted/stored.
+//  - Every add/remove emits a compliance audit event . CVV/PIN are never accepted/stored.
 //  Note: production step-up MFA for add/remove plugs in at these handlers (re-auth/TOTP); the demo
 //  gates the destructive action with an explicit client confirmation.
 export async function paymentCardController(fastify: FastifyInstance) {
@@ -149,7 +149,7 @@ and must NOT be repeated in the request body.
       ...(body.paymentCardAlias ? { paymentCardAlias: body.paymentCardAlias } : {}),
     });
 
-    // Audit (PCI DSS Req 10): record the card registration. No CHD in the summary.
+    // Audit (PCI DSS): record the card registration. No CHD in the summary.
     if (!result.reused) emitComplianceEvent(fastify.db, {
       entityType: 'card',
       entityId: result.paymentCardInstanceReference,
@@ -406,7 +406,7 @@ its funding/payout account. No CHD, no card expiry. Restricted to fraud analyst 
   // GET /api/v1/customer/:customerId/cards/:cardId, card detail.
   // Returns the card-on-file (surrogate token, lifecycle dates, alias/note). The owner also sees the
   // QE:none expiry; staff (investigator/auditor) get a READ without the expiry (owner-only reveal,
-  // PCI DSS Req 3.3). CVV/PIN are never stored, never returned.
+  // PCI DSS). CVV/PIN are never stored, never returned.
   fastify.get('/:customerId/cards/:cardId', {
     schema: {
       tags: ['cards'],
@@ -467,7 +467,7 @@ audited (Req 10).`,
     const card = await getCardById(fastify.db, customerId, cardId);
     if (!card) return reply.status(404).send({ error: 'Card not found' });
 
-    // The QE:none expiry is disclosed to the cardholder only (PCI DSS Req 3.3). A staff investigation
+    // The QE:none expiry is disclosed to the cardholder only (PCI DSS). A staff investigation
     // READ never reveals it; strip it so the drill-down stays display-safe.
     if (!isOwner) delete (card as Record<string, unknown>).paymentCardExpirationDate;
 
@@ -475,7 +475,7 @@ audited (Req 10).`,
     // never the other holders' identities: PCI/PII minimization for the cardholder's own view).
     const cardHolderCount = await getCardHolderCount(fastify.db, card.paymentCardReference as string);
 
-    // Audit (PCI DSS Req 10): record self-service access to a card-on-file. No CHD in the summary.
+    // Audit (PCI DSS): record self-service access to a card-on-file. No CHD in the summary.
     emitComplianceEvent(fastify.db, {
       entityType: 'card',
       entityId: cardId,
@@ -494,7 +494,7 @@ audited (Req 10).`,
 
   // POST /api/v1/customer/:customerId/cards/:cardId/cvv  (OWNER reveal of the per-card CVV), routed
   // THROUGH the provider dispatch (never a direct call to the built-in module). Owner-only + step-up.
-  // The CVV is derived (never stored) and returned ephemerally; the reveal is audited (Req 10) with
+  // The CVV is derived (never stored) and returned ephemerally; the reveal is audited with
   // NO CVV in the log. If an external issuer governs the capability, the dispatch routes to it.
   const ownerReveal = (kind: 'cvv' | 'pan') => async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
@@ -665,8 +665,8 @@ audit event (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const { active } = request.body as { active: boolean };
 
-    // Owner (self-service) OR an L2 investigator acting as staff (BIAN SD-15 control). The auditor is
-    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS Req 7).
+    // Owner (self-service) OR an L2 investigator acting as staff (control). The auditor is
+    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS).
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     const isOwner = !!ownId && ownId === customerId;

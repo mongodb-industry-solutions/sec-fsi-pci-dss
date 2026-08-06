@@ -12,7 +12,7 @@ import { useEffectivePermissions } from '../../../../../lib/permissions';
 
 // Dedicated config UI for the internal HRP (High-Risk Person / Sanctions) engine (overrides the
 // generic module editor). DATA-DRIVEN: screening lists + match threshold live in the capability
-// moduleConfig; the backend /modules/hrp/screen endpoint evaluates them. PCI DSS Req 12.8 / Req 10.
+// moduleConfig; the backend /modules/hrp/screen endpoint evaluates them. PCI DSS.
 const CAP = 'hrp';
 const DEFAULT_LISTS = ['OFAC_SDN', 'EU_Consolidated', 'UN_Consolidated', 'PEP_Global'];
 
@@ -57,7 +57,7 @@ export default function HrpModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'HRP / Sanctions' }]} />
-      <SectionHeader icon={ShieldAlert} title="HRP / Sanctions" description="High-risk person / counterparty and sanctions / PEP screening." debugInfo="capability=hrp · SD-13 Party Data Management · PCI DSS Req 12.8 / Req 10" />
+      <SectionHeader icon={ShieldAlert} title="HRP / Sanctions" description="High-risk person / counterparty and sanctions / PEP screening." debugInfo="capability=hrp Party Data Management · PCI DSS" />
 
       {!canEdit && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">

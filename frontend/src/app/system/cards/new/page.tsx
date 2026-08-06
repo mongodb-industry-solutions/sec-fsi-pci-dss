@@ -11,9 +11,9 @@ import { useNotify } from '../../../../components/ui/ConfirmProvider';
 import { Tooltip } from '../../../../components/Tooltip';
 import { detectNetwork, tokenizeCard } from '../../../../lib/cardTokenize';
 
-// Register a new card-on-file (BIAN SD-88). The PAN, expiry and CVV are entered here, validated and
+// Register a new card-on-file . The PAN, expiry and CVV are entered here, validated and
 // tokenized IN THE BROWSER: only the masked PAN + surrogate token + expiry + network are sent to
-// the server. The CVV (SAD) is validated and discarded; never transmitted or stored (PCI DSS Req 3).
+// the server. The CVV (SAD) is validated and discarded; never transmitted or stored (PCI DSS).
 export default function NewCardPage() {
   const router = useRouter();
   const notify = useNotify();
@@ -183,7 +183,7 @@ export default function NewCardPage() {
             <Lock size={13} className="shrink-0" />
             <span>
               Validated and tokenized in your browser. The full card number and security code are never stored
-              {debugMode ? ' (PCI DSS Req 3.2 / 3.4; expiry is QE:none, token is a surrogate).' : '.'}
+              {debugMode ? ' (PCI DSS; expiry is QE:none, token is a surrogate).' : '.'}
             </span>
           </div>
 

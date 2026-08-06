@@ -109,7 +109,7 @@ export default function PasswordlessCredentialsPage() {
         icon={KeyRound}
         title="Credentials"
         description="Security keys registered on your devices for passwordless (CIBA) sign-in. Your private key never leaves this device."
-        debugInfo="SD-91/SD-16 · partyEnrolledCredential · WebAuthn/FIDO2 · CIBA · NIST SP 800-63B AAL1 · PCI DSS Req 8"
+        debugInfo="partyEnrolledCredential · WebAuthn/FIDO2 · CIBA · NIST SP 800-63B AAL1 · PCI DSS"
       />
 
       <div className="bg-white rounded-xl border p-5 space-y-3">

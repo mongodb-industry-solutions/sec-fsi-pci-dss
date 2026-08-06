@@ -20,7 +20,7 @@ const SCOPE_DESCRIPTIONS: Record<string, string> = {
   profile: 'name, preferred_username',
   email: 'email address',
   phone: 'phone_number',
-  'read:transactions': 'Access to transaction data (PCI DSS Req 7)',
+  'read:transactions': 'Access to transaction data (PCI DSS)',
   'read:userinfo': 'Full userinfo profile',
 };
 const ALL_GRANT_TYPES = ['authorization_code', 'client_credentials', 'refresh_token', 'urn:openid:params:grant-type:ciba'] as const;
@@ -115,7 +115,7 @@ function EndpointScopeToggle({ usePrivate, onChange }: { usePrivate: boolean; on
 const PSP_ROLES: { key: string; label: string; description: string }[] = [
   { key: 'customer',              label: 'Customer',             description: 'End user authenticating via OIDC' },
   { key: 'merchant_officer',      label: 'Merchant Officer',     description: 'Merchant admin with full portal access' },
-  { key: 'security_auditor',      label: 'Security Auditor',     description: 'Read-only audit access (PCI DSS Req 10)' },
+  { key: 'security_auditor',      label: 'Security Auditor',     description: 'Read-only audit access (PCI DSS)' },
   { key: 'level1_analyst',        label: 'L1 Analyst',           description: 'First-level fraud analyst' },
   { key: 'level2_investigator',   label: 'L2 Investigator',      description: 'Senior investigator with case escalation' },
 ];
@@ -504,7 +504,7 @@ export default function MerchantSSOPage() {
   if (client === undefined) {
     return (
       <div className="w-full px-5 sm:px-8 py-6">
-        <SectionHeader icon={ShieldCheck} title="SSO" description="Configure your application's integration with PSP identity." debugInfo="BIAN SD-89 BQ:Grant, SD-16, ADR-033-037, OIDC Core 1.0, RFC 6749" />
+        <SectionHeader icon={ShieldCheck} title="SSO" description="Configure your application's integration with PSP identity." debugInfo="BQ:Grant, ADR-033-037, OIDC Core 1.0, RFC 6749" />
         <p className="text-sm text-gray-400 mt-6">Loading...</p>
       </div>
     );
@@ -514,7 +514,7 @@ export default function MerchantSSOPage() {
   if (client === null) {
     return (
       <div className="w-full px-5 sm:px-8 py-6 space-y-5">
-        <SectionHeader icon={ShieldCheck} title="SSO" description="Configure your application's integration with PSP identity." debugInfo="BIAN SD-89 BQ:Grant, SD-16, ADR-033-037, OIDC Core 1.0, RFC 6749" />
+        <SectionHeader icon={ShieldCheck} title="SSO" description="Configure your application's integration with PSP identity." debugInfo="BQ:Grant, ADR-033-037, OIDC Core 1.0, RFC 6749" />
 
         {newSecret && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 max-w-xl">
@@ -559,7 +559,7 @@ export default function MerchantSSOPage() {
         icon={ShieldCheck}
         title="SSO"
         description="Manage your application's OAuth 2.0 client, redirect URIs, scopes, and event callbacks."
-        debugInfo="BIAN SD-89 BQ:Grant, SD-16, ADR-033-037, OIDC Core 1.0, RFC 6749"
+        debugInfo="BQ:Grant, ADR-033-037, OIDC Core 1.0, RFC 6749"
       />
 
       {/* ── 1. Client credentials ── */}

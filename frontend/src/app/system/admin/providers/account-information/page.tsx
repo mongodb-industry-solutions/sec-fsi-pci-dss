@@ -6,7 +6,6 @@ export default function AccountInformationPage() {
       type: 'account_information',
       label: 'Account Information (AIS)',
       description: 'Payout account status validation and internal ledger balance (PSD2 AIS)',
-      bianSd: 'SD-36',
     }} />
   );
 }

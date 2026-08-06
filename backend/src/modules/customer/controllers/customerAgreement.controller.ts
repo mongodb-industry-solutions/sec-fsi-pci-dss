@@ -3,7 +3,7 @@ import { getByEmail, getByPhone, getByAccountRef, getByInstanceReference, getKyc
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
 
 // Acting user (unique id + name) from the JWT: recorded in the sensitive-access audit event
-// so the case activity log identifies the individual, not just the role (PCI DSS Req 10.2.1).
+// so the case activity log identifies the individual, not just the role (PCI DSS).
 function actorOf(request: unknown): { ref?: string; name?: string } {
   const u = (request as { user?: JwtUserPayload }).user;
   return { ref: u?.partyRef ?? u?.sub, name: u?.name };

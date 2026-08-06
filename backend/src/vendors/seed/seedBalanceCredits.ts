@@ -1,6 +1,6 @@
 // Seeds initial-deposit records in balanceCreditLog for every payout account
 // that has a positive availableAmount at seed time.
-// PCI DSS Req 10: every fund credit must have an audit record.
+// PCI DSS: every fund credit must have an audit record.
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';

@@ -1,4 +1,4 @@
-// BIAN SD-66: Payment Initiation, Payout Account Arrangement
+// Payment Initiation, Payout Account Arrangement
 // Each PSP user can register 1‑N bank accounts. One is marked as default.
 // Balance sub-doc tracks PSP internal ledger (pending / available / reserved).
 // IBAN / routing number are QE:none (DEK-payout-iban), decrypted only by L2 client.
@@ -24,7 +24,7 @@ export interface PayoutAccountBalance {
 
 export interface PayoutAccountArrangement {
   payoutAccountInstanceReference: string;  // UUID, PK
-  partyInstanceReference: string;          // FK → party (SD-13)
+  partyInstanceReference: string;          // FK → party 
 
   payoutAccountType: PayoutAccountType;
   payoutAccountStatus: PayoutAccountStatus;
@@ -37,7 +37,7 @@ export interface PayoutAccountArrangement {
   // Plaintext banking metadata, not payment credentials (no PCI DSS encryption requirement)
   payoutAccountAlias?: string;             // user-defined nickname (max 60)
   payoutAccountBankName?: string;          // institution name (max 100)
-  payoutAccountHolderName?: string;        // account holder legal name, BIAN SD-66 (max 140)
+  payoutAccountHolderName?: string;        // account holder legal name, (max 140)
   payoutAccountBicSwift?: string;          // ISO 9362 BIC/SWIFT: publicly published institution ID (8 or 11 chars)
   payoutAccountCorrespondentBic?: string;  // correspondent bank BIC for international wire transfers (8 or 11 chars)
   payoutAccountBankAddress?: string;       // bank branch address (max 200)
@@ -45,7 +45,7 @@ export interface PayoutAccountArrangement {
   payoutAccountCountryCode: string;        // ISO 3166-1 alpha-2
   payoutAccountPreferredRail: PayoutRail;
 
-  // PSP internal ledger (SD-86 Payments, no external provider, MongoDB $inc only)
+  // PSP internal ledger (Payments, no external provider, MongoDB $inc only)
   payoutAccountBalance: PayoutAccountBalance;
 
   bianServiceDomain: 'Payment Initiation';

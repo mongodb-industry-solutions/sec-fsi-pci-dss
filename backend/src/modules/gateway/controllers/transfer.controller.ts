@@ -1,4 +1,4 @@
-// v17.1 BIAN SD-65/66: Bank transfer REST controller (ACH / SEPA / SWIFT).
+// v17.1/66: Bank transfer REST controller (ACH / SEPA / SWIFT).
 // Routes mounted at /gateway/transfers → /api/v1/gateway/transfers
 //   POST /preview  → stateless rail derivation + validation + fee quote (no side effects)
 //   POST /bank     → execute a transfer to a registered or unregistered external account
@@ -110,7 +110,7 @@ export async function transferController(fastify: FastifyInstance) {
     const body = request.body as ExecuteBody;
 
     if (request.merchantContext) {
-      // OAuth on-behalf-of: owner from token.sub (translate to SD-13 party); attribute the action.
+      // OAuth on-behalf-of: owner from token.sub (translate to party); attribute the action.
       const owner = await resolveOwner(request, reply);
       if (!owner) return;
       if (!owner.ownerPartyRef) {
@@ -125,7 +125,7 @@ export async function transferController(fastify: FastifyInstance) {
         reference: body.reference,
         fromAccountRef: body.fromAccountRef,
         settlementSchedule: body.settlementSchedule,
-        // SD-89: stamp the initiating merchant so this execution is visible only in its history.
+        // stamp the initiating merchant so this execution is visible only in its history.
         merchantAgreementReference: request.merchantContext.merchantId,
       });
       emitProcessEvent(fastify.db, {

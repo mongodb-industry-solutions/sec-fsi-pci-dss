@@ -76,15 +76,15 @@ async function connectAndWire(fastify: FastifyInstance): Promise<void> {
   const { KybVerificationSaga } = await import('../modules/gateway/services/kybVerification.saga');
   new KybVerificationSaga(db, getEventBus()).register();
 
-  // v17: payout orchestration (merchant settlement, SD-65/SD-66/SD-36).
+  // v17: payout orchestration (merchant settlement).
   const { PayoutOrchestrationProcess } = await import('../modules/gateway/services/payoutOrchestration.process');
   new PayoutOrchestrationProcess(db, getEventBus()).register();
 
-  // P2P compliance: FDS + HRP + AML screening for peer-to-peer transfers (SD-83, PCI DSS Req 10).
+  // P2P compliance: FDS + HRP + AML screening for peer-to-peer transfers (PCI DSS).
   const { P2PComplianceProcess } = await import('../modules/gateway/services/p2pCompliance.process');
   new P2PComplianceProcess(db, getEventBus()).register();
 
-  // v28 RTP lifecycle: project execution settlement onto the linked request + expiry sweeper (SD-65).
+  // v28 RTP lifecycle: project execution settlement onto the linked request + expiry sweeper .
   if (config.rtp.enabled) {
     const { RtpLifecycleProcess } = await import('../modules/gateway/services/rtpLifecycle.process');
     new RtpLifecycleProcess(db, getEventBus()).register();

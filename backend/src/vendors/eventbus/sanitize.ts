@@ -1,4 +1,4 @@
-// Cardholder-data (CHD) scrubbing: the canonical PCI DSS Req 3.2 boundary, owned by the eventbus
+// Cardholder-data (CHD) scrubbing: the canonical PCI DSS boundary, owned by the eventbus
 // vendor so every publisher/logger shares ONE blocklist (no duplication, single source of truth).
 // Keys are stripped at ANY nesting depth before an event/payload is persisted or delivered.
 
@@ -27,8 +27,8 @@ export function sanitizeDeep(value: unknown): unknown {
   return value;
 }
 
-// OAuth/OIDC secrets and PII that must never reach a log or an audit event (PCI DSS Req 10, GDPR).
-// Distinct from CHD (Req 3.2, above): these are credentials/tokens, not cardholder data. Keys are
+// OAuth/OIDC secrets and PII that must never reach a log or an audit event (PCI DSS, GDPR).
+// Distinct from CHD (above): these are credentials/tokens, not cardholder data. Keys are
 // matched case-insensitively. `state`/`nonce` are intentionally NOT blocklisted (callers must hash
 // them before logging, never log the raw value).
 export const SECRET_BLOCKLIST = new Set([

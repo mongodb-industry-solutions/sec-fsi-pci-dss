@@ -1,4 +1,4 @@
-// BIAN SD-16: Party Authentication, ConsentGrant behavior qualifier
+// Party Authentication, ConsentGrant behavior qualifier
 // Tracks which merchant OAuth clients a user has authorized, with scopes and revocation support.
 
 export const PARTY_AUTH_CONSENT_COLLECTION = 'partyAuthConsent';

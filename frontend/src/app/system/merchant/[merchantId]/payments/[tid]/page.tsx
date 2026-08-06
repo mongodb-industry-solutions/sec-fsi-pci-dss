@@ -135,7 +135,7 @@ export default function MerchantTransactionDetailPage() {
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-start gap-2">
           <ShieldCheck size={14} className="text-blue-600 mt-0.5 shrink-0" />
           <p className="text-xs text-blue-700">
-            PCI DSS Req 3 &amp; 7: Merchant acquiring view: only the masked PAN and card token are displayed. Full PAN, CVV, payer identity, and gateway payload are never exposed to the merchant.
+            PCI DSS &amp; 7: Merchant acquiring view: only the masked PAN and card token are displayed. Full PAN, CVV, payer identity, and gateway payload are never exposed to the merchant.
           </p>
         </div>
       )}

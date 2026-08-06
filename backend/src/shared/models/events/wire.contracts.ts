@@ -100,7 +100,7 @@ export interface AmlMonitoringOutbound extends WireCorrelation {
  */
 export type AmlMonitoringInbound = WireCorrelation & AmlMonitoringCompleted;
 
-// ── v17: Account Information Service (SD-36 AIS) wire contracts ──────────────
+// ── v17: Account Information Service (AIS) wire contracts ──────────────
 
 /**
  * @event    ais.account.validation.requested  @type outbound
@@ -129,7 +129,7 @@ export interface AisValidationInbound extends WireCorrelation {
   providerReference?: string;
 }
 
-// ── v17: Payment Initiation (SD-66 PISP) wire contracts ──────────────────────
+// ── v17: Payment Initiation (PISP) wire contracts ──────────────────────
 
 /**
  * @event    payment.initiation.requested  @type outbound

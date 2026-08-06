@@ -1,4 +1,4 @@
-// OIDC/OAuth flow audit (SD-16 Party Authentication, PCI DSS Req 10). Emits one compliance-ledger
+// OIDC/OAuth flow audit (Party Authentication, PCI DSS). Emits one compliance-ledger
 // event per step of the flow so an integration can be traced end-to-end and a failure pinpointed.
 // Reuses the v7/v8 compliance ledger (emitComplianceEvent + LedgerProjection), no new store.
 //

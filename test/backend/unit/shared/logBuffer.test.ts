@@ -2,7 +2,7 @@
  * Unit tests: backend/src/shared/services/logBuffer.ts
  * The admin logs panel is the investigation surface, so every failure path must land in the ring
  * buffer: pino warn+ entries, console.warn/error from background work, and error objects rendered
- * as type + capped message (PCI DSS Req 10 / GDPR: no full stacks).
+ * as type + capped message (PCI DSS / GDPR: no full stacks).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {

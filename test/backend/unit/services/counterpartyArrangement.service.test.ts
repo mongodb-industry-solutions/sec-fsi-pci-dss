@@ -1,5 +1,5 @@
 /**
- * Unit tests: beneficiary registry, re-add after soft-delete (SD-54)
+ * Unit tests: beneficiary registry, re-add after soft-delete 
  * Source: backend/src/modules/identity/services/counterpartyArrangement.service.ts (registerBeneficiary)
  *
  * Requirement: DELETE soft-deletes an arrangement (status='removed') but the unique index on

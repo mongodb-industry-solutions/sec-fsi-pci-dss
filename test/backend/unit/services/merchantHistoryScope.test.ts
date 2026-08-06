@@ -1,9 +1,9 @@
 /**
- * Unit tests: merchant transaction-history data isolation (SD-89, v18)
+ * Unit tests: merchant transaction-history data isolation (v18)
  * Source: backend/src/modules/transaction/services/cardTransaction.service.ts (getPartyCardTransactions)
  *
  * Requirement: the merchant /history endpoint must return ONLY the activity the user performed IN THIS
- * specific merchant. For card purchases (SD-254) that means filtering by merchantAgreementInstanceReference.
+ * specific merchant. For card purchases that means filtering by merchantAgreementInstanceReference.
  * These tests assert the query built by getPartyCardTransactions is merchant-scoped when a merchant id is
  * supplied and account-only when it is not (PSP-direct callers).
  */

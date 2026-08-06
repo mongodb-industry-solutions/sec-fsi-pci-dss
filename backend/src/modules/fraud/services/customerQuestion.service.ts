@@ -58,7 +58,7 @@ export async function createQuestion(
   };
   await col(db).insertOne(record);
 
-  // Audit trail: case timeline + unified business-process events (PCI DSS Req 10).
+  // Audit trail: case timeline + unified business-process events (PCI DSS).
   await appendAuditEvent(db, caseId, 'question_created', asker.role, {
     questionId: record.customerQuestionInstanceReference, questionText: text, options, allowOther: record.allowOther,
   }, { ref: asker.ref, name: asker.name });
@@ -120,7 +120,7 @@ export async function submitResponse(
   const q = await col(db).findOne({ customerQuestionInstanceReference: questionId });
   if (!q) return { ok: false, error: 'not_found' };
 
-  // Ownership (PCI DSS Req 7): a customer may only answer questions on their own case/transaction.
+  // Ownership (PCI DSS): a customer may only answer questions on their own case/transaction.
   if (q.partyInstanceReference && responder.partyRef && q.partyInstanceReference !== responder.partyRef) {
     return { ok: false, error: 'forbidden' };
   }

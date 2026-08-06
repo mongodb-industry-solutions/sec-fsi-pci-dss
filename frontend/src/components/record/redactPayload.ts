@@ -3,26 +3,26 @@
 
 /** QE:none / sensitive-tier keys. Redacted by name in any raw or debug payload. */
 export const SENSITIVE_PAYLOAD_KEYS: ReadonlySet<string> = new Set([
-  // SD-53 customer agreement
+  // customer agreement
   'customerAgreementResidentialAddress',
   'customerAgreementRiskNotes',
   'customerAgreementSourceOfFunds',
   'customerAgreementPurposeOfRelationship',
   'customerAgreementKycCheckScreeningProviderRef',
   'governmentIdentificationReference', // legacy, still redacted for pre-v32 documents
-  // SD-13 party
+  // party
   'partyPostalAddress',
-  // SD-254 card transaction
+  // card transaction
   'rawGatewayPayload',
   'processorTransactionMetadata',
-  // SD-88 / vault
+  // / vault
   'paymentCardNumber',
   'cardServiceCode',
-  // SD-66 / SD-65 payout and execution
+  // payout and execution
   'payoutAccountIban',
   'payoutAccountRoutingNumber',
   'destinationIban',
-  // SD-65 request to pay
+  // request to pay
   'payeeAlias',
   'payerAlias',
   'unstructuredRemittance',

@@ -42,7 +42,7 @@ const RoleObject = {
   },
 };
 
-// ADR-030 / SD-16: data-driven RBAC role administration. Reads need `roles:view`, mutations need
+// ADR-030 / data-driven RBAC role administration. Reads need `roles:view`, mutations need
 // `roles:manage` (manager). Builtin roles are editable (permissions) but cannot be renamed or deleted.
 export async function rolesController(fastify: FastifyInstance) {
   const col = () => fastify.db.collection<RoleRecord>(ROLE_COLLECTION);
@@ -229,7 +229,7 @@ export async function rolesController(fastify: FastifyInstance) {
     return updated;
   });
 
-  // DELETE /roles/:roleName, custom roles only. Builtin roles cannot be deleted (PCI Req 7 baseline).
+  // DELETE /roles/:roleName, custom roles only. Builtin roles cannot be deleted (PCI DSS baseline).
   fastify.delete('/:roleName', {
     preHandler: requirePermission('roles', 'manage'),
     schema: {

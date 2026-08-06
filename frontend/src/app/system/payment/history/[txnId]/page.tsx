@@ -252,14 +252,14 @@ export default function TransactionDetailPage() {
     // Real source of truth: fetch the transaction from the API.
     const data = await api.transactions.getById(txnId, t).catch(() => null);
     if (!data) {
-      // Fallback: try P2P transfer lookup (BIAN SD-65)
+      // Fallback: try P2P transfer lookup 
       const p2p = await api.accounts.getTransfer(txnId, t).catch(() => null);
       if (p2p) {
         setP2pTransfer(p2p);
         if (showLoading) setLoading(false);
         return;
       }
-      // RTP (Request to Pay): the id is a paymentRequestInstanceReference (intent domain, SD-65).
+      // RTP (Request to Pay): the id is a paymentRequestInstanceReference (intent domain).
       const rtp = await api.rtp.getById(txnId, t).catch(() => null);
       if (rtp) {
         setRtpRequest(rtp);
@@ -355,7 +355,7 @@ export default function TransactionDetailPage() {
     </PageShell>
   );
 
-  // P2P transfer detail view (BIAN SD-65)
+  // P2P transfer detail view 
   if (p2pTransfer) {
     const isSent = p2pTransfer.initiatorPartyReference === user?.partyRef;
     const direction = isSent ? 'sent' : 'received';
@@ -398,10 +398,10 @@ export default function TransactionDetailPage() {
             // both involved parties; only the Sender block is hidden from the recipient.
             const canSeeSource = !isCustomer || isSent;
             const canSeeDest   = !isCustomer || isSent || isReceived;
-            // The beneficiary arrangement (SD-54) belongs to the SENDER (it is their saved contact),
+            // The beneficiary arrangement belongs to the SENDER (it is their saved contact),
             // so only the sender or staff may open it. For the RECIPIENT the arrangement is a foreign
             // record (access denied), and it is also redundant: they are the beneficiary. Show them
-            // their own credited payout account (SD-66) instead, so they can verify the funds landed.
+            // their own credited payout account instead, so they can verify the funds landed.
             const showBeneficiaryLink = !!p2pTransfer.beneficiaryArrangementReference && (isSent || !isCustomer);
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
@@ -430,7 +430,7 @@ export default function TransactionDetailPage() {
                         </BlockRow>
                       ) : p2pTransfer.sourceAccountMasked ? (
                         // Recipient: origin account masked to last-4 (GDPR minimisation). No full IBAN,
-                        // no openable link to the sender's account (a foreign SD-66 record). Not PCI-scoped
+                        // no openable link to the sender's account (a foreign record). Not PCI-scoped
                         // (a bank account/IBAN is not card data), so no PAN is involved.
                         <BlockRow label="Source account" info="Origin account masked to the last 4 digits (GDPR data minimisation). Enough to reconcile the incoming payment without exposing the sender's full IBAN or their account record.">
                           <span className="font-mono text-gray-700">{p2pTransfer.sourceAccountMasked}</span>
@@ -449,15 +449,15 @@ export default function TransactionDetailPage() {
                   </div>
                   {canSeeDest ? (
                     // One link per known resource, no duplication (priority order):
-                    //  1. saved beneficiary (SD-54)  → link the contact only, and ONLY for the sender
+                    //  1. saved beneficiary → link the contact only, and ONLY for the sender
                     //     or staff (the recipient does not own this arrangement: see showBeneficiaryLink)
-                    //  2. registered payout account (SD-66) → link the destination account (the
+                    //  2. registered payout account → link the destination account (the
                     //     recipient's own credited account when they are viewing a received transfer)
                     //  3. unregistered external → full IBAN the user typed (GDPR Art. 32 / PSD2:
                     //     QE-encrypted at rest, shown to the owner; not PCI-scoped card data)
                     showBeneficiaryLink ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-                        {/* Friendly alias first (owner-defined SD-54 label), then the opaque reference link. */}
+                        {/* Friendly alias first (owner-defined label), then the opaque reference link. */}
                         {(p2pTransfer.beneficiaryAlias || p2pTransfer.beneficiaryName) && (
                           <BlockRow label="To" info="The saved payee this transfer was sent to: your own label for the beneficiary, or the account holder name.">
                             <span className="text-gray-800">{p2pTransfer.beneficiaryAlias ?? p2pTransfer.beneficiaryName}</span>
@@ -685,7 +685,7 @@ export default function TransactionDetailPage() {
               <FieldInfo label="Sender" description="The cardholder who authorised this transaction. The funding payout account is debited at authorisation; the hold is cleared at settlement." />
             </div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-              <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS Req 3.3. The full PAN is never stored after authorisation. Click to manage the card.">
+              <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS. The full PAN is never stored after authorisation. Click to manage the card.">
                 {matchedCardId ? (
                   <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
                     className="font-mono text-blue-600 hover:underline">{txn.maskedPan} ↗</Link>
@@ -699,7 +699,7 @@ export default function TransactionDetailPage() {
                 </BlockRow>
               )}
               {(apiTxn?.paymentCardReference || txn.cardToken) && (
-                <BlockRow label="Card token" info="Opaque reference replacing the PAN for downstream processing (tokenisation per PCI DSS Req 3.5). Use this token to link the card to related transactions.">
+                <BlockRow label="Card token" info="Opaque reference replacing the PAN for downstream processing (tokenisation per PCI DSS). Use this token to link the card to related transactions.">
                   <span className="flex items-center gap-1.5 flex-wrap">
                     <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
                     {matchedCardId && (
@@ -950,7 +950,7 @@ export default function TransactionDetailPage() {
                   amount: true, merchantName: true, status: true,
                 },
                 neverStored: ['full PAN', 'CVV / CVV2', 'PIN', 'magnetic track data'],
-                alignment: { bian: 'Card Transaction', pciDss: ['Req 3 (no PAN/CVV at rest)', 'Req 10 (auditable)'] },
+                alignment: { bian: 'Card Transaction', pciDss: ['no PAN/CVV at rest', 'auditable'] },
               },
             },
             {

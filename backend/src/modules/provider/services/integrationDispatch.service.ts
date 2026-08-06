@@ -135,7 +135,7 @@ async function dispatchExternal(
   const wire = resolveEventOutbound(provider, triggeredBy);
 
   // Apply outbound field mapping before sending. The MAPPED payload goes to the connector (it may
-  // rename CHD, e.g. cardNumber -> card_value, for a card issuer). PCI DSS Req 3.2/10.7: we log the
+  // rename CHD, e.g. cardNumber -> card_value, for a card issuer). PCI DSS: we log the
   // ORIGINAL (pre-mapping) payload, where CHD lives under known keys that sanitizeDeep strips: the
   // mapped body (with aliased CHD) is NEVER persisted, only transmitted.
   const mappedPayload = wire.mapping.length
@@ -270,7 +270,7 @@ export async function logEvent(
     integrationEventErrorMessage: opts.error,
     integrationEventTriggeredBy: opts.triggeredBy,
     integrationEventMeta: opts.meta,
-    // Sanitized request/response capture (auth/CHD redacted): PCI DSS Req 10.7.
+    // Sanitized request/response capture (auth/CHD redacted): PCI DSS.
     ...(opts.request ? { integrationEventRequest: sanitizeDeep(opts.request) as IntegrationEvent['integrationEventRequest'] } : {}),
     ...(opts.response ? { integrationEventResponse: sanitizeDeep(opts.response) as IntegrationEvent['integrationEventResponse'] } : {}),
     businessContext: opts.businessContext,

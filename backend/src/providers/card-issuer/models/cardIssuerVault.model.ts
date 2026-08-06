@@ -1,4 +1,4 @@
-// BIAN SD-88 Payment Card, Card Administration facet (issuer-issued device).
+// Payment Card, Card Administration facet (issuer-issued device).
 // Module-owned issuer vault (v30). This collection is the issuer Cardholder Data Environment (CDE):
 // it holds the FULL PAN (CHD) and the card service code, which NEVER exist in the PSP core. The PSP
 // core (paymentCardManagement) stays descoped: token surrogate + BIN + last4 only. Removing the

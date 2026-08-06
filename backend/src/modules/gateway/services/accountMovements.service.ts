@@ -1,4 +1,4 @@
-// BIAN SD-66 / SD-65 / SD-254: unified account movement aggregation service
+// unified account movement aggregation service
 // Merges paymentExecutionProcedure (disbursements) and cardTransactionLog (card activity)
 // into a single AccountMovement ledger view for a given payout account.
 

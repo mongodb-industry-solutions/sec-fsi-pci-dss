@@ -1,4 +1,4 @@
-// BIAN SD-54: Counterparty Administration, beneficiary registry
+// Counterparty Administration, beneficiary registry
 // Each entry is a saved contact (beneficiary) in a user's personal list.
 // counterpartyArrangementReference is the opaque "beneficiary token" shared with merchants.
 // Raw phone/email is NEVER stored here, only the resolved partyInstanceReference and a masked hint.

@@ -1,4 +1,4 @@
-// BIAN SD-88: Payment Card
+// Payment Card
 // CR: PaymentCardManagement
 
 export const PAYMENT_CARD_COLLECTION = 'paymentCardManagement';
@@ -27,15 +27,15 @@ export interface PaymentCardManagementControlRecord {
   // Customer-defined, NON-CHD descriptive metadata (the only customer-editable attributes).
   // PCI DSS: these are free-text display labels only, they MUST NOT contain a PAN/CVV; the UI
   // and API treat them as a nickname/memo so the cardholder can recognize a card-on-file.
-  // BIAN SD-88: customer-facing presentation attributes of the PaymentCardManagement control record.
+  // customer-facing presentation attributes of the PaymentCardManagement control record.
   paymentCardAlias?: string;
   paymentCardCustomerNote?: string;
   // v4: recurring payment mandate
   paymentCardMandateStatus?: 'active' | 'cancelled' | 'expired';
   paymentCardConsentDateTime?: Date;
   paymentCardMandateExpiryDate?: Date;
-  // BIAN SD-88 cardAccountReference: references the SD-66 PayoutAccountArrangement that funds this
-  // card. UUID only: IBAN never stored here (PCI DSS Req 3.3). Optional: null = card not yet linked.
+  // cardAccountReference: references the PayoutAccountArrangement that funds this
+  // card. UUID only: IBAN never stored here (PCI DSS). Optional: null = card not yet linked.
   fundingPayoutAccountInstanceReference?: string;
   bianServiceDomain: 'Payment Card';
   bianControlRecordType: 'PaymentCardManagement';

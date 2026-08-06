@@ -28,7 +28,7 @@ export interface MerchantRecord {
   merchantAllowedCurrencies?: string[];
   merchantTransactionLimitAmount?: number;
   merchantSettlementSchedule?: string;
-  merchantCommissionRate?: number; // v18: SD-89 commission rate 0..1
+  merchantCommissionRate?: number; // v18: commission rate 0..1
   merchantReviewNote?: string;
   merchantAgreementKybCheck?: MerchantAgreementKybCheck;
   recordCreatedDateTime?: string;

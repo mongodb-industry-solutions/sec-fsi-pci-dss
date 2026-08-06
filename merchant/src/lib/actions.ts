@@ -147,7 +147,7 @@ export async function previewTransfer(input: {
   });
 }
 
-// Add (register) a beneficiary via the PSP (SD-54). The merchant sends only a phone/email + optional
+// Add (register) a beneficiary via the PSP . The merchant sends only a phone/email + optional
 // label; the PSP resolves it to an opaque token (never revealing the recipient's identity). The PSP
 // is anti-enumeration: it returns { found: false } for a non-existent OR already-saved contact, so we
 // surface a neutral message either way.
@@ -172,7 +172,7 @@ export async function addBeneficiary(input: {
   });
 }
 
-// Remove (soft-delete) a saved beneficiary via the PSP (SD-54). The merchant sends only the opaque
+// Remove (soft-delete) a saved beneficiary via the PSP . The merchant sends only the opaque
 // arrangement reference; the PSP scopes the delete to the acting user (token.sub). The arrangement is
 // soft-deleted server-side and can be re-added later (which reactivates it).
 export async function removeBeneficiary(input: { beneficiaryToken: string }): Promise<ActionResult> {
@@ -184,7 +184,7 @@ export async function removeBeneficiary(input: { beneficiaryToken: string }): Pr
   });
 }
 
-// Send money to a saved beneficiary (P2P, SD-65). The merchant supplies only the beneficiary
+// Send money to a saved beneficiary (P2P). The merchant supplies only the beneficiary
 // token + amount; the PSP resolves the source account and recipient server-side (no CHD/IBAN).
 export async function sendToBeneficiary(input: {
   beneficiaryToken: string;

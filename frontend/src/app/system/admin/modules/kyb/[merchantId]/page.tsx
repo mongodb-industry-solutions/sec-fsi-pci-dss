@@ -70,7 +70,7 @@ export default function KybDetailPage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYB', href: '/system/admin/modules/kyb' }, { label: String(m.merchantName ?? merchantId) }]} />
-      <SectionHeader icon={Building2} title={String(m.merchantName ?? 'Merchant')} description="KYB administration: verdict review, beneficial owners, data correction, process timeline." debugInfo={`merchant=${merchantId} · SD-89`} />
+      <SectionHeader icon={Building2} title={String(m.merchantName ?? 'Merchant')} description="KYB administration: verdict review, beneficial owners, data correction, process timeline." debugInfo={`merchant=${merchantId}`} />
 
       {/* Entity verdict + owner-layer risk */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -105,7 +105,7 @@ export default function KybDetailPage() {
       {/* KYB data */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">KYB data<Tooltip text="KYB data fields (legal entity, MCC, notes). This is data administration, NOT a decision: the verdict/status is not editable here (approve/reject stays with merchant_officer). Click Edit to correct a field; an amendment reason is required (audit, PCI Req 10)." /></h3>
+          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">KYB data<Tooltip text="KYB data fields (legal entity, MCC, notes). This is data administration, NOT a decision: the verdict/status is not editable here (approve/reject stays with merchant_officer). Click Edit to correct a field; an amendment reason is required (audit, PCI DSS)." /></h3>
           {canManage && !editing && <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium transition-colors"><Pencil size={14} /> Edit</button>}
         </div>
 
@@ -134,7 +134,7 @@ export default function KybDetailPage() {
       {/* Process timeline */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
         <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><History size={15} /> Process timeline
-          <Tooltip text="Every event of the KYB journey by correlationId: bus milestones (*.requested/*.completed) and provider wire calls (sanitized request/response, PCI Req 10.7). Reconstructs what ran, which providers were called, and what each responded." /></h3>
+          <Tooltip text="Every event of the KYB journey by correlationId: bus milestones (*.requested/*.completed) and provider wire calls (sanitized request/response, PCI DSS). Reconstructs what ran, which providers were called, and what each responded." /></h3>
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="min-w-full text-xs">
             <thead><tr className="text-left text-gray-500 border-b border-gray-100"><th className="py-1.5 pr-3">When</th><th className="py-1.5 pr-3">Source</th><th className="py-1.5 pr-3">Action</th><th className="py-1.5 pr-3">Outcome</th></tr></thead>

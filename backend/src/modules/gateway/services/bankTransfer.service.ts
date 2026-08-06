@@ -1,4 +1,4 @@
-// v17.1 BIAN SD-65/66: Unified bank-transfer service (ACH / SEPA / SWIFT).
+// v17.1/66: Unified bank-transfer service (ACH / SEPA / SWIFT).
 // All rail derivation/validation goes through the shared rail engine (DRY), and execution is
 // dispatched through the payment_initiation provider (ADR-039: never a direct builtin import),
 // so an external PISP can replace the builtin module without changing this flow.
@@ -22,7 +22,7 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 /**
  * Mask a bank account identifier (IBAN or domestic account number) for display storage.
  * Keeps the first 4 and last 4 characters, masks the middle with bullets: enough to recognise
- * and trace the destination without persisting the full number (PCI DSS Req 3.3).
+ * and trace the destination without persisting the full number (PCI DSS).
  * "FR7630006000011234567890189" → "FR76••••0189"; short values keep only the last 2.
  */
 export function maskAccountIdentifier(raw: string): string {
@@ -84,10 +84,10 @@ export interface ExecuteBankTransferInput {
   destination: RailDestination;
   rail?: BankRail;                 // user override
   reference?: string;              // ISO 20022 remittance info
-  fromAccountRef?: string;         // optional chosen source payout account (SD-66); validated for ownership
+  fromAccountRef?: string;         // optional chosen source payout account ; validated for ownership
   recurring?: RecurringMandate;
   settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
-  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
+  merchantAgreementReference?: string; // set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface ExecuteBankTransferResult {
@@ -101,7 +101,7 @@ export interface ExecuteBankTransferResult {
 
 /**
  * Execute a bank transfer to a (registered or unregistered) external account.
- * Flow: validate via rail engine -> persist SD-65 execution (routing) -> dispatch to the
+ * Flow: validate via rail engine -> persist execution (routing) -> dispatch to the
  * payment_initiation provider -> record submitted + audit. Settlement arrives asynchronously.
  */
 export async function executeBankTransfer(
@@ -154,7 +154,7 @@ export async function executeBankTransfer(
     return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors: [screen.reason ?? 'Blocked by risk screening'] };
   }
 
-  // 2. Persist the SD-65 execution in routing state (append-only resolution log).
+  // 2. Persist the execution in routing state (append-only resolution log).
   const execution: PaymentExecutionProcedure = {
     paymentExecutionInstanceReference: executionRef,
     paymentOrderInstanceReference: executionRef,
@@ -212,7 +212,7 @@ export async function executeBankTransfer(
     },
   );
 
-  // 4. Audit (PCI DSS Req 10): business + compliance events share the execution ref as correlationId.
+  // 4. Audit (PCI DSS): business + compliance events share the execution ref as correlationId.
   emitProcessEvent(db, {
     entityType: 'execution', entityId: executionRef,
     processType: 'payment_processing', processAction: 'bank.transfer.submitted',

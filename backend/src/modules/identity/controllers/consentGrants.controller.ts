@@ -1,5 +1,5 @@
 /**
- * OAuth Consent Grant API (SD-16 Party Authentication: ADR-038)
+ * OAuth Consent Grant API (Party Authentication: ADR-038)
  * Lets authenticated users view and revoke their consent grants to merchant OAuth clients.
  *
  * Routes (all require internal PSP JWT: the user's own session):
@@ -268,7 +268,7 @@ export async function consentGrantsController(fastify: FastifyInstance) {
     const { partyRef } = request.query as { partyRef?: string };
     const role = extractUserRole(request);
 
-    // Staff revoke of a grant the caller does not own: investigator only, audited (PCI DSS Req 10).
+    // Staff revoke of a grant the caller does not own: investigator only, audited (PCI DSS).
     if (partyRef) {
       if (!canStaffMutate(role)) {
         return reply.status(403).send({ error: 'Revoking another customer\'s authorized app is restricted to level2_investigator' });

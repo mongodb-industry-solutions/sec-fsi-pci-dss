@@ -167,7 +167,7 @@ export default function MerchantReviewPage() {
         <div className="text-sm text-gray-500">
           This page is restricted to <code className="bg-gray-100 px-1 rounded">merchant_officer</code> and <code className="bg-gray-100 px-1 rounded">security_auditor</code> roles.
         </div>
-        {debugMode && <div className="text-xs text-gray-400 mt-2">PCI DSS Req 7.1, Least privilege access control</div>}
+        {debugMode && <div className="text-xs text-gray-400 mt-2">PCI DSS, Least privilege access control</div>}
       </div>
     );
   }
@@ -182,7 +182,7 @@ export default function MerchantReviewPage() {
             <h1 className="text-xl font-bold text-gray-900">Merchant Review Queue</h1>
           </div>
           <p className="text-sm text-gray-500 mt-0.5">
-            {debugMode ? 'KYB review, BIAN SD-89 Action: Control. Approve or reject pending merchant applications.' : 'Approve or reject pending merchant applications.'}
+            {debugMode ? 'KYB review, Action: Control. Approve or reject pending merchant applications.' : 'Approve or reject pending merchant applications.'}
           </p>
         </div>
         <button
@@ -199,10 +199,10 @@ export default function MerchantReviewPage() {
       {debugMode && (
         <div className="flex flex-wrap gap-2">
           <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1 text-xs text-blue-700 font-medium">
-            <span className="font-bold">BIAN SD-89</span> · Action: Control
+            <span className="font-bold">Action: Control</span>
           </span>
           <span className="inline-flex items-center gap-1 bg-purple-50 border border-purple-200 rounded-full px-3 py-1 text-xs text-purple-700">
-            PCI DSS Req 7.1 · Req 12.8
+            PCI DSS
           </span>
         </div>
       )}
@@ -358,7 +358,7 @@ export default function MerchantReviewPage() {
                             KYB: merchantAgreementKybCheckStatus → <span className={rs.action === 'approve' ? 'text-green-600 font-medium' : 'text-red-500 font-medium'}>
                               {rs.action === 'approve' ? 'verified' : 'rejected'}
                             </span>
-                            {' '} BQ:Step · PCI Req 12.8
+                            {' '} BQ:Step · PCI DSS
                           </div>
                         )}
                       </div>
@@ -440,7 +440,7 @@ export default function MerchantReviewPage() {
 
       <div className="text-xs text-gray-400 text-center pt-2">
         Reviewed by: <span className="font-medium">{role}</span>
-        {debugMode && ' · Approval recorded to audit trail (SD-89 → merchantReviewedByPartyReference)'}
+        {debugMode && ' · Approval recorded to audit trail (→ merchantReviewedByPartyReference)'}
       </div>
     </div>
   );

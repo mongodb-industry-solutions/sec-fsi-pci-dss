@@ -43,7 +43,7 @@ export default function CheckoutSectionPage() {
         icon={ShoppingCart}
         title="Checkout Session"
         description="Create a hosted checkout session for the buyer."
-        debugInfo="BIAN SD-64 Payment Order · PCI DSS SAQ A / Req 3 (PAN not handled by the merchant site)"
+        debugInfo="Payment Order · PCI DSS / (PAN not handled by the merchant site)"
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">

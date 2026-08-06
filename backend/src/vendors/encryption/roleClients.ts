@@ -67,11 +67,11 @@ async function buildQEClient(uri: string, tier: 'level1' | 'level2'): Promise<Mo
         [`${dbName}.customerAgreementProcedure`]:       maps.customerAgreementProcedure,
         [`${dbName}.paymentCardManagement`]:            maps.paymentCardManagement,
         [`${dbName}.customerAuthenticationAssessment`]: maps.customerAuthenticationAssessment,
-        // SD-66: IBAN/routing are QE:none (level2 only), level1 map omits this entry entirely
+        // IBAN/routing are QE:none (level2 only), level1 map omits this entry entirely
         ...(maps.payoutAccountArrangement
           ? { [`${dbName}.payoutAccountArrangement`]: maps.payoutAccountArrangement }
           : {}),
-        // SD-65: destinationIban (unregistered external destination) QE:none, level2 only
+        // destinationIban (unregistered external destination) QE:none, level2 only
         ...(maps.paymentExecutionProcedure
           ? { [`${dbName}.paymentExecutionProcedure`]: maps.paymentExecutionProcedure }
           : {}),

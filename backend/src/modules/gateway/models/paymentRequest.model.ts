@@ -1,6 +1,6 @@
-// BIAN SD-65 Payment Order: Request to Pay (RTP), the canonical, rail-agnostic request record (v28).
+// Payment Order: Request to Pay (RTP), the canonical, rail-agnostic request record (v28).
 // RTP is an INTENT domain, separate from payment execution: on accept a distinct
-// paymentExecutionProcedure (SD-65) is created and linked by immutable reference.
+// paymentExecutionProcedure is created and linked by immutable reference.
 // RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD). Sensitive PII is GDPR-minimized:
 // aliases are stored as a non-reversible SHA-256 hash for indexing plus a QE:none plaintext for L2 display;
 // free-text remittance / structured address / payee name are QE:none (L2 only).
@@ -71,17 +71,17 @@ export interface PaymentRequestProcedure {
   requestVersion: number;                     // canonical schema version (spec)
 
   // Requester (payee: receives funds)
-  requesterPartyReference: string;            // FK → party (SD-13)
+  requesterPartyReference: string;            // FK → party 
   requesterPspId?: string;
   payeeName?: string;                         // QE:none (DEK-rtp-payee-name), L2 only
-  payeeCounterpartyReference?: string;        // FK → counterpartyArrangement (SD-54)
+  payeeCounterpartyReference?: string;        // FK → counterpartyArrangement 
   payeeAlias?: string;                        // QE:none (DEK-rtp-payee-alias), L2 plaintext display
   payeeAliasHash?: string;                    // SHA-256(alias), indexed, non-reversible
   payeeReceivingAccountReference: string;     // FK → payoutAccountArrangement (required at create)
 
   // Payer (approves + funds)
   payerPartyReference?: string;               // resolved payer (FK → party)
-  payerCounterpartyReference?: string;        // FK → counterpartyArrangement (SD-54): the requester's
+  payerCounterpartyReference?: string;        // FK → counterpartyArrangement : the requester's
                                               // beneficiary that represents the payer (for the payee's link)
   payerAlias?: string;                        // QE:none (DEK-rtp-payer-alias)
   payerAliasHash?: string;                    // SHA-256(alias), indexed

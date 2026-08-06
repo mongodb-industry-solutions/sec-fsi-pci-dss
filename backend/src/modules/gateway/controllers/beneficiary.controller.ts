@@ -1,4 +1,4 @@
-// BIAN SD-54: Counterparty Administration + SD-65: P2P Payment Execution, dual-auth REST controller.
+// Counterparty Administration + P2P Payment Execution, dual-auth REST controller.
 // Routes mounted at /beneficiaries → /api/v1/beneficiaries
 //
 // Two authentication channels on ONE capability surface (v23, no separate /merchant/* tree):
@@ -6,7 +6,7 @@
 //   · third-party merchant (OAuth on-behalf-of: read:beneficiaries / write:beneficiaries / write:transfers).
 //     Owner is derived from token.sub (subject binding); responses are display-safe (masked hint,
 //     opaque arrangement reference, NEVER counterpartyPartyReference or the raw lookup value).
-// PCI DSS Req 7 (least privilege) · Req 10 (P2P transfer audit trail) · GDPR minimisation.
+// PCI DSS (least privilege) (P2P transfer audit trail) · GDPR minimisation.
 
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
@@ -34,7 +34,7 @@ function getUser(request: unknown): JwtUserPayload | undefined {
 
 // Display-safe projection for the OAuth (merchant) channel: only the opaque arrangement reference,
 // owner label, lookup type, masked hint and status. NEVER leak counterpartyPartyReference (PSP-internal
-// identity) or the raw lookup value (GDPR minimisation, SD-54 design).
+// identity) or the raw lookup value (GDPR minimisation, design).
 function safeBeneficiary(b: CounterpartyArrangement) {
   return {
     counterpartyArrangementReference: b.counterpartyArrangementReference,
@@ -59,7 +59,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
 
   // Payee standing data is a payment-diversion fraud vector, so every change to it is auditable:
   // who, when, through which channel, on whose list (PSD2 Art. 13 RTS trusted beneficiaries,
-  // AMLD Art. 40 record keeping, PCI DSS Req 10.2.1). Values stay masked.
+  // AMLD Art. 40 record keeping, PCI DSS). Values stay masked.
   const emitLifecycle = (
     action: 'beneficiary.registered' | 'beneficiary.relabelled' | 'beneficiary.removed',
     args: {
@@ -137,7 +137,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
         ...(q.caseRef ? { caseRef: q.caseRef } : {}),
         status: q.status, page: q.page, limit: q.limit,
       });
-      // One compliance event per record surfaced (PCI DSS Req 10.2.2).
+      // One compliance event per record surfaced (PCI DSS).
       for (const b of results) {
         emitComplianceEvent(fastify.db, {
           entityType: 'beneficiary', entityId: b.counterpartyArrangementReference,
@@ -395,7 +395,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
   }, removeHandler);
 
   // ── POST /beneficiaries/:beneficiaryRef/transfer (+ /:ownerRef/:beneficiaryRef/transfer) ─────────
-  // Send money to a saved beneficiary: P2P transfer (SD-65). The merchant supplies only an amount,
+  // Send money to a saved beneficiary: P2P transfer . The merchant supplies only an amount,
   // the opaque arrangement reference, an optional source account and note (no CHD, no IBAN); the PSP
   // resolves the recipient and (when omitted) the default source account server-side.
   const transferHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -430,13 +430,13 @@ export async function beneficiaryController(fastify: FastifyInstance) {
       fromAccountRef,
       amount: body.amount,
       note: body.note,
-      // SD-89: stamp the initiating merchant so a merchant-originated send is visible only in that
+      // stamp the initiating merchant so a merchant-originated send is visible only in that
       // merchant's history. Absent for first-party sends.
       ...(oauth ? { merchantAgreementReference: request.merchantContext?.merchantId } : {}),
     });
 
     if (oauth) {
-      // Attribute the merchant-originated action (SD-16 audit, PCI DSS Req 10).
+      // Attribute the merchant-originated action (audit, PCI DSS).
       emitProcessEvent(fastify.db, {
         entityType: 'execution', entityId: result.transferReference || beneficiaryRef,
         processType: 'payment_processing', processAction: 'merchant.beneficiary.send',

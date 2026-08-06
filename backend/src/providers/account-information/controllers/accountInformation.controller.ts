@@ -1,4 +1,4 @@
-// Account Information (AIS) builtin module controller (SD-36 Open Banking, ADR-029).
+// Account Information (AIS) builtin module controller (Open Banking, ADR-029).
 // POST /score: validates a payout account; called by integration router.
 // GET/PUT /config: admin configuration.
 
@@ -156,9 +156,9 @@ export async function accountInformationController(fastify: FastifyInstance) {
     return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
   });
 
-  // ── v29 GLOBAL PAYOUT-ACCOUNT ADMINISTRATION (SD-66, built-in module surface) ─────────────────
+  // ── v29 GLOBAL PAYOUT-ACCOUNT ADMINISTRATION (built-in module surface) ─────────────────
   // Global cross-party administration of payout accounts, distinct from the party-scoped self-service
-  // surface (/api/v1/accounts/:partyRef). Gated to operations_officer (PCI Req 7) and to the
+  // surface (/api/v1/accounts/:partyRef). Gated to operations_officer (PCI DSS) and to the
   // account-information capability resolving to its internal provider (409 managed_externally).
   // QE/GDPR: IBAN/routing are never returned here (presence hints only); reveal stays on its own route.
 
@@ -257,7 +257,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   });
 
   // GET /accounts/:accountRef/cards (v30 cross-linking): list the payment cards funded by this
-  // account (SD-88 cardAccountReference). Reuses listAllCards (funding filter) via the Card-by-account
+  // account (cardAccountReference). Reuses listAllCards (funding filter) via the Card-by-account
   // port. Display-safe (no full PAN, no CVV).
   fastify.get('/accounts/:accountRef/cards', {
     preHandler: [requirePermission('accounts', 'view'), gate],

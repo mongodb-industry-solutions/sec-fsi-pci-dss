@@ -13,7 +13,7 @@ import {
   ProcessEventMeta,
 } from '../models/externalProviderArrangement.model';
 
-// CHD scrubbing is owned by the eventbus vendor (single source of truth, PCI DSS Req 3.2 / ADR-014).
+// CHD scrubbing is owned by the eventbus vendor (single source of truth, PCI DSS / ADR-014).
 // Re-exported here so existing importers keep working unchanged.
 import { sanitizeDeep } from '../../../vendors/eventbus/sanitize';
 export { sanitizeDeep };
@@ -193,7 +193,7 @@ interface EmitComplianceEventOpts {
 
 // §9.2 flip: publish-then-project. Business logic publishes the domain event; the LedgerProjection
 // bus subscriber writes the businessProcessEvent/complianceProcessEvent ledger. No direct write here
-// (the legacy write-then-mirror double-write is gone). Fire-and-forget; never blocks (PCI Req 10.2.1).
+// (the legacy write-then-mirror double-write is gone). Fire-and-forget; never blocks (PCI DSS).
 // `_db` is retained for call-site compatibility but unused: the projection owns the DB write.
 export function emitProcessEvent(_db: Db, opts: EmitProcessEventOpts): void {
   publishLedgerEvent(opts, 'business');
@@ -201,7 +201,7 @@ export function emitProcessEvent(_db: Db, opts: EmitProcessEventOpts): void {
 
 // v18: DRY helper, build the activity attribution from a merchant OAuth context (request.merchantContext).
 // Merchant endpoints pass the result as `attribution` to emit* so every OAuth-originated action is tagged
-// uniformly (SD-16 audit). Session (non-OAuth) actions omit it → default 'session' channel downstream.
+// uniformly (audit). Session (non-OAuth) actions omit it → default 'session' channel downstream.
 export function attributionFromMerchantContext(
   ctx?: { clientId?: string; merchantId?: string; sub?: string },
 ): EventActivityAttribution | undefined {
@@ -408,7 +408,7 @@ export async function listAuditEvents(
 // "Which user did what action through which merchant/app." Reads businessProcessEvent
 // filtered by merchantAgreementReference (the OAuth-originated actions tagged in A-08/A-10),
 // with optional actingPartyReference (user) filter, free-text search and date range.
-// Display-safe: businessProcessEvent never carries CHD (stripped by the bus, PCI Req 3.2) and
+// Display-safe: businessProcessEvent never carries CHD (stripped by the bus, PCI DSS) and
 // no raw IBAN; we project a bounded, non-sensitive shape for the auditor view.
 export interface MerchantActivityRow {
   id: string;
@@ -420,7 +420,7 @@ export interface MerchantActivityRow {
   entityId: string;
   clientId?: string;
   actingPartyReference?: string;
-  actingUserName?: string; // display-safe SD-13 name for the acting party (no CHD, no IBAN)
+  actingUserName?: string; // display-safe name for the acting party (no CHD, no IBAN)
   actingChannel?: string;
   summary?: Record<string, unknown>;
 }
@@ -457,7 +457,7 @@ export async function listMerchantActivity(
     col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
-  // Resolve display-safe acting-user names (SD-13) in one batch: name only, no CHD, no IBAN.
+  // Resolve display-safe acting-user names in one batch: name only, no CHD, no IBAN.
   const subs = [...new Set(docs.map((d) => d.actingPartyReference).filter((s): s is string => !!s))];
   const users = subs.length
     ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
@@ -486,7 +486,7 @@ export async function listMerchantActivity(
 // v18 D-02: operations the CALLING USER executed through a given app (self-scoped connected-apps view).
 // Filters businessProcessEvent by actingPartyReference === sub AND (clientId === app OR
 // merchantAgreementReference === app's merchant). Reuses MerchantActivityRow (same display-safe shape:
-// no CHD: stripped by the bus, PCI Req 3.2, and no raw IBAN). Free-text search + date range + paging.
+// no CHD: stripped by the bus, PCI DSS, and no raw IBAN). Free-text search + date range + paging.
 export async function listPartyAppActivity(
   db: Db,
   opts: {

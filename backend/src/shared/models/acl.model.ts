@@ -1,6 +1,6 @@
 // ── Data-driven RBAC/ACL (ADR-030) ───────────────────────────────────────────
-// PCI DSS Req 7 (role-based access control, least privilege, default-deny, documented
-// matrix + separation of duties) · BIAN SD-16 (Party Authentication).
+// PCI DSS (role-based access control, least privilege, default-deny, documented
+// matrix + separation of duties) (Party Authentication).
 //
 // E1 (plan §13): the permission CATALOG (resource × action) is STATIC, it mirrors the real
 // enforcement points, so no permission exists without a guard. The role→permission ASSIGNMENT
@@ -10,24 +10,24 @@ export const ROLE_COLLECTION = 'role';
 
 // Resources map 1:1 to BIAN Service Domains (or ADRs), the protected business/admin areas.
 export const RESOURCES = [
-  'transactions',   // SD-254 Card Transaction
-  'customers',      // SD-53 Customer Agreement
-  'cards',          // SD-88 Payment Card
-  'fraudCases',     // SD-83 Fraud Diagnosis
-  'merchants',      // SD-89 Merchant Relations
-  'providers',      // SD-193 External Provider Arrangements
+  'transactions',   // Card Transaction
+  'customers',      // Customer Agreement
+  'cards',          // Payment Card
+  'fraudCases',     // Fraud Diagnosis
+  'merchants',      // Merchant Relations
+  'providers',      // External Provider Arrangements
   'modules',        // ADR-029 internal capability modules
-  'authDomains',    // SD-16 Party Authentication
-  'roles',          // SD-16 RBAC administration
-  'auditEvents',    // ADR-025 / PCI Req 10
+  'authDomains',    // Party Authentication
+  'roles',          // RBAC administration
+  'auditEvents',    // ADR-025 / PCI DSS
   'consents',       // Open Banking consent
-  'accounts',       // SD-66 Payout Account Arrangement (v17)
-  'beneficiaries',  // SD-54 Counterparty Administration (v18)
-  'paymentRequests', // SD-65 Payment Order: Request to Pay intent domain (v28)
+  'accounts',       // Payout Account Arrangement (v17)
+  'beneficiaries',  // Counterparty Administration (v18)
+  'paymentRequests', // Payment Order: Request to Pay intent domain (v28)
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
-// Actions are PCI-aligned access levels. `viewSensitive` gates CHD/PII (Req 3/7) and is bound to
+// Actions are PCI-aligned access levels. `viewSensitive` gates CHD/PII and is bound to
 // the existing escalation flow (canReadSensitive). `own` scope (customer) is enforced in-handler.
 export const ACTIONS = ['view', 'viewSensitive', 'manage', 'investigate'] as const;
 export type Action = (typeof ACTIONS)[number];
@@ -64,8 +64,8 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       consents: ['view'],
       accounts: ['view', 'manage'],
-      beneficiaries: ['view', 'manage'],  // SD-54: own contacts (scope: own enforced per-handler)
-      paymentRequests: ['view', 'manage'], // SD-65: own RTP requests (create/approve/reject/cancel)
+      beneficiaries: ['view', 'manage'],  // own contacts (scope: own enforced per-handler)
+      paymentRequests: ['view', 'manage'], // own RTP requests (create/approve/reject/cancel)
     },
   },
   {
@@ -84,7 +84,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       fraudCases: ['view', 'investigate'],
       // No `auditEvents`: the platform-wide event stream is cross-entity (every customer, merchant
       // and integration payload), which first-line triage has no job-related need for
-      // (PCI DSS Req 10.5.1 / 7.2.2, NIST AU-9, ISO 27001 A.8.15). It would also contradict the
+      // (PCI DSS, NIST AU-9, ISO 27001 A.8.15). It would also contradict the
       // no-enumeration rule below. L1 still gets the per-case trail via fraudCases:investigate.
       // v32 A2 (ADR-048): `view` is drill-down for a KNOWN owner party reference. Cross-party SEARCH
       // needs `investigate`, which L1 deliberately does NOT hold: first-line triage has no need to
@@ -107,10 +107,10 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       merchants: ['view'],
       fraudCases: ['view', 'investigate'],
       auditEvents: ['view'],
-      accounts: ['view', 'viewSensitive'],  // PCI Req 3.3, IBAN reveal for fraud investigations
+      accounts: ['view', 'viewSensitive'],  // PCI DSS, IBAN reveal for fraud investigations
       // v32 A2: `investigate` authorises cross-party beneficiary SEARCH (ADR-048).
-      beneficiaries: ['view', 'investigate', 'manage'],  // SD-54: search + edit/remove for investigations
-      paymentRequests: ['view'],            // SD-65: read RTP requests for investigations
+      beneficiaries: ['view', 'investigate', 'manage'],  // search + edit/remove for investigations
+      paymentRequests: ['view'],            // read RTP requests for investigations
     },
   },
   {
@@ -133,14 +133,14 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       accounts: ['view', 'viewSensitive'],
       // v32 A8: the role is documented as read-only global oversight, yet it held `manage` and the UI
       // rendered Add/Remove for it. A read-only auditor able to delete a beneficiary is a
-      // segregation-of-duties finding (EBA/GL/2019/04 §31(a), ISO 27001 A.8.2, PCI DSS Req 7).
+      // segregation-of-duties finding (EBA/GL/2019/04 §31(a), ISO 27001 A.8.2, PCI DSS).
       // `investigate` gives it the cross-party search it actually needs (ADR-048).
-      beneficiaries: ['view', 'investigate'],  // SD-54: full audit visibility, READ-ONLY
-      paymentRequests: ['view'],          // SD-65: full audit visibility of RTP requests
+      beneficiaries: ['view', 'investigate'],  // full audit visibility, READ-ONLY
+      paymentRequests: ['view'],          // full audit visibility of RTP requests
     },
   },
   {
-    // KYB DECISION authority (SD-89). v31 SoD split: merchant_officer owns the KYB *decision*
+    // KYB DECISION authority . v31 SoD split: merchant_officer owns the KYB *decision*
     // (review → approve/reject/suspend via the merchant/review flow, the Control action). This is
     // distinct from operations_officer, who owns KYB *data correction* (fields + beneficial owners)
     // on already-registered merchants. Both share the `merchants` resource and emit the same
@@ -156,16 +156,16 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     rolePermissions: {
       merchants: ['view', 'manage'],
       // No `auditEvents`: a KYB officer would otherwise read events for merchants and customers
-      // unrelated to any file under review (PCI DSS Req 10.5.1, need-to-know).
+      // unrelated to any file under review (PCI DSS, need-to-know).
       accounts: ['view'],
     },
   },
   {
-    // v29: global operations of cardholder cards (SD-88) and payout accounts (SD-66) through the
+    // v29: global operations of cardholder cards and payout accounts through the
     // built-in modules (card-issuer / account-information). BIAN has no staff "Card/Account
-    // Administrator" role for SD-88/SD-66 (data domains), so we follow the project's established
-    // "<area>_officer" bank-employee convention (precedent: merchant_officer → SD-89). SoD (PCI Req 7):
-    // distinct from `manager` (SD-193, no CHD) and from `customer` (scope own, self-service).
+    // Administrator" role for (data domains), so we follow the project's established
+    // "<area>_officer" bank-employee convention (precedent: merchant_officer →). SoD (PCI DSS):
+    // distinct from `manager` (no CHD) and from `customer` (scope own, self-service).
     roleName: 'operations_officer',
     roleLabel: 'Operations Officer',
     roleDescription: 'Operations: administers cardholder cards (SD-88) and payout accounts (SD-66) via the built-in modules, plus KYC (SD-53) and KYB (SD-89) data administration (review/correct records and beneficial owners). KYB decision (approve/reject) stays with merchant_officer (SoD, PCI Req 7).',
@@ -179,23 +179,23 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       // v31: KYC/KYB DATA ADMINISTRATION (review + correction of KYC/KYB records and beneficial
       // owners). Administration is gated by the DATA resource (customers / merchants), NOT by
       // `modules`, so it stays SoD-clean: no "modules can edit any business data" bypass.
-      //   customers → SD-53 KYC record review/correction (occupation, source of funds, gov ID,
+      //   customers → KYC record review/correction (occupation, source of funds, gov ID,
       //     address, purpose). `viewSensitive` NOT granted here: decrypted CHD-adjacent identity
       //     fields still require the L2 escalation token, exactly like the investigator path.
-      //   merchants → SD-89 KYB data correction + beneficial-owner (UBO) administration on
+      //   merchants → KYB data correction + beneficial-owner (UBO) administration on
       //     already-registered merchants. This is the *correction* half of the v31 SoD split;
       //     the KYB *decision* (approve/reject/suspend) stays with `merchant_officer`. Both emit
-      //     the same compliance events; neither replaces the other (PCI Req 7).
+      //     the same compliance events; neither replaces the other (PCI DSS).
       customers: ['view', 'manage'],
       merchants: ['view', 'manage'],
       // v29.1: administer the INTERNAL capability modules (engine config / policies of fds, aml, hrp,
       // kyc, kyb, credit-bureau, card-authorization, card-issuer, account-information, payment-initiation,
-      // vop). Auth (SD-16) stays with `manager` because it is the separate `authDomains` resource, not
+      // vop). Auth stays with `manager` because it is the separate `authDomains` resource, not
       // `modules`. `manager` keeps `modules` too (platform super-admin); this is an accepted overlap.
       modules: ['view', 'manage'],
-      // v29.2: READ-ONLY visibility of external providers (SD-193), so the operations landing can show
+      // v29.2: READ-ONLY visibility of external providers , so the operations landing can show
       // which provider currently serves each capability (internal vs external / managed_externally).
-      // NO `manage`: provider CRUD/routing stays with `manager` (SoD, PCI Req 7).
+      // NO `manage`: provider CRUD/routing stays with `manager` (SoD, PCI DSS).
       providers: ['view'],
       auditEvents: ['view'],
     },
@@ -212,7 +212,7 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
       providers: ['view', 'manage'],
       // v29.2: system oversight only. Internal module engine/policy config is a business/risk process
       // owned by `operations_officer` (view+manage); `manager` keeps `modules:view` for platform
-      // troubleshooting/security oversight but does not edit business policies (SoD, PCI Req 7).
+      // troubleshooting/security oversight but does not edit business policies (SoD, PCI DSS).
       modules: ['view'],
       authDomains: ['view', 'manage'],
       roles: ['view', 'manage'],

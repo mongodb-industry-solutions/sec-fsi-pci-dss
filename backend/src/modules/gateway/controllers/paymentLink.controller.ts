@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order - Payment Link REST controller
+// Payment Order - Payment Link REST controller
 // Routes mounted at /payment/links → /api/v1/payment/links
 
 import { FastifyInstance } from 'fastify';
@@ -39,7 +39,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
 - \`single_use\`: Link becomes inactive after first successful payment (invoice-style)
 - \`multi_use\`: Link stays active for multiple payments (store button style)
 
-**PCI DSS:** SAQ A - buyer enters card details on the PSP domain, not the merchant's.`,
+**PCI DSS:** - buyer enters card details on the PSP domain, not the merchant's.`,
       security: [{ bearerAuth: [] }],
       body: {
         type: 'object',

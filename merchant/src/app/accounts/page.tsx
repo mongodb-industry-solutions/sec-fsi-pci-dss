@@ -47,7 +47,7 @@ export default async function AccountsPage() {
                 {a.payoutAccountIsDefault && <Chip tone="accent">Default</Chip>}
               </div>
               {(() => {
-                // PSP internal ledger balance (SD-66): available now vs pending settlement.
+                // PSP internal ledger balance : available now vs pending settlement.
                 const bal = a.payoutAccountBalance as
                   | { availableAmount?: number; pendingAmount?: number; currency?: string }
                   | undefined;

@@ -1,4 +1,4 @@
-// BIAN SD-89 KYB Administration controller (v31). Mounted under /merchants (same prefix as
+// KYB Administration controller (v31). Mounted under /merchants (same prefix as
 // merchant.controller: one merchant surface, no forked API). Provides the KYB *data-administration*
 // endpoints for the Operations Officer: review/correct KYB data, administer beneficial owners, and the
 // correlated process timeline. The KYB *decision* (approve/reject) stays on /:id/review (merchant_officer).

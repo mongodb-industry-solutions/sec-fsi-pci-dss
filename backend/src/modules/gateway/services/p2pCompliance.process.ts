@@ -1,7 +1,7 @@
-// BIAN SD-83 / SD-65: post-transfer compliance checks for P2P payments.
+// post-transfer compliance checks for P2P payments.
 // Mirrors the card-payment PostAuthorizationProcess: runs FDS, HRP, AML in parallel
 // and opens a FraudDiagnosisCase if any gate flags the transfer.
-// PCI DSS Req 10: every check produces a compliance event.
+// PCI DSS: every check produces a compliance event.
 
 import { Db } from 'mongodb';
 import { EventBus, DomainEvent, makeEvent, MongoEventStore } from '../../../vendors/eventbus';

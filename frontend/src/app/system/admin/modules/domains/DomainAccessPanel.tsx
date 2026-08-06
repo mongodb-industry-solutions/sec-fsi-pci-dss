@@ -11,7 +11,7 @@ type RoleMapping = { externalClaimOrGroup: string; roleName: string };
 
 const USERS_PAGE_SIZE = 8;
 
-// PII minimization (PCI DSS Req 7 / data minimization): the admin browse-list identifies accounts
+// PII minimization (PCI DSS / data minimization): the admin browse-list identifies accounts
 // by name + role; the full QE-encrypted email is not needed here, so it is masked in the list.
 function maskEmail(email: string): string {
   const [local, domain] = (email ?? '').split('@');

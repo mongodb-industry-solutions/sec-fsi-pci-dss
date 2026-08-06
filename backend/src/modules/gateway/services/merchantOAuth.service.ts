@@ -1,5 +1,5 @@
 /**
- * Merchant OAuth 2.0 client management (BIAN SD-89 BQ:Grant, ADR-037)
+ * Merchant OAuth 2.0 client management (BQ:Grant, ADR-037)
  * Issues, rotates, and revokes OAuth client credentials for merchants.
  */
 import { Db } from 'mongodb';
@@ -161,7 +161,7 @@ export interface UpdateMerchantOAuthClientInput {
   claim_mapping?: Record<string, string>;
   logo_uri?: string;    // v18: OIDC client logo_uri (https)
   client_uri?: string;  // v18: OIDC client_uri home page (https)
-  // CIBA delivery config. Notification endpoint must be HTTPS (PCI Req.4 + CIBA spec); required
+  // CIBA delivery config. Notification endpoint must be HTTPS (PCI DSS + CIBA spec); required
   // when the delivery mode is ping/push.
   backchannel_token_delivery_mode?: OAuthBackchannelDeliveryMode;
   backchannel_client_notification_endpoint?: string;
@@ -210,7 +210,7 @@ export async function updateMerchantOAuthClient(
   assertHttpsOrEmpty(patch.client_uri, 'client_uri');
 
   // CIBA: resolve the effective delivery mode + notification endpoint (patch overlaid on existing),
-  // then enforce HTTPS + presence for ping/push (PCI Req.4 + CIBA spec).
+  // then enforce HTTPS + presence for ping/push (PCI DSS + CIBA spec).
   const effectiveGrants = patch.grant_types ?? merchant.merchantOAuthClient.oauthGrantTypes;
   const effectiveDeliveryMode = patch.backchannel_token_delivery_mode
     ?? merchant.merchantOAuthClient.oauthBackchannelTokenDeliveryMode;

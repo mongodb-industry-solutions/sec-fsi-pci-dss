@@ -1,5 +1,5 @@
 // ISO-8583-style response codes used on the card_payment bus gates (§7). Shared so gate reactors
-// and the saga agree on a single vocabulary. Distinct from the SD-15 stub's 4-digit provider codes
+// and the saga agree on a single vocabulary. Distinct from the stub's 4-digit provider codes
 // in cardAuthorization.service.ts (that is an issuer-adapter internal detail, not a bus contract).
 
 export const RESPONSE_CODE_APPROVED = '00';

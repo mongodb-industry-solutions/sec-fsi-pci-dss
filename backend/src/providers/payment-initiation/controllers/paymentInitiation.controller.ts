@@ -1,4 +1,4 @@
-// Payment Initiation (PISP) builtin module controller (SD-66, ADR-029).
+// Payment Initiation (PISP) builtin module controller (ADR-029).
 // POST /score: submits a simulated bank transfer; schedules settled/failed callback on the bus.
 // GET/PUT /config: admin configuration.
 

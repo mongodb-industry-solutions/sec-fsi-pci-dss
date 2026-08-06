@@ -307,8 +307,8 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       },
     },
   }, async (request, reply) => {
-    // OAuth (merchant on-behalf-of): owner-scoped, merchant-isolated operation history (SD-89).
-    // Merges SD-65 executions and the party's own card transactions, display-safe (no CHD).
+    // OAuth (merchant on-behalf-of): owner-scoped, merchant-isolated operation history .
+    // Merges executions and the party's own card transactions, display-safe (no CHD).
     if (request.merchantContext) {
       const owner = await resolveOwner(request, reply);
       if (!owner) return;
@@ -318,7 +318,7 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       if (!owner.ownerPartyRef) return reply.send({ results: [], total: 0, page, limit });
 
       const merchantId = request.merchantContext.merchantId;
-      // Source 1: SD-65 executions the party made THROUGH THIS merchant (isolation by SD-89 ref).
+      // Source 1: executions the party made THROUGH THIS merchant (isolation by ref).
       const filter = {
         merchantAgreementReference: merchantId,
         $or: [{ initiatorPartyReference: owner.ownerPartyRef }, { beneficiaryPartyReference: owner.ownerPartyRef }],
@@ -576,7 +576,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
                   cardTransactionMaskedPanDisplay:   { type: 'string' },
                   // Payment concept (statement descriptor). Shown as the concept in history for AML/FDS context.
                   cardTransactionDescription:        { type: 'string' },
-                  // Fraud/risk status (BIAN SD-83), distinct from the payment authorization status above.
+                  // Fraud/risk status , distinct from the payment authorization status above.
                   fraudCaseCreated:                  { type: 'boolean' },
                   fraudDiagnosisCaseStatus:          { type: ['string', 'null'] },
                   fraudDiagnosisCaseReference:       { type: ['string', 'null'] },
@@ -628,7 +628,7 @@ Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
     const { userRole } = request as unknown as AuthenticatedRequest;
     const partyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
     let questions = await listQuestionsByTransaction(fastify.db, id);
-    // Ownership scoping for customers (PCI DSS Req 7): only questions addressed to them.
+    // Ownership scoping for customers (PCI DSS): only questions addressed to them.
     if (userRole === 'customer') questions = questions.filter((q) => !partyRef || q.transactionId === id);
     return reply.send({ questions });
   });

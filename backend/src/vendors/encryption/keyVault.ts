@@ -17,15 +17,15 @@ const kmsConfig = getKmsConfig();
 export interface DEKs {
   // -- Lookup tier (QE:equality, Level 1+) --------------------------------─
   txAccountRef: Binary;           // cardTransactionLog.cardTransactionAccountReference
-  partyEmail: Binary;             // party.partyEmailAddress (SD-13)
-  partyPhone: Binary;             // party.partyMobilePhoneNumber (SD-13)
+  partyEmail: Binary;             // party.partyEmailAddress 
+  partyPhone: Binary;             // party.partyMobilePhoneNumber 
   customerAccountRef: Binary;     // customerAgreementProcedure.customerAgreementReference
   authEmail: Binary;              // customerAuthenticationAssessment.customerAuthenticationEmailAddress
   // v27 searchable KYC fields (QE:equality/range/text) - lookup tier, L1+
-  partyName: Binary;              // party.partyName (SD-13) - QE:substring
-  partyNationality: Binary;       // party.partyNationality (SD-13) - QE:equality
-  partyPlaceOfBirth: Binary;      // party.partyPlaceOfBirth (SD-13) - QE:equality
-  partySex: Binary;               // party.partySex (SD-13) - QE:equality
+  partyName: Binary;              // party.partyName - QE:substring
+  partyNationality: Binary;       // party.partyNationality - QE:equality
+  partyPlaceOfBirth: Binary;      // party.partyPlaceOfBirth - QE:equality
+  partySex: Binary;               // party.partySex - QE:equality
   caGovIdType: Binary;            // customerAgreementGovernmentID.type - QE:equality
   caGovIdNumber: Binary;          // customerAgreementGovernmentID.number - QE:suffix
   caGovIdIssuingCountry: Binary;  // customerAgreementGovernmentID.issuingCountry - QE:equality
@@ -52,11 +52,11 @@ export interface DEKs {
   caPurpose: Binary;              // customerAgreementPurposeOfRelationship
   kycScreeningRef: Binary;        // customerAgreementKycCheck.customerAgreementKycCheckScreeningProviderRef
   cardExpiry: Binary;             // paymentCardManagement.paymentCardExpirationDate
-  payoutIban: Binary;             // payoutAccountArrangement.payoutAccountIban (SD-66)
-  payoutRouting: Binary;          // payoutAccountArrangement.payoutAccountRoutingNumber (SD-66)
-  execDestIban: Binary;           // paymentExecutionProcedure.destinationIban (SD-65), unregistered destination
-  partyAddress: Binary;           // party.partyPostalAddress (SD-13), GDPR PII
-  partyDob: Binary;               // party.partyDateOfBirth (SD-13), GDPR PII
+  payoutIban: Binary;             // payoutAccountArrangement.payoutAccountIban 
+  payoutRouting: Binary;          // payoutAccountArrangement.payoutAccountRoutingNumber 
+  execDestIban: Binary;           // paymentExecutionProcedure.destinationIban , unregistered destination
+  partyAddress: Binary;           // party.partyPostalAddress , GDPR PII
+  partyDob: Binary;               // party.partyDateOfBirth , GDPR PII
   // v28 RTP QE:none fields (sensitive tier, L2 only), one DEK per field per collection
   rtpPayeeAlias: Binary;          // paymentRequestProcedure.payeeAlias
   rtpPayerAlias: Binary;          // paymentRequestProcedure.payerAlias

@@ -44,7 +44,7 @@ export interface ProfileValidationCompleted {
 /**
  * @event    kyc.screening.requested
  * @producer psp.core (bridge from profile.validation.completed)  @consumer HRP Screening Provider
- * v27: high-risk-party screening for a customer, dispatched through the Integration Hub (SD-193).
+ * v27: high-risk-party screening for a customer, dispatched through the Integration Hub .
  */
 export interface KycScreeningRequested {
   partyInstanceReference: string;

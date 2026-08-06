@@ -219,7 +219,7 @@ describe('FR-v1-03 + FR-v1-04: Card transaction + fraud routes', () => {
     expect(typeof res.body.count).toBe('number');
   });
 
-  // I-01: POST with cardTransactionDescription → GET /:id returns description + type (BIAN SD-254)
+  // I-01: POST with cardTransactionDescription → GET /:id returns description + type 
   skip('I-01: POST with description fields → GET returns them', async () => {
     const postRes = await supertest(app.server)
       .post('/api/v1/card-transactions')

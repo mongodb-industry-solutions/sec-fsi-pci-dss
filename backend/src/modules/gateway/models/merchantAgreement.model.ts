@@ -1,4 +1,4 @@
-// BIAN SD-89: Merchant Relations Control Record
+// Merchant Relations Control Record
 
 export const MERCHANT_AGREEMENT_COLLECTION = 'merchantAgreementProcedure';
 
@@ -15,7 +15,7 @@ export interface MerchantApiKeyRecord {
   keyOrigin?: 'generated' | 'imported';
 }
 
-// v16: Typed webhook registry (SD-89 BQ:Notification, ADR-038)
+// v16: Typed webhook registry (BQ:Notification, ADR-038)
 // Each event type gets a dedicated webhook config with its own URL, secret, and attribute mapping.
 // ISO 20022 pacs.002 alignment for payment events; OIDC for OAuth events.
 export type WebhookEventType =
@@ -54,8 +54,8 @@ export interface MerchantWebhookConfig {
   webhookLastDeliveryError?: string;
 }
 
-// v31 (SD-89 + SD-13): beneficial owner / shareholder / controlling person. FATF / 4th AMLD (UBO).
-// Owners are Party (SD-13) roles referenced from the Merchant Agreement (SD-89), consistent with the
+// v31 (+): beneficial owner / shareholder / controlling person. FATF / 4th AMLD (UBO).
+// Owners are Party roles referenced from the Merchant Agreement , consistent with the
 // existing D-21 dual-role Party pattern. PII (name/DOB/address/govID) is NOT duplicated here: it lives
 // in the referenced `party` record (QE-tiered, GDPR Art. 5 minimization). This embed carries only the
 // FK + role + numeric ownership/control metadata. Bounded set (regulatory reporting caps it) → safe to
@@ -68,7 +68,7 @@ export type MerchantBeneficialOwnerRole =
   | 'authorized_signatory';
 
 export interface MerchantBeneficialOwner {
-  merchantBeneficialOwnerPartyReference: string;        // FK → party.partyInstanceReference (SD-13)
+  merchantBeneficialOwnerPartyReference: string;        // FK → party.partyInstanceReference 
   merchantBeneficialOwnerRole: MerchantBeneficialOwnerRole;
   merchantBeneficialOwnerOwnershipPercentage: number;   // REQUIRED numeric participation, 0..100 (2 dp)
   merchantBeneficialOwnerIsPrimary: boolean;            // exactly one true = default/controlling owner
@@ -91,26 +91,26 @@ export interface MerchantAgreementControlRecord {
   merchantAgreementStatus: MerchantAgreementStatus;
   merchantTier: 'standard' | 'enterprise';
 
-  // D-21: Party owner link, BIAN-canonical cross-domain reference via SD-13 Party.
+  // D-21: Party owner link, BIAN-canonical cross-domain reference via Party.
   // v31: kept and maintained as a DERIVED pointer to the primary/controlling owner (back-compat:
   // existing N:1 reverse-lookups, payout fallback, notification routing). Always equals the party ref
   // of the merchantBeneficialOwners element whose merchantBeneficialOwnerIsPrimary === true.
-  merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference (SD-13)
+  merchantOwnerPartyReference?: string;             // FK → party.partyInstanceReference 
 
-  // v31 (SD-89 + SD-13, FATF/4th AMLD): beneficial owners / shareholders. 1..N; invariant: exactly one
+  // v31 (+ FATF/4th AMLD): beneficial owners / shareholders. 1..N; invariant: exactly one
   // isPrimary (= merchantOwnerPartyReference). Bounded embed (subset pattern). See MerchantBeneficialOwner.
   merchantBeneficialOwners?: MerchantBeneficialOwner[];
 
-  // v17: Default settlement account (SD-66). Used as payout destination for merchant settlements.
+  // v17: Default settlement account . Used as payout destination for merchant settlements.
   // Resolution order: merchantDefaultPayoutAccountReference → owner's default payoutAccount → exception
-  merchantDefaultPayoutAccountReference?: string;  // FK → payoutAccountArrangement (SD-66)
+  merchantDefaultPayoutAccountReference?: string;  // FK → payoutAccountArrangement 
 
   // Ch-05: Review metadata (top-level, kept for backward compat). Populated by merchant_officer.
   merchantReviewNote?: string;
   merchantReviewedByPartyReference?: string;        // FK → party.partyInstanceReference of reviewing officer
   merchantReviewedDateTime?: Date;
 
-  // Ch-06: BQ:Step, KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+  // Ch-06: BQ:Step, KYB business verification (BQ:Step). PCI DSS.
   merchantAgreementKybCheck?: MerchantAgreementKybCheck;
 
   // Gateway configuration
@@ -121,7 +121,7 @@ export interface MerchantAgreementControlRecord {
   merchantWebhooks?: MerchantWebhookConfig[];       // v16: typed per-event webhook registry (ADR-038)
   merchantSettlementSchedule: SettlementSchedule;
 
-  // v18 (SD-89 pricing): commission rate charged per operation, 0..1 (e.g. 0.025 = 2.5%). Editable from
+  // v18 (pricing): commission rate charged per operation, 0..1 (e.g. 0.025 = 2.5%). Editable from
   // merchant settings (RBAC merchants:manage). Seeder only sets an initial default. Used by computeFee.
   merchantCommissionRate?: number;
 
@@ -133,7 +133,7 @@ export interface MerchantAgreementControlRecord {
   // API key management (replaces single merchantApiKeyHash)
   merchantApiKeys: MerchantApiKeyRecord[];
 
-  // v16: OAuth 2.0 client registration (SD-89 BQ:Grant, ADR-037)
+  // v16: OAuth 2.0 client registration (BQ:Grant, ADR-037)
   merchantOAuthClient?: MerchantOAuthClientConfig;
 
   // BIAN metadata
@@ -144,7 +144,7 @@ export interface MerchantAgreementControlRecord {
   schemaVersion: number;
 }
 
-// Ch-05: Full BIAN SD-89 Agreement lifecycle.
+// Ch-05: Full Agreement lifecycle.
 // Initiate (customer) → Control (merchant_officer approve/reject) → Update (amend) → Terminate (close)
 export type MerchantAgreementStatus =
   | 'initiated'       // Application submitted; not yet in review
@@ -155,7 +155,7 @@ export type MerchantAgreementStatus =
   | 'suspended'       // Fraud hold or compliance flag
   | 'rejected'        // KYB failed or policy issue (Control: reject)
   | 'closed';         // Agreement terminated (Terminate)
-// BQ:Step, KYB business verification (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+// BQ:Step, KYB business verification (BQ:Step). PCI DSS.
 export type KybCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
 // v31: result vocabularies (NOT lifecycle statuses, ADR-009). Reused verbatim from the provider/HRP
@@ -170,7 +170,7 @@ export interface MerchantAgreementKybCheck {
   merchantAgreementKybCheckNotes?: string;
   merchantAgreementKybCheckPerformedByPartyReference?: string;  // FK → party (reviewing officer)
 
-  // v31 structured ENTITY-layer verdict (SD-89 BQ:Step, plaintext, no CHD/QE). Mirrors the KYC v27
+  // v31 structured ENTITY-layer verdict (BQ:Step, plaintext, no CHD/QE). Mirrors the KYC v27
   // verdict so KYB administration can review structured data (AML defensibility). Produced by the KYB
   // screening chain (§5bis) via applyKybScreeningVerdict, never by manual entry. The OWNER-layer risk
   // is composed by reference from each UBO's customerAgreementKycCheck (no duplication onto the merchant).
@@ -183,7 +183,7 @@ export interface MerchantAgreementKybCheck {
 export type MerchantRiskCategory = 'low' | 'medium' | 'high';
 export type SettlementSchedule = 'T+1' | 'T+2' | 'T+3';
 
-// v16: OAuth 2.0 client config (BIAN SD-89 BQ:Grant, OAuth Client Authorization, ADR-037)
+// v16: OAuth 2.0 client config (BQ:Grant, OAuth Client Authorization, ADR-037)
 // added the CIBA grant (OIDC Client-Initiated Backchannel Authentication). Full URN, spec-faithful.
 export type OAuthGrantType =
   | 'authorization_code'
@@ -213,6 +213,6 @@ export interface MerchantOAuthClientConfig {
   oauthClientUri?: string;                         // https URL of the merchant home page (OIDC client_uri)
   // CIBA delivery config. Only meaningful when oauthGrantTypes includes the ciba grant.
   oauthBackchannelTokenDeliveryMode?: OAuthBackchannelDeliveryMode;
-  // HTTPS-only (PCI Req.4 + CIBA spec); required when delivery mode is ping/push. Rejected if non-HTTPS.
+  // HTTPS-only (PCI DSS + CIBA spec); required when delivery mode is ping/push. Rejected if non-HTTPS.
   oauthBackchannelClientNotificationEndpoint?: string;
 }

@@ -1,5 +1,5 @@
 /**
- * E2E: SD-88 Card Management, saved-card list, detail actions (remove + deactivate)
+ * E2E: Card Management, saved-card list, detail actions (remove + deactivate)
  *
  * The card-management UI was redesigned: management moved OFF /system/profile onto a
  * dedicated route. The searchable list lives at /system/cards (SavedCardsPanel) and

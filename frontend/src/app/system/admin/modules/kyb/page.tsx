@@ -1,5 +1,5 @@
 'use client';
-// v31: KYB built-in module page (SD-89). Two tabs: Configuration (built-in engine policy incl. the
+// v31: KYB built-in module page . Two tabs: Configuration (built-in engine policy incl. the
 // §4.0 decisionMode) and Administration (review/correct merchants + beneficial owners). Configuration
 // is gated by modules:manage; Administration by merchants:view/manage (SoD: data resource, not modules).
 import { Suspense, useEffect, useState, useCallback } from 'react';
@@ -23,7 +23,7 @@ export default function KybModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYB (Merchant Onboarding)' }]} />
-      <SectionHeader icon={Building2} title="KYB: Know Your Business" description="Merchant onboarding verification engine and the KYB administration workbench." debugInfo="capability=kyb · SD-89 Merchant Relations · FATF/4th AMLD UBO · PCI Req 7/12.8" />
+      <SectionHeader icon={Building2} title="KYB: Know Your Business" description="Merchant onboarding verification engine and the KYB administration workbench." debugInfo="capability=kyb Merchant Relations · FATF/4th AMLD UBO · PCI DSS" />
       <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
         <KybTabs />
       </Suspense>

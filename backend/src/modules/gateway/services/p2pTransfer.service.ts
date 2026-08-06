@@ -1,10 +1,10 @@
-// BIAN SD-65/66: P2P (peer-to-peer) bank transfer to a saved beneficiary.
+///66: P2P (peer-to-peer) bank transfer to a saved beneficiary.
 // v17.1 (ADR-039/040): a beneficiary transfer is an EXTERNAL bank transfer, not an internal
 // ledger move. Execution is dispatched through the payment_initiation provider (never a direct
 // builtin import). Funds are held on the sender at submission (available -> pending) and the
 // recipient is credited only when the provider emits bank.transfer.settled (async, T+N),
 // handled by PayoutOrchestrationProcess. On failure the hold is released.
-// PCI DSS Req 10: every transfer creates an immutable paymentExecutionProcedure audit record.
+// PCI DSS: every transfer creates an immutable paymentExecutionProcedure audit record.
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,7 +23,7 @@ export interface P2PTransferInput {
   fromAccountRef: string;            // sender's payout account
   amount: number;
   note?: string;
-  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
+  merchantAgreementReference?: string; // set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface P2PTransferResult {
@@ -131,7 +131,7 @@ export async function executeP2PTransfer(
   const held = await holdCardFunds(db, fromAccountRef, amount);
   if (!held) return fail(amount, transferCurrency, 'Insufficient available balance.');
 
-  // 5. Create the immutable SD-65 execution in routing state. sourcePayoutAccountReference marks this
+  // 5. Create the immutable execution in routing state. sourcePayoutAccountReference marks this
   //    as a P2P transfer so the settlement handler clears the sender hold and credits the recipient.
   const rail = recipientAccount.payoutAccountPreferredRail ?? senderAccount.payoutAccountPreferredRail;
   const execution: PaymentExecutionProcedure = {

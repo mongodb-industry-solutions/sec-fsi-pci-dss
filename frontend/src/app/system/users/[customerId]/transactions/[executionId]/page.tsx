@@ -1,5 +1,5 @@
 'use client';
-// v27 staff drill-down: display-safe SD-65 payment execution (transfer) detail for one customer.
+// v27 staff drill-down: display-safe payment execution (transfer) detail for one customer.
 // Staff-only (level2_investigator / security_auditor); the server re-enforces the role and party
 // ownership. Never renders CHD or the raw destination IBAN, only what the API returns.
 import { useEffect, useState } from 'react';
@@ -55,7 +55,7 @@ export default function StaffExecutionDetailPage() {
   const [linkedCase, setLinkedCase] = useState<{ id: string; ref: string } | null>(null);
   const [openBusy, setOpenBusy] = useState(false);
 
-  // Auditor is read-only; only the L2 investigator may open an investigation (SoD, PCI DSS Req 7).
+  // Auditor is read-only; only the L2 investigator may open an investigation (SoD, PCI DSS).
   const canOpen = role === 'level2_investigator';
 
   useEffect(() => {

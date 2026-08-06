@@ -10,7 +10,7 @@ import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { SensitiveReveal } from '../../../../components/SensitiveReveal';
 
-// Owner self-service detail for one saved card (BIAN SD-88). Shows the surrogate token, expiry
+// Owner self-service detail for one saved card . Shows the surrogate token, expiry
 // (QE:none, owner-visible), lifecycle dates and status. The alias/note are the ONLY editable
 // attributes; the card itself can be removed (soft-delete). Ownership is enforced server-side.
 interface CardDetail {
@@ -387,7 +387,7 @@ export default function CardDetailPage() {
             )}
           </div>
 
-          {/* Funding Account: BIAN SD-88 cardAccountReference (standalone panel) */}
+          {/* Funding Account: cardAccountReference (standalone panel) */}
           {card.fundingPayoutAccountInstanceReference && (
             <div className="bg-white rounded-xl border p-5">
               <div className="flex items-center gap-2 mb-3">

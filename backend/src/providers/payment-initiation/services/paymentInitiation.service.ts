@@ -1,4 +1,4 @@
-// Builtin Payment Initiation module (SD-66 PISP).
+// Builtin Payment Initiation module (PISP).
 // Simulates a bank transfer: immediately acknowledges with 'submitted', then fires
 // a 'settled' callback after the configured T+N delay via the in-process event bus.
 // Replaceable by a real PISP/SEPA connector without changing wire contracts or bus events.

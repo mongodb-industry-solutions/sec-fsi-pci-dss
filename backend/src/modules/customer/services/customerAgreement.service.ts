@@ -32,7 +32,7 @@ function buildResponse(
   canSeeSensitive: boolean,
   caseId?: string,
 ): Record<string, unknown> {
-  // Least-privilege (PCI DSS Req 7 need-to-know · BIAN SD-53/SD-13): contact PII (email,
+  // Least-privilege (PCI DSS need-to-know): contact PII (email,
   // phone) is QE:equality, searchable while encrypted, but is exposed in responses only to
   // roles with an operational need to contact/verify the customer (L2 investigator, auditor).
   // L1 triages on non-identifying attributes (name, segment, status, KYC outcome) and never
@@ -65,7 +65,7 @@ function buildResponse(
   // Sensitive QE:none PII is attached ONLY when the role is explicitly authorized
   // (auditor, or L2 with a valid escalation token), never merely because the bytes came
   // back decrypted. This is fail-closed: if the demo DB stores these fields in plaintext
-  // (QE not active), an unauthorized role still does NOT receive them. PCI DSS Req 7.
+  // (QE not active), an unauthorized role still does NOT receive them. PCI DSS.
   // QE:none values travel in the payload only on the audited escalation path (a caseId, which
   // means maybeAudit emitted field_accessed); otherwise the reveal endpoint is used. ADR-052.
   if (canSeeSensitive && isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) {
@@ -106,10 +106,10 @@ async function findPartyAndAgreement(
 
 async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord, canSeeSensitive: boolean, actor?: { ref?: string; name?: string }): Promise<void> {
   if (!caseId) return;
-  if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited (Req 10)
+  if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited 
   if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
   await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
-    // The fields actually disclosed (PCI DSS Req 10.2.2).
+    // The fields actually disclosed (PCI DSS).
     fields: [
       'customerAgreementResidentialAddress',
       'customerAgreementRiskNotes',
@@ -221,8 +221,8 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
 }
 
 // v31: audited on-demand reveal of the QE:none (L2-only) KYC fields for the administration workbench.
-// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited: PCI Req 3.2/3.3
-// for CHD-adjacent identity data, GDPR need-to-know, Req 10). Reads via the L2 QE client so the QE:none
+// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited: PCI DSS
+// for CHD-adjacent identity data, GDPR need-to-know). Reads via the L2 QE client so the QE:none
 // fields decrypt, records a field-access compliance event (field NAMES only, no values), and returns the
 // plaintext to the caller for display only (never persisted). Gated by customers:manage at the route.
 export async function revealKycSensitive(
@@ -259,7 +259,7 @@ export async function revealKycSensitive(
     processOutcome: 'approved',
     performedByPartyReference: actor.performedByPartyReference ?? null,
     performedByRole: actor.performedByRole ?? null,
-    // GDPR minimization / PCI Req 10: log which fields were revealed, never their values.
+    // GDPR minimization / PCI DSS: log which fields were revealed, never their values.
     eventSummary: { revealedFields: Object.keys(fields) },
     bianServiceDomain: 'Customer Agreement',
     bianControlRecordType: 'CustomerAgreementProcedure',
@@ -414,13 +414,13 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
     customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
-    // v27 KYC identity (SD-53). Self-profile runs on the L2/auditor client, so the QE-encrypted
+    // v27 KYC identity . Self-profile runs on the L2/auditor client, so the QE-encrypted
     // scalar leaves (govId .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate
     // QE:range; taxId QE:prefix; occupation QE:equality) are decrypted for the owner.
     customerAgreementGovernmentID:      doc.customerAgreementGovernmentID ?? null,
     customerAgreementTaxIDNumber:       doc.customerAgreementTaxIDNumber,
     customerAgreementOccupation:        doc.customerAgreementOccupation,
-    // SD-13 party demographics, decrypted here for the owner (QE:range DOB, QE:equality rest).
+    // party demographics, decrypted here for the owner (QE:range DOB, QE:equality rest).
     partyDateOfBirth:                   party.partyDateOfBirth,
     partyNationality:                   party.partyNationality,
     partyPlaceOfBirth:                  party.partyPlaceOfBirth,
@@ -453,7 +453,7 @@ export async function updateSelfProfile(
 
   let matched = false;
 
-  // PII fields that live in party (SD-13)
+  // PII fields that live in party 
   const partyPatch: Record<string, unknown> = {};
   if (patch.customerMobilePhoneNumber) {
     partyPatch.partyMobilePhoneNumber = patch.customerMobilePhoneNumber;
@@ -545,7 +545,7 @@ export async function updateSelfProfile(
 // which QE query type, the validation rules, the role gate and the tier gate. The frontend
 // renders only what the field registry exposes and enforces nothing the server does not.
 //
-// ROLE GATE (least-privilege, PCI DSS Req 7): this is a discovery capability that returns
+// ROLE GATE (least-privilege, PCI DSS): this is a discovery capability that returns
 // LISTS of customers, so it is restricted to investigator and auditor roles. Level 1 analysts
 // keep only the blind single-record lookup (getByEmail/Phone/AccountRef); they must not be able
 // to enumerate the customer base by attribute. The gate is enforced here (server-side), not in
@@ -822,7 +822,7 @@ export async function searchKyc(
 }
 
 // v27 Phase 6: persist a provider-produced HRP screening verdict onto the KYC check sub-document.
-// The Integration Hub (SD-193) dispatches the kyc.screening.requested event to the screening
+// The Integration Hub dispatches the kyc.screening.requested event to the screening
 // provider; the provider-group reactor calls this to store the structured, auditable verdict.
 // Writes go through the L2 QE client so the QE verdict fields (range/equality/none) encrypt on
 // write, exactly like updateSelfProfile. Owning the DB write here keeps it out of the reactor.

@@ -85,7 +85,7 @@ function roleOf(request: FastifyRequest): string | undefined {
 }
 
 /**
- * Generic, data-driven authorization guard (PCI DSS Req 7, default-deny). Use as a route
+ * Generic, data-driven authorization guard (PCI DSS, default-deny). Use as a route
  * preHandler: `preHandler: requirePermission('transactions', 'view')`. Denies with 403 + a
  * machine-readable body the frontend maps to <AccessDenied>.
  *

@@ -57,7 +57,6 @@ export interface CategoryMeta {
   type: string;
   label: string;
   description: string;
-  bianSd: string;
 }
 
 const ICON_BY_TYPE: Record<string, LucideIcon> = {
@@ -475,7 +474,7 @@ export function IntegrationCategoryPage({ meta }: { meta: CategoryMeta }) {
         icon={Icon}
         title={meta.label}
         description={meta.description}
-        debugInfo={`${meta.bianSd} · SD-193 · PCI DSS Req 12.8.1`}
+        debugInfo={'PCI DSS'}
         actions={
           <Link
             href={`/system/admin/providers/vendors/new?type=${meta.type}`}

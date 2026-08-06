@@ -5,7 +5,7 @@
  * category routing fails the build:
  *  - a card payment fans out to the provider-group gates (card_issuer, FDS, HRP, funds) on ONE
  *    correlationId and aggregates into a single authorization decision;
- *  - NO SAD (CVV) or full PAN ever appears in any bus payload (PCI DSS Req 3.2 / 10);
+ *  - NO SAD (CVV) or full PAN ever appears in any bus payload (PCI DSS);
  *  - provider indifference: registering an external provider in a category still routes the flow
  *    (domain untouched), and removing it is idempotent.
  *

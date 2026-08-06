@@ -1,5 +1,5 @@
 // Stub High-Risk-Party (HRP) screening engine. Feeds the KYC verdict fields on
-// customerAgreementProcedure.customerAgreementKycCheck (SD-13 party screening producing an SD-53
+// customerAgreementProcedure.customerAgreementKycCheck (party screening producing an
 // Customer Agreement outcome). Deterministic and offline: a stable reference always maps to the
 // same verdict, so seeded data and provider-produced data agree and demos are reproducible. There
 // is no real external call (internal Module engine, ADR-029).

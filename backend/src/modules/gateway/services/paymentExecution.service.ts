@@ -1,4 +1,4 @@
-// BIAN SD-65: Payment Execution Procedure service
+// Payment Execution Procedure service
 // State machine transitions for settlement lifecycle.
 
 import { Db } from 'mongodb';
@@ -26,13 +26,13 @@ export interface CreateExecutionInput {
   grossAmount: number;
   netAmount: number;
   feeAmount?: number;
-  // Attribution for a fee-bearing execution (SD-89). Omitted when feeAmount is 0.
+  // Attribution for a fee-bearing execution . Omitted when feeAmount is 0.
   fee?: PaymentExecutionFee;
   currency: string;
   paymentExecutionRail?: PayoutRail;
 }
 
-// ── v18: merchant-commission fee (SD-65 attribution / SD-89 pricing) ───────────
+// ── v18: merchant-commission fee (attribution / pricing) ───────────
 
 // DRY, single place to derive a commission fee. Rounds to 2 decimals (currency minor unit for the demo
 // currencies). rate is 0..1; a missing/invalid rate yields a zero fee. Returns both the numeric amount
@@ -56,7 +56,7 @@ export function computeFee(
   };
 }
 
-// Resolve the merchant's CURRENT commission rate (SD-89) into the amounts an execution is born with,
+// Resolve the merchant's CURRENT commission rate into the amounts an execution is born with,
 // so gross/net/fee are consistent from the first insert (no second write, no window where the record
 // claims a fee that no balance movement matches).
 //
@@ -152,7 +152,7 @@ export async function getExecution(
     .findOne({ paymentExecutionInstanceReference: executionRef });
 }
 
-// List a party's SD-65 executions (both sent and received), most recent first, capped. Used by the
+// List a party's executions (both sent and received), most recent first, capped. Used by the
 // staff customer-transactions view to aggregate the party's money movement alongside card txns.
 // Party references are plaintext business keys (not CHD/PII), so no QE decrypt is needed for the read.
 export async function listPartyExecutions(

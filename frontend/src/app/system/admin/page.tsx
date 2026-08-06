@@ -24,17 +24,17 @@ interface Integration {
   bianServiceDomain: string;
 }
 
-// Provider-admin tiles for the manager view (SD-193 external provider arrangements). Keyed by
+// Provider-admin tiles for the manager view (external provider arrangements). Keyed by
 // externalProviderArrangementType; each links to the provider admin folder.
-const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; bianSd: string; href: string }> = {
-  fraud_detection:   { label: 'Fraud Detection',    icon: ShieldAlert,  description: 'Real-time transaction scoring and fraud signals', bianSd: 'SD-63',  href: '/system/admin/fraud-detection' },
-  hrp_sanctions:     { label: 'HRP / Sanctions',    icon: ScanLine,     description: 'High-risk person and sanctions list screening',   bianSd: 'SD-13',  href: '/system/admin/hrp' },
-  kyc_identity:      { label: 'KYC / Identity',     icon: UserCheck,    description: 'Customer identity verification (KYC)',            bianSd: 'SD-53',  href: '/system/admin/kyc' },
-  kyb_business:      { label: 'KYB / Business',     icon: Building2,    description: 'Merchant business entity verification (KYB)',     bianSd: 'SD-89',  href: '/system/admin/kyb' },
-  aml_monitoring:    { label: 'AML Monitoring',     icon: AlertTriangle, description: 'Anti-money laundering pattern analysis',         bianSd: 'SD-99',  href: '/system/admin/aml' },
-  credit_bureau:     { label: 'Credit Bureau',      icon: CreditCard,   description: 'Credit scoring and bureau checks',                bianSd: 'SD-83',  href: '/system/admin/credit-bureau' },
-  card_authorization: { label: 'Card Authorization', icon: Zap,         description: 'Card transaction authorization via payment networks', bianSd: 'SD-15', href: '/system/admin/card-authorization' },
-  card_issuer:       { label: 'Card Issuer',        icon: KeyRound,     description: 'CVV and PIN validation from card-issuing processors', bianSd: 'SD-88', href: '/system/admin/card-issuer' },
+const TYPE_META: Record<string, { label: string; icon: LucideIcon; description: string; href: string }> = {
+  fraud_detection:   { label: 'Fraud Detection',    icon: ShieldAlert,  description: 'Real-time transaction scoring and fraud signals',  href: '/system/admin/fraud-detection' },
+  hrp_sanctions:     { label: 'HRP / Sanctions',    icon: ScanLine,     description: 'High-risk person and sanctions list screening',  href: '/system/admin/hrp' },
+  kyc_identity:      { label: 'KYC / Identity',     icon: UserCheck,    description: 'Customer identity verification (KYC)',  href: '/system/admin/kyc' },
+  kyb_business:      { label: 'KYB / Business',     icon: Building2,    description: 'Merchant business entity verification (KYB)',  href: '/system/admin/kyb' },
+  aml_monitoring:    { label: 'AML Monitoring',     icon: AlertTriangle, description: 'Anti-money laundering pattern analysis',  href: '/system/admin/aml' },
+  credit_bureau:     { label: 'Credit Bureau',      icon: CreditCard,   description: 'Credit scoring and bureau checks',  href: '/system/admin/credit-bureau' },
+  card_authorization: { label: 'Card Authorization', icon: Zap,         description: 'Card transaction authorization via payment networks', href: '/system/admin/card-authorization' },
+  card_issuer:       { label: 'Card Issuer',        icon: KeyRound,     description: 'CVV and PIN validation from card-issuing processors', href: '/system/admin/card-issuer' },
 };
 
 // Icon per capability for the operations-officer module grid (module admin, not provider admin).
@@ -94,7 +94,7 @@ export default function AdminDashboardPage() {
               </h1>
               <p className="text-sm text-gray-500 mt-0.5">
                 {canManageProviders
-                  ? 'External Provider Arrangements · PCI DSS Req 12.8'
+                  ? 'External Provider Arrangements · PCI DSS'
                   : 'Internal module administration (config + data) · provider status shown read-only'}
               </p>
             </div>
@@ -174,7 +174,7 @@ function ProviderGrid({ activeByType, debugMode }: { activeByType: Record<string
             )}
 
             {debugMode && (
-              <p className="mt-2 text-[10px] font-mono text-gray-400">{meta.bianSd} · {meta.label}</p>
+              <p className="mt-2 text-[10px] font-mono text-gray-400">{meta.label}</p>
             )}
           </Link>
         );

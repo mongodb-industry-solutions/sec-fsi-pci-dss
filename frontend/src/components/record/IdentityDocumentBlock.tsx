@@ -1,5 +1,5 @@
 'use client';
-// The identity document (SD-53) from customerAgreementGovernmentID. All leaves are lookup tier:
+// The identity document from customerAgreementGovernmentID. All leaves are lookup tier:
 // number QE:suffix, type and issuing country QE:equality, expiry QE:range, tax ID QE:prefix.
 import { IdCard } from 'lucide-react';
 import { RecordGroup } from './RecordGroup';

@@ -5,7 +5,7 @@
  * Before v32 the ciphertext formatter lived only inside RawDocumentPanel, so RawMongoPanel's
  * `kind: 'static'` sections and DebugRawJson rendered their payload verbatim. On the investigation
  * page that dumped the decrypted customer profile (QE:none address and risk notes) into the debug
- * JSON, unmasked and unlogged: a disclosure with no audit event (PCI DSS Req 10.2.2).
+ * JSON, unmasked and unlogged: a disclosure with no audit event (PCI DSS).
  */
 import { describe, it, expect } from 'vitest';
 import {

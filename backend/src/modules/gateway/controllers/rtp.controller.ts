@@ -1,4 +1,4 @@
-// v28 BIAN SD-65: Request to Pay REST controller. Mounted at /gateway/rtp → /api/v1/gateway/rtp.
+// v28 Request to Pay REST controller. Mounted at /gateway/rtp → /api/v1/gateway/rtp.
 // RTP is a transfer that requires the payer's in-app approval (no CIBA). Request resources are strictly
 // separate from payment (execution) resources. All mutating routes use dualPermission (session JWT/RBAC
 // OR merchant OAuth scope) + idempotency keys + Fastify schemas. Providers only via dispatch (services).
@@ -209,7 +209,7 @@ export async function rtpController(fastify: FastifyInstance) {
       };
     }
 
-    // Beneficiary link for the payee's view: the requester's SD-54 arrangement representing the payer.
+    // Beneficiary link for the payee's view: the requester's arrangement representing the payer.
     // Resolve on read (covers RTP created before the field existed) if not already stored.
     let payerCounterpartyReference = req.payerCounterpartyReference;
     if (!payerCounterpartyReference && req.payerPartyReference) {
@@ -292,7 +292,7 @@ export async function rtpController(fastify: FastifyInstance) {
   });
 
   // POST /requests/:ref/qr, issue/get a QR for this request (shared QR capability).
-  // v35 CH-3: state-changing → write-level, as POST /gateway/qr/represent (PCI DSS Req 7).
+  // v35 CH-3: state-changing → write-level, as POST /gateway/qr/represent (PCI DSS).
   fastify.post('/requests/:ref/qr', { config: { dualAuth: true }, preHandler: dualPermission({ resource: 'paymentRequests', action: 'manage', scope: 'write:rtp' }), schema: { tags: ['rtp'], summary: 'Issue/get a QR for this request', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } } }, async (request, reply) => {
     const actor = await resolveActor(request, reply); if (!actor) return;
     const { ref } = request.params as { ref: string };

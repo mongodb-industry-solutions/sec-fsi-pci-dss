@@ -92,7 +92,7 @@ export default function LinksSectionPage() {
         icon={Link2}
         title="Payment Links"
         description="Create a shareable payment link."
-        debugInfo="BIAN SD-64 Payment Order · PCI DSS Req 3 (PAN captured on the hosted page)"
+        debugInfo="Payment Order · PCI DSS (PAN captured on the hosted page)"
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5">

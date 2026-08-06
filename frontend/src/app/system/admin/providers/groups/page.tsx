@@ -195,7 +195,7 @@ export default function RoutingGroupsPage() {
         title="Groups"
         description="Provider categories. Built-in groups can be activated/deactivated; add custom groups for advanced routing."
         info="Each built-in group is a provider category (e.g. Fraud Detection). Open one to manage its providers. Built-in groups cannot be deleted; only deactivated. Custom groups add routing across multiple providers (strategy + members)."
-        debugInfo="BIAN SD-193 ExternalProviderArrangementPortfolio · built-in deactivate-only · custom = routing strategy + members · manager only"
+        debugInfo="ExternalProviderArrangementPortfolio · built-in deactivate-only · custom = routing strategy + members · manager only"
       />
 
       {/* Create */}

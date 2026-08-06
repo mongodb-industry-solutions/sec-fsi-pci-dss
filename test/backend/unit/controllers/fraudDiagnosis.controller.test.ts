@@ -1,5 +1,5 @@
 /**
- * Unit tests: fraud case OPEN + REOPEN role guards (SD-83, PCI DSS Req 7 separation of duties).
+ * Unit tests: fraud case OPEN + REOPEN role guards (PCI DSS separation of duties).
  * Source: backend/src/modules/fraud/controllers/fraudDiagnosis.controller.ts
  *
  * The controller delegates the SoD decision to two exported guards:

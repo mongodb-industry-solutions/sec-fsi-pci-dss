@@ -12,7 +12,7 @@ import { phoneDigest } from '../../../vendors/encryption/digest';
 // (see registration flow). Pending and suspended accounts cannot log in.
 export type ManagedUserStatus = 'active' | 'suspended' | 'pending';
 
-// Contact PII (email/phone/name) is BIAN SD-13 Party data, not SD-91 credentials. Phone is
+// Contact PII (email/phone/name) is Party data, not credentials. Phone is
 // QE:equality-encrypted with a blind-index digest for uniqueness. Reads/writes go through the
 // QE-enabled role client. This helper creates or updates the linked party's contact fields and
 // keeps the phone digest in sync, rejecting a phone already owned by another party.
@@ -44,7 +44,7 @@ async function writePartyContact(
     await col.updateOne({ partyInstanceReference: partyRef }, { $set: set });
     return;
   }
-  // No party yet (e.g. an admin-created account): create the minimal SD-13 identity record.
+  // No party yet (e.g. an admin-created account): create the minimal identity record.
   const now = new Date();
   await col.insertOne({
     partyInstanceReference: partyRef,
@@ -84,7 +84,7 @@ async function readPartyPhone(partyRef: string): Promise<string | undefined> {
   }
 }
 
-// ADR-030 / SD-91: local-domain user administration (manager-managed). Role assignment references
+// ADR-030 / local-domain user administration (manager-managed). Role assignment references
 // the global `role` collection (any builtin or custom role name). Passwords are bcrypt-hashed
 // (12 rounds) and never returned. Remote (OIDC/SAML) domains manage role MAPPINGS instead, not users.
 
@@ -100,7 +100,7 @@ export interface ManagedUser {
   partyReference?: string;
   lastLoginAt?: string;
   createdAt?: string;
-  // Contact PII from the linked party (SD-13); only populated on the single-user detail read.
+  // Contact PII from the linked party ; only populated on the single-user detail read.
   phone?: string;
 }
 
@@ -160,7 +160,7 @@ export async function createUser(db: Db, input: {
   if (existing) throw Object.assign(new Error(`A user with email '${email}' already exists.`), { statusCode: 409 });
 
   const partyRef = randomUUID();
-  // Contact PII lives in the SD-13 party. Create it up-front (name/email always; phone when given)
+  // Contact PII lives in the party. Create it up-front (name/email always; phone when given)
   // so the account is a proper BIAN identity and is discoverable (e.g. beneficiary lookup by phone).
   await writePartyContact(partyRef, { name: input.name, email, phone: input.phone });
 
@@ -190,7 +190,7 @@ export async function updateUser(db: Db, id: string, patch: {
   const current = await col.findOne({ customerAuthenticationInstanceReference: id });
   if (!current) return null;
 
-  // Contact PII (name/phone) is mirrored to the linked SD-13 party. Phone throws 409 on a clash.
+  // Contact PII (name/phone) is mirrored to the linked party. Phone throws 409 on a clash.
   // Pass the account email too so that, if the party has to be created (missing doc), it is complete.
   if (typeof patch.phone === 'string' || (typeof patch.name === 'string' && current.partyInstanceReference)) {
     await writePartyContact(current.partyInstanceReference, {

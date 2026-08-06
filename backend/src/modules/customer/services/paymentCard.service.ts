@@ -12,8 +12,8 @@ import {
 import { CUSTOMER_AGREEMENT_COLLECTION, CustomerAgreementControlRecord } from '../models/customerAgreement.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
-// Resolve the customerAgreement owned by a Party (SD-13). Used to enforce that a customer can
-// only manage THEIR OWN cards (PCI DSS Req 7 least privilege): the path :customerId must equal
+// Resolve the customerAgreement owned by a Party . Used to enforce that a customer can
+// only manage THEIR OWN cards (PCI DSS least privilege): the path :customerId must equal
 // the agreement linked to the caller's partyRef.
 export async function getOwnAgreementId(db: Db, partyRef: string | undefined): Promise<string | null> {
   if (!partyRef) return null;
@@ -32,7 +32,7 @@ export interface CreateCardInput {
   paymentCardIsPreferred: boolean;
   // Optional customer nickname (non-CHD display metadata) set at registration time.
   paymentCardAlias?: string;
-  // v30.1: the funding/payout account this card draws from (BIAN SD-88 cardAccountReference). The
+  // v30.1: the funding/payout account this card draws from (cardAccountReference). The
   // card owner is derived from this account's party, so admin registration requires it.
   fundingPayoutAccountInstanceReference?: string;
 }
@@ -98,7 +98,7 @@ export async function upsertCardByToken(db: Db, input: CreateCardInput): Promise
   return { paymentCardInstanceReference: cardId, created };
 }
 
-// Soft-delete (PCI DSS Req 10: never lose the audit history). The card is marked `revoked`
+// Soft-delete (PCI DSS: never lose the audit history). The card is marked `revoked`
 // and its recurring mandate cancelled; it is filtered out of the customer's list but the
 // record is retained. Scoped by customerRef so a card can only be revoked by its owner.
 // Returns true if a matching active card was revoked.
@@ -117,7 +117,7 @@ export async function revokeCard(db: Db, customerRef: string, cardId: string): P
   return true;
 }
 
-// ---- Physical-card registry (SD-88, ADR-027): one doc per token; FDS/AML shared-card signal -----
+// ---- Physical-card registry (ADR-027): one doc per token; FDS/AML shared-card signal -----
 
 // Recompute the registry entry for a token from its non-revoked arrangements: the set of distinct
 // holders and the holder count. Emits a compliance event when the card crosses the shared-card
@@ -231,7 +231,7 @@ export async function registerCardForCustomer(db: Db, input: CreateCardInput): P
   return { paymentCardInstanceReference: cardId, paymentCardStatus: status, reused };
 }
 
-// Auditor Data Integrity (PCI DSS Req 10): detect card records that are duplicated by error.
+// Auditor Data Integrity (PCI DSS): detect card records that are duplicated by error.
 //   - duplicateArrangements: the same (customer, token) stored more than once (a hard duplicate).
 //   - tokenizationDuplicates: one customer holding the same masked PAN + network under DIFFERENT
 //     tokens (the same physical card duplicated because of inconsistent/non-deterministic tokens).
@@ -292,7 +292,7 @@ export async function rebuildCardRegistry(db: Db): Promise<number> {
   return tokens.length;
 }
 
-// v29 admin (SD-88, built-in module card-issuer): cross-party GLOBAL card list for the operations
+// v29 admin (built-in module card-issuer): cross-party GLOBAL card list for the operations
 // officer. Display-safe projection identical to the customer list (surrogate token, masked PAN,
 // network, status, agreement ref, dates): the QE:none expiry is NOT included here (returned only by
 // the per-card detail). Revoked cards are retained for audit and excluded. Paginated + filterable.
@@ -305,7 +305,7 @@ export async function listAllCards(
   query.paymentCardStatus = opts?.status ? opts.status : { $ne: 'revoked' };
   if (opts?.network) query.paymentCardNetwork = opts.network;
   if (opts?.agreement) query.customerAgreementInstanceReference = opts.agreement;
-  // Scope to the cards funded by one payout account (SD-88 cardAccountReference cross-linking).
+  // Scope to the cards funded by one payout account (cardAccountReference cross-linking).
   if (opts?.funding) query.fundingPayoutAccountInstanceReference = opts.funding;
   // v30 non-CHD truncated-PAN search: last4 (equality) + BIN prefix. Cheap, no QE, no CHD.
   if (opts?.last4) query.paymentCardLast4 = opts.last4.replace(/\D/g, '').slice(-4);
@@ -351,7 +351,7 @@ export async function listAllCards(
 // owner/staff self-service getCardById, this is NOT scoped by customerAgreementInstanceReference.
 // Returns the QE:none expiry (business need-to-know: verify a card is correctly registered; expiry
 // is CHD but NOT SAD, and PCI DSS does not mandate masking it). CVV/PIN are never stored. Null if
-// not found. Callers MUST audit the access (card.accessed, PCI Req 10).
+// not found. Callers MUST audit the access (card.accessed, PCI DSS).
 export async function getCardByIdAny(db: Db, cardId: string) {
   return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .findOne({ paymentCardInstanceReference: cardId }, { projection: { _id: 0 } });
@@ -412,7 +412,7 @@ export async function getCardsByCustomer(db: Db, customerRef: string) {
   return { results };
 }
 
-// BIAN SD-88 cardAccountReference: return all active cards that fund from a specific payout account.
+// cardAccountReference: return all active cards that fund from a specific payout account.
 // Used by the account detail page to show linked payment methods. Read-only; no CHD returned.
 export async function getCardsByFundingAccount(db: Db, accountRef: string) {
   const results = await db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)

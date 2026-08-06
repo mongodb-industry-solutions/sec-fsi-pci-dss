@@ -1,6 +1,6 @@
 /**
  * E2E: /system/audit-events reads its filters from the query string, so a record can deep-link
- * into its own audit trail (PCI DSS Req 10.2: the trail must be reachable from the record).
+ * into its own audit trail (PCI DSS: the trail must be reachable from the record).
  * Primary roles: security_auditor, manager.
  */
 import { test, expect, Page } from '@playwright/test';

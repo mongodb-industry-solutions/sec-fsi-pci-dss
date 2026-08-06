@@ -5,7 +5,7 @@ import { useEffectivePermissions } from '../lib/permissions';
 
 // Deep link from a business record to its audit trail. /system/audit-events reads every filter
 // from the query string, so a prefiltered link is all an oversight role needs to jump from the
-// record to the events that reference it (PCI DSS Req 10.2: the trail must be reachable).
+// record to the events that reference it (PCI DSS: the trail must be reachable).
 // Rendered only for roles that hold auditEvents:view, so it never advertises a 403.
 
 export interface AuditTrailLinkProps {

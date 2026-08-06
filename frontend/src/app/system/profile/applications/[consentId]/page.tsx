@@ -212,7 +212,7 @@ export default function AuthorizedApplicationDetailPage() {
         icon={Layers}
         title="Application access"
         description="What this app can access on your behalf, and when you approved it."
-        debugInfo="SD-16 · ConsentGrant · OAuth 2.0 / OIDC · self-scoped (sub)"
+        debugInfo="ConsentGrant · OAuth 2.0 / OIDC · self-scoped (sub)"
       />
 
       {statusOverride === 'revoked' && (

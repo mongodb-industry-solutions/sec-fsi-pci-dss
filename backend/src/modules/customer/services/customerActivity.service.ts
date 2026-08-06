@@ -1,6 +1,6 @@
 // v27: staff view of a customer's aggregated activity (transactions).
-// Orchestrates read-only, display-safe money movement for a found customer: SD-65 payment
-// executions (sent/received) and SD-254 card transactions. Domain logic lives here (Hexagonal);
+// Orchestrates read-only, display-safe money movement for a found customer: payment
+// executions (sent/received) and card transactions. Domain logic lives here (Hexagonal);
 // the controller stays thin. Reuses the transaction/gateway services rather than duplicating the
 // merge the merchant OAuth history already performs.
 import { Db } from 'mongodb';
@@ -34,10 +34,10 @@ interface ActivityRow {
 /**
  * Aggregate a customer's transactions for the staff profile view.
  *
- * Role gate (PCI DSS Req 7): VIEW is restricted to level2_investigator and security_auditor;
+ * Role gate (PCI DSS): VIEW is restricted to level2_investigator and security_auditor;
  * L1 analyst and customer are rejected with 403. Resolves customerId
  * (customerAgreementInstanceReference) -> partyInstanceReference (+ account reference) via the
- * agreement, then merges the party's SD-65 executions and SD-254 card transactions display-safe.
+ * agreement, then merges the party's executions and card transactions display-safe.
  */
 export async function getCustomerTransactions(
   db: Db,
@@ -67,7 +67,7 @@ export async function getCustomerTransactions(
   const partyRef = agreement.partyInstanceReference;
   const accountReference = agreement.customerAgreementReference;
 
-  // Source 1: SD-65 executions (sent/received) for the party, across all merchants/rails.
+  // Source 1: executions (sent/received) for the party, across all merchants/rails.
   const execDocs = await listPartyExecutions(db, partyRef, 200);
   const execRows: ActivityRow[] = execDocs.map((d) => ({
     kind: 'transfer',
@@ -86,7 +86,7 @@ export async function getCustomerTransactions(
     completedAt: d.completedAt?.toISOString() ?? null,
   }));
 
-  // Source 2: the party's OWN card transactions (SD-254), masked PAN only, across all merchants.
+  // Source 2: the party's OWN card transactions , masked PAN only, across all merchants.
   const acctRef = accountReference ?? (await resolveAccountReferenceForParty(db, partyRef));
   const cardTxns = acctRef ? await getPartyCardTransactions(db, acctRef, 200) : [];
   const cardRows: ActivityRow[] = cardTxns.map((t) => ({
@@ -115,7 +115,7 @@ export async function getCustomerTransactions(
   return { results, total, page: p, limit: l };
 }
 
-// Display-safe SD-65 execution detail for the staff drill-down (no CHD, no raw IBAN).
+// Display-safe execution detail for the staff drill-down (no CHD, no raw IBAN).
 export interface ExecutionDetail {
   kind: 'transfer';
   paymentExecutionInstanceReference: string;
@@ -147,12 +147,12 @@ export interface ExecutionDetail {
 }
 
 /**
- * Staff drill-down: display-safe detail of ONE SD-65 payment execution belonging to a customer.
+ * Staff drill-down: display-safe detail of ONE payment execution belonging to a customer.
  *
- * Role gate (PCI DSS Req 7): restricted to level2_investigator and security_auditor (else 403).
+ * Role gate (PCI DSS): restricted to level2_investigator and security_auditor (else 403).
  * Resolves customerId (customerAgreementInstanceReference) -> partyInstanceReference, then asserts
  * the execution belongs to that party (initiator or beneficiary) else 404 (existence not leaked).
- * Reuses the SD-65 paymentExecution service; never returns the raw destination IBAN (QE:none).
+ * Reuses the paymentExecution service; never returns the raw destination IBAN (QE:none).
  */
 export async function getCustomerTransactionDetail(
   db: Db,

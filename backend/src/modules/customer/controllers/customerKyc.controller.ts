@@ -1,4 +1,4 @@
-// BIAN SD-53 KYC Administration controller (v31). Mounted under /customer (same prefix as the
+// KYC Administration controller (v31). Mounted under /customer (same prefix as the
 // customer-agreement search controller: one customer surface, no forked API). The Operations Officer
 // reviews/corrects KYC data here; sensitive identity fields stay behind the L1/L2 QE tiers + escalation
 // token (never decrypted without viewSensitive). Verdict/status is not editable here (decision 2).
@@ -125,7 +125,7 @@ export async function customerKycController(fastify: FastifyInstance) {
 
   // GET /customer/:partyInstanceReference/kyc/reveal, audited on-demand reveal of the QE:none KYC fields
   // (residential address, source of funds, purpose, risk notes, postal address). Ephemeral, need-to-know,
-  // audited (PCI Req 3.2/3.3 CHD-adjacent, GDPR, Req 10). Gated by customers:manage (the KYC admin).
+  // audited (PCI DSS CHD-adjacent, GDPR). Gated by customers:manage (the KYC admin).
   fastify.get('/:partyInstanceReference/kyc/reveal', {
     schema: {
       tags: ['customer'],

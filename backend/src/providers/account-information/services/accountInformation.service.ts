@@ -1,4 +1,4 @@
-// Builtin Account Information Service module (SD-36 Open Banking AIS).
+// Builtin Account Information Service module (Open Banking AIS).
 // Verifies a PSP-registered payout account and returns its internal ledger balance.
 // Replaceable by a real PSD2 AIS provider without changing the wire contract or bus events.
 
@@ -75,7 +75,7 @@ export function validateAccount(
   return result;
 }
 
-// v17 Funds-availability check (SD-36 AIS) for the card-payment funds gate. Reuses validateAccount
+// v17 Funds-availability check (AIS) for the card-payment funds gate. Reuses validateAccount
 // so the balance is ALWAYS sourced from the real ledger (never simulated). Pure: the atomic hold and
 // the DB read live in the gate reactor; this only interprets the account into a funds verdict. The
 // amount is expected already expressed in the ACCOUNT currency (FX applied upstream).

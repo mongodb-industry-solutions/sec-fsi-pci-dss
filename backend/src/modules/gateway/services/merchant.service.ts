@@ -1,4 +1,4 @@
-// BIAN SD-89: Merchant Relations service
+// Merchant Relations service
 // Full MongoDB-backed implementation (replaces in-memory stub from v4 prototype).
 
 import { Db } from 'mongodb';
@@ -31,7 +31,7 @@ export interface CreateMerchantInput {
   merchantLegalEntityReference: string;
   merchantCategoryCode: string;
   merchantCountryCode: string;
-  merchantOwnerPartyReference?: string;  // Ch-05: FK → party.partyInstanceReference (SD-13)
+  merchantOwnerPartyReference?: string;  // Ch-05: FK → party.partyInstanceReference 
   merchantTier?: 'standard' | 'enterprise';
   merchantAllowedCurrencies?: string[];
   merchantTransactionLimitAmount?: number;
@@ -74,7 +74,7 @@ export async function getMerchants(
   return { results, total };
 }
 
-// Ch-05: dual-role lookup; customer finds their own merchant by partyRef (SD-13 FK)
+// Ch-05: dual-role lookup; customer finds their own merchant by partyRef (FK)
 export async function getMerchantPicker(
   db: Db,
   filters: { q?: string; limit?: number }
@@ -132,7 +132,7 @@ export async function getMerchantById(db: Db, id: string) {
   return merchant ?? null;
 }
 
-// ── Merchant lifecycle audit trail (BIAN SD-89, PCI DSS Req 10) ─────────────────
+// ── Merchant lifecycle audit trail (PCI DSS) ─────────────────
 // Append-only event log of merchant relationship actions (submitted, approved,
 // rejected, KYB, config updates). No cardholder data; operational metadata only.
 export const MERCHANT_EVENTS_COLLECTION = 'merchantAgreementEvents';
@@ -204,7 +204,7 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     merchantCountryCode: input.merchantCountryCode,
     merchantAgreementStatus: 'under_review',   // Ch-05: starts at under_review; officer must approve
     ...(input.merchantOwnerPartyReference && { merchantOwnerPartyReference: input.merchantOwnerPartyReference }),
-    // Ch-06: BQ:Step; KYB initiated at application time (BIAN SD-89 BQ:Step)
+    // Ch-06: BQ:Step; KYB initiated at application time (BQ:Step)
     merchantAgreementKybCheck: {
       merchantAgreementKybCheckStatus: 'initiated' as KybCheckStatus,
     } satisfies MerchantAgreementKybCheck,
@@ -295,7 +295,7 @@ export async function reviewMerchantApplication(
         merchantReviewNote: reviewNote ?? '',
         merchantReviewedByPartyReference: reviewerPartyRef,
         merchantReviewedDateTime: now,
-        // Ch-06: BQ:Step; formal KYB check record (BIAN SD-89 BQ:Step). PCI DSS Req 12.8.
+        // Ch-06: BQ:Step; formal KYB check record (BQ:Step). PCI DSS.
         merchantAgreementKybCheck: {
           merchantAgreementKybCheckStatus: kybStatus,
           merchantAgreementKybCheckCompletedDate: now,
@@ -352,8 +352,8 @@ export async function updateMerchant(
     | 'merchantSettlementSchedule'
     | 'merchantAgreementStatus'
     | 'merchantAllowedCurrencies'
-    | 'merchantDefaultPayoutAccountReference'  // E2: self-service payout account (BIAN SD-66 FK)
-    | 'merchantCommissionRate'                 // v18: SD-89 pricing (0..1), audited on change
+    | 'merchantDefaultPayoutAccountReference'  // E2: self-service payout account (FK)
+    | 'merchantCommissionRate'                 // v18: pricing (0..1), audited on change
   >>
 ) {
   const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOneAndUpdate(
@@ -495,7 +495,7 @@ export async function generateApiKey(
 }
 
 /**
- * Import an EXISTING API key supplied by the merchant's own system. PCI DSS Req 3: only the bcrypt
+ * Import an EXISTING API key supplied by the merchant's own system. PCI DSS: only the bcrypt
  * hash + a display prefix are stored; the plaintext is hashed and discarded, never persisted and
  * never returned (the merchant already holds it). Returns metadata, or 'invalid' if too short, or
  * 'duplicate' if that exact key is already registered (active) for the merchant.
@@ -559,7 +559,7 @@ export async function updateApiKeyLabel(
 
 /**
  * Returns API key METADATA only (never the hash or plaintext): id, prefix, label,
- * status, created/last-used dates. BIAN SD-89 credential management; PCI DSS Req 3/8.
+ * status, created/last-used dates. credential management; PCI DSS.
  */
 export async function getMerchantApiKeys(db: Db, merchantId: string) {
   const merchant = await db

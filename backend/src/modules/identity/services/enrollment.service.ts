@@ -1,7 +1,7 @@
 /**
  * Passwordless credential enrollment (WebAuthn/FIDO2-style registration ceremony).
  * Session-gated: the caller is an already-authenticated user (sub = customerAuthenticationInstanceReference).
- * Stores PUBLIC key material only (PCI Req.3). Emits SD-91 compliance events (Req.8/10).
+ * Stores PUBLIC key material only (PCI DSS). Emits compliance events .
  *
  * Registration challenge is STATELESS: an HMAC-signed, expiring token binding the ceremony to the
  * owner's sub. No extra collection is needed; the device signs the exact challenge string, and

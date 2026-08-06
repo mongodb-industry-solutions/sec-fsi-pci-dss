@@ -2,7 +2,7 @@
  * Unit tests: v32 C5 raw-document authorization (test 26)
  * Source: backend/src/modules/system/services/rawDocumentAccess.service.ts
  *
- * The raw view used to be authorized by JWT presence alone (PCI DSS Req 7.3.1/7.3.3 gap):
+ * The raw view used to be authorized by JWT presence alone (PCI DSS gap):
  * any authenticated caller could read any allowed-collection document by UUID, exposing the
  * plaintext attributes of another party's record. These tests pin the two branches:
  * staff roles need `view` on the owning BIAN resource, and an own-scope role (customer)

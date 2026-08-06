@@ -7,11 +7,11 @@ import {
   PSP_REVENUE_ACCOUNT_REFERENCE,
 } from '../../modules/gateway/services/commissionSettlement.service';
 
-// Demo bank-transfer executions (SD-65) covering the three recipient-identity variants so the
+// Demo bank-transfer executions covering the three recipient-identity variants so the
 // payment-history detail page (/system/payment/history/{ref}) shows a navigable link or full
 // destination for each. All initiated by Luis (b0000001) from his default account.
-//   1. To a saved beneficiary (SD-54 arrangement)      → links /system/beneficiaries/{cab…}
-//   2. To a registered payout account (SD-66)          → links /system/accounts/{pau…}
+//   1. To a saved beneficiary (arrangement)      → links /system/beneficiaries/{cab…}
+//   2. To a registered payout account → links /system/accounts/{pau…}
 //   3. To an unregistered external IBAN                → shows full IBAN (QE-encrypted at rest)
 // destinationIban is QE:none, the seeder runs on the L2 encrypted client, so it is encrypted on insert.
 
@@ -19,11 +19,11 @@ const INITIATOR = 'b0000001-0000-4000-8000-000000000001';       // Luis
 const SOURCE_ACCOUNT = 'pao00001-0000-4000-8000-000000000001';  // Luis' default (EUR)
 const NOW = new Date('2026-07-01T10:00:00.000Z');
 
-// v18: Espresso Works Ltd (SD-89), merchant the commission fee is attributed to.
+// v18: Espresso Works Ltd , merchant the commission fee is attributed to.
 const ESPRESSO = 'm0000001-0000-4000-8000-000000000001';
 const COMMISSION_RATE = 0.025;
 
-// Build a merchant-commission execution (SD-65) with fee attribution (SD-89) so the merchant dashboard
+// Build a merchant-commission execution with fee attribution so the merchant dashboard
 // shows commissionRevenue after reseed. Deterministic; no balance movement (no source/resolved account).
 function commissionExecution(ref: string, gross: number, collected: Date): PaymentExecutionProcedure {
   const feeAmount = Math.round(gross * COMMISSION_RATE * 100) / 100;
@@ -138,7 +138,7 @@ export async function seedPaymentExecutions(db: Db) {
       }
     }
 
-    // A collected merchant commission (SD-89) has a holder: credit the PSP revenue ledger and log it,
+    // A collected merchant commission has a holder: credit the PSP revenue ledger and log it,
     // mirroring what the runtime path does at settlement (commissionSettlement.service). Only fees
     // attributed to a merchant count; a bare feeAmount is a rail charge, not a commission.
     //

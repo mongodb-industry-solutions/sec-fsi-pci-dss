@@ -48,7 +48,7 @@ export const RESOURCE_BIAN: Record<string, string> = {
   modules: 'ADR-029 Capability Modules',
   authDomains: 'Party Authentication',
   roles: 'RBAC',
-  auditEvents: 'ADR-025 · PCI Req 10',
+  auditEvents: 'ADR-025 · PCI DSS',
   consents: 'Open Banking Consent',
   accounts: 'Payout Account Arrangement',
   beneficiaries: 'Counterparty Administration',

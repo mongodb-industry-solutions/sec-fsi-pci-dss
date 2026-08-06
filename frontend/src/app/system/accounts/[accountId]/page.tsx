@@ -1,7 +1,7 @@
 'use client';
-// BIAN SD-66: Payout Account Detail, Customer Account Detail Page (v17 Phase C)
-// PCI DSS Req 3.3: IBAN never shown in full. GDPR: account holder data visible to data subject only.
-// PCI DSS Req 7: partyRef from JWT must match account's partyInstanceReference (enforced backend).
+// Payout Account Detail, Customer Account Detail Page (v17 Phase C)
+// PCI DSS: IBAN never shown in full. GDPR: account holder data visible to data subject only.
+// PCI DSS: partyRef from JWT must match account's partyInstanceReference (enforced backend).
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -474,7 +474,7 @@ export default function AccountDetailPage() {
                     </div>
                     {account.payoutAccountBankName && (
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {/* PCI Req 3.3: display bank name only, never full IBAN */}
+                        {/* PCI DSS: display bank name only, never full IBAN */}
                         {account.payoutAccountBankName}
                       </p>
                     )}
@@ -607,7 +607,7 @@ export default function AccountDetailPage() {
                             type="button"
                             onClick={toggleIban}
                             disabled={ibanLoading}
-                            title={ibanRevealed ? 'Hide IBAN' : 'Reveal IBAN (PCI DSS Req 3.3)'}
+                            title={ibanRevealed ? 'Hide IBAN' : 'Reveal IBAN (PCI DSS)'}
                             className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50"
                           >
                             {ibanLoading ? (
@@ -859,7 +859,7 @@ export default function AccountDetailPage() {
               )}
             </div>
 
-            {/* Linked payment cards (BIAN SD-88 cardAccountReference) */}
+            {/* Linked payment cards (cardAccountReference) */}
             <div className="bg-white rounded-xl border p-5 space-y-3">
               <div className="flex items-center gap-2">
                 <CreditCard size={14} className="text-gray-400" />

@@ -1,5 +1,5 @@
 /**
- * Unit tests: merchant-commission posting (SD-89 pricing → SD-66 balances).
+ * Unit tests: merchant-commission posting (pricing → balances).
  * Source: backend/src/modules/gateway/services/commissionSettlement.service.ts
  *
  * The commission is withheld from the gross, so collecting it must move money in TWO legs:

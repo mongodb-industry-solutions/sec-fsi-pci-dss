@@ -1,6 +1,6 @@
 'use client';
-// Unified beneficiary action modal (v28). One component drives BOTH "Send money" (P2P, SD-65) and
-// "Request money" (RTP, SD-65 intent) so the two flows share an identical, simplified UI. The row only
+// Unified beneficiary action modal (v28). One component drives BOTH "Send money" (P2P) and
+// "Request money" (RTP, intent) so the two flows share an identical, simplified UI. The row only
 // shows a compact button; all data capture happens in a modal (portalled to <body> to escape any
 // transformed ancestor). Reuses the existing server actions and the PSP API only.
 //

@@ -60,51 +60,49 @@ interface DashboardCard {
   description: string;
   icon:        LucideIcon;
   href:        string;
-  bianSd?:     string;
-  pciDss?:     string;
 }
 
 const ROLE_CARDS: Record<string, DashboardCard[]> = {
   customer: [
-    { label: 'Transactions',    description: 'View all your past payments and transfers, including their status and any security review.',    icon: ClipboardList,  href: '/system/payment/history', bianSd: 'SD-27',  pciDss: 'Req 7.2' },
-    { label: 'New Payment',     description: 'Pay a merchant with a saved card. Choose the merchant, amount and channel.',                    icon: PlusCircle,     href: '/system/payment',         bianSd: 'SD-27',  pciDss: 'Req 3' },
-    { label: 'Transfer',        description: 'Send money to a saved contact, initiate a bank transfer, or create a payment link.',           icon: ArrowLeftRight, href: '/system/transfer',        bianSd: 'SD-54',  pciDss: 'Req 3' },
-    { label: 'Payment Methods', description: 'View and manage your saved cards. Only the last 4 digits are ever displayed.',                  icon: CreditCard,     href: '/system/cards',           bianSd: 'SD-88',  pciDss: 'Req 3' },
-    { label: 'Payout Accounts', description: 'Manage the bank accounts where you send and receive money.',                                   icon: Landmark,       href: '/system/accounts',        bianSd: 'SD-66',  pciDss: 'Req 3.3' },
-    { label: 'Merchants',       description: 'Browse the merchants you can pay.',                                                            icon: Store,          href: '/system/merchant',        bianSd: 'SD-89',  pciDss: 'Req 12' },
-    { label: 'Profile',         description: 'View and update your personal details and contact information.',                               icon: User,           href: '/system/profile',         bianSd: 'SD-53',  pciDss: 'Req 8' },
+    { label: 'Transactions',    description: 'View all your past payments and transfers, including their status and any security review.',    icon: ClipboardList,  href: '/system/payment/history' },
+    { label: 'New Payment',     description: 'Pay a merchant with a saved card. Choose the merchant, amount and channel.',                    icon: PlusCircle,     href: '/system/payment' },
+    { label: 'Transfer',        description: 'Send money to a saved contact, initiate a bank transfer, or create a payment link.',           icon: ArrowLeftRight, href: '/system/transfer' },
+    { label: 'Payment Methods', description: 'View and manage your saved cards. Only the last 4 digits are ever displayed.',                  icon: CreditCard,     href: '/system/cards' },
+    { label: 'Payout Accounts', description: 'Manage the bank accounts where you send and receive money.',                                   icon: Landmark,       href: '/system/accounts' },
+    { label: 'Merchants',       description: 'Browse the merchants you can pay.',                                                            icon: Store,          href: '/system/merchant' },
+    { label: 'Profile',         description: 'View and update your personal details and contact information.',                               icon: User,           href: '/system/profile' },
   ],
   level1_analyst: [
-    { label: 'Cases',        description: 'Review open fraud cases. Search by case reference, email, phone or card, and escalate to L2 when needed.', icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
-    { label: 'Transactions', description: 'Search and inspect card transactions across all customers.',                                                icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2' },
-    { label: 'Users',        description: 'Look up customers by email, phone or account reference.',                                                   icon: Users,            href: '/system/users',         bianSd: 'SD-53', pciDss: 'Req 12.3' },
-    { label: 'Merchants',    description: 'Browse merchants and review their KYB status and payment activity.',                                        icon: Store,            href: '/system/merchant',      bianSd: 'SD-89', pciDss: 'Req 12.8' },
+    { label: 'Cases',        description: 'Review open fraud cases. Search by case reference, email, phone or card, and escalate to L2 when needed.', icon: BriefcaseMedical, href: '/system/investigation' },
+    { label: 'Transactions', description: 'Search and inspect card transactions across all customers.',                                                icon: CreditCard,       href: '/system/transactions' },
+    { label: 'Users',        description: 'Look up customers by email, phone or account reference.',                                                   icon: Users,            href: '/system/users' },
+    { label: 'Merchants',    description: 'Browse merchants and review their KYB status and payment activity.',                                        icon: Store,            href: '/system/merchant' },
   ],
   level2_investigator: [
-    { label: 'Cases',        description: 'Approve escalations, access full customer details, and resolve cases as fraud or cleared.',  icon: BriefcaseMedical, href: '/system/investigation', bianSd: 'SD-63', pciDss: 'Req 10.4' },
-    { label: 'Transactions', description: 'Deep-dive transaction analysis with full access to gateway and processor details.',         icon: CreditCard,       href: '/system/transactions',  bianSd: 'SD-27', pciDss: 'Req 10.2' },
-    { label: 'Users',        description: 'Full customer records and agreement detail.',                                               icon: Users,            href: '/system/users',         bianSd: 'SD-53', pciDss: 'Req 12.3' },
-    { label: 'Merchants',    description: 'Merchant due-diligence: identity, risk profile and payment activity.',                     icon: Store,            href: '/system/merchant',      bianSd: 'SD-89', pciDss: 'Req 12.8' },
+    { label: 'Cases',        description: 'Approve escalations, access full customer details, and resolve cases as fraud or cleared.',  icon: BriefcaseMedical, href: '/system/investigation' },
+    { label: 'Transactions', description: 'Deep-dive transaction analysis with full access to gateway and processor details.',         icon: CreditCard,       href: '/system/transactions' },
+    { label: 'Users',        description: 'Full customer records and agreement detail.',                                               icon: Users,            href: '/system/users' },
+    { label: 'Merchants',    description: 'Merchant due-diligence: identity, risk profile and payment activity.',                     icon: Store,            href: '/system/merchant' },
   ],
   security_auditor: [
-    { label: 'Cases',          description: 'Read-only view of every fraud case and its complete audit trail.',                  icon: BriefcaseMedical, href: '/system/investigation',  bianSd: 'SD-63',  pciDss: 'Req 10.4' },
-    { label: 'Transactions',   description: 'Full transaction audit view, all fields visible, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions',   bianSd: 'SD-27',  pciDss: 'Req 10.2.1' },
-    { label: 'Users',          description: 'Customer and staff account review: authentication records and role assignments.',   icon: Users,            href: '/system/users',          bianSd: 'SD-91',  pciDss: 'Req 8.2' },
-    { label: 'Audit Log',      description: 'Security event log: who did what and when, across all cases and users.',           icon: BarChart3,        href: '/system/audit',          bianSd: 'SD-16',  pciDss: 'Req 10' },
-    { label: 'Audit Events',   description: 'Unified activity log across payments, compliance checks and integrations.',        icon: Activity,         href: '/system/audit-events',   bianSd: 'SD-193', pciDss: 'Req 10.2' },
-    { label: 'Data Integrity', description: 'Check that all records are consistent and no data is missing or duplicated.',      icon: ShieldCheck,      href: '/system/integrity',      bianSd: 'SD-83',  pciDss: 'Req 10' },
-    { label: 'Merchant',       description: 'Merchant compliance and lifecycle audit across the portfolio.',                    icon: Store,            href: '/system/merchant',       bianSd: 'SD-89',  pciDss: 'Req 12.8' },
+    { label: 'Cases',          description: 'Read-only view of every fraud case and its complete audit trail.',                  icon: BriefcaseMedical, href: '/system/investigation' },
+    { label: 'Transactions',   description: 'Full transaction audit view, all fields visible, no modifications permitted.',     icon: CreditCard,       href: '/system/transactions' },
+    { label: 'Users',          description: 'Customer and staff account review: authentication records and role assignments.',   icon: Users,            href: '/system/users' },
+    { label: 'Audit Log',      description: 'Security event log: who did what and when, across all cases and users.',           icon: BarChart3,        href: '/system/audit' },
+    { label: 'Audit Events',   description: 'Unified activity log across payments, compliance checks and integrations.',        icon: Activity,         href: '/system/audit-events' },
+    { label: 'Data Integrity', description: 'Check that all records are consistent and no data is missing or duplicated.',      icon: ShieldCheck,      href: '/system/integrity' },
+    { label: 'Merchant',       description: 'Merchant compliance and lifecycle audit across the portfolio.',                    icon: Store,            href: '/system/merchant' },
   ],
   merchant_officer: [
-    { label: 'Review Queue', description: 'Approve or reject pending merchant applications.',                         icon: ClipboardCheck, href: '/system/merchant/review', bianSd: 'SD-89', pciDss: 'Req 12.8' },
-    { label: 'All Merchants',description: 'Full merchant portfolio with KYB status, activity and history.',           icon: Store,          href: '/system/merchant',        bianSd: 'SD-89', pciDss: 'Req 12.8' },
-    { label: 'My Profile',   description: 'Manage your profile and contact details.',                                 icon: User,           href: '/system/profile',         bianSd: 'SD-53', pciDss: 'Req 8' },
+    { label: 'Review Queue', description: 'Approve or reject pending merchant applications.',                         icon: ClipboardCheck, href: '/system/merchant/review' },
+    { label: 'All Merchants',description: 'Full merchant portfolio with KYB status, activity and history.',           icon: Store,          href: '/system/merchant' },
+    { label: 'My Profile',   description: 'Manage your profile and contact details.',                                 icon: User,           href: '/system/profile' },
   ],
   operations_officer: [
-    { label: 'Modules',       description: 'Administer the internal capability engines (card issuer, AIS, FDS, AML, HRP...) and their business policies.', icon: LayoutGrid, href: '/system/admin/modules',                                 bianSd: 'ADR-029', pciDss: 'Req 12.8' },
-    { label: 'Cards',         description: 'Global cardholder card administration (SD-88): register, edit, activate/suspend and revoke saved cards.',        icon: CreditCard, href: '/system/admin/modules/card-issuer?tab=cards',           bianSd: 'SD-88',   pciDss: 'Req 3.3' },
-    { label: 'Payout Accounts', description: 'Global payout-account administration (SD-66): create, edit and close accounts. IBAN stays encrypted.',        icon: Landmark,   href: '/system/admin/modules/account-information?tab=accounts', bianSd: 'SD-66',   pciDss: 'Req 3.3' },
-    { label: 'Audit Events',  description: 'Follow how rules and configurations behave: card validation and connected-module outcomes (approved/rejected/error).', icon: Activity,   href: '/system/audit-events',                                 bianSd: 'ADR-025', pciDss: 'Req 10.2' },
+    { label: 'Modules',       description: 'Administer the internal capability engines (card issuer, AIS, FDS, AML, HRP...) and their business policies.', icon: LayoutGrid, href: '/system/admin/modules' },
+    { label: 'Cards',         description: 'Global cardholder card administration: register, edit, activate/suspend and revoke saved cards.',        icon: CreditCard, href: '/system/admin/modules/card-issuer?tab=cards' },
+    { label: 'Payout Accounts', description: 'Global payout-account administration: create, edit and close accounts. IBAN stays encrypted.',        icon: Landmark,   href: '/system/admin/modules/account-information?tab=accounts' },
+    { label: 'Audit Events',  description: 'Follow how rules and configurations behave: card validation and connected-module outcomes (approved/rejected/error).', icon: Activity,   href: '/system/audit-events' },
   ],
   manager: [],
 };
@@ -363,12 +361,12 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
       .catch(() => {});
   }, []);
 
-  // Primary admin sections (BIAN SD-193); each is an independent area. Audit Events sits under
+  // Primary admin sections ; each is an independent area. Audit Events sits under
   // /system; Modules, Providers and Groups under /system/admin.
   const MAIN_CARDS: { label: string; description: string; icon: LucideIcon; href: string; debug: string }[] = [
-    { label: 'Audit Events', description: 'Unified business, compliance and integration audit trail.', icon: Activity,   href: '/system/audit-events',           debug: 'ADR-025 · Req 10.2 / 10.7' },
+    { label: 'Audit Events', description: 'Unified business, compliance and integration audit trail.', icon: Activity,   href: '/system/audit-events',           debug: 'ADR-025' },
     { label: 'Modules',      description: 'Internal capability engines (scoring, screening) and their config.', icon: LayoutGrid, href: '/system/admin/modules',          debug: 'ADR-029 · internal modules' },
-    { label: 'Providers',    description: 'External provider arrangements; register, route and monitor.', icon: Plug,       href: '/system/admin/providers',        debug: 'Req 12.8' },
+    { label: 'Providers',    description: 'External provider arrangements; register, route and monitor.', icon: Plug,       href: '/system/admin/providers',        debug: '' },
     { label: 'Groups',       description: 'Provider categories and routing groups; activate built-ins or add custom groups.', icon: Network,    href: '/system/admin/providers/groups', debug: 'routing portfolio' },
   ];
 
@@ -376,7 +374,7 @@ function ManagerIntegrationHub({ debugMode }: { debugMode: boolean }) {
     <>
       <div className="mb-6">
         <h2 className="text-lg font-semibold text-gray-900">Integration Hub</h2>
-        <p className="text-sm text-gray-500 mt-0.5">External Provider Arrangements · PCI DSS Req 12.8</p>
+        <p className="text-sm text-gray-500 mt-0.5">External Provider Arrangements · PCI DSS</p>
       </div>
 
       {/* Primary sections */}
@@ -464,9 +462,6 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
                     </div>
                     <p className="font-semibold text-gray-900 text-sm">{card.label}</p>
                     <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{card.description}</p>
-                    {debugMode && card.bianSd && (
-                      <p className="mt-2 text-[10px] font-mono text-gray-400">{card.bianSd} · {card.pciDss}</p>
-                    )}
                   </Link>
                 );
               })}
@@ -477,7 +472,7 @@ function RoleDashboard({ user, onSignOut }: { user: DecodedUser; onSignOut: () =
           <div className="mt-8">
             <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
               Insights
-              {debugMode && <span className="text-[10px] font-mono text-gray-400">· aggregates only · PCI DSS Req 3/7</span>}
+              {debugMode && <span className="text-[10px] font-mono text-gray-400">· aggregates only · PCI DSS</span>}
             </h2>
             <RoleStats role={user.role} token={getToken() ?? ''} />
           </div>

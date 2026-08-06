@@ -1,5 +1,5 @@
 // Internal FDS (Fraud Detection) engine: the built-in scorer used when no external fraud vendor is
-// active (internal-first, ADR-010/029). Distinct from Fraud Diagnosis (SD-83). The engine is
+// active (internal-first, ADR-010/029). Distinct from Fraud Diagnosis . The engine is
 // DATA-DRIVEN: its rules live in the Module config (capabilityModuleConfiguration.moduleConfig for
 // `fds`) so an operator can add/edit rules from the admin UI without code (P13.2/P13.5). Pure function.
 //

@@ -23,7 +23,7 @@ export async function seedUsers(db: Db) {
   // v33 (F1): every customer party must be able to sign in. The fixtures already carry a login per
   // customer (the generator applies the same derivation), so this is an idempotent safety net that
   // also closes the gap for a party added to parties.json without one. Identity comes from the party,
-  // SD-13 being the source of truth, so a login can never disagree with the KYC record.
+  // being the source of truth, so a login can never disagree with the KYC record.
   const parties = (await db
     .collection(PARTY_COLLECTION)
     .find({ partyType: 'customer' }, { projection: { _id: 0, partyInstanceReference: 1, partyType: 1, partyName: 1, partyEmailAddress: 1, recordCreatedDateTime: 1 } })

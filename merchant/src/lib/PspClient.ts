@@ -254,7 +254,7 @@ export class PspClient {
     );
   }
 
-  // Add (register) a beneficiary by resolving a phone/email to a saved payee (SD-54). The merchant
+  // Add (register) a beneficiary by resolving a phone/email to a saved payee . The merchant
   // never learns the recipient's identity: the PSP resolves it server-side and returns an opaque
   // reference. Anti-enumeration: the PSP returns { found: false } for a non-existent/duplicate contact.
   addBeneficiary(lookupType: 'phone' | 'email', lookupValue: string, label?: string) {
@@ -271,11 +271,11 @@ export class PspClient {
     rail?: string;
     reference?: string;
   }) {
-    // Money movement to a beneficiary/external account = bank transfer (SD-65).
+    // Money movement to a beneficiary/external account = bank transfer .
     return this.bankTransfer(input);
   }
 
-  // Send money to a saved beneficiary (P2P transfer, SD-65). The merchant sends only the amount,
+  // Send money to a saved beneficiary (P2P transfer). The merchant sends only the amount,
   // the opaque beneficiary reference, an optional chosen source account reference and an optional
   // description; the PSP resolves the recipient (and the default source account, if none chosen)
   // server-side. `:beneficiaryRef` is a resource id (like /orders/:orderId), NOT a credential.
@@ -351,8 +351,8 @@ export class PspClient {
   }
 
   // ── History (merchant-isolated operation history for this party): merchant OAuth (read:transactions) ──
-  // Merchant-isolated operation history (SD-89): the PSP /transactions OAuth channel already MERGES
-  // this party's SD-65 executions + card transactions made through THIS merchant. Request up to 100
+  // Merchant-isolated operation history : the PSP /transactions OAuth channel already MERGES
+  // this party's executions + card transactions made through THIS merchant. Request up to 100
   // so the merchant's history is not silently truncated (the endpoint default is 20).
   listHistory(page = 1, limit = 100) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(

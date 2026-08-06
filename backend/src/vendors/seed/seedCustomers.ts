@@ -7,7 +7,7 @@ import { screenParty, screeningHash } from '../../providers/kyc/services/hrpScre
 // v2: customerAgreements.json contains merged sensitive fields (address, govId, riskNotes).
 // The QE client encrypts them with DEK-sensitive tier on write - no separate *Sensitive file.
 //
-// v27: deterministic KYC enrichment mirroring seedParties. Every new SD-53 field (structured
+// v27: deterministic KYC enrichment mirroring seedParties. Every new field (structured
 // government ID, TIN, occupation, source of funds, purpose, and provider KYC verdicts) is
 // populated so all 5 QE search types return demoable results. Values derive from the instance
 // reference so they are stable across reseeds. Enrichment is idempotent: only absent fields are

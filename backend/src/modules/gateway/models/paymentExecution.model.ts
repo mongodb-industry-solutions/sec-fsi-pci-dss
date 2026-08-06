@@ -1,4 +1,4 @@
-// BIAN SD-65: Payment Execution, settlement lifecycle record
+// Payment Execution, settlement lifecycle record
 // Created after authorization; tracks the full journey from routing to completion.
 // resolutionLog is append-only and captures every beneficiary resolution step for PCI audit.
 
@@ -26,34 +26,34 @@ export interface PaymentExecutionResolutionStep {
   stepDateTime: Date;
 }
 
-// v18 (SD-65 / SD-89): merchant-commission ATTRIBUTION sub-doc. The numeric commission amount stays
+// v18 : merchant-commission ATTRIBUTION sub-doc. The numeric commission amount stays
 // in the flat `feeAmount` field (single source of truth: do NOT duplicate it here); this sub-doc only
 // records WHO the fee belongs to and HOW it was derived, so the merchant dashboard can aggregate
-// commission revenue (SD-89) from the execution record (SD-65). Not CHD → NOT QE-encrypted.
+// commission revenue from the execution record . Not CHD → NOT QE-encrypted.
 export interface PaymentExecutionFee {
-  feeMerchantReference: string;   // FK → merchantAgreementInstanceReference (SD-89) the fee is attributed to
+  feeMerchantReference: string;   // FK → merchantAgreementInstanceReference the fee is attributed to
   feeRateApplied: number;         // commission rate 0..1 applied at capture time
   feeCollectedDateTime: Date;     // when the commission was collected
 }
 
 export interface PaymentExecutionProcedure {
   paymentExecutionInstanceReference: string;      // UUID, PK
-  paymentOrderInstanceReference: string;          // FK → paymentOrderProcedure (SD-64)
-  cardTransactionInstanceReference?: string;      // FK → cardTransactionLog (SD-254)
+  paymentOrderInstanceReference: string;          // FK → paymentOrderProcedure 
+  cardTransactionInstanceReference?: string;      // FK → cardTransactionLog 
 
   beneficiaryType: BeneficiaryType;
-  beneficiaryPartyReference?: string;             // FK → party (SD-13) for user payouts
-  initiatorPartyReference?: string;               // FK → party (SD-13); set for P2P transfers (enables customer-scoped history)
-  sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement (SD-66); sender's account, enables per-account movement ledger
-  resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement (SD-66); recipient's account
+  beneficiaryPartyReference?: string;             // FK → party for user payouts
+  initiatorPartyReference?: string;               // FK → party ; set for P2P transfers (enables customer-scoped history)
+  sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement ; sender's account, enables per-account movement ledger
+  resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement ; recipient's account
 
-  beneficiaryArrangementReference?: string;       // FK → counterpartyArrangement (SD-54); set for P2P-to-beneficiary transfers → enables link to the beneficiary
+  beneficiaryArrangementReference?: string;       // FK → counterpartyArrangement ; set for P2P-to-beneficiary transfers → enables link to the beneficiary
 
-  // v18 (SD-89): the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
+  // v18 : the merchant that INITIATED this execution via the merchant portal (OAuth on-behalf-of).
   // Set only when the operation originates from a merchant client; PSP-direct customer transfers leave it
   // unset. Enables merchant data isolation: a merchant's transaction history shows only its own activity for
   // the user, never the user's activity in other merchants or directly in the PSP. Not CHD → NOT QE-encrypted.
-  merchantAgreementReference?: string;            // FK → merchantAgreementInstanceReference (SD-89)
+  merchantAgreementReference?: string;            // FK → merchantAgreementInstanceReference 
 
   // External bank-transfer recipient identity (SEPA/ACH/SWIFT to an unregistered account).
   // GDPR Art. 32 / PSD2 (NOT PCI DSS: that governs card data). destinationIban is QE:none

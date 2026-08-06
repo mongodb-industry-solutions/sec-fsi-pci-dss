@@ -139,7 +139,7 @@ export default function SettingsSectionPage() {
         title="Settings"
         description="Operational configuration for your merchant account."
         info="You can self-serve operational settings here. Risk-governed values, such as your transaction limit and account status, are managed by the PSP and shown for reference."
-        debugInfo="BIAN SD-89 Merchant Relations · PCI DSS Req 12.8 (TPSP responsibilities)"
+        debugInfo="Merchant Relations · PCI DSS (TPSP responsibilities)"
       />
 
       {/* Operational settings (owner editable) */}
@@ -184,7 +184,7 @@ export default function SettingsSectionPage() {
           </select>
         </div>
 
-        {/* Commission per operation (v18 B-07: BIAN SD-89) */}
+        {/* Commission per operation (v18 B-07:) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Commission per operation</label>
           <p className="text-xs text-gray-500 mb-2">
@@ -221,7 +221,7 @@ export default function SettingsSectionPage() {
           )}
         </div>
 
-        {/* Default Payout Account (E3: BIAN SD-89 / SD-66) */}
+        {/* Default Payout Account (E3:) */}
         {ownerPartyRef && (
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -357,7 +357,7 @@ export default function SettingsSectionPage() {
               <h2 className="font-semibold text-gray-800 text-sm">Business verification (KYB)</h2>
             </div>
             <p className="text-xs text-gray-500">
-              Know Your Business identity verification performed by the PSP during onboarding (PCI DSS Req 12.8).
+              Know Your Business identity verification performed by the PSP during onboarding (PCI DSS).
             </p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
               <div className="text-gray-500">KYB status</div>
@@ -389,7 +389,7 @@ export default function SettingsSectionPage() {
             </div>
             {debugMode && (
               <p className="text-[10px] font-mono text-gray-400 pt-1">
-                KybCheck · PCI Req 12.8
+                KybCheck · PCI DSS
               </p>
             )}
           </div>
@@ -408,7 +408,7 @@ export default function SettingsSectionPage() {
               <p className="text-sm font-medium text-gray-700">Deactivate this merchant account</p>
               <p className="text-xs text-gray-500 mt-0.5">
                 Suspends all payment processing, OAuth authentication, and new operations immediately.
-                The account and all its data are retained for audit compliance (PCI DSS Req 10). You can request reactivation from your merchant officer.
+                The account and all its data are retained for audit compliance (PCI DSS). You can request reactivation from your merchant officer.
               </p>
             </div>
             <button

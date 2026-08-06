@@ -14,7 +14,7 @@ export async function customerActivityController(fastify: FastifyInstance) {
 (sent/received) and SD-254 card transactions, resolved from \`:customerId\`
 (\`customerAgreementInstanceReference\`) via the agreement's \`partyInstanceReference\`.
 
-**Role gate (PCI DSS Req 7 least privilege):** restricted to \`level2_investigator\` and
+**Role gate (PCI DSS least privilege):** restricted to \`level2_investigator\` and
 \`security_auditor\`. The \`customer\` and \`level1_analyst\` roles receive 403.
 
 **PCI DSS:** rows are display-safe only (amount, currency, status, rail, concept, masked PAN /
@@ -56,7 +56,7 @@ masked destination account). No full PAN, CVV, raw IBAN or raw gateway payload i
   });
 
   // GET /api/v1/customer/:customerId/transactions/:executionId
-  // Staff drill-down to one SD-65 payment execution belonging to this customer. Transfer-kind rows
+  // Staff drill-down to one payment execution belonging to this customer. Transfer-kind rows
   // only; card-kind rows use the existing GET /transactions/:id detail.
   fastify.get('/:customerId/transactions/:executionId', {
     schema: {
@@ -66,7 +66,7 @@ masked destination account). No full PAN, CVV, raw IBAN or raw gateway payload i
 \`:customerId\` (\`customerAgreementInstanceReference\`) via the agreement's \`partyInstanceReference\`.
 The execution must belong to that party (as initiator or beneficiary) else 404 (existence is not leaked).
 
-**Role gate (PCI DSS Req 7 least privilege):** restricted to \`level2_investigator\` and
+**Role gate (PCI DSS least privilege):** restricted to \`level2_investigator\` and
 \`security_auditor\`. The \`customer\` and \`level1_analyst\` roles receive 403.
 
 **PCI DSS / GDPR:** display-safe only (amount, currency, status, rail, concept, masked destination,

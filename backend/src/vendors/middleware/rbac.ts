@@ -6,8 +6,8 @@ export const VALID_USER_ROLES: ReadonlySet<UserRole> = new Set([
   'level1_analyst',
   'level2_investigator',
   'security_auditor',
-  'merchant_officer',     // Ch-05: SD-89 Merchant Acquiring officer
-  'manager',             // Ch-07: SD-193 Integration Hub administrator
+  'merchant_officer',     // Ch-05: Merchant Acquiring officer
+  'manager',             // Ch-07: Integration Hub administrator
 ]);
 
 export function extractUserRole(request: FastifyRequest): UserRole {
@@ -53,7 +53,7 @@ export function canRevealKycSensitive(role: UserRole, hasValidToken = false): bo
   return KYC_ADMIN_REVEAL_ROLES.has(role) || canReadSensitive(role, hasValidToken);
 }
 
-// Staff investigation roles (v27 profile staff view, PCI DSS Req 7 least privilege).
+// Staff investigation roles (v27 profile staff view, PCI DSS least privilege).
 // VIEW of a found customer's related data (transactions, authorized apps, accounts, cards) is
 // limited to these roles; L1 analyst and customer are blocked. Mirrors KYC_SEARCH_ROLES.
 export const STAFF_INVESTIGATION_ROLES: ReadonlySet<UserRole> = new Set([

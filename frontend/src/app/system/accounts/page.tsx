@@ -1,6 +1,6 @@
 'use client';
-// BIAN SD-66: Payout Account, Account List Page (v17 Phase C)
-// PCI DSS Req 3.3: IBAN never shown in full. PCI DSS Req 7: partyRef from JWT enforced server-side.
+// Payout Account, Account List Page (v17 Phase C)
+// PCI DSS: IBAN never shown in full. PCI DSS: partyRef from JWT enforced server-side.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -250,7 +250,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
             </div>
             <div>
               <h2 className="font-bold text-[#001E2B] leading-none">Register Payout Account</h2>
-              <p className="text-xs text-gray-400 mt-0.5">PCI DSS Req 3.3</p>
+              <p className="text-xs text-gray-400 mt-0.5">PCI DSS</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -423,7 +423,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
 
               <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 flex items-start gap-2 text-xs text-blue-700">
                 <Lock size={13} className="mt-0.5 shrink-0" />
-                <span>IBAN and routing number are stored encrypted at rest (MongoDB Queryable Encryption · PCI DSS Req 3.3). Only authorised Level 2 users can decrypt them.</span>
+                <span>IBAN and routing number are stored encrypted at rest (MongoDB Queryable Encryption · PCI DSS). Only authorised Level 2 users can decrypt them.</span>
               </div>
 
               <div>
@@ -635,7 +635,7 @@ export default function AccountsPage() {
           icon={Landmark}
           title="Payout Accounts"
           description="Manage your registered payout and settlement accounts."
-          debugInfo="BIAN SD-66 Payout Account · PCI DSS Req 3.3 (IBAN encrypted QE) · Req 7 (partyRef JWT-scoped) · Req 10 (audited)"
+          debugInfo="Payout Account · PCI DSS: IBAN encrypted QE · partyRef JWT-scoped · audited"
         />
 
         {/* Register Account button (C2) */}

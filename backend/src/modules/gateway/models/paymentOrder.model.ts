@@ -1,5 +1,5 @@
-// BIAN SD-64: Payment Order Control Record
-// SD-65: Payment Execution is represented as the routingDecision sub-document
+// Payment Order Control Record
+// Payment Execution is represented as the routingDecision sub-document
 
 export const PAYMENT_ORDER_COLLECTION = 'paymentOrderProcedure';
 
@@ -14,18 +14,18 @@ export interface PaymentOrderControlRecord {
   customerAgreementInstanceReference?: string;      // FK → customerAgreement (populated on confirm)
   linkedCardTransactionReference?: string;          // FK → cardTransaction (populated on authorize)
 
-  // v17: Payout orchestration fields (SD-65 / SD-66)
+  // v17: Payout orchestration fields 
   paymentOrderBeneficiaryType?: BeneficiaryType;    // 'merchant' | 'user' | 'anonymous'
   paymentOrderBeneficiaryReference?: string;        // partyRef for user payouts / anonymous target
   paymentOrderCaptureStrategy: CaptureStrategy;     // default 'immediate'
-  paymentOrderExecutionReference?: string;          // FK → paymentExecutionProcedure (SD-65)
+  paymentOrderExecutionReference?: string;          // FK → paymentExecutionProcedure 
 
   // Payment details
   paymentOrderAmount: { amount: number; currency: string };
   paymentOrderMerchantReference: string;            // Merchant's own order ID
   paymentOrderDescription?: string;
 
-  // Lifecycle  -  SD-64: Payment Order state machine
+  // Lifecycle  -  Payment Order state machine
   paymentOrderStatus: PaymentOrderStatus;
   paymentOrderInitiatedDateTime: Date;
   paymentOrderConfirmedDateTime?: Date;
@@ -36,7 +36,7 @@ export interface PaymentOrderControlRecord {
   paymentOrderRefundedDateTime?: Date;
   paymentOrderExpiresAt: Date;                      // TTL: auto-expire stale initiated orders
 
-  // Routing  -  SD-65: Payment Execution decision
+  // Routing  -  Payment Execution decision
   routingDecision?: {
     processor: string;                              // e.g. 'simulated_processor_v1'
     routedAt: Date;

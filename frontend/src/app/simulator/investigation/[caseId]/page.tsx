@@ -599,7 +599,7 @@ function L2ResolveView({ fraudCase, busy, isResolved, canResolve, onResolve }: {
         )}
       </div>
       <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm">
-        <strong>PCI DSS v4.0:</strong> the complete investigation trail satisfies Req 10 (audit logging), Req 3 (CHD protection via QE), and Req 7 (role-based access).
+        <strong>PCI DSS v4.0:</strong> the complete investigation trail satisfies audit logging, CHD protection via QE, and role-based access.
       </div>
     </div>
   );

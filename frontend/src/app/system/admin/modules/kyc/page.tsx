@@ -1,5 +1,5 @@
 'use client';
-// v31: KYC built-in module page (SD-53). Two tabs: Configuration (built-in engine policy incl. the
+// v31: KYC built-in module page . Two tabs: Configuration (built-in engine policy incl. the
 // §4.0 decisionMode) and Administration (review/correct KYC-completed customers). Configuration gated
 // by modules:manage; Administration by customers:view/manage (SoD: data resource, not modules).
 import { Suspense, useEffect, useState, useCallback } from 'react';
@@ -25,7 +25,7 @@ export default function KycModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYC (Customer Onboarding)' }]} />
-      <SectionHeader icon={UserCheck} title="KYC: Know Your Customer" description="Customer onboarding verification engine and the KYC administration workbench." debugInfo="capability=kyc · SD-53 Customer Agreement · PCI Req 7/8/10/12.8" />
+      <SectionHeader icon={UserCheck} title="KYC: Know Your Customer" description="Customer onboarding verification engine and the KYC administration workbench." debugInfo="capability=kyc Customer Agreement · PCI DSS" />
       <Suspense fallback={<div className="text-sm text-gray-400">Loading…</div>}>
         <KycTabs />
       </Suspense>
@@ -135,7 +135,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
         {hasActiveFilters && <button onClick={clearAll} className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-800"><X size={14} /> Clear</button>}
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {/* Only a customer holds a CustomerAgreement (SD-53), so Employee is always empty here. */}
+        {/* Only a customer holds a CustomerAgreement , so Employee is always empty here. */}
         <select value={partyType} onChange={(e) => { setPage(1); setPartyType(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm" title="Party type. KYC administers customer agreements, which only a customer party holds."><option value="customer">Customer</option><option value="employee">Employee</option><option value="all">All</option></select>
         <select value={status} onChange={(e) => { setPage(1); setStatus(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All statuses</option>{['verified', 'rejected', 'expired'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
         <select value={segment} onChange={(e) => { setPage(1); setSegment(e.target.value); }} className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"><option value="">All segments</option>{['retail', 'premium', 'corporate', 'sme'].map((s) => <option key={s} value={s}>{s}</option>)}</select>
@@ -178,7 +178,7 @@ function KycAdmin({ token, canView }: { token: string; canView: boolean }) {
           <p className="text-xs text-gray-500">
             {total} {total === 1 ? 'user' : 'users'} with a completed KYC record
             {status ? ` (status: ${status})` : ' (verified, rejected or expired; records still initiated are excluded)'}.
-            {debugMode && ' SD-53 customer agreements, not SD-16 authentication users: the two populations differ.'}
+            {debugMode && ' customer agreements, not authentication users: the two populations differ.'}
           </p>
           <Pagination page={page} totalPages={Math.max(1, Math.ceil(total / limit))} total={total} limit={limit} onPageChange={setPage} onLimitChange={(l) => { setLimit(l); setPage(1); }} noun="KYC records" />
         </>

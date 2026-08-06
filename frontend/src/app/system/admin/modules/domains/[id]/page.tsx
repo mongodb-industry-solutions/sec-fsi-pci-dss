@@ -114,7 +114,7 @@ function DomainDetail() {
         icon={KeyRound}
         title={display}
         description={`${isLocal ? 'Local' : type.toUpperCase()} authentication & authorization domain · ${FLOW_LABELS[flow] ?? flow}`}
-        debugInfo={`BIAN SD-16 · ${name} · ${enabled ? 'enabled' : 'disabled'}`}
+        debugInfo={`${name} · ${enabled ? 'enabled' : 'disabled'}`}
         actions={
           <button onClick={toggleEnabled} disabled={busy}
             className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border font-medium transition-colors ${enabled ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64]'}`}>

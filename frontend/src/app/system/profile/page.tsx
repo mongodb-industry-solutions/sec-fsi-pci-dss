@@ -52,7 +52,7 @@ interface ProfileData {
     customerAgreementStatus?: string;
     customerAgreementEnrollmentDate?: string;
     customerAgreementPreferredLanguage?: string;
-    customerAgreementKycCheck?: CustomerAgreementKycCheck;  // BQ:Step, SD-53. PCI DSS Req 8.1
+    customerAgreementKycCheck?: CustomerAgreementKycCheck;  // BQ:Step. PCI DSS
     // v27 KYC identity, decrypted for the owner (self-profile runs on the L2/auditor client).
     customerAgreementGovernmentID?: GovernmentID | null;
     customerAgreementTaxIDNumber?: string;
@@ -149,7 +149,7 @@ function KycStatusBadge({ kyc, debugMode }: { kyc: CustomerAgreementKycCheck; de
       {debugMode && (
         <>
           <DebugChip label="BQ:Step · KycCheck" />
-          <DebugChip label="PCI Req 8.1" tone="standard" />
+          <DebugChip label="PCI DSS" tone="standard" />
         </>
       )}
     </div>
@@ -405,7 +405,7 @@ export default function ProfilePage() {
   if (!profile) return null;
 
   const ag = profile.agreement;
-  // SD-13 Party demographics: populated for every role (staff included), so non-customer
+  // Party demographics: populated for every role (staff included), so non-customer
   // profiles are not empty. Customers get these from the agreement above; staff from party.
   const pty = profile.party as {
     partyMobilePhoneNumber?: string;
@@ -433,7 +433,7 @@ export default function ProfilePage() {
         icon={User}
         title="My Profile"
         description="Your account and contact details."
-        debugInfo="BIAN SD-53 Customer Agreement · PCI DSS Req 8 (identity) · Req 3 (QE at rest)"
+        debugInfo="Customer Agreement · PCI DSS: identity · QE at rest"
         actions={!editing && (
           <button
             onClick={() => { setEditing(true); setSaveMsg(null); }}
@@ -630,7 +630,7 @@ export default function ProfilePage() {
           {sourceOfFunds && <PlainField label="Source of funds" value={humanize(sourceOfFunds)} qe="qe-none" collection="customerAgreementProcedure" info="Declared origin of your funds (AML/KYC). Encrypted at rest and not searchable (QE:none)." />}
           {purpose && <PlainField label="Purpose of relationship" value={humanize(purpose)} qe="qe-none" collection="customerAgreementProcedure" info="Why you opened this account (AML/KYC). Encrypted at rest and not searchable (QE:none)." />}
 
-          {/* SD-13 Party demographics: shown for staff (no customer agreement), so their profile
+          {/* Party demographics: shown for staff (no customer agreement), so their profile
               carries the same KYC-typical detail as customers: phone, DOB, nationality, address.
               Phone/DOB/address are GDPR PII (QE-encrypted at rest), shown with a reveal toggle. */}
           {!ag && pty && (() => {
@@ -754,7 +754,7 @@ export default function ProfilePage() {
               <h2 className="font-semibold text-gray-800 text-sm">Identity Verification (KYC)</h2>
             </div>
             {debugMode && (
-              <DebugChip label="BQ:Step · KycCheck · PCI Req 8.1" />
+              <DebugChip label="BQ:Step · KycCheck · PCI DSS" />
             )}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm items-start">
@@ -942,7 +942,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="font-semibold text-gray-800 text-sm">Credentials</h2>
-              {debugMode && <DebugChip label="SD-91/SD-16 · partyEnrolledCredential · CIBA · PCI DSS Req 8" />}
+              {debugMode && <DebugChip label="partyEnrolledCredential · CIBA · PCI DSS" />}
             </div>
             <p className="text-xs text-gray-500 mt-0.5">Security keys for passwordless sign-in. Enroll, rotate and revoke your devices.</p>
           </div>
@@ -950,7 +950,7 @@ export default function ProfilePage() {
         <ChevronRight size={18} className="text-gray-400 shrink-0" />
       </Link>
 
-      {/* Payment-card management lives in its own section: /system/cards (BIAN SD-88). */}
+      {/* Payment-card management lives in its own section: /system/cards . */}
 
       {/* Data protection notice, debug mode only */}
       {debugMode && (

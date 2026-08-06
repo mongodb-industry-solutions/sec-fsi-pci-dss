@@ -79,7 +79,7 @@ export default function AdminEventsPage() {
         icon={Activity}
         title="Business Process Events"
         description="Unified audit trail across all business processes."
-        debugInfo="ADR-025 · businessProcessEvent + complianceProcessEvent (timeseries) · PCI DSS Req 10.2.1 / 10.3 / 10.7"
+        debugInfo="ADR-025 · businessProcessEvent + complianceProcessEvent (timeseries) · PCI DSS"
       />
 
       {/* Tab bar */}

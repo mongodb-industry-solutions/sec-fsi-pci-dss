@@ -127,7 +127,7 @@ export const config = {
     paymentInitiationAlwaysSucceed: pspEnv('PAYMENT_INITIATION_ALWAYS_SUCCEED', 'true') === 'true',
     // Builtin account-information module
     aisAlwaysVerify: pspEnv('AIS_ALWAYS_VERIFY', 'true') === 'true',
-    // SD-54 Counterparty Administration: beneficiary registry limits
+    // Counterparty Administration: beneficiary registry limits
     beneficiaryMaxPerUser: parseInt(pspEnv('BENEFICIARY_MAX_PER_USER', '100')!, 10),
     beneficiaryRateLimitRpm: parseInt(pspEnv('BENEFICIARY_RATE_LIMIT_RPM', '20')!, 10),
     // v17.1 Bank transfers: sandbox mode (transfers are simulated end to end; no real rail effect)

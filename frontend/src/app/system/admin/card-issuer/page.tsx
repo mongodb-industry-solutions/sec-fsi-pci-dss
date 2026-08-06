@@ -6,7 +6,6 @@ export default function CardIssuerPage() {
       type: 'card_issuer',
       label: 'Card Issuer',
       description: 'CVV and PIN validation services from card-issuing processors',
-      bianSd: 'SD-88',
     }} />
   );
 }

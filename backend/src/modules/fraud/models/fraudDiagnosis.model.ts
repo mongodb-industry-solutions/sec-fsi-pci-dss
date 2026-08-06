@@ -1,4 +1,4 @@
-// BIAN SD-83: Fraud Diagnosis (no QE: operational metadata only)
+// Fraud Diagnosis (no QE: operational metadata only)
 
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { AnalystRole } from '../../../shared/models/identity.model';
@@ -15,9 +15,9 @@ export interface FraudDiagnosisControlRecord {
   fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
   // Links to protected records (plaintext keys by design: no PII in these refs)
-  cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
-  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
-  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure (SD-65); set for P2P cases
+  cardTransactionInstanceReference: string;              // FK to cardTransactionLog 
+  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure 
+  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure ; set for P2P cases
   transactionKind?: 'card' | 'p2p';                     // discriminator; absent = 'card' for legacy docs
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
@@ -107,7 +107,7 @@ export interface FraudDiagnosisCaseEventRecord {
   fraudDiagnosisInstanceReference: string;               // FK to fraudDiagnosisCase
   actionDateTime: Date;
   actionType: ActionType;
-  performedByInstanceReference: string;   // unique acting-user id (partyRef/sub), PCI DSS Req 10.2.1
+  performedByInstanceReference: string;   // unique acting-user id (partyRef/sub), PCI DSS
   performedByName?: string;                // acting user's display name (shown in the activity log)
   performedByRole: AnalystRole;
   actionDetails: Record<string, unknown>;
@@ -131,9 +131,9 @@ export type ActionType =
   | 'escalated'
   | 'ai_review'
   | 'resolved'
-  | 'reopened'            // SD-83: a resolved/closed case was reopened for further review
+  | 'reopened'            // a resolved/closed case was reopened for further review
   | 'closed'
-  | 'question_created'    // SD-83: investigator posed a question to the customer
-  | 'question_answered';  // SD-83: customer submitted an (immutable) response
+  | 'question_created'    // investigator posed a question to the customer
+  | 'question_answered';  // customer submitted an (immutable) response
 
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';

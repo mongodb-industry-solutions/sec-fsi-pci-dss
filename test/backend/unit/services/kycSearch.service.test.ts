@@ -237,7 +237,7 @@ describe('searchKyc query window beyond the QE index limit', () => {
 describe('searchKyc tier gate on result fields', () => {
   // v32 C2/D-3: a search result never carries QE:none plaintext. The auditor is told the
   // sensitive tier is available and must call the reveal endpoint, which emits one compliance
-  // event per disclosure (PCI DSS Req 10.2.2). Contact PII is lookup tier and still travels.
+  // event per disclosure (PCI DSS). Contact PII is lookup tier and still travels.
   it('security auditor gets sensitiveAvailable (not plaintext) and contact PII', async () => {
     h.getDbForRole.mockResolvedValue(makeDb());
     const rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'security_auditor');

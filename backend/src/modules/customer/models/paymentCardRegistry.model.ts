@@ -1,4 +1,4 @@
-// BIAN SD-88: Payment Card, the physical card INSTRUMENT, registered ONCE per card.
+// Payment Card, the physical card INSTRUMENT, registered ONCE per card.
 //
 // Rationale (ADR-027, FDS/AML): a single card (same PAN → same deterministic token) may be held by
 // several customers. The per-customer relationship lives in `paymentCardManagement` (the card-on-file

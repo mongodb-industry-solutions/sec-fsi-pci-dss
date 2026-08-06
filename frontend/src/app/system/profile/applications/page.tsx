@@ -133,7 +133,7 @@ export default function AuthorizedApplicationsPage() {
         icon={Layers}
         title="Authorized Applications"
         description="Apps and merchants you have authorized to access your account via OIDC. Review activity, revoke, or re-approve access at any time."
-        debugInfo="SD-16 · ConsentGrant · OAuth 2.0 / OIDC · PCI DSS Req 7 (least privilege) · soft-revoke (audit) · self-scoped (sub)"
+        debugInfo="ConsentGrant · OAuth 2.0 / OIDC · PCI DSS (least privilege) · soft-revoke (audit) · self-scoped (sub)"
       />
 
       {/* Filters + search */}

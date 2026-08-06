@@ -3,7 +3,7 @@
  * Source: backend/src/modules/customer/services/customerAgreement.service.ts
  *
  * The service now resolves a role-aware QE client (getDbForRole) and joins the PII-
- * bearing `party` record (SD-13) with the `customerAgreementProcedure` record. The
+ * bearing `party` record with the `customerAgreementProcedure` record. The
  * QE client and escalation-token validator are mocked so the join + response shaping
  * are tested in isolation. Sensitive fields (address/govId/riskNotes) only appear when
  * the underlying field is decrypted (L2 client); for the L1 default they are omitted.

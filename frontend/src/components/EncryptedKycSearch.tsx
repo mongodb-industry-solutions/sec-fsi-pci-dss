@@ -34,7 +34,7 @@ interface Props {
 }
 
 // This discovery search returns LISTS of customers, so it is an investigator/auditor capability
-// (least-privilege, PCI DSS Req 7). Level 1 analysts use the blind single-record lookup only.
+// (least-privilege, PCI DSS). Level 1 analysts use the blind single-record lookup only.
 // The server enforces this too (403); the client gate is UX. Keep in sync with the backend
 // KYC_SEARCH_ROLES set.
 const KYC_SEARCH_ROLES = new Set(['level2_investigator', 'security_auditor']);

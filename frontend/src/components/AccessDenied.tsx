@@ -8,7 +8,7 @@ import { RESOURCE_LABELS, ACTION_LABELS, RESOURCE_BIAN } from '../config/acl';
 // ADR-030: reusable "access not authorized" screen. Renders inside the /system layout (header +
 // sidebar provided by layout.tsx). The role's responsibilities are derived from the live ACL
 // (GET /acl/effective); never hardcoded; so they always match the actual permission matrix.
-// PCI DSS Req 7 (least privilege, default-deny is shown to the user, not silently failing).
+// PCI DSS (least privilege, default-deny is shown to the user, not silently failing).
 export function AccessDenied({ resource, action = 'view' }: { resource?: string; action?: string }) {
   const { perms } = useEffectivePermissions();
   const resourceLabel = resource ? (RESOURCE_LABELS[resource] ?? resource) : 'this section';
@@ -22,7 +22,7 @@ export function AccessDenied({ resource, action = 'view' }: { resource?: string;
         icon={ShieldX}
         title="Access not authorized"
         description={resource ? `Your role cannot ${actionLabel} ${resourceLabel}.` : 'You do not have permission to view this section.'}
-        debugInfo={resource ? `${RESOURCE_BIAN[resource] ?? resource} · denied: ${resource}:${action} · PCI DSS Req 7 (least privilege)` : undefined}
+        debugInfo={resource ? `${RESOURCE_BIAN[resource] ?? resource} · denied: ${resource}:${action} · PCI DSS (least privilege)` : undefined}
       />
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">

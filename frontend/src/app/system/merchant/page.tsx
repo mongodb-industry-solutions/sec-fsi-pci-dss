@@ -167,8 +167,6 @@ function MerchantApplicationForm({
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-gray-700">Quick-fill with demo data</p>
             <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-0.5 text-xs text-blue-700 font-medium">
-              <span className="font-bold">BIAN SD-89</span>
-              <ChevronRight size={9} />
               <span>Action: Initiate</span>
             </span>
           </div>
@@ -243,7 +241,7 @@ function MerchantApplicationForm({
         </button>
         {debugMode && (
           <p className="text-xs text-gray-400 text-center font-mono">
-            PCI DSS Req 12.8 · documented merchant agreement required before processing payments
+            PCI DSS · documented merchant agreement required before processing payments
           </p>
         )}
       </form>
@@ -251,7 +249,7 @@ function MerchantApplicationForm({
   );
 }
 
-// ── BIAN SD-89 lifecycle debug panel ─────────────────────────────────────────
+// ── lifecycle debug panel ─────────────────────────────────────────
 
 const SD89_STATES: { key: string; label: string; color: string }[] = [
   { key: 'initiated',    label: 'Initiated',    color: 'bg-gray-100 text-gray-600 border-gray-300' },
@@ -265,11 +263,9 @@ function BianLifecyclePanel({ currentStatus }: { currentStatus: string }) {
     <div className="rounded-xl border border-[#001E2B]/15 overflow-hidden">
       <div className="bg-[#001E2B] px-4 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[#00ED64] text-xs font-semibold">BIAN SD-89</span>
-          <span className="text-gray-500 text-xs">·</span>
           <span className="text-gray-400 text-xs font-mono">MerchantAgreementProcedure</span>
         </div>
-        <span className="text-gray-500 text-xs font-mono">PCI DSS Req 12.8</span>
+        <span className="text-gray-500 text-xs font-mono">PCI DSS</span>
       </div>
       <div className="bg-[#001E2B]/3 px-4 py-4">
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Lifecycle · main path</p>
@@ -365,7 +361,7 @@ function CustomerMerchantList({
         icon={Store}
         title="My Merchants"
         description="Manage your merchant agreements. Each merchant has independent credentials, webhooks, and OAuth integration."
-        debugInfo="BIAN SD-89 MerchantAgreementProcedure · PCI DSS Req 12.8"
+        debugInfo="MerchantAgreementProcedure · PCI DSS"
         actions={
           <button
             type="button"
@@ -535,7 +531,7 @@ function AnalystMerchantView({ token, role }: { token: string; role: string }) {
         icon={Store}
         title="Merchant Agreements"
         description={isMerchantOfficer ? 'Full merchant portfolio across the lifecycle.' : 'Read-only oversight of all merchant agreements.'}
-        debugInfo="BIAN SD-89 MerchantAgreementProcedure · PCI DSS Req 7 · Req 12.8"
+        debugInfo="MerchantAgreementProcedure · PCI DSS"
         actions={isMerchantOfficer && (
           <Link href="/system/merchant/review"
             className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] text-sm font-medium hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors shrink-0">

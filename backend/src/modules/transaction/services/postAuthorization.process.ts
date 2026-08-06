@@ -53,7 +53,7 @@ export class PostAuthorizationProcess {
     if (p.fraudCaseCreated && p.fraudDiagnosisInstanceReference) {
       await this.enrichCase(txnId, p.fraudDiagnosisInstanceReference);
     }
-    // A5: Debit card funding account balance (BIAN SD-88 cardAccountReference, PCI Req 3.2)
+    // A5: Debit card funding account balance (cardAccountReference, PCI DSS)
     // Uses only the UUID reference: IBAN is never read here.
     void this.decrementCardFundingBalance(txnId).catch(() => {});
   }
@@ -115,7 +115,7 @@ export class PostAuthorizationProcess {
   // v17: DEBIT holds now happen atomically in the funds-check GATE (providerGroups.onFunds) BEFORE the
   // payment is authorized, so this post-auth step no longer holds for purchases (that would double-debit).
   // It only handles the REFUND credit path (return funds to the cardholder's available balance).
-  // Uses only UUID references: IBAN is never accessed (PCI DSS Req 3.2).
+  // Uses only UUID references: IBAN is never accessed (PCI DSS).
   private async decrementCardFundingBalance(txnId: string): Promise<void> {
     const txn = await this.db.collection<{
       cardTransactionAmount?: { amount: number; currency: string };
@@ -135,7 +135,7 @@ export class PostAuthorizationProcess {
       .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
     if (!card?.fundingPayoutAccountInstanceReference) return;
     const accountRef = card.fundingPayoutAccountInstanceReference;
-    // Refund: return funds to cardholder available balance (BIAN SD-88 credit), in account currency (FX).
+    // Refund: return funds to cardholder available balance (credit), in account currency (FX).
     const { PAYOUT_ACCOUNT_COLLECTION } = await import('../../gateway/models/payoutAccount.model');
     const account = await this.db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
       .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountCurrency: 1 } });

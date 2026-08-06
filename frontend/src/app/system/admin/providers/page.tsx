@@ -159,7 +159,7 @@ export default function IntegrationsListPage() {
         icon={Plug}
         title="Providers"
         description="External provider vendors and their arrangements."
-        debugInfo="SD-193 · ExternalProviderArrangement · PCI DSS Req 12.8.1"
+        debugInfo="ExternalProviderArrangement · PCI DSS"
         actions={
           <Link
             href="/system/admin/providers/vendors/new"
@@ -345,7 +345,7 @@ export default function IntegrationsListPage() {
 
       {debugMode && (
         <div className="text-xs text-gray-400 font-mono">
-          {ROLE_LABELS['manager']} · PCI DSS Req 12.8.1; maintained list of all third-party service providers
+          {ROLE_LABELS['manager']} · PCI DSS; maintained list of all third-party service providers
         </div>
       )}
     </div>

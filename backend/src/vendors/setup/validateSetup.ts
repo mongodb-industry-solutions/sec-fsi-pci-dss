@@ -29,7 +29,7 @@ const EXPECTED_COLLECTIONS = [
   'customerCreditRatingState',
   'consentAgreement',
   'consentAccessLog',
-  // SD-193 External Provider Arrangements (dev.v7 Fase 2: BIAN-pure rename + new module config)
+  // External Provider Arrangements (dev.v7 Fase 2: BIAN-pure rename + new module config)
   'externalProviderArrangement',
   'externalProviderArrangementActionLog',
   'externalProviderArrangementPortfolio',

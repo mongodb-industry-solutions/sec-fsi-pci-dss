@@ -1,4 +1,4 @@
-// BIAN SD-65/SD-66: Payout Orchestration Process (v17)
+// Payout Orchestration Process (v17)
 // Subscribes to card.payment.authorization.completed.
 // Resolves beneficiary → validates account (AIS) → initiates transfer (PISP).
 // On settlement: credits balance, marks transaction as settled.
@@ -59,9 +59,9 @@ export class PayoutOrchestrationProcess {
   }
 
   // Compensating action of the payout saga (EDA): a payout that will never settle must not leave the
-  // beneficiary holding an expected credit. Moves the SD-65 control record to its terminal state, then
+  // beneficiary holding an expected credit. Moves the control record to its terminal state, then
   // releases the reservation taken at authorization and records both in the resolution log and on the
-  // event stream (PCI DSS Req 10).
+  // event stream (PCI DSS).
   //
   // Provider-indifferent by construction: it is driven by the OUTCOME of a dispatch, never by which
   // provider produced it, so replacing the builtin AIS/PISP module with an external service (ADR-039)
@@ -171,7 +171,7 @@ export class PayoutOrchestrationProcess {
     // would double-reverse and drive pendingAmount negative on a later settlement.
     let handedToRail = false;
     try {
-      // Merchant commission (SD-89): the buyer paid the gross, so the fee is WITHHELD here, not added.
+      // Merchant commission : the buyer paid the gross, so the fee is WITHHELD here, not added.
       // The PSP remits netAmount to the merchant and keeps feeAmount (posted to its revenue account at
       // settlement). No rate configured yields feeAmount 0 and netAmount == grossAmount.
       const { feeAmount, netAmount, fee } = await resolveMerchantFee(db, merchantRef, amount, currency);
@@ -379,7 +379,7 @@ export class PayoutOrchestrationProcess {
         }
       }
 
-      // Mark card transaction as settled + clear cardholder pending hold (BIAN SD-66, PCI DSS Req 10)
+      // Mark card transaction as settled + clear cardholder pending hold (PCI DSS)
       if (execution.cardTransactionInstanceReference) {
         await db.collection(CARD_TRANSACTION_COLLECTION).updateOne(
           { cardTransactionInstanceReference: execution.cardTransactionInstanceReference },

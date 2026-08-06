@@ -32,7 +32,7 @@ export interface WebhookDeliveryResult {
   delivered: boolean;
   statusCode?: number;
   attempts: number;
-  // Full request + merchant response capture for the audit trail (PCI DSS Req 10.7). The HMAC
+  // Full request + merchant response capture for the audit trail (PCI DSS). The HMAC
   // signature header is shown (it is not a secret); the signing secret is never included.
   request: { method: string; url: string; headers: Record<string, string>; body: WebhookEvent };
   response?: { status: number; headers: Record<string, string>; body: unknown };

@@ -71,7 +71,7 @@ export function dualPermission(opts: DualPermissionOptions) {
 
 export interface ResolvedOwner {
   channel: AuthChannel;
-  // SD-13 party the domain data is keyed by. Undefined only when an OAuth subject has no linked
+  // party the domain data is keyed by. Undefined only when an OAuth subject has no linked
   // party (caller should return an empty result, never a cross-user leak).
   ownerPartyRef?: string;
   // The authenticated subject: OAuth token.sub, or the session partyRef.

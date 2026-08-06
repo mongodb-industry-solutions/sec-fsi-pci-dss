@@ -38,30 +38,30 @@ export async function createCollections(
   // role-aware QE client pool (roleClients.ts) - Level 1 map omits sensitive fields so
   // they are returned as Binary ciphertext; Level 2 map includes them for auto-decryption.
   const qeCollections = [
-    // SD-13: Party Data Management  -  canonical PII store
+    // Party Data Management  -  canonical PII store
     { name: 'party',                            map: maps.party },
-    // SD-254: Card Transaction Log (includes sensitive gateway fields in unified doc)
+    // Card Transaction Log (includes sensitive gateway fields in unified doc)
     { name: 'cardTransactionLog',               map: maps.cardTransactionLog },
-    // SD-53: Customer Agreement Procedure (includes sensitive address/govId in unified doc)
+    // Customer Agreement Procedure (includes sensitive address/govId in unified doc)
     { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure },
-    // SD-88: Payment Card Management
+    // Payment Card Management
     { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
     // Card Administration (issuer CDE, v30): module-owned vault with the full PAN + service code
     // (QE:equality). The PSP core NEVER holds these; extracting the module leaves the core descoped.
     { name: 'cardIssuerVault',                  map: maps.cardIssuerVault },
-    // SD-91: Customer Authentication
+    // Customer Authentication
     { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
-    // SD-66: Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS Req 3.3)
+    // Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS)
     ...(maps.payoutAccountArrangement
       ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
       : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
     ),
-    // SD-65: Payment Execution Procedure (destinationIban QE:none, L2 only, GDPR Art. 32 / PSD2)
+    // Payment Execution Procedure (destinationIban QE:none, L2 only, GDPR Art. 32 / PSD2)
     ...(maps.paymentExecutionProcedure
       ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
       : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
     ),
-    // SD-65 (v28): Request to Pay canonical record. Alias/remittance/address/payee-name QE:none, L2 only
+    // (v28): Request to Pay canonical record. Alias/remittance/address/payee-name QE:none, L2 only
     // (GDPR minimization). RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD).
     ...(maps.paymentRequestProcedure
       ? [{ name: PAYMENT_REQUEST_COLLECTION, map: maps.paymentRequestProcedure }]
@@ -123,7 +123,7 @@ export async function createCollections(
     console.log('  skip:    authenticationDomain (already exists)');
   }
 
-  // ADR-030 / SD-16: RBAC role definitions  -  plaintext, no QE (permission matrix, no CHD)
+  // ADR-030 / RBAC role definitions  -  plaintext, no QE (permission matrix, no CHD)
   if (!existingNames.has('role') || reset) {
     if (existingNames.has('role') && reset) {
       await db.collection('role').drop();
@@ -135,7 +135,7 @@ export async function createCollections(
     console.log('  skip:    role (already exists)');
   }
 
-  // SD-16: Party Authentication Assessment  -  plaintext, identity verification stubs
+  // Party Authentication Assessment  -  plaintext, identity verification stubs
   if (!existingNames.has('partyAuthenticationAssessment') || reset) {
     if (existingNames.has('partyAuthenticationAssessment') && reset) {
       await db.collection('partyAuthenticationAssessment').drop();
@@ -147,7 +147,7 @@ export async function createCollections(
     console.log('  skip:    partyAuthenticationAssessment (already exists)');
   }
 
-  // SD-88: Payment Card Registry  -  plaintext, the physical card deduplicated by token (no CHD)
+  // Payment Card Registry  -  plaintext, the physical card deduplicated by token (no CHD)
   if (!existingNames.has('paymentCardRegistry') || reset) {
     if (existingNames.has('paymentCardRegistry') && reset) {
       await db.collection('paymentCardRegistry').drop();
@@ -159,7 +159,7 @@ export async function createCollections(
     console.log('  skip:    paymentCardRegistry (already exists)');
   }
 
-  // SD-83: Fraud Diagnosis Case  -  plaintext, no QE
+  // Fraud Diagnosis Case  -  plaintext, no QE
   if (!existingNames.has('fraudDiagnosisCase') || reset) {
     if (existingNames.has('fraudDiagnosisCase') && reset) {
       await db.collection('fraudDiagnosisCase').drop();
@@ -171,7 +171,7 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCase (already exists)');
   }
 
-  // SD-83: Fraud Diagnosis Case Events  -  plaintext, append-only audit log
+  // Fraud Diagnosis Case Events  -  plaintext, append-only audit log
   if (!existingNames.has('fraudDiagnosisCaseEvents') || reset) {
     if (existingNames.has('fraudDiagnosisCaseEvents') && reset) {
       await db.collection('fraudDiagnosisCaseEvents').drop();
@@ -182,7 +182,7 @@ export async function createCollections(
     console.log('  skip:    fraudDiagnosisCaseEvents (already exists)');
   }
 
-  // SD-83: Customer Questions  -  plaintext (no CHD), investigator questions + immutable responses
+  // Customer Questions  -  plaintext (no CHD), investigator questions + immutable responses
   if (!existingNames.has('fraudDiagnosisCustomerQuestion') || reset) {
     if (existingNames.has('fraudDiagnosisCustomerQuestion') && reset) {
       await db.collection('fraudDiagnosisCustomerQuestion').drop();
@@ -204,7 +204,7 @@ export async function createCollections(
     console.log('  skip:    notification (already exists)');
   }
 
-  // SD-60: Customer Credit Rating State  -  plaintext, classification metadata, no PII
+  // Customer Credit Rating State  -  plaintext, classification metadata, no PII
   if (!existingNames.has('customerCreditRatingState') || reset) {
     if (existingNames.has('customerCreditRatingState') && reset) {
       await db.collection('customerCreditRatingState').drop();
@@ -240,7 +240,7 @@ export async function createCollections(
     console.log('  skip:    consentAccessLog (already exists)');
   }
 
-  // SD-89: Merchant Agreement Procedure  -  plaintext (API key stored as bcrypt hash)
+  // Merchant Agreement Procedure  -  plaintext (API key stored as bcrypt hash)
   if (!existingNames.has('merchantAgreementProcedure') || reset) {
     if (existingNames.has('merchantAgreementProcedure') && reset) {
       await db.collection('merchantAgreementProcedure').drop();
@@ -252,7 +252,7 @@ export async function createCollections(
     console.log('  skip:    merchantAgreementProcedure (already exists)');
   }
 
-  // SD-64: Checkout Session Log  -  plaintext (TTL-indexed, 30-min session lifecycle)
+  // Checkout Session Log  -  plaintext (TTL-indexed, 30-min session lifecycle)
   if (!existingNames.has('checkoutSessionLog') || reset) {
     if (existingNames.has('checkoutSessionLog') && reset) {
       await db.collection('checkoutSessionLog').drop();
@@ -264,7 +264,7 @@ export async function createCollections(
     console.log('  skip:    checkoutSessionLog (already exists)');
   }
 
-  // SD-64: Payment Link Record  -  plaintext (unique short code, optional TTL)
+  // Payment Link Record  -  plaintext (unique short code, optional TTL)
   if (!existingNames.has('paymentLinkRecord') || reset) {
     if (existingNames.has('paymentLinkRecord') && reset) {
       await db.collection('paymentLinkRecord').drop();
@@ -289,7 +289,7 @@ export async function createCollections(
     console.log(`  skip:    ${DEMO_TEAM_CONTACT_COLLECTION} (already exists)`);
   }
 
-  // SD-89: Merchant Agreement Events  -  plaintext, append-only lifecycle audit (ADR-025 fix)
+  // Merchant Agreement Events  -  plaintext, append-only lifecycle audit (ADR-025 fix)
   if (!existingNames.has('merchantAgreementEvents') || reset) {
     if (existingNames.has('merchantAgreementEvents') && reset) {
       await db.collection('merchantAgreementEvents').drop();
@@ -301,7 +301,7 @@ export async function createCollections(
     console.log('  skip:    merchantAgreementEvents (already exists)');
   }
 
-  // SD-193: External Provider Arrangement Action Log  -  timeseries, TTL 90 days (ADR-025).
+  // External Provider Arrangement Action Log  -  timeseries, TTL 90 days (ADR-025).
   // Timeseries collections cannot be converted; drop + recreate always on reset.
   // Renamed from legacy 'integrationEvents'.)
   if (existingNames.has('integrationEvents')) {
@@ -385,7 +385,7 @@ export async function createCollections(
     console.log('  skip:    domainEvent (already exists)');
   }
 
-  // v16 (ADR-036): SD-16 RSA public key registry, public keys only, never private. JWKS + rotation audit.
+  // v16 (ADR-036): RSA public key registry, public keys only, never private. JWKS + rotation audit.
   if (!existingNames.has('partyAuthenticationKey') || reset) {
     if (existingNames.has('partyAuthenticationKey') && reset) {
       await db.collection('partyAuthenticationKey').drop();
@@ -397,7 +397,7 @@ export async function createCollections(
     console.log('  skip:    partyAuthenticationKey (already exists)');
   }
 
-  // v16 (ADR-033): SD-16 OAuth 2.0 authorization codes, TTL 5 minutes (expiresAt index)
+  // v16 (ADR-033): OAuth 2.0 authorization codes, TTL 5 minutes (expiresAt index)
   if (!existingNames.has('partyAuthorizationCode') || reset) {
     if (existingNames.has('partyAuthorizationCode') && reset) {
       await db.collection('partyAuthorizationCode').drop();
@@ -409,7 +409,7 @@ export async function createCollections(
     console.log('  skip:    partyAuthorizationCode (already exists)');
   }
 
-  // v16 (ADR-033): SD-16 Issued OAuth tokens, refresh tokens + revocation registry. TTL on expiresAt.
+  // v16 (ADR-033): Issued OAuth tokens, refresh tokens + revocation registry. TTL on expiresAt.
   if (!existingNames.has('partyIssuedToken') || reset) {
     if (existingNames.has('partyIssuedToken') && reset) {
       await db.collection('partyIssuedToken').drop();
@@ -421,7 +421,7 @@ export async function createCollections(
     console.log('  skip:    partyIssuedToken (already exists)');
   }
 
-  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant, per-user per-client consent with revocation support.
+  // v16 (ADR-038): PartyAuthentication, ConsentGrant, per-user per-client consent with revocation support.
   if (!existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) || reset) {
     if (existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) && reset) {
       await db.collection(PARTY_AUTH_CONSENT_COLLECTION).drop();
@@ -433,7 +433,7 @@ export async function createCollections(
     console.log(`  skip:    ${PARTY_AUTH_CONSENT_COLLECTION} (already exists)`);
   }
 
-  // SD-91/SD-16: PartyEnrolledCredential, user authenticator registry (public keys only, no CHD).
+  // PartyEnrolledCredential, user authenticator registry (public keys only, no CHD).
   if (!existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) || reset) {
     if (existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) && reset) {
       await db.collection(PARTY_ENROLLED_CREDENTIAL_COLLECTION).drop();
@@ -445,7 +445,7 @@ export async function createCollections(
     console.log(`  skip:    ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (already exists)`);
   }
 
-  // SD-91: PartyBackchannelAuthentication, CIBA auth_req_id lifecycle (TTL-expiring, one-time).
+  // PartyBackchannelAuthentication, CIBA auth_req_id lifecycle (TTL-expiring, one-time).
   if (!existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) || reset) {
     if (existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) && reset) {
       await db.collection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).drop();
@@ -466,10 +466,10 @@ export async function createCollections(
     console.log(`  skip:    ${MERCHANT_WEBHOOK_LOG_COLLECTION} (already exists)`);
   }
 
-  // SD-65: Payment Execution Procedure, created above as a QE-encrypted collection
+  // Payment Execution Procedure, created above as a QE-encrypted collection
   // (destinationIban QE:none). See the qeCollections loop; no plaintext creation here.
 
-  // SD-54: Counterparty Arrangement, plaintext (beneficiary registry, no raw PII stored)
+  // Counterparty Arrangement, plaintext (beneficiary registry, no raw PII stored)
   if (!existingNames.has(COUNTERPARTY_COLLECTION) || reset) {
     if (existingNames.has(COUNTERPARTY_COLLECTION) && reset) {
       await db.collection(COUNTERPARTY_COLLECTION).drop();
@@ -492,7 +492,7 @@ export async function createCollections(
     console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
   }
 
-  // SD-65 (v28): QR Payment Representation, plaintext. No QE: TTL forbids it (v35 CH-1).
+  // (v28): QR Payment Representation, plaintext. No QE: TTL forbids it (v35 CH-1).
   if (!existingNames.has(QR_REPRESENTATION_COLLECTION) || reset) {
     if (existingNames.has(QR_REPRESENTATION_COLLECTION) && reset) {
       await db.collection(QR_REPRESENTATION_COLLECTION).drop();
@@ -516,7 +516,7 @@ export async function createCollections(
     console.log(`  skip:    ${RTP_ALIAS_DIRECTORY_CACHE_COLLECTION} (already exists)`);
   }
 
-  // SD-65 (v28): Payment Request Event, timeseries, TTL 365 days (per-request lifecycle trail).
+  // (v28): Payment Request Event, timeseries, TTL 365 days (per-request lifecycle trail).
   // Timeseries collections cannot be converted; drop + recreate always on reset.
   if (!existingNames.has(PAYMENT_REQUEST_EVENT_COLLECTION) || reset) {
     if (existingNames.has(PAYMENT_REQUEST_EVENT_COLLECTION) && reset) {
