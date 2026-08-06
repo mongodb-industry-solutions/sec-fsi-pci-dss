@@ -98,7 +98,7 @@ const MODE_DESCRIPTION: Record<KycSearchMode, string> = {
   prefix:    'Prefix match (encStrStartsWith) evaluated over ciphertext',
   suffix:    'Suffix match (encStrEndsWith) evaluated over ciphertext',
   range:     'Encrypted range query over ciphertext',
-  equality:  'Deterministic equality match over ciphertext',
+  equality:  'Equality query over fully randomized ciphertext',
 };
 
 // Logical registry collection -> physical MongoDB collection name (for the debug detail).
@@ -305,7 +305,7 @@ export function EncryptedKycSearch({ token, role, escalationToken, resultHref }:
         <span>
           Encrypted attribute search is a Level 2 investigator / auditor capability. Level 1 analysts
           look a customer up by a concrete value (email, phone or account reference) provided by a case
-          or the customer, and cannot browse the customer base by attribute (least-privilege, PCI DSS Req 7).
+          or the customer, and cannot browse the customer base by attribute (least-privilege, PCI DSS).
         </span>
       </div>
     );
