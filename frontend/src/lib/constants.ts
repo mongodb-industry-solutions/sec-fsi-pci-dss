@@ -23,6 +23,16 @@ export const API_BASE_URL =
 export const MERCHANT_PUBLIC_URL =
   process.env.NEXT_PUBLIC_PSP_URL_MERCHANT || 'http://localhost:8082';
 
+// Shareable URL of this demo: runtime browser origin (correct in any environment),
+// with NEXT_PUBLIC_PSP_URL_FRONTEND as optional override when the origin is not shareable.
+export function demoPublicUrl(path = ''): string {
+  const base = (
+    process.env.NEXT_PUBLIC_PSP_URL_FRONTEND ||
+    (typeof window !== 'undefined' ? window.location.origin : '')
+  ).replace(/\/+$/, '');
+  return `${base}${path}`;
+}
+
 // All seeded demo accounts share the same bcrypt-hashed credential.
 // The plaintext is a fixed demo convention (documented in auth.controller.ts);
 // the seed stores only the hash. Used to auto-fill the login form (debug mode)
