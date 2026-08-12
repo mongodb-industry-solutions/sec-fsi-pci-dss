@@ -1,8 +1,10 @@
 'use client';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { CreditCard, Search, Store, ArrowRight, Home, LayoutDashboard } from 'lucide-react';
-import { MERCHANT_PUBLIC_URL } from '../../lib/constants';
+import { useState } from 'react';
+import { CreditCard, Search, Store, ArrowRight, Home, LayoutDashboard, QrCode, X } from 'lucide-react';
+import { MERCHANT_PUBLIC_URL, demoPublicUrl } from '../../lib/constants';
+import { QrRepresentation } from '../../components/QrRepresentation';
 
 interface HubCard {
   key: string;
@@ -15,6 +17,7 @@ interface HubCard {
 
 export default function SimulatorHubPage() {
   const router = useRouter();
+  const [shareTarget, setShareTarget] = useState<string | null>(null);
 
   const cards: HubCard[] = [
     {
@@ -45,6 +48,15 @@ export default function SimulatorHubPage() {
       onSelect: () => {
         window.location.href = MERCHANT_PUBLIC_URL;
       },
+    },
+    {
+      key: 'share',
+      title: 'Share with QR code',
+      description:
+        'Show a QR code with this environment\'s demo URL so anyone can open the demo on a phone and follow along.',
+      icon: QrCode,
+      cta: 'Show QR code',
+      onSelect: () => setShareTarget(demoPublicUrl('/simulator')),
     },
   ];
 
@@ -81,6 +93,21 @@ export default function SimulatorHubPage() {
           );
         })}
       </div>
+
+      {/* QR for this environment's demo URL; format "link" keeps the payload verbatim. */}
+      {shareTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setShareTarget(null)}>
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-semibold text-[#001E2B]">Share this demo</h2>
+              <button type="button" onClick={() => setShareTarget(null)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" aria-label="Close">
+                <X size={16} />
+              </button>
+            </div>
+            <QrRepresentation encodedPayload={shareTarget} payloadFormat="link" label="Scan to open the demo" />
+          </div>
+        </div>
+      )}
 
       {/* Secondary navigation: leave the simulator or jump straight into Application mode. */}
       <div className="mt-8 pt-6 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-center gap-3">
