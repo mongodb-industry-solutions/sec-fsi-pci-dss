@@ -123,6 +123,23 @@ export async function resolveCustomerAgreement(db: Db, accountReference: string)
 }
 
 /**
+ * Resolve an agreement by its INSTANCE reference (UUID) into the pair used to stamp a transaction.
+ * Complements `resolveCustomerAgreement`, which keys off an email or the ACC-xxx business key: a card
+ * on file names its owner by UUID, so a hosted flow that only knows the card resolves the payer here.
+ */
+async function resolveAgreementByInstance(db: Db, instanceRef: string): Promise<{ uuid?: string; reference?: string }> {
+  try {
+    const l1Db = await getDbForRole('level1_analyst', false);
+    const agreement = await l1Db
+      .collection<{ customerAgreementInstanceReference: string; customerAgreementReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ customerAgreementInstanceReference: instanceRef } as Record<string, unknown>);
+    return { uuid: agreement?.customerAgreementInstanceReference, reference: agreement?.customerAgreementReference };
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Resolve a party's canonical account reference (customerAgreementReference, e.g. ACC-xxx) from its
  * partyInstanceReference. Used to (a) stamp a checkout/API payment with the payer's account so it
  * lands under them in payment history, and (b) list a party's card transactions for the merchant history
@@ -236,7 +253,16 @@ export async function initiateTransaction(
     throw new CardNotActiveError(onFile.paymentCardStatus);
   }
 
-  const resolved = await resolveCustomerAgreement(db, input.accountReference);
+  // A hosted flow (payment link / checkout) may not know who the payer is: it passes the email when the
+  // payer typed one and falls back to the CARD TOKEN otherwise, which resolves to no agreement and left
+  // the transaction stamped with a token instead of an account reference. Such a payment then belonged
+  // to nobody and never appeared in any history. Fall back to the card-on-file owner, which is exactly
+  // who paid whenever the card is registered (including a card this same flow auto-registers).
+  let resolved = await resolveCustomerAgreement(db, input.accountReference);
+  if (!resolved.reference && onFile?.customerAgreementInstanceReference) {
+    const byCard = await resolveAgreementByInstance(db, onFile.customerAgreementInstanceReference);
+    if (byCard.reference) resolved = byCard;
+  }
   const canonicalAccountRef = resolved.reference ?? input.accountReference;
 
   const txn: CardTransactionLogControlRecord = {

@@ -70,6 +70,44 @@ describe('v36: movement collection', () => {
     expect(res.status).not.toBe(401);
   });
 
+  // The merchant OAuth channel is what leafy-wallet uses (`PspClient.listTransactions`). It broke once
+  // when the public-path exemption became method-scoped and the GET fell through to the session path,
+  // which verifies HS256 and rejects an RS256 Bearer. This pins the channel, not just the shape.
+  skip('the merchant OAuth channel can list movements', async () => {
+    const tok = await supertest(app.server)
+      .post('/api/v1/auth/token')
+      .type('form')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: 'oauth001-0000-4000-8000-000000000001',
+        client_secret: 'espresso-demo-secret-2026',
+        scope: 'read:transactions',
+      });
+    expect(tok.status).toBe(200);
+    const res = await supertest(app.server)
+      .get('/api/v1/transactions?limit=5')
+      .set('Authorization', `Bearer ${tok.body.access_token}`);
+    expect(res.status).toBe(200);
+    // Same envelope the consumer reads.
+    for (const k of ['results', 'total', 'page', 'limit']) expect(res.body).toHaveProperty(k);
+  });
+
+  skip('an OAuth token without read:transactions is refused', async () => {
+    const tok = await supertest(app.server)
+      .post('/api/v1/auth/token')
+      .type('form')
+      .send({
+        grant_type: 'client_credentials',
+        client_id: 'oauth001-0000-4000-8000-000000000001',
+        client_secret: 'espresso-demo-secret-2026',
+        scope: 'read:accounts',
+      });
+    const res = await supertest(app.server)
+      .get('/api/v1/transactions?limit=5')
+      .set('Authorization', `Bearer ${tok.body.access_token}`);
+    expect(res.status).toBe(403);
+  });
+
   // -- scoping -------------------------------------------------------------
 
   // A customer must see only their own movements. This is the guard that regressed when the collection

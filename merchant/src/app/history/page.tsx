@@ -84,6 +84,14 @@ function statusTone(s?: string): 'ok' | 'warn' | 'err' | 'neutral' {
   return 'neutral';
 }
 
+// Date AND time: several movements a day are normal in the demo, and a date alone made them
+// indistinguishable. Rendered from the ISO string so the server-rendered value never drifts by locale.
+function stamp(iso?: string | null): string {
+  if (!iso) return 'n/a';
+  const s = String(iso);
+  return s.length >= 16 ? `${s.slice(0, 10)} ${s.slice(11, 16)}` : s.slice(0, 10);
+}
+
 export default async function HistoryPage() {
   const session = await getSession();
   if (!session) redirect('/');
@@ -128,7 +136,7 @@ export default async function HistoryPage() {
     return {
       key: (t.paymentExecutionInstanceReference ?? `op-${i}`) as string,
       txnId: (t.paymentExecutionInstanceReference ?? t.transferReference ?? '') as string,
-      date: (t.completedAt ?? t.initiatedAt ?? '').toString().slice(0, 10) || 'n/a',
+      date: stamp((t.completedAt ?? t.initiatedAt) as string | undefined),
       concept: (t.concept ?? '') as string,
       direction: (t.direction ?? 'n/a') as string,
       amount: money(gross, t.currency),
@@ -157,7 +165,7 @@ export default async function HistoryPage() {
     return {
       key: x.paymentRequestInstanceReference as string,
       txnId: x.paymentRequestInstanceReference as string,
-      date: (x.recordCreatedDateTime ?? '').toString().slice(0, 10) || 'n/a',
+      date: stamp(x.recordCreatedDateTime as string | undefined),
       concept: (x.purpose ?? 'Payment request') as string,
       direction: role === 'to_approve' ? 'sent' : 'received',
       amount: money(gross, x.currency),
@@ -192,7 +200,7 @@ export default async function HistoryPage() {
             <table className="w-full text-sm">
               <thead className="bg-surface-alt text-left text-muted">
                 <tr>
-                  <th className="p-3 font-medium">Date</th>
+                  <th className="p-3 font-medium">Date / time</th>
                   <th className="p-3 font-medium">Transaction ID</th>
                   <th className="p-3 font-medium">Concept</th>
                   <th className="p-3 font-medium">Direction</th>
@@ -208,7 +216,7 @@ export default async function HistoryPage() {
                   const Icon = DirIcon(r.direction);
                   return (
                     <tr key={r.key} className="border-t border-line text-ink">
-                      <td className="p-3">{r.date}</td>
+                      <td className="p-3 whitespace-nowrap">{r.date}</td>
                       <td className="p-3">
                         <span className="inline-flex items-center gap-1">
                           <span className="font-mono text-xs text-muted" title={r.txnId || undefined}>{shortRef(r.txnId)}</span>
