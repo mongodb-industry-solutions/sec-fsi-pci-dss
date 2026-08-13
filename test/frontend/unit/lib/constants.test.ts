@@ -106,8 +106,16 @@ describe('demoPublicUrl', () => {
     });
   });
 
+  // Pin the SSR case explicitly instead of relying on the ambient environment: this file currently
+  // runs under node (vitest 4 ignores `environmentMatchGlobs`), but the assertion must hold under
+  // jsdom too, where `window` would otherwise be defined.
   it('yields a relative path when rendered server-side (no window)', () => {
-    expect(demoPublicUrl('/simulator')).toBe('/simulator');
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(demoPublicUrl('/simulator')).toBe('/simulator');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

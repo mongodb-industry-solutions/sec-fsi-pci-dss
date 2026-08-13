@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   openTransferFraudCase: vi.fn(async () => {}),
   getPayoutAccount: vi.fn(),
   holdCardFunds: vi.fn(async () => true),
+  releaseCardHold: vi.fn(async () => true),
   dispatchProvider: vi.fn(async () => ({ provider: 'internal', status: 'received', responseBody: {} })),
   emitProcessEvent: vi.fn(),
   emitComplianceEvent: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/transferRiskGate', () 
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccount.service', () => ({ getPayoutAccount: h.getPayoutAccount }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  holdCardFunds: h.holdCardFunds, releaseCardHold: vi.fn(), settleCardDebit: vi.fn(),
+  holdCardFunds: h.holdCardFunds, releaseCardHold: h.releaseCardHold, settleCardDebit: vi.fn(),
   creditAvailable: vi.fn(), creditDirect: vi.fn(), debitPending: vi.fn(), releasePendingCredit: vi.fn(),
 }));
 vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider }));
@@ -111,5 +112,37 @@ describe('a held bank transfer reserves the money it parks', () => {
     expect(h.holdCardFunds).not.toHaveBeenCalled();
     expect(h.dispatchProvider).toHaveBeenCalled();
     expect(res.status).toBe('submitted');
+  });
+});
+
+/**
+ * PR #116 review: the hold is taken before the execution is persisted, so a failure in between would
+ * leave the sender's funds reserved with no execution to release them. That is the same invariant the
+ * payout process states for its own reservation ("a failure must never leave the merchant holding an
+ * amount that will not settle"), applied to the payer side.
+ */
+describe('a failure past the reservation releases the hold', () => {
+  beforeEach(() => {
+    for (const fn of Object.values(h)) (fn as { mockClear?: () => void }).mockClear?.();
+    h.holdCardFunds.mockResolvedValue(true);
+    h.getPayoutAccount.mockResolvedValue({
+      payoutAccountInstanceReference: FROM, partyInstanceReference: PARTY, payoutAccountStatus: 'active',
+    });
+    h.screenTransfer.mockResolvedValue({ hold: true, indicators: ['fds.high.risk'], score: 78 });
+  });
+
+  it('releases the funds when the held execution cannot be persisted', async () => {
+    h.insertOne.mockRejectedValueOnce(new Error('write failed'));
+    const res = await executeBankTransfer(db(), input());
+    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
+    expect(res.status).toBe('exception');
+    expect(res.errors?.[0]).toMatch(/no funds were moved/i);
+  });
+
+  it('has nothing to release when no hold was taken', async () => {
+    h.insertOne.mockRejectedValueOnce(new Error('write failed'));
+    const res = await executeBankTransfer(db(), input({ fromAccountRef: undefined }));
+    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(res.status).toBe('exception');
   });
 });

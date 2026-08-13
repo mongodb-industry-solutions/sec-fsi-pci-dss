@@ -17,7 +17,7 @@ import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/b
 import { screenTransfer, openTransferFraudCase, TransferScreeningResult } from './transferRiskGate';
 import { RISK_HOLD_STEP } from './transferReview.service';
 import { getPayoutAccount } from './payoutAccount.service';
-import { holdCardFunds } from './payoutAccountBalance.service';
+import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
@@ -157,7 +157,17 @@ export async function executeBankTransfer(
         return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors };
       }
     }
-    await recordRiskHold(db, executionRef, input, rail, screen, now);
+    // Compensation: a failure past the reservation must not leave the funds held with no execution.
+    try {
+      await recordRiskHold(db, executionRef, input, rail, screen, now);
+    } catch (err) {
+      if (input.fromAccountRef) {
+        await releaseCardHold(db, input.fromAccountRef, input.amount).catch(() => { /* best effort */ });
+      }
+      console.error('[bank-transfer] could not persist the held execution; hold released:', err);
+      const errors = ['Could not hold this transfer for review. No funds were moved.'];
+      return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors };
+    }
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
     await openTransferFraudCase(db, {
       transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators,

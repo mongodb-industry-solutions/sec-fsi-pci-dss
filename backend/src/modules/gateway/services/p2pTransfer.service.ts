@@ -113,7 +113,15 @@ export async function executeP2PTransfer(
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
       recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
     };
-    await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(heldExec);
+    // Compensation: past the reservation, a failure must never leave the sender's funds held with no
+    // execution to release them (the same invariant the payout process states for its own reservation).
+    try {
+      await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(heldExec);
+    } catch (err) {
+      await releaseCardHold(db, fromAccountRef, amount).catch(() => { /* best effort */ });
+      console.error('[p2p] could not persist the held execution; hold released:', err);
+      return fail(amount, transferCurrency, 'Could not hold this transfer for review. No funds were moved.');
+    }
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
     await openTransferFraudCase(db, {
       transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount,
