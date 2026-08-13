@@ -2463,3 +2463,43 @@ on-screen value.
 constraint surfaced during `setup:db`. It is recorded here because the reasoning is not obvious: on a
 collection whose expiry is enforced by a TTL index, "encrypt the sensitive field" is unavailable, and
 the correct move is to stop persisting the field rather than to weaken the lifecycle.
+
+### ADR-059: a risk signal holds a payment, it does not decline it (v36)
+
+**Status.** Accepted.
+
+**Context.** The Phase-1 authorization gate treated all four gates alike: any non-approved verdict was
+a hard decline. The FDS gate mapped a `block`/`decline` recommendation onto `outcome: 'declined'`, and
+the saga's decline branch publishes `fraudCaseCreated: false`, so a high-score payment was rejected
+automatically and no investigation case was ever opened. With the seeded rule set
+(`bands.declineAtOrAbove: 120`), a 1250 payment at a risky MCC scored 135 and was auto-declined: the
+L1 triage and L2 confirmation the platform is built around were unreachable for exactly the payments
+that most needed them.
+
+The second half of the defect was on the money side. `PayoutOrchestrationProcess.onAuthorized` paid out
+on any non-declined outcome, so once a flagged payment was authorized the merchant was settled at T+N
+regardless of an open case, and resolving the case had no effect on the payment at all.
+
+**Decision.**
+
+1. **Separate eligibility from risk.** Eligibility gates decline: the card issuer (invalid card, CVV or
+   owner), the funds check (insufficient funds) and sanctions screening (a regulatory block). The fraud
+   gate is a risk gate: it always completes as approved and carries its verdict, which opens the case.
+2. **Accepted is not completed.** An authorization with an open case is withheld: no execution is
+   created and no ledger movement happens, so the funds-gate hold placed at authorization is exactly
+   the money that stays put. The cardholder is not charged and the merchant is not credited.
+3. **The investigation closes the payment.** Resolving the case publishes `fraud.case.resolved`, which
+   the payout process consumes: `cleared` releases the withheld payout, `confirmed_fraud` returns the
+   hold to the cardholder (pending -> available) and declines the transaction. Only a still-authorized
+   transaction is actionable, so a settled or already declined payment is never re-processed.
+
+**Consequences.** A flagged payment is auditable end to end: authorized, withheld, investigated,
+resolved, then either settled or reversed, with the money immobilised (not moved) throughout. Merchant
+commission revenue no longer counts payments still under investigation, which is the correct reading.
+No API change: routes, request/response shapes and the SSE outcome fields are untouched; what changes
+is which value `outcome` takes for a fraud signal. No schema, DEK or seed change, so no `--reset`.
+
+**On the standards.** Withholding satisfies AML (monitoring alerts are not meant to block; suspicious
+activity is investigated and reported) and satisfies the sanctions freeze obligation *provided* nothing
+releases a withheld payment except an explicit resolution: no timeout, no scheduled settlement job. The
+sanctions gate itself is left as a hard decline, since a confirmed match should not be accepted at all.

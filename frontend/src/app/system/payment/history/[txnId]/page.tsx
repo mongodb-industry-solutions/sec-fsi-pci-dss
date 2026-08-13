@@ -837,6 +837,14 @@ export default function TransactionDetailPage() {
             </div>
           )}
 
+          {/* An open investigation holds the payment: authorized, but nothing is charged yet. */}
+          {txn.status === 'authorized' && !['resolved_cleared', 'resolved_fraud', 'closed'].includes(caseNotes.fraudDiagnosisCaseStatus ?? '') && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              This payment is accepted but on hold while the review is open. The amount is reserved on your
+              account and has not been charged; it is only completed once the review closes.
+            </p>
+          )}
+
           {/* Customer-visible notes list */}
           {caseNotes.notes && caseNotes.notes.length > 0 ? (
             <div className="space-y-2">

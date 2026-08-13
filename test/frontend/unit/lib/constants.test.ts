@@ -2,13 +2,14 @@
  * Unit tests: frontend/src/lib/constants.ts
  * Validates all five demo users, role labels, color maps, and formatRiskIndicator.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   DEMO_PASSWORD,
   ROLE_LABELS,
   SEVERITY_COLORS,
   STATUS_COLORS,
   formatRiskIndicator,
+  demoPublicUrl,
 } from '../../../../frontend/src/lib/constants';
 
 // All seeded demo accounts now share one bcrypt-hashed credential exposed via the
@@ -77,5 +78,35 @@ describe('formatRiskIndicator', () => {
 
   it('handles empty string without throwing', () => {
     expect(() => formatRiskIndicator('')).not.toThrow();
+  });
+});
+
+// Share QR: the URL must resolve per environment (configured public URL first, browser origin next).
+describe('demoPublicUrl', () => {
+  const withOrigin = (origin: string, fn: () => void) => {
+    vi.stubGlobal('window', { location: { origin } });
+    try { fn(); } finally { vi.unstubAllGlobals(); }
+  };
+
+  it('appends the path to the browser origin', () => {
+    withOrigin('https://demo.example.com', () => {
+      expect(demoPublicUrl('/simulator')).toBe('https://demo.example.com/simulator');
+    });
+  });
+
+  it('returns the bare base when no path is given', () => {
+    withOrigin('https://demo.example.com', () => {
+      expect(demoPublicUrl()).toBe('https://demo.example.com');
+    });
+  });
+
+  it('never doubles the slash when the origin carries a trailing one', () => {
+    withOrigin('https://demo.example.com/', () => {
+      expect(demoPublicUrl('/simulator')).toBe('https://demo.example.com/simulator');
+    });
+  });
+
+  it('yields a relative path when rendered server-side (no window)', () => {
+    expect(demoPublicUrl('/simulator')).toBe('/simulator');
   });
 });

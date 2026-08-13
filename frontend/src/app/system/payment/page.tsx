@@ -868,6 +868,13 @@ export default function DemoPaymentPage() {
                 )}
               </div>
 
+              {!declined && result.fraudCaseCreated && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  The amount is reserved on your account, not charged: this payment only completes once the
+                  security review closes.
+                </p>
+              )}
+
               <p className="text-sm text-gray-600">
                 For the full detail of this operation, open it in{' '}
                 <Link href={detailPath} className="text-[#001E2B] font-medium underline hover:no-underline">

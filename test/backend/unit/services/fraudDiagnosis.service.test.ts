@@ -248,3 +248,48 @@ describe('getCaseById', () => {
     expect(await getCaseById(makeDb({ findOneResult: null }), 'nonexistent')).toBeNull();
   });
 });
+
+// The payment follow-up is event-driven: resolving a case publishes fraud.case.resolved, which the
+// payout process consumes to release or reverse the withheld payment.
+describe('updateCase publishes the resolution', () => {
+  function resolveDb(caseDoc: Record<string, unknown>) {
+    return {
+      collection: vi.fn().mockReturnValue({
+        findOneAndUpdate: vi.fn().mockResolvedValue(caseDoc),
+      }),
+    } as any;
+  }
+
+  async function captureResolution(status: string, caseDoc: Record<string, unknown>) {
+    const { setEventBus, getEventBus } = await import('../../../../backend/src/vendors/eventbus');
+    const { EventBusInProcess } = await import('../../../../backend/src/vendors/eventbus/EventBusInProcess');
+    setEventBus(new EventBusInProcess());
+    const seen: Array<Record<string, unknown>> = [];
+    getEventBus().subscribe('fraud.case.resolved', (e) => { seen.push(e.payload as Record<string, unknown>); });
+    const { updateCase } = await import('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service');
+    await updateCase(resolveDb(caseDoc), 'case-1', { fraudDiagnosisCaseStatus: status as never });
+    return seen;
+  }
+
+  const linked = { fraudDiagnosisInstanceReference: 'case-1', cardTransactionInstanceReference: 'txn-1' };
+
+  it('maps resolved_cleared to a cleared outcome', async () => {
+    const seen = await captureResolution('resolved_cleared', linked);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ outcome: 'cleared', cardTransactionInstanceReference: 'txn-1' });
+  });
+
+  it('maps resolved_fraud to a confirmed_fraud outcome', async () => {
+    const seen = await captureResolution('resolved_fraud', linked);
+    expect(seen[0]).toMatchObject({ outcome: 'confirmed_fraud' });
+  });
+
+  it('publishes nothing for a non-terminal status change', async () => {
+    expect(await captureResolution('under_review', linked)).toHaveLength(0);
+  });
+
+  it('publishes nothing for a case with no linked transaction reference at all', async () => {
+    const seen = await captureResolution('resolved_fraud', { fraudDiagnosisInstanceReference: 'case-2' });
+    expect(seen).toHaveLength(0);
+  });
+});

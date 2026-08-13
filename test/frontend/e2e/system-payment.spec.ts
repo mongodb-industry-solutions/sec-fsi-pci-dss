@@ -92,6 +92,24 @@ test.describe('FR-v1-01/03: new payment wizard', () => {
     await advanceToConfirmation(page);
     await expect(page.getByText(/Payment Confirmed/i)).toBeVisible({ timeout: 8000 });
     await expect(page.getByText(/fraud|review|investigation/i).first()).toBeVisible({ timeout: 8000 });
+    // Accepted, not completed: the amount is reserved until the review closes.
+    await expect(page.getByText(/reserved on your account, not charged/i)).toBeVisible();
+  });
+
+  // A decline is a completed operation: it lands on the receipt with a link to the detail, never on
+  // an inline error on the review step.
+  test('a declined payment lands on the receipt with the operation detail link', async ({ page }) => {
+    await page.route('**/api/v1/transactions/*/stream', (route) =>
+      route.fulfill(sseOutcome({ status: 'declined', declineReason: 'insufficient_funds', fraudCaseCreated: false })));
+    await page.route('**/api/v1/transactions', (route) => route.request().method() === 'POST'
+      ? route.fulfill(json({ cardTransactionInstanceReference: 'txn-dec-1', cardTransactionStatus: 'pending' }, 201))
+      : route.continue());
+    await advanceToConfirmation(page);
+    await expect(page.getByText(/Payment Not Completed/i)).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Declined', { exact: true })).toBeVisible();
+    await expect(page.getByText(/insufficient funds/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /your transactions/i })).toHaveAttribute('href', '/system/payment/history/txn-dec-1');
+    await expect(page.getByRole('button', { name: /View Operation Detail/i })).toBeVisible();
   });
 });
 

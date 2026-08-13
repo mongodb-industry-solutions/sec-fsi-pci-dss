@@ -25,15 +25,23 @@ export class PayoutOrchestrationProcess {
 
   register(): void {
     this.bus.subscribe('card.payment.authorization.completed', (e) => this.onAuthorized(e));
+    this.bus.subscribe('fraud.case.resolved', (e) => this.onCaseResolved(e));
     this.bus.subscribe('bank.transfer.settled', (e) => this.onTransferSettled(e));
     this.bus.subscribe('bank.transfer.failed', (e) => this.onTransferFailed(e));
   }
 
   private async onAuthorized(e: DomainEvent): Promise<void> {
-    const p = e.payload as { outcome?: string };
+    const p = e.payload as { outcome?: string; fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string };
     if (p.outcome === 'declined') return;
 
     const txnId = e.correlationId;
+
+    // An authorization under investigation is accepted but NOT completed: the cardholder hold stays in
+    // place and no money moves until the case is resolved (see onCaseResolved).
+    if (p.fraudCaseCreated) {
+      await this.withholdPayout(txnId, p.fraudDiagnosisInstanceReference);
+      return;
+    }
 
     try {
       await this.triggerPayout(txnId);
@@ -41,6 +49,47 @@ export class PayoutOrchestrationProcess {
       // Payout failure never rolls back the authorized payment
       console.error(`[payout-orch] Failed to trigger payout for txn ${txnId}:`, err);
     }
+  }
+
+  // Investigation closed: a cleared case releases the withheld payout, a confirmed fraud never
+  // completes the payment (the hold is returned to the cardholder and the transaction is declined).
+  private async onCaseResolved(e: DomainEvent): Promise<void> {
+    const p = e.payload as { outcome?: string; cardTransactionInstanceReference?: string };
+    const txnId = p.cardTransactionInstanceReference;
+    if (!txnId) return;
+
+    const txn = await this.db.collection<{ cardTransactionStatus?: string; cardTransactionAmount?: { amount: number; currency: string } }>(CARD_TRANSACTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { cardTransactionStatus: 1, cardTransactionAmount: 1 } });
+    // Only a still-withheld authorization is actionable: a settled or already declined payment is done.
+    if (txn?.cardTransactionStatus !== 'authorized') return;
+
+    try {
+      if (p.outcome === 'cleared') {
+        await this.triggerPayout(txnId);
+        return;
+      }
+      if (p.outcome === 'confirmed_fraud') {
+        const { amount = 0, currency = 'USD' } = txn.cardTransactionAmount ?? {};
+        await this.returnCardholderPendingHold(txnId, amount, currency);
+        const { declineTransaction } = await import('../../transaction/services/cardTransaction.service');
+        await declineTransaction(this.db, txnId, 'confirmed_fraud', 'fraud_confirmed');
+      }
+    } catch (err) {
+      console.error(`[payout-orch] Failed to apply case resolution for txn ${txnId}:`, err);
+    }
+  }
+
+  // Record that the payout is withheld pending investigation. No ledger movement: the funds gate hold
+  // taken at authorization is exactly the money that must stay put.
+  private async withholdPayout(txnId: string, caseRef?: string): Promise<void> {
+    emitProcessEvent(this.db, {
+      entityType: 'transaction', entityId: txnId,
+      processType: 'payment_processing', processAction: 'payout.withheld',
+      processOutcome: 'pending',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: { txnId, reason: 'investigation_open', ...(caseRef ? { fraudDiagnosisInstanceReference: caseRef } : {}) },
+      bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    });
   }
 
   private async accountCurrency(payoutAccountRef: string): Promise<string | undefined> {
@@ -521,6 +570,21 @@ export class PayoutOrchestrationProcess {
     const accountRef = card.fundingPayoutAccountInstanceReference;
     const heldAmount = await this.convert(amount, settlementCurrency, await this.accountCurrency(accountRef));
     await settleCardDebit(this.db, accountRef, heldAmount);
+  }
+
+  // Confirmed fraud: give the cardholder's held amount back (pending -> available) instead of
+  // finalizing it. Mirrors clearCardholderPendingHold, same FX handling, opposite ledger move.
+  private async returnCardholderPendingHold(txnId: string, amount: number, currency: string): Promise<void> {
+    const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
+    const txn = await this.db.collection<{ paymentCardInstanceReference?: string }>(CARD_TRANSACTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { paymentCardInstanceReference: 1 } });
+    if (!txn?.paymentCardInstanceReference) return;
+    const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
+      .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
+    if (!card?.fundingPayoutAccountInstanceReference) return;
+    const accountRef = card.fundingPayoutAccountInstanceReference;
+    const heldAmount = await this.convert(amount, currency, await this.accountCurrency(accountRef));
+    await releaseCardHold(this.db, accountRef, heldAmount);
   }
 
   private async getMerchantSettlementSchedule(merchantRef: string): Promise<'T+0' | 'T+1' | 'T+2' | 'T+3'> {
