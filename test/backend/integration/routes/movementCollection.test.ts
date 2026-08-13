@@ -54,6 +54,48 @@ describe('v36: movement collection', () => {
     await app.close();
   });
 
+  // -- authentication ------------------------------------------------------
+
+  // `/api/v1/transactions` is in the PUBLIC_EXACT list so the simulator can CREATE a payment with no
+  // session. The exemption used to be path-only, so the collection GET was public too: harmless while
+  // it required a cardToken, a full data exposure once it started listing every movement (v36).
+  skip('the collection GET requires authentication', async () => {
+    const res = await supertest(app.server).get('/api/v1/transactions?limit=1');
+    expect(res.status).toBe(401);
+  });
+
+  skip('creating a payment stays public (simulator mode)', async () => {
+    // No token: the route must still be reachable. An invalid body is fine, a 401 is not.
+    const res = await supertest(app.server).post('/api/v1/transactions').send({});
+    expect(res.status).not.toBe(401);
+  });
+
+  // -- scoping -------------------------------------------------------------
+
+  // A customer must see only their own movements. This is the guard that regressed when the collection
+  // stopped receiving an explicit `email` from the client and fell back to a default role.
+  skip('a customer sees fewer movements than staff', async () => {
+    const mine = await supertest(app.server)
+      .get('/api/v1/transactions?limit=200')
+      .set('Authorization', `Bearer ${tokens.customer}`);
+    const all = await supertest(app.server)
+      .get('/api/v1/transactions?limit=200')
+      .set('Authorization', `Bearer ${tokens.analyst}`);
+    expect(mine.status).toBe(200);
+    expect(all.status).toBe(200);
+    expect(mine.body.total).toBeLessThan(all.body.total);
+  });
+
+  // Direction is relative to the viewer, so an incoming transfer must not read as sent.
+  skip('a transfer the customer received is marked received', async () => {
+    const res = await supertest(app.server)
+      .get('/api/v1/transactions?kind=transfer&limit=200')
+      .set('Authorization', `Bearer ${tokens.customer}`);
+    const rows = res.body.results as Array<{ direction: string }>;
+    if (rows.length === 0) return;
+    expect(rows.some((r) => r.direction === 'received')).toBe(true);
+  });
+
   // -- page size -----------------------------------------------------------
 
   skip('accepts the page size the history page requests', async () => {

@@ -6,7 +6,11 @@ import { api, FraudCase, ActionEvent, TransactionNotesResponse, RtpRequestDTO } 
 import { RtpDetailView } from '../../../../../components/RtpDetailView';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
-import { Check, Copy, Eye, EyeOff, Info } from 'lucide-react';
+import {
+  Check, Copy, Eye, EyeOff, Info, ArrowLeft, ArrowRight, ArrowUpRight, ArrowDownLeft, ExternalLink,
+  CheckCircle2, XCircle, Clock, AlertTriangle, Search, Ban, MinusCircle, Mail, CircleDot,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
 import { useNotificationsStream } from '../../../../../lib/useNotificationsStream';
@@ -47,7 +51,7 @@ function FieldLabel({ children, info }: { children: React.ReactNode; info: strin
   );
 }
 
-// One-click copy with a transient ✓ confirmation.
+// One-click copy with a transient confirmation icon.
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -92,26 +96,33 @@ function BlockRow({ label, info, children }: { label: string; info: string; chil
   );
 }
 
-// Common status → display mapping shared by card + P2P sections.
+// One status vocabulary for the whole view: colour AND icon per status, so a chip looks the same
+// wherever it appears (card section, transfer section, RTP section).
+const STATUS_ICONS: Record<string, { color: string; Icon: LucideIcon }> = {
+  completed:        { color: 'bg-emerald-100 text-emerald-800',                Icon: CheckCircle2 },
+  authorized:       { color: 'bg-green-100 text-green-800',                    Icon: CheckCircle2 },
+  settled:          { color: 'bg-emerald-100 text-emerald-800 font-semibold',  Icon: CheckCircle2 },
+  under_review:     { color: 'bg-amber-100 text-amber-800',                    Icon: AlertTriangle },
+  open:             { color: 'bg-amber-100 text-amber-800',                    Icon: AlertTriangle },
+  escalated:        { color: 'bg-orange-100 text-orange-800',                  Icon: Search },
+  resolved_cleared: { color: 'bg-green-100 text-green-800',                    Icon: CheckCircle2 },
+  resolved_fraud:   { color: 'bg-red-100 text-red-800',                        Icon: Ban },
+  closed:           { color: 'bg-gray-100 text-gray-700',                      Icon: MinusCircle },
+  declined:         { color: 'bg-red-100 text-red-800',                        Icon: XCircle },
+  failed:           { color: 'bg-red-100 text-red-800',                        Icon: XCircle },
+  pending:          { color: 'bg-blue-100 text-blue-800',                      Icon: Clock },
+  reversed:         { color: 'bg-red-100 text-red-800',                        Icon: XCircle },
+};
+
+// Common status chip shared by the card, transfer and RTP sections.
 function StatusChip({ status }: { status?: string | null }) {
-  const map: Record<string, string> = {
-    completed: 'bg-emerald-100 text-emerald-800',
-    authorized: 'bg-green-100 text-green-800',
-    settled: 'bg-emerald-100 text-emerald-800 font-semibold',
-    under_review: 'bg-amber-100 text-amber-800',
-    open: 'bg-amber-100 text-amber-800',
-    escalated: 'bg-orange-100 text-orange-800',
-    resolved_cleared: 'bg-green-100 text-green-800',
-    resolved_fraud: 'bg-red-100 text-red-800',
-    closed: 'bg-gray-100 text-gray-700',
-    declined: 'bg-red-100 text-red-800',
-    failed: 'bg-red-100 text-red-800',
-    pending: 'bg-blue-100 text-blue-800',
-  };
   // A missing status must degrade to a neutral chip, never crash the detail view.
   const value = status ?? '';
+  const meta = STATUS_ICONS[value];
+  const Icon = meta?.Icon ?? CircleDot;
   return (
-    <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded font-medium w-fit ${map[value] ?? 'bg-gray-100 text-gray-600'}`}>
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium w-fit ${meta?.color ?? 'bg-gray-100 text-gray-600'}`}>
+      <Icon size={12} className="shrink-0" />
       {value ? value.replace(/_/g, ' ') : 'n/a'}
     </span>
   );
@@ -135,16 +146,17 @@ interface StoredTransaction {
   paymentReference?: string | null;
 }
 
-const STATUS_DISPLAY: Record<string, { label: string; color: string; icon: string }> = {
-  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800',         icon: '✓' },
-  settled:          { label: 'Settled (funds disbursed)',        color: 'bg-emerald-100 text-emerald-800 font-semibold', icon: '✓' },
-  under_review:     { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  icon: '●' },
-  open:             { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  icon: '●' },
-  escalated:        { label: 'In investigation',                color: 'bg-orange-100 text-orange-800',icon: '●' },
-  resolved_cleared: { label: 'Cleared',                         color: 'bg-green-100 text-green-800',  icon: '✓' },
-  resolved_fraud:   { label: 'Fraud confirmed – refund issued', color: 'bg-red-100 text-red-800',      icon: '!' },
-  closed:           { label: 'Closed',                          color: 'bg-gray-100 text-gray-700',    icon: '–' },
-  declined:         { label: 'Declined',                        color: 'bg-red-100 text-red-800',      icon: '✗' },
+const STATUS_DISPLAY: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
+  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800',         Icon: CheckCircle2 },
+  settled:          { label: 'Settled (funds disbursed)',        color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
+  under_review:     { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  Icon: AlertTriangle },
+  open:             { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  Icon: AlertTriangle },
+  escalated:        { label: 'In investigation',                color: 'bg-orange-100 text-orange-800',Icon: Search },
+  resolved_cleared: { label: 'Cleared',                         color: 'bg-green-100 text-green-800',  Icon: CheckCircle2 },
+  resolved_fraud:   { label: 'Fraud confirmed, refund issued',  color: 'bg-red-100 text-red-800',      Icon: Ban },
+  closed:           { label: 'Closed',                          color: 'bg-gray-100 text-gray-700',    Icon: MinusCircle },
+  declined:         { label: 'Declined',                        color: 'bg-red-100 text-red-800',      Icon: XCircle },
+  pending:          { label: 'Pending',                         color: 'bg-blue-100 text-blue-800',    Icon: Clock },
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -154,13 +166,13 @@ const CHANNEL_LABELS: Record<string, string> = {
   atm:         'ATM withdrawal',
 };
 
-const EVENT_META: Record<string, { label: string; icon: string; dotColor: string }> = {
-  case_opened:    { label: 'Transaction flagged for security review',  icon: '!', dotColor: 'border-amber-400 bg-amber-50' },
-  escalated:      { label: 'Review escalated to specialist team',      icon: '↑', dotColor: 'border-orange-400 bg-orange-50' },
-  note_added:     { label: 'Update added to your case',                icon: '✉', dotColor: 'border-blue-400 bg-blue-50' },
-  resolved:       { label: 'Review completed',                         icon: '✓', dotColor: 'border-green-400 bg-green-50' },
-  closed:         { label: 'Case closed',                              icon: '–', dotColor: 'border-gray-300 bg-gray-50' },
-  field_accessed: { label: 'Account details verified',                 icon: '●', dotColor: 'border-purple-400 bg-purple-50' },
+const EVENT_META: Record<string, { label: string; Icon: LucideIcon; dotColor: string }> = {
+  case_opened:    { label: 'Transaction flagged for security review',  Icon: AlertTriangle, dotColor: 'border-amber-400 bg-amber-50' },
+  escalated:      { label: 'Review escalated to specialist team',      Icon: ArrowUpRight,  dotColor: 'border-orange-400 bg-orange-50' },
+  note_added:     { label: 'Update added to your case',                Icon: Mail,          dotColor: 'border-blue-400 bg-blue-50' },
+  resolved:       { label: 'Review completed',                         Icon: CheckCircle2,  dotColor: 'border-green-400 bg-green-50' },
+  closed:         { label: 'Case closed',                              Icon: MinusCircle,   dotColor: 'border-gray-300 bg-gray-50' },
+  field_accessed: { label: 'Account details verified',                 Icon: Search,        dotColor: 'border-purple-400 bg-purple-50' },
 };
 
 function CardTokenField({ token }: { token: string }) {
@@ -335,7 +347,7 @@ export default function TransactionDetailPage() {
 
   const currentStatus = fraudCase?.caseStatus ?? txn?.status ?? '';
   const statusMeta = STATUS_DISPLAY[currentStatus] ?? {
-    label: currentStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '●',
+    label: currentStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', Icon: CircleDot,
   };
 
   const shell = { user, debugMode };
@@ -357,7 +369,7 @@ export default function TransactionDetailPage() {
       <div className="text-center py-12 text-gray-500">
         <p className="mb-3">Transaction not found.</p>
         <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
-          ← Back to transactions
+          <ArrowLeft size={14} /> Back to transactions
         </Link>
       </div>
     </PageShell>
@@ -372,17 +384,19 @@ export default function TransactionDetailPage() {
     return (
       <PageShell {...shell}>
         <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
-          ← Back to transactions
+          <ArrowLeft size={14} /> Back to transactions
         </Link>
         <div className="bg-white rounded-xl border p-5 mb-4">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h1 className="text-xl font-bold text-gray-900">P2P Transfer</h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${direction === 'sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-                  {direction === 'sent' ? '↑ Sent' : '↓ Received'}
+                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${direction === 'sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                  {direction === 'sent'
+                    ? <><ArrowUpRight size={12} className="shrink-0" /> Sent</>
+                    : <><ArrowDownLeft size={12} className="shrink-0" /> Received</>}
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${p2pTransfer.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${p2pTransfer.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
                   {p2pTransfer.paymentExecutionStatus}
                 </span>
               </div>
@@ -432,7 +446,7 @@ export default function TransactionDetailPage() {
                           {p2pTransfer.sourcePayoutAccountReference ? (
                             <Link href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
                               className="font-mono text-blue-600 hover:underline">
-                              {p2pTransfer.sourcePayoutAccountReference} ↗
+                              {p2pTransfer.sourcePayoutAccountReference} <ExternalLink size={11} className="inline" />
                             </Link>
                           ): <span className="text-gray-400">—</span>}
                         </BlockRow>
@@ -474,7 +488,7 @@ export default function TransactionDetailPage() {
                         <BlockRow label="Beneficiary" info="Counterparty Administration: the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
                           <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference!)}`}
                             className="font-mono text-green-600 hover:underline">
-                            {p2pTransfer.beneficiaryArrangementReference} ↗
+                            {p2pTransfer.beneficiaryArrangementReference} <ExternalLink size={11} className="inline" />
                           </Link>
                         </BlockRow>
                       </dl>
@@ -483,7 +497,7 @@ export default function TransactionDetailPage() {
                         <BlockRow label="Payout account" info="Payout Account Arrangement credited for this transfer: a registered destination account. Open it to see the account details.">
                           <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
                             className="font-mono text-green-600 hover:underline">
-                            {p2pTransfer.resolvedPayoutAccountReference} ↗
+                            {p2pTransfer.resolvedPayoutAccountReference} <ExternalLink size={11} className="inline" />
                           </Link>
                         </BlockRow>
                       </dl>
@@ -543,7 +557,7 @@ export default function TransactionDetailPage() {
                   1 {p2pTransfer.currency} = {p2pTransfer.fxRate.toFixed(6)} {p2pTransfer.recipientCurrency}
                   {p2pTransfer.recipientAmount != null && (
                     <span className="ml-2 text-gray-400">
-                      → {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.recipientCurrency }).format(p2pTransfer.recipientAmount)}
+                      <ArrowRight size={11} className="inline" /> {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.recipientCurrency }).format(p2pTransfer.recipientAmount)}
                     </span>
                   )}
                 </span>
@@ -632,13 +646,13 @@ export default function TransactionDetailPage() {
 
             {isAnalyst && (
               <Link href={`/system/investigation/${fc.fraudDiagnosisInstanceReference}`} className="inline-flex items-center gap-1.5 text-sm text-[#001E2B] hover:underline font-medium">
-                Open fraud investigation ↗
+                Open fraud investigation <ExternalLink size={12} />
               </Link>
             )}
           </div>
         ) : (
           <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
-            ✓ No security review triggered for this transfer.
+            <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} className="text-green-600" /> No security review triggered for this transfer.</span>
           </div>
         )}
       </PageShell>
@@ -653,7 +667,7 @@ export default function TransactionDetailPage() {
   return (
     <PageShell {...shell}>
       <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
-        ← Back to transactions
+        <ArrowLeft size={14} /> Back to transactions
       </Link>
 
       {/* Main transaction card */}
@@ -666,11 +680,13 @@ export default function TransactionDetailPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900">{txn.merchant}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`text-xs px-2 py-0.5 rounded font-medium border ${cardDirection === 'debit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                {cardDirection === 'debit' ? '↑ Sent' : '↓ Received'}
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium border ${cardDirection === 'debit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                {cardDirection === 'debit'
+                  ? <><ArrowUpRight size={12} /> Sent</>
+                  : <><ArrowDownLeft size={12} /> Received</>}
               </span>
               <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${statusMeta.color}`}>
-                <span>{statusMeta.icon}</span>
+                <statusMeta.Icon size={12} className="shrink-0" />
                 {statusMeta.label}
               </span>
             </div>
@@ -696,7 +712,7 @@ export default function TransactionDetailPage() {
               <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS. The full PAN is never stored after authorisation. Click to manage the card.">
                 {matchedCardId ? (
                   <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
-                    className="font-mono text-blue-600 hover:underline">{txn.maskedPan} ↗</Link>
+                    className="font-mono text-blue-600 hover:underline">{txn.maskedPan} <ExternalLink size={11} className="inline" /></Link>
                 ) : (
                   <span className="font-mono text-gray-700">{txn.maskedPan}</span>
                 )}
@@ -712,7 +728,7 @@ export default function TransactionDetailPage() {
                     <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
                     {matchedCardId && (
                       <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
-                        className="text-[#001E2B] hover:underline shrink-0">Manage ↗</Link>
+                        className="inline-flex items-center gap-1 text-[#001E2B] hover:underline shrink-0">Manage <ExternalLink size={11} /></Link>
                     )}
                   </span>
                 </BlockRow>
@@ -856,7 +872,7 @@ export default function TransactionDetailPage() {
           {/* Customer-visible notes list */}
           {caseNotes.notes && caseNotes.notes.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-blue-700 uppercase">✉ Messages from security team</p>
+              <p className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 uppercase"><Mail size={12} /> Messages from security team</p>
               {caseNotes.notes.map((note) => (
                 <div key={note.noteId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-900">{note.noteText}</p>
@@ -895,10 +911,10 @@ export default function TransactionDetailPage() {
             ? 'bg-red-50 border-red-200 text-red-900'
             : 'bg-green-50 border-green-200 text-green-900'
         }`}>
-          <p className="font-semibold mb-1">
+          <p className="inline-flex items-center gap-1.5 font-semibold mb-1">
             {fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud'
-              ? '! Unauthorized transaction confirmed'
-              : '✓ Transaction cleared'}
+              ? <><Ban size={14} /> Unauthorized transaction confirmed</>
+              : <><CheckCircle2 size={14} /> Transaction cleared</>}
           </p>
           <p>
             {fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud'
@@ -919,11 +935,11 @@ export default function TransactionDetailPage() {
             <div className="absolute left-3 top-2 bottom-2 w-px bg-gray-200" />
             <div className="space-y-5">
               {visibleEvents.map((e, i) => {
-                const meta = EVENT_META[e.actionType] ?? { label: e.actionType, icon: '●', dotColor: 'border-gray-300 bg-gray-50' };
+                const meta = EVENT_META[e.actionType] ?? { label: e.actionType, Icon: CircleDot, dotColor: 'border-gray-300 bg-gray-50' };
                 return (
                   <div key={i} className="relative">
-                    <div className={`absolute -left-8 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${meta.dotColor}`}>
-                      {meta.icon}
+                    <div className={`absolute -left-8 w-6 h-6 rounded-full border-2 flex items-center justify-center ${meta.dotColor}`}>
+                      <meta.Icon size={12} className="text-gray-700" />
                     </div>
                     <p className="text-sm font-medium text-gray-800">{meta.label}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{new Date(e.actionDateTime).toLocaleString()}</p>
@@ -938,7 +954,7 @@ export default function TransactionDetailPage() {
       {/* No fraud case: the "no review needed" note only makes sense for a payment that went through. */}
       {!txn.fraudCaseCreated && txn.status !== 'declined' && txn.status !== 'under_review' && (
         <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
-          ✓ This transaction was processed normally and did not require additional review.
+          <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} className="text-green-600" /> This transaction was processed normally and did not require additional review.</span>
         </div>
       )}
       {!txn.fraudCaseCreated && txn.status === 'declined' && (

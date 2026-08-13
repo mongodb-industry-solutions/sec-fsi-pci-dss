@@ -16,7 +16,7 @@ import { AuditTrailLink } from '../../../../components/AuditTrailLink';
 import { AccessDenied } from '../../../../components/AccessDenied';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { Tooltip } from '../../../../components/Tooltip';
-import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -243,7 +243,9 @@ export default function TransactionDetailPage() {
   if (notFound || !txn) return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-500 space-y-3">
       <p>Transaction not found.</p>
-      <Link href="/system/transactions" className="text-blue-600 hover:underline text-sm">← Back to transactions</Link>
+      <Link href="/system/transactions" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
+        <ArrowLeft size={14} /> Back to transactions
+      </Link>
     </div>
   );
 
@@ -345,7 +347,7 @@ export default function TransactionDetailPage() {
 
         <Link href={fromCase ? `/system/investigation/${fromCase.caseId}` : '/system/transactions'}
           className="inline-block text-blue-600 hover:underline text-sm">
-          ← Back
+          <ArrowLeft size={14} /> Back
         </Link>
       </div>
     );

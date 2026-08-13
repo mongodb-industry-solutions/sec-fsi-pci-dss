@@ -9,6 +9,7 @@ import { FraudAlert } from '../../../components/FraudAlert';
 import { Tooltip } from '../../../components/Tooltip';
 import { detectNetwork, tokenizeCard } from '../../../lib/cardTokenize';
 import Link from 'next/link';
+import { Check, AlertTriangle } from 'lucide-react';
 
 // A saved card-on-file the customer can pay with. The surrogate token is reused so
 // the transaction references the real stored card; the full PAN/CVV are never present here.
@@ -332,7 +333,7 @@ export default function DemoPaymentPage() {
                 step > s  ? 'bg-green-500 text-white' :
                             'bg-gray-200 text-gray-400'
               }`}>
-                {step > s ? '✓' : s}
+                {step > s ? <Check size={14} /> : s}
               </div>
               <span className={`text-sm hidden sm:inline ${step === s ? 'font-semibold text-gray-800' : 'text-gray-400'}`}>
                 {STEPS[s - 1]}
@@ -514,7 +515,7 @@ export default function DemoPaymentPage() {
                             ? 'text-gray-300'
                             : m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'
                         }`}>
-                          {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                          {m.risk === 'high' && <AlertTriangle size={11} className="inline mr-0.5 -mt-0.5" />}{mccNote(m.mcc)}
                         </div>
                       </button>
                     ))}
@@ -545,7 +546,7 @@ export default function DemoPaymentPage() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
                             <span className="font-medium">{m.label}</span>
                             <span className={`ml-2 text-xs ${m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'}`}>
-                              {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                              {m.risk === 'high' && <AlertTriangle size={11} className="inline mr-0.5 -mt-0.5" />}{mccNote(m.mcc)}
                             </span>
                           </button>
                         </li>
@@ -634,7 +635,7 @@ export default function DemoPaymentPage() {
                   </div>
                   {isFraudRisk && debugMode && (
                     <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                      <span className="shrink-0 mt-0.5">⚠</span>
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                       <span>This transaction will trigger an automatic fraud review case.</span>
                     </div>
                   )}
@@ -828,7 +829,7 @@ export default function DemoPaymentPage() {
               <div className="flex items-center gap-3">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${
                   declined ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
-                }`}>{declined ? '!' : '✓'}</div>
+                }`}>{declined ? <AlertTriangle size={18} /> : <Check size={18} />}</div>
                 <div>
                   <h2 className={`font-bold text-lg ${declined ? 'text-amber-700' : 'text-green-700'}`}>
                     {declined ? 'Payment Not Completed' : 'Payment Confirmed'}

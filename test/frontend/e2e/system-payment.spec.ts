@@ -138,6 +138,12 @@ test.describe('FR-v1-01: payment history', () => {
     await expect(page.getByText('TechGadgets Ltd.').first()).toBeVisible({ timeout: 8000 });
     // One list, every movement kind: the transfer row comes from the same response.
     await expect(page.getByText('Rent share').first()).toBeVisible({ timeout: 8000 });
+    // Icons are lucide components, not text glyphs: no arrow / tick characters reach the markup.
+    const body = await page.locator('main').innerText();
+    for (const glyph of ['↑', '↓', '↕', '✓', '✗', '💳', '›']) expect(body, glyph).not.toContain(glyph);
+    // The direction and status chips render as inline SVG icons.
+    await expect(page.locator('main svg').first()).toBeVisible();
+    await expect(page.getByText('Transfer sent').first()).toBeVisible();
   });
 });
 

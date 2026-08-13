@@ -1126,7 +1126,8 @@ surface becomes one collection with one merge.
 | FR-v36-12 | Every movement is visible to oversight roles | `/system/transactions` lists card payments, transfers and payment requests for L1 / L2 / auditor with a kind badge, counterparty, destination, rail and the `held` / `case` markers; each row reaches its detail. Panels awaiting the enrichment read-model render an animated skeleton with `role="status"` instead of nothing |
 | FR-v36-13 | The collection accepts the page size its clients request | `limit` ceiling is 200 (the merged history page requests 200); 201 → 400; the paged envelope is unchanged. Pinned by an integration test against the real route, since a stubbed E2E does not exercise schema validation |
 | FR-v36-14 | A widened endpoint does not break its readers | the customer detail page discriminates on `kind`, not on a 404, so a transfer reference renders the transfer view; `StatusChip` degrades to a neutral chip on a missing status. Pinned by an E2E asserting no page error |
-| FR-v36-15 | Gate indicators read as plain language | `formatRiskIndicator` translates `fds.*`, `hrp.*`, `aml.*`, `vop.*` and the engine rule ids; the transaction detail uses the formatter |
+| FR-v36-15 | The collection is never public, and it is scoped per caller | `/api/v1/transactions` stays public for POST only (simulator payment creation); the collection GET requires a token (401 without one). A customer sees only their own movements and cannot widen the scope with another email; `direction` is relative to the viewer, so an inbound transfer reads `received` |
+| FR-v36-16 | Gate indicators read as plain language | `formatRiskIndicator` translates `fds.*`, `hrp.*`, `aml.*`, `vop.*` and the engine rule ids; the transaction detail uses the formatter |
 
 ### Definition of Done
 

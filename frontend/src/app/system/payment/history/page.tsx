@@ -1,7 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ClipboardList, ArrowDownLeft, ArrowUpRight, SlidersHorizontal, HandCoins } from 'lucide-react';
+import {
+  Plus, ClipboardList, ArrowDownLeft, ArrowUpRight, SlidersHorizontal, HandCoins,
+  CreditCard, ArrowLeftRight, CheckCircle2, XCircle, Clock, AlertTriangle, Search, Ban,
+  MinusCircle, RotateCcw, Mail, ChevronRight,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
@@ -62,27 +67,40 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 // ── Payment authorization status ──────────────────────────────────────────────
-const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
-  authorized: { label: 'Authorized',  color: 'bg-green-100 text-green-800' },
-  settled:    { label: '✓ Settled',   color: 'bg-emerald-100 text-emerald-800 font-semibold' },
-  captured:   { label: 'Captured',    color: 'bg-teal-100 text-teal-800' },
-  pending:    { label: 'Pending',     color: 'bg-amber-100 text-amber-800' },
-  declined:   { label: 'Declined',    color: 'bg-red-100 text-red-800' },
-  voided:     { label: 'Voided',      color: 'bg-gray-100 text-gray-500' },
-  refunded:   { label: 'Refunded',    color: 'bg-purple-100 text-purple-700' },
-  failed:     { label: 'Failed',      color: 'bg-red-100 text-red-800' },
-  expired:    { label: 'Expired',     color: 'bg-gray-100 text-gray-500' },
-  completed:  { label: '✓ Completed', color: 'bg-emerald-100 text-emerald-800 font-semibold' },
+// Every status carries a lucide icon: one visual language across the list and the detail view.
+type StatusMeta = { label: string; color: string; Icon: LucideIcon };
+const PAYMENT_STATUS: Record<string, StatusMeta> = {
+  authorized: { label: 'Authorized',  color: 'bg-green-100 text-green-800',        Icon: CheckCircle2 },
+  settled:    { label: 'Settled',     color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
+  captured:   { label: 'Captured',    color: 'bg-teal-100 text-teal-800',          Icon: CheckCircle2 },
+  pending:    { label: 'Pending',     color: 'bg-amber-100 text-amber-800',        Icon: Clock },
+  declined:   { label: 'Declined',    color: 'bg-red-100 text-red-800',            Icon: XCircle },
+  voided:     { label: 'Voided',      color: 'bg-gray-100 text-gray-500',          Icon: MinusCircle },
+  refunded:   { label: 'Refunded',    color: 'bg-purple-100 text-purple-700',      Icon: RotateCcw },
+  failed:     { label: 'Failed',      color: 'bg-red-100 text-red-800',            Icon: XCircle },
+  expired:    { label: 'Expired',     color: 'bg-gray-100 text-gray-500',          Icon: MinusCircle },
+  completed:  { label: 'Completed',   color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
 };
 
+// One chip renderer, so a status looks the same wherever it is shown.
+function StatusChip({ meta, title }: { meta: StatusMeta; title?: string }) {
+  const { Icon } = meta;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${meta.color}`} title={title}>
+      <Icon size={12} className="shrink-0" />
+      {meta.label}
+    </span>
+  );
+}
+
 // ── Fraud / risk status ──────────────────────────────────────────
-const FRAUD_STATUS: Record<string, { label: string; color: string; icon: string }> = {
-  open:             { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
-  under_review:     { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
-  escalated:        { label: 'Under investigation', color: 'bg-orange-100 text-orange-800', icon: '🔍' },
-  resolved_fraud:   { label: 'Confirmed fraud',     color: 'bg-red-100 text-red-800',      icon: '🛑' },
-  resolved_cleared: { label: 'Cleared, legitimate', color: 'bg-green-100 text-green-800',  icon: '✓' },
-  closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',    icon: '•' },
+const FRAUD_STATUS: Record<string, StatusMeta> = {
+  open:             { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',   Icon: AlertTriangle },
+  under_review:     { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',   Icon: AlertTriangle },
+  escalated:        { label: 'Under investigation', color: 'bg-orange-100 text-orange-800', Icon: Search },
+  resolved_fraud:   { label: 'Confirmed fraud',     color: 'bg-red-100 text-red-800',       Icon: Ban },
+  resolved_cleared: { label: 'Cleared, legitimate', color: 'bg-green-100 text-green-800',   Icon: CheckCircle2 },
+  closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',     Icon: MinusCircle },
 };
 
 function fmtAmount(amount: number, currency: string) {
@@ -407,14 +425,24 @@ export default function TransactionHistoryPage() {
                     if (row.category === 'card') {
                       const pay = PAYMENT_STATUS[row.status] ?? { label: row.status.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700' };
                       const fraud = (row.fraudCaseCreated && row.caseStatus)
-                        ? (FRAUD_STATUS[row.caseStatus] ?? { label: row.caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '⚠' })
+                        ? (FRAUD_STATUS[row.caseStatus] ?? { label: row.caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', Icon: AlertTriangle })
                         : null;
                       return (
                         <Link key={row.id} href={`/system/payment/history/${row.id}`}
                           className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0">
-                              <p className="font-semibold text-gray-900 truncate">{row.merchant}</p>
+                              <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                                {(() => {
+                                  const dir = cardDirection(row.cardTransactionType, row.status);
+                                  // Outgoing by nature; muted when the attempt moved no money.
+                                  const cls = dir === 'debit' ? 'text-red-600' : dir === 'credit' ? 'text-green-700' : 'text-gray-400';
+                                  return dir === 'credit'
+                                    ? <ArrowDownLeft size={15} className={`${cls} shrink-0`} />
+                                    : <ArrowUpRight size={15} className={`${cls} shrink-0`} />;
+                                })()}
+                                {row.merchant}
+                              </p>
                               <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
                               {row.concept && (
                                 <p className="text-xs text-gray-500 mt-0.5 truncate">Concept: {row.concept}</p>
@@ -433,14 +461,15 @@ export default function TransactionHistoryPage() {
                                 })()}
                                 <p className="text-xs text-gray-500 font-mono">{row.maskedPan}</p>
                               </div>
-                              <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                              <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${pay.color}`} title="Payment authorization status">💳 {pay.label}</span>
-                            {fraud && (
-                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${fraud.color}`} title="Fraud / risk review status">{fraud.icon} {fraud.label}</span>
-                            )}
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-gray-100 text-gray-700" title="Movement type">
+                              <CreditCard size={12} /> Card
+                            </span>
+                            <StatusChip meta={pay} title="Payment authorization status" />
+                            {fraud && <StatusChip meta={fraud} title="Fraud / risk review status" />}
                             {row.cardTransactionType && (
                               <span className={`text-xs px-2 py-0.5 rounded font-medium ${TYPE_COLORS[row.cardTransactionType] ?? 'bg-gray-100 text-gray-600'}`}>
                                 {TYPE_LABELS[row.cardTransactionType] ?? row.cardTransactionType.replace(/_/g, ' ')}
@@ -451,7 +480,7 @@ export default function TransactionHistoryPage() {
                           </div>
                           {row.customerNote && (
                             <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">
-                              <span className="font-semibold">✉ Security team: </span>{row.customerNote}
+                              <span className="inline-flex items-center gap-1 font-semibold"><Mail size={12} /> Security team:</span> {row.customerNote}
                             </div>
                           )}
                           {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
@@ -487,12 +516,16 @@ export default function TransactionHistoryPage() {
                                   {isIncoming ? '+' : '−'}{fmtAmount(row.amount, row.currency)}
                                 </p>
                               </div>
-                              <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                              <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-purple-50 text-purple-700 border border-purple-200"><HandCoins size={12} /> Request to Pay</span>
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${rtpStatusColor}`}>{rtpStatusLabel}</span>
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${rtpStatusColor}`}>
+                              {pendingApproval ? <Clock size={12} /> : row.status === 'payment_settled' ? <CheckCircle2 size={12} />
+                                : ['rejected', 'cancelled', 'expired', 'payment_failed'].includes(row.status) ? <XCircle size={12} /> : <Clock size={12} />}
+                              {rtpStatusLabel}
+                            </span>
                           </div>
                           {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
                         </Link>
@@ -506,8 +539,11 @@ export default function TransactionHistoryPage() {
                         className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer">
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">
-                              {isSent ? '↑ P2P Transfer sent' : '↓ P2P Transfer received'}
+                            <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                              {isSent
+                                ? <ArrowUpRight size={15} className="text-red-600 shrink-0" />
+                                : <ArrowDownLeft size={15} className="text-green-700 shrink-0" />}
+                              {isSent ? 'Transfer sent' : 'Transfer received'}
                             </p>
                             <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
                             {row.p2pNote && <p className="text-xs text-gray-400 mt-0.5 truncate">{row.p2pNote}</p>}
@@ -519,14 +555,14 @@ export default function TransactionHistoryPage() {
                               </p>
                               {row.p2pRail && <p className="text-xs text-gray-400 capitalize">{row.p2pRail.replace(/_/g, ' ')}</p>}
                             </div>
-                            <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                            <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${isSent ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-                            ↕ P2P Transfer
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${isSent ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                            <ArrowLeftRight size={12} /> Transfer
                           </span>
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${pay.color}`}>{pay.label}</span>
+                          <StatusChip meta={pay} title="Payment execution status" />
                         </div>
                         {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
                       </Link>

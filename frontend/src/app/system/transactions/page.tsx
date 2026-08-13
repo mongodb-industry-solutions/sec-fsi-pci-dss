@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { Pagination } from '../../../components/Pagination';
-import { Mail, Type, Search, X, Lock, CreditCard } from 'lucide-react';
+import { Mail, Type, Search, X, Lock, CreditCard, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { RequirePermission } from '../../../components/RequirePermission';
 
@@ -356,7 +356,7 @@ export default function TransactionsPage() {
                           href={`/system/transactions/${m.paymentExecutionInstanceReference}`}
                           className="text-xs text-blue-600 hover:underline whitespace-nowrap flex items-center gap-1"
                         >
-                          View details <span className="opacity-0 group-hover:opacity-100 transition-opacity">›</span>
+                          View details <ChevronRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
                       )}
                     </td>

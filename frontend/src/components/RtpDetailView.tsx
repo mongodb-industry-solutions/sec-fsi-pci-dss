@@ -5,7 +5,7 @@
 // approval, the payer can approve/reject here (NOT from the transfer hub). Real authenticated endpoints.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Check, X, Info, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Check, X, Info, ArrowDownLeft, ArrowUpRight, ArrowLeft, ExternalLink } from 'lucide-react';
 import { api, RtpRequestDTO } from '../lib/api';
 
 const PENDING = ['created', 'validated', 'presented', 'delivered', 'viewed'];
@@ -101,7 +101,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
   return (
     <>
       <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
-        ← Back to transactions
+        <ArrowLeft size={14} /> Back to transactions
       </Link>
 
       {/* Header + Sender/Recipient (mirrors the P2P detail card) */}
@@ -143,7 +143,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                   <dt className="text-gray-500">Funding account</dt>
                   <dd className="font-mono text-xs text-gray-800 break-all">
                     {req.payerFundingAccountReference
-                      ? <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} ↗</Link>
+                      ? <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} <ExternalLink size={11} className="inline" /></Link>
                       : '—'}
                   </dd>
                 </>
@@ -175,7 +175,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                   ) : req.payerFundingAccountReference && (<>
                     <dt className="text-gray-500">Funding account</dt>
                     <dd className="font-mono text-xs text-gray-800 break-all">
-                      <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} ↗</Link>
+                      <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} <ExternalLink size={11} className="inline" /></Link>
                     </dd>
                   </>)}
                 </>
@@ -189,7 +189,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                     <dt className="text-gray-500">Beneficiary</dt>
                     <dd>
                       <Link href={`/system/beneficiaries/${req.payerCounterpartyReference}`} className="text-blue-600 hover:underline break-all">
-                        View beneficiary ↗
+                        View beneficiary <ExternalLink size={11} className="inline" />
                       </Link>
                     </dd>
                   </>)}
@@ -220,7 +220,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
               {(staffRole || isPayee) && (<>
                 <dt className="text-gray-500">Receiving account</dt>
                 <dd className="font-mono text-xs text-gray-800 break-all">
-                  <Link href={`/system/accounts/${req.payeeReceivingAccountReference}`} className="text-blue-600 hover:underline">{req.payeeReceivingAccountReference} ↗</Link>
+                  <Link href={`/system/accounts/${req.payeeReceivingAccountReference}`} className="text-blue-600 hover:underline">{req.payeeReceivingAccountReference} <ExternalLink size={11} className="inline" /></Link>
                 </dd>
               </>)}
               {staffRole && (<>
@@ -246,7 +246,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
             <div className="flex items-center justify-between gap-2">
               <span className="text-gray-500 flex items-center gap-1"><Info size={12} className="text-gray-400" /> Transfer / execution ID</span>
               {req.linkedPaymentExecutionReference
-                ? <Link href={`/system/payment/history/${req.linkedPaymentExecutionReference}`} className="font-mono text-xs text-blue-600 hover:underline break-all">{req.linkedPaymentExecutionReference} ↗</Link>
+                ? <Link href={`/system/payment/history/${req.linkedPaymentExecutionReference}`} className="font-mono text-xs text-blue-600 hover:underline break-all">{req.linkedPaymentExecutionReference} <ExternalLink size={11} className="inline" /></Link>
                 : <span className="font-mono text-xs text-gray-400">Not created yet</span>}
             </div>
             <p className="text-[11px] text-gray-400">The actual money movement created after approval. Use it for support about the funds/settlement.</p>
@@ -291,7 +291,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
               </div>
             ))}
             {staffRole && sc.caseInstanceReference && (
-              <Link href={`/system/investigation/${sc.caseInstanceReference}`} className="text-blue-600 hover:underline">Open investigation case ↗</Link>
+              <Link href={`/system/investigation/${sc.caseInstanceReference}`} className="text-blue-600 hover:underline">Open investigation case <ExternalLink size={11} className="inline" /></Link>
             )}
           </div>
         ) : (
