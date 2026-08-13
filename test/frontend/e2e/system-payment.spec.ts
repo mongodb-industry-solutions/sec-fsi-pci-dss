@@ -140,3 +140,45 @@ test.describe('FR-v1-01: payment history', () => {
     await expect(page.getByText('Rent share').first()).toBeVisible({ timeout: 8000 });
   });
 });
+
+/**
+ * Regression (v36): the customer detail page used the 404 of GET /transactions/:id as the signal
+ * "this reference is not a card payment, try the transfer / RTP endpoints". Once that route started
+ * resolving EVERY movement kind, a transfer answered 200 with a movement row, the page took the card
+ * branch and crashed on an undefined status. It must fall through to the transfer view instead.
+ */
+test.describe('customer detail page: a transfer reference', () => {
+  const MOVEMENT_ROW = {
+    kind: 'transfer', paymentExecutionInstanceReference: 'exec-c1', direction: 'sent',
+    grossAmount: 800, currency: 'EUR', paymentExecutionStatus: 'pending', paymentExecutionRail: 'sepa',
+    concept: 'Car deposit', beneficiaryName: 'Carlos', destinationAccountMasked: 'ES12••••5477',
+    initiatedAt: '2026-07-08T09:20:00Z', completedAt: null, heldForReview: true,
+  };
+  const TRANSFER = {
+    paymentExecutionInstanceReference: 'exec-c1',
+    initiatorPartyReference: 'p-1', initiatorName: 'Luis Fernandez',
+    beneficiaryPartyReference: 'p-2', beneficiaryName: 'Carlos',
+    grossAmount: 800, netAmount: 800, feeAmount: 0, currency: 'EUR',
+    paymentExecutionStatus: 'pending', paymentExecutionRail: 'sepa',
+    routingNote: 'Car deposit',
+    initiatedAt: '2026-07-08T09:20:00Z', direction: 'sent', fraudCase: null,
+  };
+
+  test('renders the transfer instead of crashing on a card-shaped read', async ({ page, context }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+
+    // The movement route answers 200 with the row (post-v36 behaviour), not 404.
+    await page.route('**/api/v1/transactions/exec-c1', (r) => r.fulfill(json(MOVEMENT_ROW)));
+    await page.route('**/api/v1/transactions/exec-c1/notes', (r) => r.fulfill(json({ caseFound: false, notes: [] })));
+    await page.route('**/api/v1/accounts/transfer/exec-c1', (r) => r.fulfill(json(TRANSFER)));
+    await page.route('**/api/v1/notifications**', (r) => r.fulfill(json({ count: 0, items: [] })));
+
+    await loginAs(context, 'customer', { partyRef: 'p-1' });
+    await page.goto('/system/payment/history/exec-c1');
+
+    // The transfer view rendered, and nothing blew up.
+    await expect(page.getByText(/Car deposit/i).first()).toBeVisible({ timeout: 15000 });
+    expect(errors.filter((e) => /replace|undefined/i.test(e))).toEqual([]);
+  });
+});

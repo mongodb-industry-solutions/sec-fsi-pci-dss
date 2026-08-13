@@ -93,7 +93,7 @@ function BlockRow({ label, info, children }: { label: string; info: string; chil
 }
 
 // Common status → display mapping shared by card + P2P sections.
-function StatusChip({ status }: { status: string }) {
+function StatusChip({ status }: { status?: string | null }) {
   const map: Record<string, string> = {
     completed: 'bg-emerald-100 text-emerald-800',
     authorized: 'bg-green-100 text-green-800',
@@ -108,9 +108,11 @@ function StatusChip({ status }: { status: string }) {
     failed: 'bg-red-100 text-red-800',
     pending: 'bg-blue-100 text-blue-800',
   };
+  // A missing status must degrade to a neutral chip, never crash the detail view.
+  const value = status ?? '';
   return (
-    <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded font-medium w-fit ${map[status] ?? 'bg-gray-100 text-gray-600'}`}>
-      {status.replace(/_/g, ' ')}
+    <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded font-medium w-fit ${map[value] ?? 'bg-gray-100 text-gray-600'}`}>
+      {value ? value.replace(/_/g, ' ') : 'n/a'}
     </span>
   );
 }
@@ -250,8 +252,13 @@ export default function TransactionDetailPage() {
     setToken(t);
     if (showLoading) setLoading(true);
 
-    // Real source of truth: fetch the transaction from the API.
-    const data = await api.transactions.getById(txnId, t).catch(() => null);
+    // Real source of truth: fetch the movement from the API.
+    // v36 (ADR-063): /transactions/:id resolves EVERY movement kind, so a non-card reference now
+    // answers 200 with a movement row instead of 404. This page renders each kind from its own
+    // domain endpoint, so anything that is not a card transaction falls through to those.
+    const raw = await api.transactions.getById(txnId, t).catch(() => null);
+    const movementKind = (raw as { kind?: string } | null)?.kind;
+    const data = movementKind && movementKind !== 'card' ? null : raw;
     if (!data) {
       // Fallback: try P2P transfer lookup 
       const p2p = await api.accounts.getTransfer(txnId, t).catch(() => null);
