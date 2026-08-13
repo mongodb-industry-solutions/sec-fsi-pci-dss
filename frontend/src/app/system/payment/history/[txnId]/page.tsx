@@ -919,10 +919,15 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* No fraud case */}
-      {!txn.fraudCaseCreated && (
+      {/* No fraud case: the "no review needed" note only makes sense for a payment that went through. */}
+      {!txn.fraudCaseCreated && txn.status !== 'declined' && txn.status !== 'under_review' && (
         <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
           ✓ This transaction was processed normally and did not require additional review.
+        </div>
+      )}
+      {!txn.fraudCaseCreated && txn.status === 'declined' && (
+        <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
+          This payment was not completed, so no amount was charged.
         </div>
       )}
 

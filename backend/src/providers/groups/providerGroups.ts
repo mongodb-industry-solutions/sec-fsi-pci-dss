@@ -265,10 +265,10 @@ export class ProviderGroups {
     publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED, available, held: amountInAccountCcy, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
   }
 
-  // Real-time fraud scoring. Fail-open: only an explicit block/decline declines.
+  // Real-time fraud scoring. A fraud signal never declines the payment: the authorization proceeds on
+  // the issuer/funds verdicts and the risk verdict opens an investigation case instead (L1 -> L2).
   private async onFds(e: DomainEvent): Promise<void> {
     const p = e.payload as Record<string, unknown>;
-    let approved = true;
     let reason: string | undefined;
     let verdict: { riskScore?: number; recommendation?: string; fraudFlag?: boolean; rulesFired?: string[] } | undefined;
     try {
@@ -277,11 +277,11 @@ export class ProviderGroups {
         merchantName: p.merchantName, merchantCategoryCode: p.merchantCategoryCode,
       }, { entityType: 'transaction', entityId: e.correlationId, processType: 'fraud_evaluation' });
       verdict = r.responseBody as typeof verdict;
-      if (verdict?.recommendation === 'block' || verdict?.recommendation === 'decline') { approved = false; reason = 'fraud_block'; }
+      if (verdict?.recommendation === 'block' || verdict?.recommendation === 'decline') reason = 'fraud_review';
     } catch { /* fail-open */ }
     void this.bus.publish(makeEvent({
       eventType: 'fds.scoring.completed', correlationId: e.correlationId, businessProcess: 'card_payment', source: 'callback.fds', causationId: e.eventId,
-      payload: { transactionId: e.correlationId, outcome: approved ? 'approved' : 'declined', approved, reason, riskScore: verdict?.riskScore, recommendation: verdict?.recommendation, fraudFlag: verdict?.fraudFlag, rulesFired: verdict?.rulesFired },
+      payload: { transactionId: e.correlationId, outcome: 'approved', approved: true, reason, riskScore: verdict?.riskScore, recommendation: verdict?.recommendation, fraudFlag: verdict?.fraudFlag, rulesFired: verdict?.rulesFired },
       bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
     }));
   }
