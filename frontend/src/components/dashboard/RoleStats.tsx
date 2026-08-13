@@ -67,7 +67,7 @@ function CustomerStats({ token }: { token: string }) {
   const [rows, setRows] = useState<Txn[] | null>(null);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    api.transactions.listAll({ limit: 100 }, token)
+    api.transactions.list({ kind: 'card', limit: 100 }, token)
       .then((r) => setRows(r.results as unknown as Txn[]))
       .catch(() => setRows(null)).finally(() => setLoading(false));
   }, [token]);

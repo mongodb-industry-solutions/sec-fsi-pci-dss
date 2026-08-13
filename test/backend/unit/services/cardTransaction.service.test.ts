@@ -20,7 +20,8 @@ const h = vi.hoisted(() => {
     qeDb,
     getDbForRole: vi.fn().mockResolvedValue(qeDb),
     validateToken: vi.fn().mockReturnValue({ valid: false }),
-    createFraudCase: vi.fn().mockResolvedValue({ fraudDiagnosisInstanceReference: 'fraud-uuid' }),
+    getCardByToken: vi.fn(async () => null as unknown),
+  createFraudCase: vi.fn().mockResolvedValue({ fraudDiagnosisInstanceReference: 'fraud-uuid' }),
   };
 });
 
@@ -40,7 +41,7 @@ vi.mock('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service',
 // process/compliance events, upserts the card registry, and fires the merchant callback. Mock these
 // so the test exercises the transaction + fraud-trigger logic in isolation.
 vi.mock('../../../../backend/src/modules/customer/services/paymentCard.service', () => ({
-  getCardByToken: vi.fn().mockResolvedValue(null),       // no card-on-file → passes through
+  getCardByToken: h.getCardByToken,                     // default: no card-on-file → passes through
   upsertCardByToken: vi.fn().mockResolvedValue({ paymentCardInstanceReference: 'card-x', created: false }),
 }));
 vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({
@@ -54,7 +55,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.servi
   sendMerchantPaymentCallback: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
+import { createTransaction, getTransactionById, getAllTransactions } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../../../backend/src/modules/provider/services/integrationDispatch.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
@@ -68,15 +69,25 @@ function txDb() {
   return { collection: vi.fn(() => ({ findOne: vi.fn().mockResolvedValue(null) })) } as any;
 }
 
-// Local mock DB used only by getTransactionsByCardToken (which queries the passed db directly).
+// Local mock DB used by the collection queries, which run against the passed db directly.
+// `_find` exposes the spy so a test can assert WHICH field a filter queried.
 function makeDb(overrides?: { findResults?: unknown[] }) {
-  const toArrayMock = vi.fn().mockResolvedValue(overrides?.findResults ?? []);
-  const sortMock = vi.fn().mockReturnValue({ toArray: toArrayMock });
-  return {
+  const rows = overrides?.findResults ?? [];
+  const cursor = {
+    sort: vi.fn().mockReturnThis(),
+    skip: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    toArray: vi.fn().mockResolvedValue(rows),
+  };
+  const find = vi.fn().mockReturnValue(cursor);
+  const db: any = {
     collection: vi.fn().mockReturnValue({
-      find: vi.fn().mockReturnValue({ sort: sortMock }),
+      find,
+      countDocuments: vi.fn().mockResolvedValue(rows.length),
     }),
-  } as any;
+  };
+  db._find = find;
+  return db;
 }
 
 beforeEach(() => {
@@ -258,19 +269,90 @@ describe('getTransactionById', () => {
   });
 });
 
-describe('getTransactionsByCardToken', () => {
-  it('returns all transactions for a card token with count', async () => {
-    const docs = [{ cardTransactionInstanceReference: 'txn-001' }, { cardTransactionInstanceReference: 'txn-002' }];
-    const db = makeDb({ findResults: docs });
-    const result = await getTransactionsByCardToken(db, 'pm_abc');
-    expect(result.results).toHaveLength(2);
-    expect(result.count).toBe(2);
+// v36 (ADR-063): the card-token lookup is a filter on the canonical collection, and the masked PAN is
+// its OWN filter. It used to be inferred from the shape of the `cardToken` value, so a token that
+// happened to look like a masked PAN queried the wrong field.
+describe('getAllTransactions: explicit card filters', () => {
+  it('matches the card token on paymentCardReference', async () => {
+    const db = makeDb({ findResults: [{ cardTransactionInstanceReference: 'txn-001' }] });
+    const result = await getAllTransactions(db, { cardToken: 'pm_abc' }, 1, 20);
+    expect(db._find).toHaveBeenCalledWith(expect.objectContaining({ paymentCardReference: 'pm_abc' }));
+    expect(result.results).toHaveLength(1);
+    expect(result.total).toBe(1);
   });
 
-  it('returns empty results for unknown token', async () => {
+  it('matches a masked PAN on its own field, never on the token', async () => {
     const db = makeDb({ findResults: [] });
-    const result = await getTransactionsByCardToken(db, 'pm_unknown');
+    await getAllTransactions(db, { maskedPan: '****-****-****-4242' }, 1, 20);
+    const query = db._find.mock.calls[0][0];
+    expect(query).toEqual({ cardTransactionMaskedPanDisplay: '****-****-****-4242' });
+    expect(query).not.toHaveProperty('paymentCardReference');
+  });
+
+  it('returns an empty page for an unknown token', async () => {
+    const db = makeDb({ findResults: [] });
+    const result = await getAllTransactions(db, { cardToken: 'pm_unknown' }, 1, 20);
     expect(result.results).toHaveLength(0);
-    expect(result.count).toBe(0);
+    expect(result.total).toBe(0);
+  });
+});
+
+/**
+ * A hosted flow (payment link / checkout) may not know the payer: it passes the typed email, else the
+ * CARD TOKEN. A token resolves to no agreement, so the transaction used to be stamped with the token as
+ * its account reference, which made the payment belong to nobody and kept it out of every history
+ * (customer and merchant alike). The card-on-file owner is the fallback.
+ */
+describe('a hosted payment resolves its payer through the card on file', () => {
+  // The agreement lookup runs on the ROLE client (QE), not on the db handed to createTransaction, so
+  // drive that double: answer only for the instance reference the card names.
+  function agreementLookup() {
+    h.findOne.mockImplementation(async (filter: Record<string, unknown>) => (
+      filter?.customerAgreementInstanceReference === 'agr-1'
+        ? { customerAgreementInstanceReference: 'agr-1', customerAgreementReference: 'ACC-LF-20240115' }
+        : null
+    ));
+  }
+
+  beforeEach(() => {
+    h.insertOne.mockClear();
+    h.findOne.mockReset();
+    h.findOne.mockResolvedValue(null);
+    h.getCardByToken.mockResolvedValue(null);
+  });
+
+  afterAll(() => { h.findOne.mockReset(); h.findOne.mockResolvedValue(null); });
+
+  it('stamps the owner account reference instead of the card token', async () => {
+    h.getCardByToken.mockResolvedValue({
+      paymentCardStatus: 'active', customerAgreementInstanceReference: 'agr-1',
+    });
+    // What processLinkPayment sends when the payer typed no email.
+    agreementLookup();
+    await createTransaction(txDb(), { ...baseInput, accountReference: 'pm_abc123' });
+    const doc = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
+    expect(doc.cardTransactionAccountReference).toBe('ACC-LF-20240115');
+  });
+
+  it('keeps the token when the card is not registered to anyone', async () => {
+    h.getCardByToken.mockResolvedValue(null);
+    await createTransaction(txDb(), { ...baseInput, accountReference: 'pm_abc123' });
+    const doc = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
+    // Nothing to resolve: the previous behaviour is preserved rather than inventing an owner.
+    expect(doc.cardTransactionAccountReference).toBe('pm_abc123');
+  });
+
+  it('an explicit account reference still wins over the card', async () => {
+    h.getCardByToken.mockResolvedValue({
+      paymentCardStatus: 'active', customerAgreementInstanceReference: 'agr-1',
+    });
+    h.findOne.mockImplementation(async (filter: Record<string, unknown>) => (
+      filter?.customerAgreementReference === 'ACC-OTHER'
+        ? { customerAgreementInstanceReference: 'agr-9', customerAgreementReference: 'ACC-OTHER' }
+        : null
+    ));
+    await createTransaction(txDb(), { ...baseInput, accountReference: 'ACC-OTHER' });
+    const doc = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
+    expect(doc.cardTransactionAccountReference).toBe('ACC-OTHER');
   });
 });

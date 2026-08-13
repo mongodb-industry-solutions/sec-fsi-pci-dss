@@ -99,14 +99,17 @@ export async function listAccountMovements(
     fundingPayoutAccountInstanceReference: accountRef,
   }).toArray();
 
-  const cardIds = cards.map((c) => c.paymentCardInstanceReference);
+  // A card transaction references its card by TOKEN (`paymentCardReference`, the PAN surrogate), not by
+  // the card's instance UUID. Matching the UUIDs against that field silently returned nothing, so a card
+  // payment was recorded and moved the balance yet never appeared among the account's movements.
+  const cardTokens = cards.map((c) => c.paymentCardReference).filter((t): t is string => !!t);
 
   // 3. Fetch card transactions for those cards
   let cardMovements: AccountMovement[] = [];
-  if (cardIds.length > 0) {
+  if (cardTokens.length > 0) {
     const txCol = db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION);
     const transactions = await txCol.find({
-      paymentCardReference: { $in: cardIds },
+      paymentCardReference: { $in: cardTokens },
     }).toArray();
 
     cardMovements = transactions.map((tx) => {

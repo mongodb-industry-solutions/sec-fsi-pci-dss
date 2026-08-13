@@ -5,21 +5,37 @@ import Link from 'next/link';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 import { Pagination } from '../../../components/Pagination';
-import { Mail, Type, Search, X, Lock, CreditCard } from 'lucide-react';
+import { Mail, Type, Search, X, Lock, CreditCard, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { RequirePermission } from '../../../components/RequirePermission';
 
-interface Transaction {
-  cardTransactionInstanceReference?: string;
-  paymentCardReference?: string;
-  cardTransactionAmount?: { amount: number; currency: string };
-  cardTransactionDateTime?: string;
-  cardTransactionStatus?: string;
-  cardTransactionMerchantName?: string;
-  cardTransactionMerchantCategoryCode?: string;
-  cardTransactionChannel?: string;
-  cardTransactionMaskedPanDisplay?: string;
+// v36 (ADR-063): the collection returns normalized movement rows, so this list shows card payments,
+// transfers and payment requests alike. L1 / L2 / auditor see every movement, each at their access level.
+interface Movement {
+  kind?: 'card' | 'transfer' | 'rtp';
+  paymentExecutionInstanceReference?: string;
+  direction?: 'sent' | 'received';
+  grossAmount?: number;
+  currency?: string;
+  paymentExecutionStatus?: string;
+  paymentExecutionRail?: string | null;
+  concept?: string | null;
+  beneficiaryName?: string | null;
+  destinationAccountMasked?: string | null;
+  merchantCategoryCode?: string | null;
+  channel?: string | null;
+  initiatedAt?: string | null;
+  completedAt?: string | null;
+  heldForReview?: boolean;
+  fraudCase?: { created: boolean; status?: string | null; reference?: string | null };
 }
+
+const KIND_LABELS: Record<string, string> = { card: 'Card', transfer: 'Transfer', rtp: 'Request to Pay' };
+const KIND_COLORS: Record<string, string> = {
+  card:     'bg-[#001E2B] text-[#00ED64]',
+  transfer: 'bg-blue-100 text-blue-800',
+  rtp:      'bg-purple-100 text-purple-800',
+};
 
 const STATUS_COLORS: Record<string, string> = {
   authorized: 'bg-green-100 text-green-800',
@@ -50,7 +66,7 @@ export default function TransactionsPage() {
     setToken(t);
   }, [router]);
 
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactions, setTransactions] = useState<Movement[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -68,8 +84,9 @@ export default function TransactionsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await api.transactions.listAll(
+      const res = await api.transactions.list(
         {
+          // Every movement kind: this is the staff movement list, not a card-only view.
           status:    filterStatus    || undefined,
           merchant:  filterMerchant  || undefined,
           cardToken: filterCardToken || undefined,
@@ -80,7 +97,7 @@ export default function TransactionsPage() {
         },
         token
       );
-      setTransactions(res.results as Transaction[]);
+      setTransactions(res.results as Movement[]);
       setTotal(res.total);
     } catch {
       setTransactions([]);
@@ -279,7 +296,7 @@ export default function TransactionsPage() {
             <table className="min-w-full text-sm divide-y divide-gray-100">
               <thead className="bg-gray-50">
                 <tr>
-                  {['Date', 'Merchant', 'Amount', 'Card', 'Channel', 'Status', ''].map((h) => (
+                  {['Date', 'Type', 'Counterparty', 'Amount', 'Card / destination', 'Channel / rail', 'Status', ''].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wide">
                       {h}
                     </th>
@@ -287,47 +304,65 @@ export default function TransactionsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {transactions.map((txn, i) => (
-                  <tr key={txn.cardTransactionInstanceReference ?? i} className="hover:bg-gray-50 cursor-pointer group">
+                {transactions.map((m, i) => {
+                  const at = m.completedAt ?? m.initiatedAt;
+                  const kind = m.kind ?? 'card';
+                  return (
+                  <tr key={m.paymentExecutionInstanceReference ?? i} className="hover:bg-gray-50 cursor-pointer group">
                     <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
-                      {txn.cardTransactionDateTime
-                        ? new Date(txn.cardTransactionDateTime).toLocaleString()
-                        : '-'}
+                      {at ? new Date(at).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${KIND_COLORS[kind] ?? 'bg-gray-100 text-gray-700'}`}>
+                        {KIND_LABELS[kind] ?? kind}
+                      </span>
+                      {m.direction === 'received' && <span className="ml-1 text-xs text-gray-400">in</span>}
                     </td>
                     <td className="px-4 py-2.5">
-                      <p className="font-medium text-gray-900 truncate max-w-40">{txn.cardTransactionMerchantName}</p>
-                      {txn.cardTransactionMerchantCategoryCode && (
-                        <p className="text-xs text-gray-400 font-mono">MCC {txn.cardTransactionMerchantCategoryCode}</p>
+                      <p className="font-medium text-gray-900 truncate max-w-40">{m.beneficiaryName ?? m.concept ?? '-'}</p>
+                      {m.merchantCategoryCode && (
+                        <p className="text-xs text-gray-400 font-mono">MCC {m.merchantCategoryCode}</p>
                       )}
                     </td>
                     <td className="px-4 py-2.5 font-semibold whitespace-nowrap">
-                      {txn.cardTransactionAmount
-                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)
+                      {m.grossAmount != null && m.currency
+                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: m.currency }).format(m.grossAmount)
                         : '-'}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-gray-600">
-                      {txn.cardTransactionMaskedPanDisplay ?? '-'}
+                      {m.destinationAccountMasked ?? '-'}
                     </td>
                     <td className="px-4 py-2.5 text-xs capitalize text-gray-600">
-                      {txn.cardTransactionChannel ?? '-'}
+                      {m.channel ?? m.paymentExecutionRail ?? '-'}
                     </td>
-                    <td className="px-4 py-2.5">
-                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[txn.cardTransactionStatus ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
-                        {txn.cardTransactionStatus}
+                    <td className="px-4 py-2.5 whitespace-nowrap">
+                      <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[m.paymentExecutionStatus ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
+                        {m.paymentExecutionStatus}
                       </span>
+                      {m.heldForReview && (
+                        <span className="ml-1 text-xs px-2 py-0.5 rounded font-medium bg-amber-100 text-amber-800" title="Funds held, not delivered">
+                          held
+                        </span>
+                      )}
+                      {m.fraudCase?.created && (
+                        <span className="ml-1 text-xs px-2 py-0.5 rounded font-medium bg-red-50 text-red-700" title={`Case ${m.fraudCase.reference ?? ''}`}>
+                          case
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-2.5">
-                      {txn.cardTransactionInstanceReference && (
+                      {m.paymentExecutionInstanceReference && (
                         <Link
-                          href={`/system/transactions/${txn.cardTransactionInstanceReference}`}
+                          href={`/system/transactions/${m.paymentExecutionInstanceReference}`}
                           className="text-xs text-blue-600 hover:underline whitespace-nowrap flex items-center gap-1"
                         >
-                          View details <span className="opacity-0 group-hover:opacity-100 transition-opacity">›</span>
+                          View details <ChevronRight size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" />
                         </Link>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

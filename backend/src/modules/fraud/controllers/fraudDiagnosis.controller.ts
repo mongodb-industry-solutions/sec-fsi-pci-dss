@@ -433,8 +433,15 @@ without creating a duplicate.
             },
             cardTransactionInstanceReference: {
               type: 'string',
-              description: 'UUID of the originating `cardTransactionLog` document. Use with `GET /api/v1/transactions/:id`.',
+              description: 'Reference of the movement the case is about. Resolves on `GET /api/v1/transactions/:id` for every kind (ADR-063).',
             },
+            // ADR-062: a case can cover any movement kind, not only a card payment.
+            transactionKind: {
+              type: 'string', enum: ['card', 'p2p', 'bank_transfer', 'rtp'],
+              description: 'Movement kind. Absent on cases opened before ADR-062 (treat as `card`).',
+            },
+            paymentExecutionInstanceReference: { type: 'string', nullable: true, description: 'Linked `paymentExecutionProcedure` (non-card movements).' },
+            paymentRequestInstanceReference:   { type: 'string', nullable: true, description: 'Linked `paymentRequestProcedure` (RTP cases).' },
             customerAgreementInstanceReference: {
               type: 'string',
               description: 'UUID of the subject `customerAgreementProcedure` document. Use with `GET /api/v1/customer`.',

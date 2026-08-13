@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { ArrowLeftRight, SendHorizonal, Landmark, QrCode, ChevronRight, HandCoins } from 'lucide-react';
+import { ArrowLeftRight, SendHorizonal, Landmark, QrCode, ChevronRight, HandCoins, CreditCard } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 import { useEffect, useState } from 'react';
@@ -77,6 +77,12 @@ export default function TransferPage() {
           title="Request to Pay"
           description="Request money from someone; they approve to pay"
           href="/system/transfer/rtp"
+        />
+        <MethodCard
+          icon={<CreditCard size={20} className="text-[#001E2B]" />}
+          title="New merchant payment"
+          description="Pay a merchant with one of your cards"
+          href="/system/payment"
         />
       </div>
 

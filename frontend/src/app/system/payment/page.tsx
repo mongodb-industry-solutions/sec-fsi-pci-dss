@@ -9,6 +9,7 @@ import { FraudAlert } from '../../../components/FraudAlert';
 import { Tooltip } from '../../../components/Tooltip';
 import { detectNetwork, tokenizeCard } from '../../../lib/cardTokenize';
 import Link from 'next/link';
+import { Check, AlertTriangle } from 'lucide-react';
 
 // A saved card-on-file the customer can pay with. The surrogate token is reused so
 // the transaction references the real stored card; the full PAN/CVV are never present here.
@@ -162,7 +163,8 @@ export default function DemoPaymentPage() {
   const [error, setError]                   = useState<string | null>(null);
   const { debugMode }                       = useDebugMode();
   const [result, setResult] = useState<{
-    txnId: string; fraudCaseCreated: boolean; caseId?: string; maskedPan: string
+    txnId: string; status: 'authorized' | 'declined'; declineReason?: string;
+    fraudCaseCreated: boolean; caseId?: string; maskedPan: string
   } | null>(null);
 
   // Once merchant presets load, auto-select the first one (replaces old hard-coded default)
@@ -293,12 +295,16 @@ export default function DemoPaymentPage() {
       // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
       const txnId = res.cardTransactionInstanceReference;
       const outcome = await awaitPaymentOutcome(txnId);
-      if (outcome.status === 'declined') {
-        setError(`The card issuer declined this payment${outcome.declineReason ? ` (${outcome.declineReason.replace(/_/g, ' ')})` : ''}. No charge was made.`);
-        return;
-      }
-      // Persisted server-side; history reads from the real API (no local mirror).
-      setResult({ txnId, fraudCaseCreated: !!outcome.fraudCaseCreated, caseId: outcome.caseId ?? undefined, maskedPan: maskedCard });
+      // Both outcomes are a recorded operation: always land on the receipt step, which links
+      // to the transaction detail for the full decision trail.
+      setResult({
+        txnId,
+        status: outcome.status,
+        declineReason: outcome.declineReason ?? undefined,
+        fraudCaseCreated: !!outcome.fraudCaseCreated,
+        caseId: outcome.caseId ?? undefined,
+        maskedPan: maskedCard,
+      });
       setStep(3);
     } catch (err) {
       setError((err as Error).message);
@@ -327,7 +333,7 @@ export default function DemoPaymentPage() {
                 step > s  ? 'bg-green-500 text-white' :
                             'bg-gray-200 text-gray-400'
               }`}>
-                {step > s ? '✓' : s}
+                {step > s ? <Check size={14} /> : s}
               </div>
               <span className={`text-sm hidden sm:inline ${step === s ? 'font-semibold text-gray-800' : 'text-gray-400'}`}>
                 {STEPS[s - 1]}
@@ -509,7 +515,7 @@ export default function DemoPaymentPage() {
                             ? 'text-gray-300'
                             : m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'
                         }`}>
-                          {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                          {m.risk === 'high' && <AlertTriangle size={11} className="inline mr-0.5 -mt-0.5" />}{mccNote(m.mcc)}
                         </div>
                       </button>
                     ))}
@@ -540,7 +546,7 @@ export default function DemoPaymentPage() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
                             <span className="font-medium">{m.label}</span>
                             <span className={`ml-2 text-xs ${m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'}`}>
-                              {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                              {m.risk === 'high' && <AlertTriangle size={11} className="inline mr-0.5 -mt-0.5" />}{mccNote(m.mcc)}
                             </span>
                           </button>
                         </li>
@@ -629,7 +635,7 @@ export default function DemoPaymentPage() {
                   </div>
                   {isFraudRisk && debugMode && (
                     <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                      <span className="shrink-0 mt-0.5">⚠</span>
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                       <span>This transaction will trigger an automatic fraud review case.</span>
                     </div>
                   )}
@@ -813,14 +819,26 @@ export default function DemoPaymentPage() {
         )}
 
         {/* -- STEP 3 --------------------------------------------------------─ */}
-        {step === 3 && result && (
+        {step === 3 && result && (() => {
+          const declined = result.status === 'declined';
+          const detailPath = `/system/payment/history/${result.txnId}`;
+          return (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-6 space-y-4">
+              {/* A decline is a completed operation too: same receipt layout, different tone. */}
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-lg shrink-0">✓</div>
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${
+                  declined ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                }`}>{declined ? <AlertTriangle size={18} /> : <Check size={18} />}</div>
                 <div>
-                  <h2 className="font-bold text-green-700 text-lg">Payment Confirmed</h2>
-                  <p className="text-xs text-gray-400">Transaction recorded securely in MongoDB Atlas</p>
+                  <h2 className={`font-bold text-lg ${declined ? 'text-amber-700' : 'text-green-700'}`}>
+                    {declined ? 'Payment Not Completed' : 'Payment Confirmed'}
+                  </h2>
+                  <p className="text-xs text-gray-400">
+                    {declined
+                      ? 'The operation was recorded and no amount was charged'
+                      : 'Transaction recorded securely in MongoDB Atlas'}
+                  </p>
                 </div>
               </div>
 
@@ -839,11 +857,31 @@ export default function DemoPaymentPage() {
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-gray-500">Status</span>
-                  <span className={result.fraudCaseCreated ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>
-                    {result.fraudCaseCreated ? 'Under review' : 'Authorized'}
+                  <span className={declined || result.fraudCaseCreated ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>
+                    {declined ? 'Declined' : result.fraudCaseCreated ? 'Under review' : 'Authorized'}
                   </span>
                 </div>
+                {declined && result.declineReason && (
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-gray-500">Reason</span>
+                    <span className="capitalize">{result.declineReason.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
               </div>
+
+              {!declined && result.fraudCaseCreated && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  The amount is reserved on your account, not charged: this payment only completes once the
+                  security review closes.
+                </p>
+              )}
+
+              <p className="text-sm text-gray-600">
+                For the full detail of this operation, open it in{' '}
+                <Link href={detailPath} className="text-[#001E2B] font-medium underline hover:no-underline">
+                  your transactions
+                </Link>.
+              </p>
 
               {result.fraudCaseCreated && result.caseId && (
                 <FraudAlert
@@ -863,12 +901,19 @@ export default function DemoPaymentPage() {
               )}
             </div>
 
-            <button onClick={() => router.push('/system/payment/history')}
-              className="w-full border rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50 bg-white">
-              View My Transactions
-            </button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button onClick={() => router.push(detailPath)}
+                className="w-full rounded-lg py-2.5 text-sm font-semibold bg-[#001E2B] text-[#00ED64] hover:opacity-90">
+                View Operation Detail
+              </button>
+              <button onClick={() => router.push('/system/payment/history')}
+                className="w-full border rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50 bg-white">
+                View My Transactions
+              </button>
+            </div>
           </div>
-        )}
+          );
+        })()}
 
       </main>
     </div>

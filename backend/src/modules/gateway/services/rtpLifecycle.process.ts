@@ -20,6 +20,9 @@ export class RtpLifecycleProcess {
   register(): void {
     this.bus.subscribe('bank.transfer.settled', (e) => this.onSettled(e));
     this.bus.subscribe('bank.transfer.failed', (e) => this.onFailed(e));
+    // A held approval is moved forward by the investigation outcome, not by the payer (ADR-061).
+    this.bus.subscribe('transfer.hold.released', (e) => this.onHoldReleased(e));
+    this.bus.subscribe('transfer.hold.reversed', (e) => this.onFailed(e));
     // Expiry sweeper: transition lapsed requests to `expired` with an auditable event (not just TTL).
     if (this.sweepMs > 0) {
       this.sweeper = setInterval(() => { void this.sweepExpired(); }, this.sweepMs);
@@ -52,6 +55,20 @@ export class RtpLifecycleProcess {
         relatedReference: req.paymentRequestInstanceReference, actionable: false,
       });
     } catch { /* transition may race; idempotent no-op */ }
+  }
+
+  // Investigation cleared a held approval: the transfer went to the rail, so the request is initiated.
+  private async onHoldReleased(e: DomainEvent): Promise<void> {
+    const p = e.payload as { executionRef?: string; paymentExecutionInstanceReference?: string };
+    const execRef = p.paymentExecutionInstanceReference ?? p.executionRef ?? e.correlationId;
+    const req = await this.findByExecution(execRef);
+    if (!req || req.status !== 'accepted') return;
+    try {
+      await transitionRequest(this.db, req.paymentRequestInstanceReference, 'payment_initiated', {
+        action: 'rtp.payment.initiated', outcome: 'submitted', summary: 'Security review cleared; payment sent to the rail',
+        meta: { executionReference: execRef },
+      });
+    } catch { /* idempotent */ }
   }
 
   private async onFailed(e: DomainEvent): Promise<void> {

@@ -140,14 +140,16 @@ export default function CardDetailPage() {
   ) => {
     setTxnsLoading(true);
     try {
-      const params: Parameters<typeof api.transactions.listAll>[0] = {
+      const params: Parameters<typeof api.transactions.list>[0] = {
+        // This panel renders card transactions: ask for the card document shape.
+        kind: 'card',
         cardToken,
         page,
         limit: 10,
       };
       if (status) params.status = status;
-      const res = await api.transactions.listAll(params, t);
-      // Filter by date client-side when dateFrom/dateTo are set, since listAll doesn't support them
+      const res = await api.transactions.list(params, t);
+      // Filter by date client-side when dateFrom/dateTo are set: the collection has no date filter
       let results = res.results as unknown as CardTransaction[];
       if (dateFrom) {
         const from = new Date(dateFrom).getTime();

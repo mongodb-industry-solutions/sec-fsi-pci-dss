@@ -1,6 +1,6 @@
 {
   "name": "leafy-merchant-demo",
-  "version": "2.6.5",
+  "version": "2.7.1",
   "private": true,
   "description": "Espresso Works Ltd — external merchant demo app integrating with Sec4 Pay PSP via OAuth2/OIDC SSO + API. No database.",
   "scripts": {

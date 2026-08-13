@@ -633,7 +633,7 @@ function CustomerView({ fraudCase }: { fraudCase: FraudCase }) {
               {isFraud ? 'Your dispute has been resolved' : 'Transaction reviewed and cleared'}
             </p>
             <p className={`text-sm ${isFraud ? 'text-green-700' : 'text-blue-700'}`}>
-              The transaction of <strong>{amount}</strong> at <strong>{snap?.cardTransactionMerchantName ?? 'the merchant'}</strong>{' '}
+              The operation of <strong>{amount}</strong> <strong>{snap?.cardTransactionMerchantName ?? ''}</strong>{' '}
               {isFraud
                 ? 'was confirmed as fraud. A full refund has been issued and a new card will be dispatched.'
                 : 'was reviewed and confirmed legitimate. No action needed on your account.'}

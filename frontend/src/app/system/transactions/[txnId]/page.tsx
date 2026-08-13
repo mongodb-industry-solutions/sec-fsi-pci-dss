@@ -16,7 +16,7 @@ import { AuditTrailLink } from '../../../../components/AuditTrailLink';
 import { AccessDenied } from '../../../../components/AccessDenied';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { Tooltip } from '../../../../components/Tooltip';
-import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -243,9 +243,115 @@ export default function TransactionDetailPage() {
   if (notFound || !txn) return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-500 space-y-3">
       <p>Transaction not found.</p>
-      <Link href="/system/transactions" className="text-blue-600 hover:underline text-sm">← Back to transactions</Link>
+      <Link href="/system/transactions" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
+        <ArrowLeft size={14} /> Back to transactions
+      </Link>
     </div>
   );
+
+  // v36 (ADR-063): the reference may resolve to a NON-card movement (transfer / RTP). It carries the
+  // movement-row shape, so it gets its own compact detail: the card-centric panels below (PAN, issuer,
+  // card-on-file, KYB) have no meaning for it.
+  const movement = txn as unknown as {
+    kind?: 'card' | 'transfer' | 'rtp';
+    paymentExecutionInstanceReference?: string;
+    direction?: string; grossAmount?: number; netAmount?: number; feeAmount?: number; currency?: string;
+    paymentExecutionRail?: string | null; paymentExecutionStatus?: string; concept?: string | null;
+    beneficiaryName?: string | null; destinationAccountMasked?: string | null;
+    linkedPaymentExecutionReference?: string | null;
+    initiatedAt?: string | null; completedAt?: string | null; heldForReview?: boolean;
+    fraudCase?: { created: boolean; status?: string | null; reference?: string | null };
+  };
+  if (movement.kind && movement.kind !== 'card') {
+    const KIND_LABEL: Record<string, string> = { transfer: 'Transfer', rtp: 'Request to Pay' };
+    const amount = movement.grossAmount != null && movement.currency
+      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: movement.currency }).format(movement.grossAmount)
+      : '-';
+    const at = movement.completedAt ?? movement.initiatedAt;
+    return (
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+        <Breadcrumb items={fromCase
+          ? [
+              { label: 'Home', href: '/system' },
+              { label: 'Cases', href: '/system/investigation' },
+              { label: fromCase.caseRef ?? 'Case', href: `/system/investigation/${fromCase.caseId}` },
+              { label: 'Movement' },
+            ]
+          : [
+              { label: 'Home', href: '/system' },
+              { label: 'Transactions', href: '/system/transactions' },
+              { label: 'Movement' },
+            ]}
+        />
+
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">{amount}</h1>
+              <p className="text-sm text-gray-500 mt-0.5">{at ? new Date(at).toLocaleString() : '-'}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[#001E2B] text-[#00ED64] font-medium">
+                {KIND_LABEL[movement.kind] ?? movement.kind}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 capitalize">
+                {movement.paymentExecutionStatus ?? '-'}
+              </span>
+              {movement.heldForReview && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                  Funds held, not delivered
+                </span>
+              )}
+            </div>
+          </div>
+
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt className="text-gray-500">Reference</dt>
+            <dd className="font-mono text-xs break-all">{movement.paymentExecutionInstanceReference ?? txnId}</dd>
+            <dt className="text-gray-500">Direction</dt>
+            <dd className="capitalize">{movement.direction ?? '-'}</dd>
+            <dt className="text-gray-500">Rail</dt>
+            <dd className="uppercase text-xs">{movement.paymentExecutionRail ?? 'n/a'}</dd>
+            <dt className="text-gray-500">Destination</dt>
+            <dd className="truncate">{movement.beneficiaryName ?? movement.destinationAccountMasked ?? 'n/a'}</dd>
+            <dt className="text-gray-500">Reference note</dt>
+            <dd className="truncate">{movement.concept ?? 'n/a'}</dd>
+            {movement.netAmount != null && (
+              <>
+                <dt className="text-gray-500">Net / fee</dt>
+                <dd className="font-mono text-xs">{movement.netAmount} / {movement.feeAmount ?? 0} {movement.currency}</dd>
+              </>
+            )}
+            {movement.linkedPaymentExecutionReference && (
+              <>
+                <dt className="text-gray-500">Settled by</dt>
+                <dd>
+                  <Link href={`/system/transactions/${movement.linkedPaymentExecutionReference}`}
+                    className="font-mono text-xs text-blue-600 hover:underline break-all">
+                    {movement.linkedPaymentExecutionReference}
+                  </Link>
+                </dd>
+              </>
+            )}
+          </dl>
+        </div>
+
+        {movement.fraudCase?.created && (
+          <div className="bg-white rounded-xl border p-5 text-sm">
+            <p className="font-semibold text-gray-800 mb-1">Under investigation</p>
+            <p className="text-gray-600">
+              Case {movement.fraudCase.reference ?? ''} · <span className="capitalize">{(movement.fraudCase.status ?? '').replace(/_/g, ' ')}</span>
+            </p>
+          </div>
+        )}
+
+        <Link href={fromCase ? `/system/investigation/${fromCase.caseId}` : '/system/transactions'}
+          className="inline-block text-blue-600 hover:underline text-sm">
+          <ArrowLeft size={14} /> Back
+        </Link>
+      </div>
+    );
+  }
 
   const formattedAmount = txn.cardTransactionAmount
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)

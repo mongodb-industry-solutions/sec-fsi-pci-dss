@@ -36,7 +36,8 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/auth/introspect',
   '/api/v1/auth/revoke',
   '/api/v1/transactions/merchants',
-  // Simulator mode: transaction creation without a user session
+  // Simulator mode: transaction CREATION without a user session. Method-scoped below: the collection
+  // GET on the same path must never be public, or it would list every movement in the platform.
   '/api/v1/transactions',
   // Admin login does its own credential check
   '/api/v1/admin/login',
@@ -56,6 +57,18 @@ const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/
 // NOTE: if a Bearer token IS present on these routes, it is validated and the role
 // is checked  -  customers are denied even on public-GET routes.
 const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
+
+// Some public paths are only public for SOME methods. `/api/v1/transactions` is public so the
+// simulator can create a payment with no session; its GET is the movement collection and must stay
+// authenticated (v36: it would otherwise return every movement to an anonymous caller).
+const PUBLIC_EXACT_METHODS: Record<string, ReadonlySet<string>> = {
+  '/api/v1/transactions': new Set(['POST']),
+};
+
+function methodIsPublic(path: string, method: string): boolean {
+  const allowed = PUBLIC_EXACT_METHODS[path];
+  return !allowed || allowed.has(method);
+}
 
 // URL prefixes and exact paths that the `customer` role is never allowed to access.
 // Customers use /api/v1/auth/me for their own profile; they must not query other
@@ -162,7 +175,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(401).send({ error: 'invalid_token', error_description: 'A valid session or OAuth token is required.' });
   }
 
-  if (PUBLIC_EXACT.has(path)) {
+  if (PUBLIC_EXACT.has(path) && methodIsPublic(path, method)) {
     attachRbacContext(request);
     return;
   }

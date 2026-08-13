@@ -123,6 +123,23 @@ export async function resolveCustomerAgreement(db: Db, accountReference: string)
 }
 
 /**
+ * Resolve an agreement by its INSTANCE reference (UUID) into the pair used to stamp a transaction.
+ * Complements `resolveCustomerAgreement`, which keys off an email or the ACC-xxx business key: a card
+ * on file names its owner by UUID, so a hosted flow that only knows the card resolves the payer here.
+ */
+async function resolveAgreementByInstance(db: Db, instanceRef: string): Promise<{ uuid?: string; reference?: string }> {
+  try {
+    const l1Db = await getDbForRole('level1_analyst', false);
+    const agreement = await l1Db
+      .collection<{ customerAgreementInstanceReference: string; customerAgreementReference: string }>(CUSTOMER_AGREEMENT_COLLECTION)
+      .findOne({ customerAgreementInstanceReference: instanceRef } as Record<string, unknown>);
+    return { uuid: agreement?.customerAgreementInstanceReference, reference: agreement?.customerAgreementReference };
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Resolve a party's canonical account reference (customerAgreementReference, e.g. ACC-xxx) from its
  * partyInstanceReference. Used to (a) stamp a checkout/API payment with the payer's account so it
  * lands under them in payment history, and (b) list a party's card transactions for the merchant history
@@ -236,7 +253,16 @@ export async function initiateTransaction(
     throw new CardNotActiveError(onFile.paymentCardStatus);
   }
 
-  const resolved = await resolveCustomerAgreement(db, input.accountReference);
+  // A hosted flow (payment link / checkout) may not know who the payer is: it passes the email when the
+  // payer typed one and falls back to the CARD TOKEN otherwise, which resolves to no agreement and left
+  // the transaction stamped with a token instead of an account reference. Such a payment then belonged
+  // to nobody and never appeared in any history. Fall back to the card-on-file owner, which is exactly
+  // who paid whenever the card is registered (including a card this same flow auto-registers).
+  let resolved = await resolveCustomerAgreement(db, input.accountReference);
+  if (!resolved.reference && onFile?.customerAgreementInstanceReference) {
+    const byCard = await resolveAgreementByInstance(db, onFile.customerAgreementInstanceReference);
+    if (byCard.reference) resolved = byCard;
+  }
   const canonicalAccountRef = resolved.reference ?? input.accountReference;
 
   const txn: CardTransactionLogControlRecord = {
@@ -646,26 +672,9 @@ export async function getDistinctMerchants(db: Db) {
   return results as { name: string; mcc: string }[];
 }
 
-export async function getTransactionsByCardToken(db: Db, value: string) {
-  // Detect masked PAN (contains * or matches ****-****-****-XXXX pattern)
-  // and route to the correct plaintext field.
-  const isMaskedPan = value.includes('*') || /^\*{4}[-\s]?\*{4}[-\s]?\*{4}[-\s]?\d{4}$/.test(value);
-
-  const query = isMaskedPan
-    ? { cardTransactionMaskedPanDisplay: value }
-    : { paymentCardReference: value };
-
-  const results = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
-    .find(query as Partial<CardTransactionLogControlRecord>)
-    .sort({ cardTransactionDateTime: -1 })
-    .toArray();
-
-  return { results, count: results.length };
-}
-
 export async function getAllTransactions(
   db: Db,
-  filters: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string },
+  filters: { status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string; transactionId?: string },
   page: number,
   limit: number
 ) {
@@ -673,6 +682,9 @@ export async function getAllTransactions(
   if (filters.status)        query['cardTransactionStatus']            = filters.status;
   if (filters.merchant)      query['cardTransactionMerchantName']      = { $regex: filters.merchant, $options: 'i' };
   if (filters.cardToken)     query['paymentCardReference']             = filters.cardToken;
+  // v36: the masked PAN is its own filter. It used to be inferred from the shape of `cardToken`,
+  // which misclassified any token that happened to look like a masked PAN.
+  if (filters.maskedPan)     query['cardTransactionMaskedPanDisplay']  = filters.maskedPan;
   if (filters.transactionId) query['cardTransactionInstanceReference'] = filters.transactionId;
 
   // Lookup by email resolves the customer's canonical account reference, then

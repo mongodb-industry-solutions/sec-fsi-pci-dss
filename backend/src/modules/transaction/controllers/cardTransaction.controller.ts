@@ -4,7 +4,6 @@ import { beginSSE } from '../../../shared/services/sse';
 import {
   initiateTransaction,
   getTransactionById,
-  getTransactionsByCardToken,
   getDistinctMerchants,
   getAllTransactions,
   resolveAccountReferenceForParty,
@@ -18,6 +17,10 @@ import { getEventBus } from '../../../vendors/eventbus';
 import { getCaseNotes } from '../../fraud/services/fraudDiagnosis.service';
 import { listQuestionsByTransaction, submitResponse } from '../../fraud/services/customerQuestion.service';
 import { requirePermission } from '../../../vendors/middleware/acl';
+import {
+  listNonCardMovements, dedupeRtpExecutions, sortAndPage, normalizeCardRow, attachFraudCases,
+  getMovementByRef, type MovementRow,
+} from '../../gateway/services/paymentMovement.service';
 import { resolveOwner } from '../../../vendors/middleware/dualAuth';
 import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
 
@@ -261,12 +264,14 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     request.raw.on('close', () => { clearInterval(keepAlive); sub.unsubscribe(); res.end(); });
   });
 
-  // Dual-auth without the `dualAuth` route flag: `/api/v1/transactions` is a PUBLIC_EXACT path
-  // (simulator reads without a session), so we must NOT 401 anonymous callers. Detect a merchant
-  // OAuth Bearer best-effort (scope-gated); otherwise fall back to the existing session/public RBAC.
+  // v36: the collection serves TWO authenticated channels, so it declares `dualAuth`: the middleware
+  // accepts a first-party session JWT (HS256) OR a merchant OAuth Bearer (RS256) and 401s otherwise.
+  // The path is PUBLIC_EXACT for POST only (simulator payment creation); listing is never anonymous.
   fastify.get('/', {
+    config: { dualAuth: true },
     preHandler: async (request, reply) => {
-      const mc = await tryMerchantContext(request);
+      // dualAuth already resolved the merchant channel when the caller used an OAuth token.
+      const mc = request.merchantContext ?? await tryMerchantContext(request);
       if (mc) {
         if (!mc.scopes.includes('read:transactions')) {
           return reply.status(403).send({ error: 'insufficient_scope', error_description: 'Required scope: read:transactions' });
@@ -278,22 +283,37 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     },
     schema: {
       tags: ['transactions'],
-      summary: 'List transactions by card token (session) or the merchant on-behalf-of operation history (OAuth)',
-      description: `Returns all transactions associated with a card token, sorted by
-\`cardTransactionDateTime\` descending (most recent first).
+      summary: 'List movements (canonical collection: card payments, transfers and payment requests)',
+      description: `Paginated movement history, newest first. THE single collection endpoint
+(v36 / ADR-063): the former \`GET /transactions/all\` was the same resource under another name and
+has been removed.
 
-The query uses a standard plaintext index on \`paymentCardReference\` because the card
-token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
+**Channels** (resolved by authentication, not by path): session/customer (scoped to the caller),
+merchant OAuth on-behalf-of (merchant-isolated) and staff (\`transactions:view\`).
+
+Every movement kind is returned by default as \`kind\`-discriminated rows (\`card\`, \`transfer\`,
+\`rtp\`): listing is the collection's job and narrowing is what filters are for. Pass \`kind\` to
+narrow. An RTP that has a linked execution is listed once, as the RTP row (BIAN keeps both records;
+the duplicate presentation is what is collapsed).
+
+Card-token and masked-PAN lookups are explicit filters. The card token is a PAN surrogate and is NOT
+Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
         properties: {
           cardToken: {
             type: 'string',
-            description: 'Card surrogate token (session channel). Same value as `paymentCardReference` in the `paymentCard` collection.',
+            description: 'Card surrogate token. Same value as `paymentCardReference` in the `paymentCard` collection.',
           },
+          maskedPan: { type: 'string', description: 'Masked PAN display value, e.g. `****-****-****-4242`.' },
+          status:    { type: 'string', description: 'Filter by movement status (`authorized`, `declined`, `pending`, `settled`, `disputed`).' },
+          merchant:  { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
+          email:     { type: 'string', description: 'Filter by customer email (QE:equality → account reference). Ignored for the customer role, which is scoped to its own email.' },
+          transactionId: { type: 'string', description: 'Filter by exact movement reference.' },
+          kind: { type: 'string', enum: ['card', 'transfer', 'rtp'], description: 'Narrow to one movement kind. Omitted returns every kind.' },
           page: { type: 'number', default: 1 },
-          limit: { type: 'number', default: 20, maximum: 100 },
+          limit: { type: 'number', default: 20, maximum: 200, description: 'Page size (max 200).' },
         },
       },
       // No strict 200 response schema: this route now serves TWO shapes, the session card-token list
@@ -318,68 +338,100 @@ token is a PAN surrogate and is NOT Cardholder Data under PCI DSS v4.0.`,
       if (!owner.ownerPartyRef) return reply.send({ results: [], total: 0, page, limit });
 
       const merchantId = request.merchantContext.merchantId;
-      // Source 1: executions the party made THROUGH THIS merchant (isolation by ref).
-      const filter = {
-        merchantAgreementReference: merchantId,
-        $or: [{ initiatorPartyReference: owner.ownerPartyRef }, { beneficiaryPartyReference: owner.ownerPartyRef }],
-      };
-      const execDocs = await fastify.db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION)
-        .find(filter).sort({ initiatedAt: -1 }).limit(200).toArray();
-      const execRows = execDocs.map((d) => ({
-        kind: 'transfer' as const,
-        paymentExecutionInstanceReference: d.paymentExecutionInstanceReference,
-        direction: d.initiatorPartyReference === owner.ownerPartyRef ? 'sent' : 'received',
-        grossAmount: d.grossAmount, netAmount: d.netAmount, feeAmount: d.feeAmount, currency: d.currency,
-        paymentExecutionRail: d.paymentExecutionRail ?? null,
-        paymentExecutionStatus: d.paymentExecutionStatus,
-        concept: d.paymentExecutionRemittanceInformation ?? d.routingNote ?? null,
-        beneficiaryName: d.beneficiaryName ?? null,
-        destinationAccountMasked: d.destinationAccountMasked ?? null,
-        initiatedAt: d.initiatedAt?.toISOString() ?? null,
-        completedAt: d.completedAt?.toISOString() ?? null,
-        _sortAt: d.completedAt ?? d.initiatedAt ?? null,
-      }));
+      // Source 1: executions + requests the party made THROUGH THIS merchant (isolation by ref).
+      // Shared normalization/merge/de-dup: see gateway/services/paymentMovement.service (ADR-063).
+      const movementRows = await listNonCardMovements(fastify.db, { partyRef: owner.ownerPartyRef, merchantRef: merchantId });
 
       // Source 2: the party's OWN card transactions made in THIS merchant (masked PAN, no CHD).
       const accountReference = await resolveAccountReferenceForParty(fastify.db, owner.ownerPartyRef);
       const cardTxns = accountReference ? await getPartyCardTransactions(fastify.db, accountReference, 200, merchantId) : [];
-      const cardRows = cardTxns.map((t) => ({
-        kind: 'card' as const,
+      const cardRows: MovementRow[] = cardTxns.map((t) => ({
+        kind: 'card',
         paymentExecutionInstanceReference: t.cardTransactionInstanceReference,
         direction: 'sent',
-        grossAmount: t.grossAmount, netAmount: undefined as number | undefined, feeAmount: undefined as number | undefined,
-        currency: t.currency, paymentExecutionRail: 'card', paymentExecutionStatus: t.status,
+        grossAmount: t.grossAmount,
+        currency: t.currency,
+        paymentExecutionRail: 'card',
+        paymentExecutionStatus: t.status,
         concept: t.cardTransactionDescription ?? null,
-        beneficiaryName: t.merchantName, destinationAccountMasked: t.maskedPan,
-        initiatedAt: t.initiatedAt, completedAt: t.initiatedAt,
+        beneficiaryName: t.merchantName,
+        destinationAccountMasked: t.maskedPan,
+        initiatedAt: t.initiatedAt,
+        completedAt: t.initiatedAt,
         _sortAt: t.initiatedAt ? new Date(t.initiatedAt) : null,
       }));
 
-      const merged = [...execRows, ...cardRows].sort((a, b) => {
-        const av = a._sortAt ? new Date(a._sortAt).getTime() : 0;
-        const bv = b._sortAt ? new Date(b._sortAt).getTime() : 0;
-        return bv - av;
-      });
-      const total = merged.length;
-      const results = merged.slice((page - 1) * limit, page * limit).map(({ _sortAt, ...row }) => { void _sortAt; return row; });
+      const { results, total } = sortAndPage(dedupeRtpExecutions([...movementRows, ...cardRows]), page, limit);
       return reply.send({ results, total, page, limit });
     }
 
-    // Session channel: list by card token (existing behavior).
-    const { cardToken } = request.query as { cardToken?: string };
-    if (!cardToken) {
-      return reply.status(400).send({ error: 'cardToken query parameter is required' });
+    // Session / staff channel: the collection, with optional filters. A customer is scoped to their
+    // own movements; staff see everything their role allows (RBAC is unchanged).
+    const q = request.query as {
+      cardToken?: string; maskedPan?: string; status?: string; merchant?: string; email?: string;
+      transactionId?: string; kind?: 'card' | 'transfer' | 'rtp'; page?: number; limit?: number;
+    };
+    const page = Math.max(1, Number(q.page ?? 1));
+    const limit = Math.min(200, Math.max(1, Number(q.limit ?? 20)));
+    const { userRole } = request as unknown as AuthenticatedRequest;
+    const jwtEmail = (request as unknown as { user?: { email?: string } }).user?.email;
+    // Privacy: a customer may only list their OWN movements. Ignore any email they pass.
+    const effectiveEmail = userRole === 'customer' ? jwtEmail : q.email;
+
+    // ONLY an explicit `kind=card` returns the card document shape (what card-specific consumers
+    // expect). Everything else returns normalized movement rows, so the response shape depends on one
+    // parameter and nothing else.
+    if (q.kind === 'card') {
+      return reply.send(await getAllTransactions(
+        fastify.db,
+        { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, transactionId: q.transactionId },
+        page, limit,
+      ));
     }
-    const result = await getTransactionsByCardToken(fastify.db, cardToken);
-    return reply.send(result);
+
+    // Every kind (default), or one non-card kind: normalized rows through the shared read-model.
+    const partyRef = userRole === 'customer'
+      ? (request as unknown as { user?: { partyRef?: string } }).user?.partyRef
+      : undefined;
+    const canSeePayeeName = userRole === 'level2_investigator' || userRole === 'security_auditor';
+    // A card-only filter (token / masked PAN / merchant name) cannot match a transfer or a request,
+    // so those sources are skipped rather than queried and discarded.
+    const cardOnlyFilter = !!q.cardToken || !!q.maskedPan || !!q.merchant;
+    const nonCard = !q.kind && !cardOnlyFilter
+      ? await listNonCardMovements(fastify.db, { partyRef, includePayeeName: canSeePayeeName })
+      : q.kind === 'transfer' || q.kind === 'rtp'
+        ? await listNonCardMovements(fastify.db, { partyRef, includePayeeName: canSeePayeeName })
+        : [];
+    // Card rows are fetched unpaged for the merge; the page is applied to the merged set.
+    const cardRows = q.kind === 'transfer' || q.kind === 'rtp'
+      ? []
+      : (await getAllTransactions(
+          fastify.db,
+          { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, transactionId: q.transactionId },
+          1, 500,
+        )).results.map((r) => normalizeCardRow(r as Record<string, unknown>));
+
+    const rows = [...cardRows, ...nonCard]
+      .filter((r) => (q.kind ? r.kind === q.kind : true))
+      .filter((r) => (q.status ? r.paymentExecutionStatus === q.status : true))
+      .filter((r) => (q.transactionId ? r.paymentExecutionInstanceReference === q.transactionId : true));
+
+    const { results, total } = sortAndPage(dedupeRtpExecutions(rows), page, limit);
+    // Investigation status per row, one lookup for the page (any movement kind).
+    return reply.send({ results: await attachFraudCases(fastify.db, results), total, page, limit });
   });
 
   fastify.get('/:id', {
     preHandler: requirePermission('transactions', 'view'),
     schema: {
       tags: ['transactions'],
-      summary: 'Get a transaction by ID',
-      description: `Returns a single \`cardTransaction\` document by its UUID.
+      summary: 'Get a movement by reference (card payment, transfer or payment request)',
+      description: `Returns the movement identified by the reference, whatever kind it is (v36 /
+ADR-063): a \`cardTransaction\` document for a card payment, or a \`kind\`-discriminated movement row
+for a payment execution (P2P / bank transfer) or a payment request (RTP). Every movement has a
+reference and every reference resolves here, so a client never has to know the kind in advance.
+
+Card payments keep the exact document they have always returned.
 
 **QE note:** \`cardTransactionAccountReference\` is a QE:equality field; it is
 decrypted in the API process memory and returned as plaintext. Atlas stores only
@@ -421,6 +473,24 @@ role to retrieve.`,
             cardTransactionAccountReference:   { type: 'string', nullable: true, description: 'QE:equality  -  decrypted account reference.' },
             merchantAgreementInstanceReference:{ type: 'string', nullable: true, description: 'Payee merchant FK (plaintext, no PII) for KYB linking.' },
             cardTransactionInitiationType:     { type: 'string', nullable: true },
+            // v36: movement-row fields, present when the reference is a transfer or a payment request.
+            kind:                              { type: 'string', enum: ['card', 'transfer', 'rtp'], description: 'Movement kind.' },
+            paymentExecutionInstanceReference:  { type: 'string', description: 'Movement reference (execution / request / transaction).' },
+            direction:                         { type: 'string', enum: ['sent', 'received'] },
+            grossAmount:                       { type: 'number' },
+            netAmount:                         { type: 'number' },
+            feeAmount:                         { type: 'number' },
+            currency:                          { type: 'string' },
+            paymentExecutionRail:              { type: 'string', nullable: true },
+            paymentExecutionStatus:            { type: 'string' },
+            concept:                           { type: 'string', nullable: true },
+            beneficiaryName:                   { type: 'string', nullable: true },
+            destinationAccountMasked:          { type: 'string', nullable: true },
+            beneficiaryArrangementReference:   { type: 'string', nullable: true },
+            linkedPaymentExecutionReference:   { type: 'string', nullable: true },
+            initiatedAt:                       { type: 'string', nullable: true },
+            completedAt:                       { type: 'string', nullable: true },
+            heldForReview:                     { type: 'boolean', description: 'Accepted but not delivered: funds reserved while an investigation is open.' },
             sensitive: {
               type: 'object', nullable: true,
               description: 'Available to Level 2 Investigator (with escalation token) and Security Auditor.',
@@ -439,8 +509,15 @@ role to retrieve.`,
     const { id } = request.params as { id: string };
     const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
     const txn = await getTransactionById(fastify.db, id, userRole as Parameters<typeof getTransactionById>[2], escalationToken);
-    if (!txn) return reply.status(404).send({ error: 'Transaction not found' });
-    return reply.send(txn);
+    if (txn) return reply.send(txn);
+
+    // Not a card payment: resolve it as a transfer or a payment request, so every movement reference
+    // opens its detail. The RTP payee name is QE:none / L2-only.
+    const canSeePayeeName = userRole === 'level2_investigator' || userRole === 'security_auditor';
+    const movement = await getMovementByRef(fastify.db, id, { includePayeeName: canSeePayeeName });
+    if (!movement) return reply.status(404).send({ error: 'Transaction not found' });
+    const [withCase] = await attachFraudCases(fastify.db, [movement]);
+    return reply.send(withCase);
   });
 
   // GET /api/v1/transactions/:id/notes  -  customer-safe: returns customer-visible notes list
@@ -532,85 +609,6 @@ Retracted notes are excluded from the list.`,
   });
 
   // GET /api/v1/transactions/all   -  paginated transaction list for analyst / auditor roles
-  fastify.get('/all', {
-    preHandler: requirePermission('transactions', 'view'),
-    schema: {
-      tags: ['transactions'],
-      summary: 'List all transactions (paginated)',
-      description: `Returns a paginated list of all \`cardTransaction\` records sorted by
-\`cardTransactionDateTime\` descending. Supports optional filters.
-
-Intended for L1 Analyst, L2 Investigator, and Security Auditor roles.
-Not accessible to the \`customer\` role (enforced by RBAC middleware).`,
-      security: [{ bearerAuth: [] }],
-      querystring: {
-        type: 'object',
-        properties: {
-          status:    { type: 'string', enum: ['authorized', 'declined', 'pending', 'settled', 'disputed'], description: 'Filter by transaction status.' },
-          merchant:  { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
-          cardToken: { type: 'string', description: 'Filter by exact card token (paymentCardReference).' },
-          email:     { type: 'string', format: 'email', description: 'Filter by customer email (QE:equality → account reference → transactions). Two-step QE search.' },
-          transactionId: { type: 'string', description: 'Filter by exact cardTransactionInstanceReference (PK).' },
-          page:      { type: 'string', default: '1' },
-          limit:     { type: 'string', default: '20' },
-        },
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            results: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  cardTransactionInstanceReference: { type: 'string' },
-                  paymentCardReference:             { type: 'string' },
-                  cardTransactionAmount:             { $ref: 'MonetaryAmount#' },
-                  cardTransactionDateTime:           { type: 'string', format: 'date-time' },
-                  cardTransactionStatus:             { type: 'string' },
-                  cardTransactionType:               { type: 'string' },
-                  cardTransactionMerchantName:       { type: 'string' },
-                  cardTransactionMerchantCategoryCode: { type: 'string' },
-                  cardTransactionChannel:            { type: 'string' },
-                  cardTransactionMaskedPanDisplay:   { type: 'string' },
-                  // Payment concept (statement descriptor). Shown as the concept in history for AML/FDS context.
-                  cardTransactionDescription:        { type: 'string' },
-                  // Fraud/risk status , distinct from the payment authorization status above.
-                  fraudCaseCreated:                  { type: 'boolean' },
-                  fraudDiagnosisCaseStatus:          { type: ['string', 'null'] },
-                  fraudDiagnosisCaseReference:       { type: ['string', 'null'] },
-                  fraudDiagnosisCaseSeverity:        { type: ['string', 'null'] },
-                  fraudDiagnosisResolutionOutcome:   { type: ['string', 'null'] },
-                },
-              },
-            },
-            total: { type: 'number' },
-            page:  { type: 'number' },
-            limit: { type: 'number' },
-          },
-        },
-        401: { $ref: 'Error#' },
-      },
-    },
-  }, async (request, reply) => {
-    const { status, merchant, cardToken, email, transactionId, page = '1', limit = '20' } = request.query as {
-      status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: string; limit?: string;
-    };
-    // Privacy: a customer may only list their OWN transactions. Ignore any email
-    // they pass and scope to the email in their JWT.
-    const { userRole } = request as unknown as AuthenticatedRequest;
-    const jwtEmail = (request as unknown as { user?: { email?: string } }).user?.email;
-    const effectiveEmail = userRole === 'customer' ? jwtEmail : email;
-    const result = await getAllTransactions(
-      fastify.db,
-      { status, merchant, cardToken, email: effectiveEmail, transactionId },
-      parseInt(page, 10),
-      parseInt(limit, 10)
-    );
-    return reply.send(result);
-  });
-
   // GET /api/v1/transactions/:id/questions  -  customer-facing list of investigator questions for a
   // transaction. Customers are scoped to their OWN questions (by party); staff see all for the tx.
   fastify.get('/:id/questions', {

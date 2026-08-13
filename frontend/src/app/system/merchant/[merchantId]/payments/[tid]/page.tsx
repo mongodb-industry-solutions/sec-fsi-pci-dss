@@ -293,7 +293,9 @@ export default function MerchantTransactionDetailPage() {
         );
       })() : caseInfo && !caseInfo.caseFound && (
         <div className="bg-white rounded-xl border border-gray-200 p-5 text-center text-sm text-gray-500">
-          ✓ This transaction was processed normally and did not require additional security review.
+          {txn.cardTransactionStatus === 'declined'
+            ? 'This payment was not completed, so no amount was settled.'
+            : '✓ This transaction was processed normally and did not require additional security review.'}
         </div>
       )}
     </div>

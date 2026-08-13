@@ -462,7 +462,57 @@ export async function updateCase(
     { $set: update },
     { returnDocument: 'after' }
   );
+  if (result) await publishCaseResolved(db, result as unknown as FraudDiagnosisControlRecord, patch.fraudDiagnosisCaseStatus);
   return result ?? null;
+}
+
+// A resolved case closes the payment decision it opened: the payout process listens and either
+// releases the withheld payout (cleared) or returns the hold and declines it (confirmed fraud).
+async function publishCaseResolved(
+  db: Db,
+  fraudCase: FraudDiagnosisControlRecord,
+  newStatus?: FraudDiagnosisControlRecord['fraudDiagnosisCaseStatus'],
+): Promise<void> {
+  if (newStatus !== 'resolved_cleared' && newStatus !== 'resolved_fraud') return;
+  const txnId = fraudCase.cardTransactionInstanceReference;
+  if (!txnId) return;
+  try {
+    const { getEventBus, makeEvent } = await import('../../../vendors/eventbus');
+    await getEventBus().publish(makeEvent({
+      eventType: 'fraud.case.resolved', correlationId: txnId, businessProcess: 'fraud_investigation',
+      source: 'fraud.diagnosis',
+      payload: {
+        fraudDiagnosisInstanceReference: fraudCase.fraudDiagnosisInstanceReference,
+        cardTransactionInstanceReference: txnId,
+        outcome: newStatus === 'resolved_cleared' ? 'cleared' : 'confirmed_fraud',
+      },
+      bian: { serviceDomain: 'SD-83 Fraud Diagnosis', controlRecord: 'FraudDiagnosisCase' },
+    }));
+  } catch (err) {
+    // The case resolution itself must never fail because the payment follow-up could not be published.
+    console.error('[fraud] publish fraud.case.resolved failed:', err);
+  }
+}
+
+/**
+ * Stamp the execution a case's movement ended up using. An RTP case is opened at screening time, when
+ * the approval has not created its execution yet, so the case only knows the request reference. Called
+ * by the approval once the execution exists, which keeps the case resolvable by either reference.
+ */
+export async function linkCaseExecution(
+  db: Db,
+  movementReference: string,
+  paymentExecutionInstanceReference: string,
+): Promise<void> {
+  try {
+    await db.collection(FRAUD_DIAGNOSIS_COLLECTION).updateOne(
+      { cardTransactionInstanceReference: movementReference, fraudDiagnosisCaseStatus: { $nin: RESOLVED_STATUSES } },
+      { $set: { paymentExecutionInstanceReference, recordUpdatedDateTime: new Date() } },
+    );
+  } catch (err) {
+    // Never block the movement on bookkeeping: the read path also resolves through the request link.
+    console.error('[fraud] linkCaseExecution failed:', err);
+  }
 }
 
 export async function getCaseEvents(db: Db, caseId: string) {

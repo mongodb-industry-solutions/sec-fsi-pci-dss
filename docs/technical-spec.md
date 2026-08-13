@@ -330,6 +330,12 @@ export interface FraudDiagnosisControlRecord {
   // Links to protected records: BIAN *InstanceReference FK naming pattern
   cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
   customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
+  // ADR-061: a case can cover any money movement, not only a card payment. The discriminator decides
+  // which counterparty the investigation read-model resolves (merchant vs beneficiary vs payee) and
+  // which link is authoritative. Absent = 'card' (legacy docs).
+  transactionKind?: 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+  paymentExecutionInstanceReference?: string;             // FK to paymentExecutionProcedure (SD-65), non-card
+  paymentRequestInstanceReference?: string;               // FK to paymentRequestProcedure (SD-64), RTP
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
@@ -2985,7 +2991,7 @@ Counts are the v33 population.
 | `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
 | `backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
 | `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 21 | `bin/seed-generate.ts` + 1 curated non-card case (`transactionKind: 'p2p'`, linked to the held execution seeded in `seedPaymentExecutions`) |
 | `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
@@ -4077,8 +4083,20 @@ fire-and-forget and never blocks the auth response (Req 10.2.1).
 
 **Collection `domainEvent`** (regular, not time-series: carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
 
+**Movement collection (v36 / ADR-063).** `GET /api/v1/transactions` is the single collection for every
+financial movement. Rows are `kind`-discriminated (`card` | `transfer` | `rtp`) and every kind is
+returned by default; `kind` narrows. Filters: `status`, `merchant`, `cardToken`, `maskedPan`, `email`,
+`transactionId`, `page`, `limit`. Envelope `{ results, total, page, limit }`. Channels are resolved by
+authentication (customer → own movements, merchant OAuth → merchant-isolated, staff → `transactions:view`).
+`GET /transactions/all` was removed (same resource, non-REST alias). `GET /transactions/:id` resolves a
+reference of ANY kind: a card payment returns its `cardTransaction` document, a transfer/RTP returns the
+movement row. Normalization, RTP de-dup and paging live in `gateway/services/paymentMovement.service.ts`.
+
 **Async payment authorization.** `POST /api/v1/transactions` returns `202 { cardTransactionInstanceReference, cardTransactionStatus: 'pending' }`. The client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, `skipAuth`, no PII/CHD, race-safe) for the terminal `authorized`/`declined`. Transient `cardVerification { cardNumber, cvv, expiry }` on create is forwarded to the issuer only and never stored or logged.
-- **Phase 1 gate** (parallel, out-of-band): `card-issuer` + `fds` + `hrp` (sanctions). Each publishes its `*.completed` verdict; `PaymentAuthorizationSaga` aggregates, any hard decline gives `payment.declined`, all approve gives `payment.authorized`.
+- **Phase 1 gate** (parallel, out-of-band): `card-issuer` + `fds` + `hrp` (sanctions) + `funds`. Each publishes its `*.completed` verdict; `PaymentAuthorizationSaga` aggregates, any hard decline gives `payment.declined`, all approve gives `payment.authorized`.
+- **Eligibility vs risk** (ADR-059, revised by ADR-061). Only ELIGIBILITY gates hard-decline: `card-issuer` (invalid card/CVV/owner) and `funds` (insufficient funds); on the RTP surface a Verification of Payee mismatch also rejects. `fds` AND `hrp` are RISK gates: both always complete as `approved` and carry their verdict, so the payment is authorized, the payout withheld and a `fraudDiagnosisCase` opened for L1 (escalating to L2). A sanctions match is scored as a high-risk indicator (`rulesFired += 'sanctions_match'`, score floored at 90): the freeze obligation is met by never completing the payment, and only an explicit L1/L2 resolution releases or reverses it.
+- **Transfers follow the same policy** (ADR-060): `screenTransfer` returns `hold`, not `blocked`. A held bank/P2P transfer is created in `paymentExecutionStatus: 'pending'` with a `risk.hold` resolution step, the sender funds are held, and nothing is dispatched to the rail; the transfer route answers 202 with `status: 'pending'` + `holdReason`. `fraud.case.resolved` submits it (`cleared`) or returns the funds and reverses it (`confirmed_fraud`), gated on `pending` + the hold step. Eligibility failures (no supported rail, inactive source account, VoP mismatch) keep rejecting.
+- **Accepted is not completed** (ADR-059): an authorization carrying `fraudCaseCreated` withholds the payout (no execution, no ledger movement, the funds-gate hold stays in place). Resolving the case publishes `fraud.case.resolved`, consumed by `PayoutOrchestrationProcess`: `cleared` releases the withheld payout, `confirmed_fraud` returns the hold (pending -> available) and declines the transaction. Only a transaction still in `authorized` is actionable.
 - **Phase 2** (post-auth, async): `PostAuthorizationProcess` runs AML monitoring and enriches the case from the correlated trail into a new schemaless field `fraudDiagnosisCase.subsystemSignals { issuer, fds, sanctions, aml }`.
 - `createTransaction` remains a synchronous wrapper (initiate + await terminal) so the gateway (checkout / payment-link) is unchanged. See ADR-032.
 

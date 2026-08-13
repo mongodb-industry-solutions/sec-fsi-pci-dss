@@ -7,7 +7,7 @@ import { Db } from 'mongodb';
 import { EventBus, DomainEvent } from '../../../vendors/eventbus';
 import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
-import type { PaymentExecutionStatus } from '../models/paymentExecution.model';
+import { PAYMENT_EXECUTION_COLLECTION, type PaymentExecutionStatus } from '../models/paymentExecution.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution, resolveMerchantFee } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
@@ -25,15 +25,24 @@ export class PayoutOrchestrationProcess {
 
   register(): void {
     this.bus.subscribe('card.payment.authorization.completed', (e) => this.onAuthorized(e));
+    this.bus.subscribe('fraud.case.resolved', (e) => this.onCaseResolved(e));
+    this.bus.subscribe('aml.monitoring.completed', (e) => this.onAmlAlert(e));
     this.bus.subscribe('bank.transfer.settled', (e) => this.onTransferSettled(e));
     this.bus.subscribe('bank.transfer.failed', (e) => this.onTransferFailed(e));
   }
 
   private async onAuthorized(e: DomainEvent): Promise<void> {
-    const p = e.payload as { outcome?: string };
+    const p = e.payload as { outcome?: string; fraudCaseCreated?: boolean; fraudDiagnosisInstanceReference?: string };
     if (p.outcome === 'declined') return;
 
     const txnId = e.correlationId;
+
+    // An authorization under investigation is accepted but NOT completed: the cardholder hold stays in
+    // place and no money moves until the case is resolved (see onCaseResolved).
+    if (p.fraudCaseCreated) {
+      await this.withholdPayout(txnId, p.fraudDiagnosisInstanceReference);
+      return;
+    }
 
     try {
       await this.triggerPayout(txnId);
@@ -41,6 +50,96 @@ export class PayoutOrchestrationProcess {
       // Payout failure never rolls back the authorized payment
       console.error(`[payout-orch] Failed to trigger payout for txn ${txnId}:`, err);
     }
+  }
+
+  // Investigation closed: a cleared case releases the withheld movement, a confirmed fraud never
+  // completes it (the hold goes back to the payer and the movement is declined/reversed). Applies to
+  // both card payments and held transfers: a transfer case carries the execution reference in the same
+  // field, so the transfer branch runs when no card transaction matches.
+  private async onCaseResolved(e: DomainEvent): Promise<void> {
+    const p = e.payload as { outcome?: string; cardTransactionInstanceReference?: string };
+    const ref = p.cardTransactionInstanceReference;
+    if (!ref) return;
+    if (p.outcome !== 'cleared' && p.outcome !== 'confirmed_fraud') return;
+
+    const txnId = ref;
+    const txn = await this.db.collection<{ cardTransactionStatus?: string; cardTransactionAmount?: { amount: number; currency: string } }>(CARD_TRANSACTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { cardTransactionStatus: 1, cardTransactionAmount: 1 } });
+
+    if (!txn) { await this.resolveHeldTransfer(ref, p.outcome); return; }
+    // Only a still-withheld authorization is actionable: a settled or already declined payment is done.
+    if (txn.cardTransactionStatus !== 'authorized') return;
+
+    try {
+      if (p.outcome === 'cleared') {
+        await this.triggerPayout(txnId);
+        return;
+      }
+      if (p.outcome === 'confirmed_fraud') {
+        const { amount = 0, currency = 'USD' } = txn.cardTransactionAmount ?? {};
+        await this.returnCardholderPendingHold(txnId, amount, currency);
+        const { declineTransaction } = await import('../../transaction/services/cardTransaction.service');
+        await declineTransaction(this.db, txnId, 'confirmed_fraud', 'fraud_confirmed');
+      }
+    } catch (err) {
+      console.error(`[payout-orch] Failed to apply case resolution for txn ${txnId}:`, err);
+    }
+  }
+
+  // AML runs after authorization, so its alert can land once the payout is already moving. Recall it
+  // while that is still possible (nothing handed to the rail yet) and hold it for the investigation.
+  // Past that point the rail owns the transfer: record it, and the case reviews it post-settlement.
+  private async onAmlAlert(e: DomainEvent): Promise<void> {
+    if (!(e.payload as { alert?: boolean }).alert) return;
+    const txnId = e.correlationId;
+    const exec = await this.db.collection<{ paymentExecutionInstanceReference: string; paymentExecutionStatus: string; grossAmount?: number; currency: string; resolvedPayoutAccountReference?: string; merchantAgreementReference?: string }>(PAYMENT_EXECUTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId });
+    if (!exec) { await this.withholdPayout(txnId); return; }
+
+    const recallable = exec.paymentExecutionStatus === 'routing' || exec.paymentExecutionStatus === 'scheduled';
+    if (!recallable) {
+      emitProcessEvent(this.db, {
+        entityType: 'execution', entityId: exec.paymentExecutionInstanceReference,
+        processType: 'payment_processing', processAction: 'payout.recall.not.possible',
+        processOutcome: 'pending',
+        performedByPartyReference: null, performedByRole: null,
+        eventSummary: { txnId, reason: 'aml_alert_after_rail_dispatch', executionStatus: exec.paymentExecutionStatus },
+        bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+      });
+      return;
+    }
+
+    const heldAmount = await this.convert(exec.grossAmount ?? 0, exec.currency, await this.accountCurrency(exec.resolvedPayoutAccountReference ?? ''));
+    await this.abortPayout({
+      execRef: exec.paymentExecutionInstanceReference, status: 'exception', reason: 'Recalled and held for AML investigation',
+      payoutAccountRef: exec.resolvedPayoutAccountReference ?? '', heldAmount,
+      merchantRef: exec.merchantAgreementReference ?? '', txnId,
+    });
+    await this.withholdPayout(txnId);
+  }
+
+  // Held transfer (bank / P2P): cleared submits it to the rail, confirmed fraud returns the funds.
+  private async resolveHeldTransfer(executionRef: string, outcome: string): Promise<void> {
+    const { submitHeldTransfer, reverseHeldTransfer } = await import('./transferReview.service');
+    try {
+      if (outcome === 'cleared') await submitHeldTransfer(this.db, executionRef);
+      else await reverseHeldTransfer(this.db, executionRef);
+    } catch (err) {
+      console.error(`[payout-orch] Failed to apply case resolution for transfer ${executionRef}:`, err);
+    }
+  }
+
+  // Record that the payout is withheld pending investigation. No ledger movement: the funds gate hold
+  // taken at authorization is exactly the money that must stay put.
+  private async withholdPayout(txnId: string, caseRef?: string): Promise<void> {
+    emitProcessEvent(this.db, {
+      entityType: 'transaction', entityId: txnId,
+      processType: 'payment_processing', processAction: 'payout.withheld',
+      processOutcome: 'pending',
+      performedByPartyReference: null, performedByRole: null,
+      eventSummary: { txnId, reason: 'investigation_open', ...(caseRef ? { fraudDiagnosisInstanceReference: caseRef } : {}) },
+      bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    });
   }
 
   private async accountCurrency(payoutAccountRef: string): Promise<string | undefined> {
@@ -521,6 +620,21 @@ export class PayoutOrchestrationProcess {
     const accountRef = card.fundingPayoutAccountInstanceReference;
     const heldAmount = await this.convert(amount, settlementCurrency, await this.accountCurrency(accountRef));
     await settleCardDebit(this.db, accountRef, heldAmount);
+  }
+
+  // Confirmed fraud: give the cardholder's held amount back (pending -> available) instead of
+  // finalizing it. Mirrors clearCardholderPendingHold, same FX handling, opposite ledger move.
+  private async returnCardholderPendingHold(txnId: string, amount: number, currency: string): Promise<void> {
+    const { PAYMENT_CARD_COLLECTION } = await import('../../customer/models/paymentCard.model');
+    const txn = await this.db.collection<{ paymentCardInstanceReference?: string }>(CARD_TRANSACTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { paymentCardInstanceReference: 1 } });
+    if (!txn?.paymentCardInstanceReference) return;
+    const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
+      .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
+    if (!card?.fundingPayoutAccountInstanceReference) return;
+    const accountRef = card.fundingPayoutAccountInstanceReference;
+    const heldAmount = await this.convert(amount, currency, await this.accountCurrency(accountRef));
+    await releaseCardHold(this.db, accountRef, heldAmount);
   }
 
   private async getMerchantSettlementSchedule(merchantRef: string): Promise<'T+0' | 'T+1' | 'T+2' | 'T+3'> {

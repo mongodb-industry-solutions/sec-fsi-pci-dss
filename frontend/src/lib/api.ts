@@ -300,6 +300,10 @@ export interface FraudCase {
   caseStatus: string;
   riskSeverity: string;
   cardTransactionInstanceReference: string;
+  // ADR-062: movement kind of the case (absent on pre-ADR-062 cases → treat as card).
+  transactionKind?: CaseMovementKind;
+  paymentExecutionInstanceReference?: string | null;
+  paymentRequestInstanceReference?: string | null;
   customerAgreementInstanceReference: string;
   transactionSnapshot?: TransactionSnapshot;
   fraudDiagnosisAssessment?: {
@@ -332,21 +336,67 @@ export interface RawDocumentResponse {
   document: Record<string, unknown>;
 }
 
+export type CaseMovementKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+
+export interface CasePartySummary {
+  reference: string;
+  name: string | null;
+  type: string | null;
+  customerAgreementInstanceReference: string | null;
+}
+
+export interface CaseAccountSummary {
+  reference: string;
+  alias: string | null;
+  bankName: string | null;
+  holderName: string | null;
+  currency: string | null;
+  countryCode: string | null;
+  type: string | null;
+  status: string | null;
+  partyReference: string | null;
+  balance: { available: number | null; pending: number | null };
+}
+
 export interface CaseEnrichment {
   caseId: string;
   asOf: string;
+  // Movement kind: decides whether the counterparty is a merchant, a beneficiary or a payee.
+  transactionKind?: CaseMovementKind;
   operation: {
     transactionId: string;
+    kind?: CaseMovementKind;
     type: string;
     status: string;
     channel: string | null;
-    merchantCategoryCode: string | null;
-    merchantName: string;
-    maskedPan: string;
+    merchantCategoryCode?: string | null;
+    merchantName?: string;
+    maskedPan?: string;
+    rail?: string | null;
+    heldForReview?: boolean;
     amount: { amount: number; currency: string };
     dateTime: string;
     description: string | null;
   } | null;
+  // Non-card movements only: the destination of the money (PSP-owned data, visible to L1).
+  counterparty?: {
+    kind: 'beneficiary' | 'external_account' | 'payee';
+    label: string | null;
+    accountMasked: string | null;
+    countryCode: string | null;
+    partyReference: string | null;
+    arrangementReference: string | null;
+    accountReference: string | null;
+    labelRestricted?: boolean;
+    lookupHint?: string | null;
+    lookupType?: string | null;
+    status?: string | null;
+    registeredAt?: string | null;
+    ownerParty?: CasePartySummary | null;
+    account?: CaseAccountSummary | null;
+  } | null;
+  // Payer side of a non-card movement: the account the funds are held on.
+  sourceAccount?: CaseAccountSummary | null;
   sdf: {
     score: number | null;
     scorePending: boolean;
@@ -390,6 +440,8 @@ export interface CaseEnrichment {
     customerId: string | null;
     merchantId: string | null;
     accountRef: string | null;
+    executionRef?: string | null;
+    paymentRequestRef?: string | null;
   };
 }
 
@@ -889,9 +941,15 @@ export const api = {
         escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {},
         token
       ),
+    // v36: card-token / masked-PAN lookups are explicit filters on the canonical collection, which
+    // returns the paginated envelope like every other query.
     getByCardToken: (cardToken: string, token: string) =>
-      apiFetch<{ results: Record<string, unknown>[]; count: number }>(
-        `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
+      apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/transactions?kind=card&cardToken=${encodeURIComponent(cardToken)}&limit=100`, {}, token
+      ),
+    getByMaskedPan: (maskedPan: string, token: string) =>
+      apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/transactions?kind=card&maskedPan=${encodeURIComponent(maskedPan)}&limit=100`, {}, token
       ),
     getNotes: (txnId: string, token: string) =>
       apiFetch<TransactionNotesResponse>(`/api/v1/transactions/${txnId}/notes`, {}, token),
@@ -904,8 +962,14 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),
-    listAll: (
-      params: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: number; limit?: number },
+    // v36 (ADR-063): ONE collection endpoint. Every movement kind by default (server-merged and
+    // RTP-de-duped); `kind` narrows to one. Card-only callers pass `kind: 'card'` and keep the card
+    // document shape.
+    list: (
+      params: {
+        status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string;
+        transactionId?: string; kind?: 'card' | 'transfer' | 'rtp'; page?: number; limit?: number;
+      },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -918,7 +982,7 @@ export const api = {
         total: number;
         page: number;
         limit: number;
-      }>(`/api/v1/transactions/all${qs ? `?${qs}` : ''}`, {}, token);
+      }>(`/api/v1/transactions${qs ? `?${qs}` : ''}`, {}, token);
     },
   },
 
@@ -2349,7 +2413,7 @@ export const api = {
       body: { fromAccountRef: string; amount: number; note?: string },
       token: string,
     ) =>
-      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; recipientHint?: string }>(
+      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; holdReason?: string; recipientHint?: string }>(
         `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}/transfer`,
         { method: 'POST', body: JSON.stringify(body) },
         token,

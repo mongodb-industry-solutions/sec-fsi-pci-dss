@@ -89,6 +89,19 @@ describe('P5: per-gate *.requested/*.completed pairs + causation', () => {
     }
   });
 
+  it('never declines on a fraud verdict: the fds gate approves and carries the verdict for the case', async () => {
+    h.dispatchProvider.mockResolvedValue({
+      provider: 'internal', status: 'received',
+      responseBody: { riskScore: 135, recommendation: 'decline', fraudFlag: true, rulesFired: ['HIGH_VALUE_TXN', 'RISKY_MCC'] },
+    });
+    await createTransaction(txDb(), { ...baseInput, amount: 1250 });
+    const fds = store.events.find((e) => e.eventType === 'fds.scoring.completed')!;
+    const payload = fds.payload as { outcome: string; recommendation?: string };
+    expect(payload.outcome).toBe('approved');
+    expect(payload.recommendation).toBe('decline');
+    h.dispatchProvider.mockResolvedValue({ provider: 'internal', status: 'received' });
+  });
+
   it('records a pending-correlation entry for the issuer at dispatch (§7.7)', async () => {
     await createTransaction(txDb(), baseInput);
     // The sync built-in path leaves the entry for a would-be async callback; it is swept by TTL.

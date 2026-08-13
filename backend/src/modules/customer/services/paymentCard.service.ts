@@ -352,6 +352,23 @@ export async function listAllCards(
 // Returns the QE:none expiry (business need-to-know: verify a card is correctly registered; expiry
 // is CHD but NOT SAD, and PCI DSS does not mandate masking it). CVV/PIN are never stored. Null if
 // not found. Callers MUST audit the access (card.accessed, PCI DSS).
+/**
+ * The token of a party's card-on-file to charge server-side: the preferred card, else the first active
+ * one. Used by the merchant API-payment channel, which holds no CHD and can only reference a token.
+ * Returns null when the party has no active card (the caller then falls back to its configured token).
+ */
+export async function getChargeableCardToken(db: Db, partyInstanceReference: string): Promise<string | null> {
+  const agreementId = await getOwnAgreementId(db, partyInstanceReference);
+  if (!agreementId) return null;
+  const cards = await db.collection<{ paymentCardReference?: string; paymentCardIsPreferred?: boolean }>(PAYMENT_CARD_COLLECTION)
+    .find({ customerAgreementInstanceReference: agreementId, paymentCardStatus: 'active' } as Record<string, unknown>)
+    .toArray()
+    .catch(() => []);
+  if (cards.length === 0) return null;
+  const preferred = cards.find((c) => c.paymentCardIsPreferred) ?? cards[0];
+  return preferred.paymentCardReference ?? null;
+}
+
 export async function getCardByIdAny(db: Db, cardId: string) {
   return db.collection<PaymentCardManagementControlRecord>(PAYMENT_CARD_COLLECTION)
     .findOne({ paymentCardInstanceReference: cardId }, { projection: { _id: 0 } });

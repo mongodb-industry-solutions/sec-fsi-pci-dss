@@ -1691,7 +1691,7 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 **Decision.**
 1. **EventBus vendor (port/adapter), one instance for ALL events** (`backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus`, no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
 2. **`DomainEvent` envelope + correlated event store** (`domainEvent` collection). Every event carries `eventId` (idempotency), `eventType` (dotted, module-prefixed), `correlationId` (= the journey, the `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey` (Kafka-ready). CHD is stripped on publish (`sanitizeDeep`, single CHD blocklist owned by the vendor). The legacy `emitProcessEvent`/`emitComplianceEvent`/`logEvent` also mirror to the store with correlation. `GET /api/v1/events/trail/:correlationId` returns the ordered journey.
-3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them, any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
+3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them, any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. Only eligibility gates hard-decline (`card-issuer`, `funds`, and `hrp` sanctions as a regulatory block); `fds` is a risk gate whose `review`/`decline` recommendation authorizes the payment and opens a fraud case for L1/L2 instead of declining it. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
 4. **Backward compatibility.** `createTransaction` is kept as a synchronous wrapper (initiate + await the terminal event) so the gateway (checkout / payment-link) is unchanged.
 
 **Consequences.**
@@ -2463,3 +2463,223 @@ on-screen value.
 constraint surfaced during `setup:db`. It is recorded here because the reasoning is not obvious: on a
 collection whose expiry is enforced by a TTL index, "encrypt the sensitive field" is unavailable, and
 the correct move is to stop persisting the field rather than to weaken the lifecycle.
+
+### ADR-059: a risk signal holds a payment, it does not decline it (v36)
+
+**Status.** Accepted.
+
+**Context.** The Phase-1 authorization gate treated all four gates alike: any non-approved verdict was
+a hard decline. The FDS gate mapped a `block`/`decline` recommendation onto `outcome: 'declined'`, and
+the saga's decline branch publishes `fraudCaseCreated: false`, so a high-score payment was rejected
+automatically and no investigation case was ever opened. With the seeded rule set
+(`bands.declineAtOrAbove: 120`), a 1250 payment at a risky MCC scored 135 and was auto-declined: the
+L1 triage and L2 confirmation the platform is built around were unreachable for exactly the payments
+that most needed them.
+
+The second half of the defect was on the money side. `PayoutOrchestrationProcess.onAuthorized` paid out
+on any non-declined outcome, so once a flagged payment was authorized the merchant was settled at T+N
+regardless of an open case, and resolving the case had no effect on the payment at all.
+
+**Decision.**
+
+1. **Separate eligibility from risk.** Eligibility gates decline: the card issuer (invalid card, CVV or
+   owner), the funds check (insufficient funds) and sanctions screening (a regulatory block). The fraud
+   gate is a risk gate: it always completes as approved and carries its verdict, which opens the case.
+2. **Accepted is not completed.** An authorization with an open case is withheld: no execution is
+   created and no ledger movement happens, so the funds-gate hold placed at authorization is exactly
+   the money that stays put. The cardholder is not charged and the merchant is not credited.
+3. **The investigation closes the payment.** Resolving the case publishes `fraud.case.resolved`, which
+   the payout process consumes: `cleared` releases the withheld payout, `confirmed_fraud` returns the
+   hold to the cardholder (pending -> available) and declines the transaction. Only a still-authorized
+   transaction is actionable, so a settled or already declined payment is never re-processed.
+
+**Consequences.** A flagged payment is auditable end to end: authorized, withheld, investigated,
+resolved, then either settled or reversed, with the money immobilised (not moved) throughout. Merchant
+commission revenue no longer counts payments still under investigation, which is the correct reading.
+No API change: routes, request/response shapes and the SSE outcome fields are untouched; what changes
+is which value `outcome` takes for a fraud signal. No schema, DEK or seed change, so no `--reset`.
+
+**On the standards.** Withholding satisfies AML (monitoring alerts are not meant to block; suspicious
+activity is investigated and reported) and satisfies the sanctions freeze obligation *provided* nothing
+releases a withheld payment except an explicit resolution: no timeout, no scheduled settlement job. The
+sanctions gate itself is left as a hard decline, since a confirmed match should not be accepted at all.
+
+### ADR-060: the risk hold applies to every money movement, not only card payments (v36)
+
+**Status.** Accepted.
+
+**Context.** ADR-059 fixed card payments: a fraud signal holds the payment instead of declining it. The
+transfer rails still did the opposite, and worse. `transferRiskGate.screenTransfer` returned `blocked`,
+and because the FDS branch flagged on `fraudFlag` (true for any non-`approve` recommendation), a plain
+**review** verdict rejected the transfer outright: the execution was written as `exception`, a case was
+opened for L1, and nothing could ever move that transfer again. Clearing the case had no effect, so the
+customer's only option was to retry and be rejected by the same rule. Money was never at risk (the
+rejection happened before any ledger movement), but the operation was dead, and a false positive was
+indistinguishable from confirmed fraud.
+
+**Decision.** One policy for every movement type: a risk signal (fraud, sanctions, severe AML) HOLDS,
+it never rejects. Only eligibility failures reject (invalid card/CVV/owner, insufficient funds, no
+supported rail, Verification of Payee mismatch).
+
+1. **Held, in `pending`.** The screening result is `hold`, not `blocked`. The execution is created in
+   `pending` (an existing status: "created, not yet routed") with a `risk.hold` resolution step, and
+   nothing is dispatched to the payout rail. For P2P the sender funds are held FIRST
+   (available -> pending) so the money is immobilised, not merely undelivered.
+2. **Only a resolution can move it.** `getHeldExecution` gates every path on `pending` + the
+   `risk.hold` step, so a settled, failed or reversed execution is never re-processed.
+   `fraud.case.resolved` then either submits the transfer to the rail (`cleared`) or returns the held
+   funds and reverses the execution (`confirmed_fraud`). A transfer case carries the execution
+   reference in the same field a card case uses, so one event serves both.
+3. **`pending` is inert by construction.** Nothing consumes a `pending` execution: settlement is driven
+   by the rail's `bank.transfer.settled`, which cannot arrive because the transfer was never dispatched.
+   That is what makes the hold safe without a new lifecycle state.
+
+**Consequences.** A flagged transfer is now recoverable: cleared by L1/L2 it completes, confirmed fraud
+returns the funds. False positives cost a review, not a lost operation. The transfer response gains
+`status: 'pending'` with a `holdReason`, and a flagged transfer answers 202 (accepted) where it used to
+answer 422 (rejected). No route, field removal or schema change: `paymentExecutionStatus` already had
+`pending`, and the transfer routes carry no response schema, so nothing is stripped or invalidated. An
+integrator that polls `GET /gateway/transfers/:ref/status` sees `pending` and then the terminal state.
+
+**Not included.** RTP approval keeps its current shape: a risk hold (or a VoP mismatch) leaves the
+request `presented` with no funds moved and a case opened, and the payer re-approves once it clears. The
+money-safety invariant already holds there (nothing is reserved, nothing is delivered), so aligning it
+to the `pending` execution model is a follow-up, not a correctness fix.
+
+### ADR-061: one risk policy for every movement, with no unsupervised outcome (v36)
+
+**Status.** Accepted.
+
+**Context.** ADR-059/060 unified the happy path but left four asymmetries where a risk signal still had
+an unsupervised outcome: (a) a sanctions match on a card payment declined the payment and, because the
+saga's decline branch publishes `fraudCaseCreated: false`, opened NO case, so a sanctions hit was a
+silent rejection nobody reviewed; (b) an AML alert on a card payment only enriched a case that already
+existed, so an AML-only alert settled with nobody assigned to it; (c) a non-severe AML alert on a
+transfer let the movement reach the rail and opened the case afterwards, money already gone; (d) an RTP
+approval held for review kept the request `presented` with no linked execution, so the resolution had no
+effect and the payer had to re-approve into the same rule.
+
+**Decision.** Risk signals (fraud, sanctions, AML) hold and always open a case; eligibility failures
+reject. Applied per surface:
+
+1. **Sanctions on cards hold.** `hrp.screening.completed` carries `sanctionsMatch` and completes as
+   approved. The saga merges it into the risk verdict handed to `completeAuthorized`
+   (`recommendation: 'review'`, `rulesFired += 'sanctions_match'`, score floored at 90), so the payment
+   is authorized, the payout withheld and a high-severity case opened. The freeze obligation is met by
+   never completing the payment: only an L1/L2 resolution can release or reverse it.
+2. **An AML-only alert opens a case.** `PostAuthorizationProcess` opens one through the fraud module's
+   own factory when no case exists, then enriches it as before.
+3. **The AML alert recalls a recallable payout.** `PayoutOrchestrationProcess` consumes
+   `aml.monitoring.completed`: while the execution is still `routing`/`scheduled` it aborts the payout
+   (existing compensation releases the merchant reservation) and withholds it. Once the rail has the
+   transfer, it is NOT recallable: that is recorded as `payout.recall.not.possible` and the case reviews
+   it post-settlement, which is AML's designed post-hoc nature. No invented reversal.
+4. **Any AML alert holds a transfer.** The gate no longer distinguishes severity.
+5. **A held RTP approval joins the model.** The payer's funds are held and the execution is created in
+   `pending` with the `risk.hold` step and linked to the request, which stays `accepted` (accepted, not
+   initiated). `RtpLifecycleProcess` consumes the hold outcome: released -> `payment_initiated` (the
+   rail then settles it as usual), reversed -> `payment_failed`. VoP keeps rejecting: a payee-name
+   mismatch is a verification failure, not a risk score.
+
+**Architecture.** No deviation: every cross-module reaction is an event (`fraud.case.resolved`,
+`aml.monitoring.completed`, `transfer.hold.released/reversed`), every provider call still goes through
+`dispatchProvider`, and each decision stays in its owning module (case semantics in `fraud`, ledger and
+rail in `gateway`, authorization in `transaction`). No new collection, field, DEK or index, so nothing
+to add to `setup/` or `seed/` and no `--reset`.
+
+**API.** Unchanged. The only additive state-machine change is `accepted -> payment_failed` for an RTP
+request that was accepted, held and then confirmed fraudulent; a held approval still answers
+`status: 'accepted'`.
+
+**Consequences.** Every risk outcome on every movement type is now supervised: something is held, a case
+exists, and a human decides. The single remaining unrecallable window is an AML alert that lands after
+the rail has taken the transfer, which is documented rather than papered over.
+
+### ADR-062: an investigation case is about a money movement, not about a card payment (v36)
+
+**Status.** Accepted.
+
+**Context.** The investigation case detail was written for card payments and had no other shape. A
+transfer case (P2P, bank transfer, RTP) carries the execution reference in
+`cardTransactionInstanceReference`, so the read-model's card lookup missed, `operation` came back null,
+`merchantId` was undefined and the UI fell back to its "external merchant: not acquired by this PSP, so
+there is no KYB record" panel. For a transfer to a registered beneficiary that message is not just
+unhelpful, it is wrong: there is no merchant in the movement at all, and the PSP owns the destination
+record in full. L1 was left with a screen that named a merchant that did not exist and hid the
+beneficiary that did.
+
+**Decision.**
+
+1. **Stamp the movement kind at case creation.** `transactionKind` widens to
+   `'card' | 'p2p' | 'bank_transfer' | 'rtp'` and `openTransferFraudCase` writes it together with
+   `paymentExecutionInstanceReference` (or the new `paymentRequestInstanceReference` for RTP). The
+   snapshot descriptor becomes "Transfer to <beneficiary label>" instead of a truncated account ref.
+2. **The read-model resolves the movement it actually is.** For a non-card case the enrichment builds
+   `operation` from the payment execution or the payment request (status, rail, remittance info,
+   `heldForReview`) and adds a `counterparty` block: a registered beneficiary, an unregistered
+   destination account, or an RTP payee. `kyb` stays null and the client drops the merchant panel.
+3. **Minimisation holds (ADR-048).** The counterparty exposes the label, the MASKED account, the
+   country and the references. The full IBAN is never added to this surface: it stays behind the
+   existing escalation-gated endpoints. This is PSP-owned counterparty data, so L1 sees it without an
+   escalation, which is the point of the fix.
+4. **Seeded, not only runtime.** `seedPaymentExecutions` gains a held beneficiary transfer and
+   `fraudCases.json` a matching `p2p` case, so the non-card investigation path is demonstrable after a
+   reseed instead of requiring someone to trigger a hold live.
+
+**Consequences.** One case-detail layout serves every movement type: the operation panel adapts (card +
+MCC vs destination + rail) and the counterparty panel replaces the merchant panel when there is no
+merchant. The seed-integrity guard is now kind-aware: the `case → card transaction` rule applies to card
+cases only, and a new rule requires every non-card case to carry the link to its movement, so a case
+that the read-model could not resolve fails the suite instead of rendering an empty panel.
+
+**Model change.** Two optional plaintext fields on an existing plaintext collection
+(`transactionKind` widened, `paymentRequestInstanceReference` added). No QE field, DEK, index or
+collection change, so `setup/` needs nothing; the seed data ships with the change as required.
+
+### ADR-063: one movement collection, and the merge lives in one place (v36)
+
+**Status.** Accepted.
+
+**Context.** The v36 investigation work exposed three problems in the transaction read surface.
+(a) `GET /transactions/all` and `GET /transactions` were the same resource under two names, and the
+latter answered 400 without a `cardToken`, so a collection GET could not list. (b) The rule for "what
+is a row of movement history" (normalize card + execution + request, de-dup an RTP against the
+execution that settles it, sort by date) was implemented THREE times: in the merchant channel of the
+controller, in the customer history page and in the merchant app. (c) A transfer or RTP reference had
+no detail endpoint an analyst could reach, so the investigation UI had to render a dead reference.
+The `cardToken` filter also guessed by value shape whether it was a token or a masked PAN.
+
+**Decision.**
+
+1. **One collection.** `GET /api/v1/transactions` lists every movement kind by default as
+   `kind`-discriminated rows (`card`, `transfer`, `rtp`), with `kind` as a narrowing filter. Listing is
+   the collection's job; narrowing is what filters are for. `GET /transactions/all` is DELETED, not
+   deprecated: the only callers were internal.
+2. **One merge.** `gateway/services/paymentMovement.service.ts` owns normalization, the RTP de-dup and
+   the paging. The merchant channel and the staff/session channel both consume it, and the customer
+   history page dropped its client-side merge for a single request.
+3. **Explicit filters.** `cardToken` and `maskedPan` are separate parameters. The value-shape heuristic
+   is gone: a token that happened to look like a masked PAN queried the wrong field.
+4. **Every reference resolves.** `GET /transactions/:id` falls through to the movement read-model, so a
+   transfer or an RTP reference returns its movement document instead of 404. The investigation UI can
+   therefore always offer the link.
+5. **Merge in memory, not `$unionWith`.** `cardTransactionLog` is QE-enabled and aggregation stages are
+   restricted over encrypted collections.
+
+**Compatibility.** The one external consumer (leafy-wallet) calls `GET /transactions` with no params on
+the merchant OAuth channel, which is unchanged: same rows, same envelope, same field names, and no RTP
+rows added to a merchant-isolated view (RTP carries no merchant attribution, and those clients fetch it
+themselves). A unit test asserts the consumer's exact field reads. Internal callers were migrated in
+the same change. `movementScope`, an earlier compatibility flag, was dropped as unnecessary once the
+consumer inventory was confirmed: the parameter only affected the session/staff channel, which no
+external system uses.
+
+**Deliberately flow-agnostic.** A row is derived from the STORED record, never from the choreography
+that produced it, and each kind has its own normalizer. A future DB-driven payment-workflow
+orchestrator can add kinds or change the sequence of events for a process without touching this read
+surface: add a normalizer, not a branch in a caller.
+
+**Consequences.** One endpoint, one merge, one place to change a row. The staff card list, the card
+detail and the dashboard stat pin themselves to `kind=card` to keep the card document shape. Response
+schemas gained the movement fields as additive optional properties (they are strict, so an undeclared
+field would be stripped). No collection, index, DEK or seed change.

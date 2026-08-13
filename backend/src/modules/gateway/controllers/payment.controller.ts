@@ -16,6 +16,7 @@ import { validateMerchantToken } from '../../../vendors/middleware/validateMerch
 import { createTransaction, CardIssuerDeclinedError, resolveAccountReferenceForParty } from '../../transaction/services/cardTransaction.service';
 import { attributionFromMerchantContext, emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+import { getChargeableCardToken } from '../../customer/services/paymentCard.service';
 
 const PAYMENT_STATUS_ENUM = [
   'initiated', 'confirmed', 'authorized', 'captured',
@@ -91,7 +92,20 @@ initiated → confirmed → authorized → captured → settled
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
-        402: { description: 'Card issuer declined the tokenised charge.', $ref: 'Error#' },
+        402: {
+          description: 'Card issuer declined the tokenised charge.',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            // The reason is what makes a decline actionable for the merchant; the shared Error schema
+            // would strip these, leaving the client with a bare status code.
+            error_description: { type: 'string', description: 'Human-readable decline reason from the issuer.' },
+            responseCode: { type: 'string', description: 'Issuer response code (ISO 8583 style).' },
+            paymentOrderInstanceReference: { type: 'string' },
+            paymentOrderReference: { type: 'string' },
+            paymentOrderStatus: { type: 'string' },
+          },
+        },
         403: { description: 'Merchant token missing write:payments scope or merchant mismatch.', $ref: 'Error#' },
         409: { description: '(v5-only) Duplicate idempotency key  -  not yet enforced in this prototype.', $ref: 'Error#' },
       },
@@ -137,7 +151,10 @@ initiated → confirmed → authorized → captured → settled
     // Charge a TOKENISED card server-side (PCI DSS: no PAN/CVV in the merchant; the PSP holds the
     // token). The card transaction carries the acquiring merchant reference, so completeAuthorized
     // applies the commission fee (Item 1) and the merchant dashboard revenue reflects this API payment.
-    const apiChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
+    // Charge the ACTING BUYER's card-on-file when the merchant forwarded their subject: a demo charge
+    // against a fixed token only worked if that token happened to be seeded, so the API-payment method
+    // failed with a bare 402. `PSP_API_PAYMENT_TEST_TOKEN` stays as the unattributed fallback.
+    const fallbackChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
     // v18 attribution: if the merchant forwarded the acting user's subject, resolve it to the payer's
     // party + canonical account so the charge lands in THEIR payment history. Falls back to the merchant
     // account key when no acting user is supplied (pure machine charge).
@@ -147,6 +164,9 @@ initiated → confirmed → authorized → captured → settled
     const actingAccountReference = actingPartyReference
       ? await resolveAccountReferenceForParty(fastify.db, actingPartyReference)
       : undefined;
+    const apiChargeToken = actingPartyReference
+      ? (await getChargeableCardToken(fastify.db, actingPartyReference).catch(() => null)) ?? fallbackChargeToken
+      : fallbackChargeToken;
     try {
       const tx = await createTransaction(fastify.db, {
         cardToken: apiChargeToken,
