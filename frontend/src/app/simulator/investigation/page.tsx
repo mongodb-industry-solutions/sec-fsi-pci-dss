@@ -62,7 +62,7 @@ export default function SimulatorInvestigationPage() {
         // Confirm DB state: how many transactions exist for this email. Authenticate as the persona
         // (real JWT) and use the REAL transactions endpoint (works in local + production, no open surface).
         getSimToken(saved.email)
-          .then((token) => api.transactions.listAll({ email: saved.email, limit: 1 }, token))
+          .then((token) => api.transactions.list({ kind: 'card', email: saved.email, limit: 1 }, token))
           .then((res: { total: number }) => setDbTxCount(res.total))
           .catch(() => null);
       }

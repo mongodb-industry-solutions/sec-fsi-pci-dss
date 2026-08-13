@@ -54,7 +54,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.servi
   sendMerchantPaymentCallback: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { createTransaction, getTransactionById, getTransactionsByCardToken } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
+import { createTransaction, getTransactionById, getAllTransactions } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../../../backend/src/modules/provider/services/integrationDispatch.service';
 import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
@@ -68,15 +68,25 @@ function txDb() {
   return { collection: vi.fn(() => ({ findOne: vi.fn().mockResolvedValue(null) })) } as any;
 }
 
-// Local mock DB used only by getTransactionsByCardToken (which queries the passed db directly).
+// Local mock DB used by the collection queries, which run against the passed db directly.
+// `_find` exposes the spy so a test can assert WHICH field a filter queried.
 function makeDb(overrides?: { findResults?: unknown[] }) {
-  const toArrayMock = vi.fn().mockResolvedValue(overrides?.findResults ?? []);
-  const sortMock = vi.fn().mockReturnValue({ toArray: toArrayMock });
-  return {
+  const rows = overrides?.findResults ?? [];
+  const cursor = {
+    sort: vi.fn().mockReturnThis(),
+    skip: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    toArray: vi.fn().mockResolvedValue(rows),
+  };
+  const find = vi.fn().mockReturnValue(cursor);
+  const db: any = {
     collection: vi.fn().mockReturnValue({
-      find: vi.fn().mockReturnValue({ sort: sortMock }),
+      find,
+      countDocuments: vi.fn().mockResolvedValue(rows.length),
     }),
-  } as any;
+  };
+  db._find = find;
+  return db;
 }
 
 beforeEach(() => {
@@ -258,19 +268,30 @@ describe('getTransactionById', () => {
   });
 });
 
-describe('getTransactionsByCardToken', () => {
-  it('returns all transactions for a card token with count', async () => {
-    const docs = [{ cardTransactionInstanceReference: 'txn-001' }, { cardTransactionInstanceReference: 'txn-002' }];
-    const db = makeDb({ findResults: docs });
-    const result = await getTransactionsByCardToken(db, 'pm_abc');
-    expect(result.results).toHaveLength(2);
-    expect(result.count).toBe(2);
+// v36 (ADR-063): the card-token lookup is a filter on the canonical collection, and the masked PAN is
+// its OWN filter. It used to be inferred from the shape of the `cardToken` value, so a token that
+// happened to look like a masked PAN queried the wrong field.
+describe('getAllTransactions: explicit card filters', () => {
+  it('matches the card token on paymentCardReference', async () => {
+    const db = makeDb({ findResults: [{ cardTransactionInstanceReference: 'txn-001' }] });
+    const result = await getAllTransactions(db, { cardToken: 'pm_abc' }, 1, 20);
+    expect(db._find).toHaveBeenCalledWith(expect.objectContaining({ paymentCardReference: 'pm_abc' }));
+    expect(result.results).toHaveLength(1);
+    expect(result.total).toBe(1);
   });
 
-  it('returns empty results for unknown token', async () => {
+  it('matches a masked PAN on its own field, never on the token', async () => {
     const db = makeDb({ findResults: [] });
-    const result = await getTransactionsByCardToken(db, 'pm_unknown');
+    await getAllTransactions(db, { maskedPan: '****-****-****-4242' }, 1, 20);
+    const query = db._find.mock.calls[0][0];
+    expect(query).toEqual({ cardTransactionMaskedPanDisplay: '****-****-****-4242' });
+    expect(query).not.toHaveProperty('paymentCardReference');
+  });
+
+  it('returns an empty page for an unknown token', async () => {
+    const db = makeDb({ findResults: [] });
+    const result = await getAllTransactions(db, { cardToken: 'pm_unknown' }, 1, 20);
     expect(result.results).toHaveLength(0);
-    expect(result.count).toBe(0);
+    expect(result.total).toBe(0);
   });
 });

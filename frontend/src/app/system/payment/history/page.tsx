@@ -178,97 +178,82 @@ export default function TransactionHistoryPage() {
   useEffect(() => {
     const load = async () => {
       const t = getToken() ?? '';
-      const u = t ? decodeToken(t) : null;
 
-      const cardPromise = api.transactions.listAll({ email: u?.email, limit: 200 }, t).then(res =>
-        res.results.map((r) => {
-          const row = r as {
-            cardTransactionInstanceReference: string;
-            cardTransactionAmount: { amount: number; currency: string };
-            cardTransactionDateTime: string;
-            cardTransactionStatus: string;
-            cardTransactionType?: string;
-            cardTransactionMerchantName: string;
-            cardTransactionMerchantCategoryCode?: string;
-            cardTransactionChannel?: string;
-            cardTransactionMaskedPanDisplay: string;
-            cardTransactionDescription?: string;
-            fraudCaseCreated?: boolean;
-            fraudDiagnosisCaseStatus?: string | null;
-            fraudDiagnosisCaseReference?: string | null;
-          };
+      // v36 (ADR-063): ONE request. The collection returns every movement kind by default, already
+      // merged, RTP-de-duped and scoped to the caller, so the client re-implements none of it.
+      const res = await api.transactions
+        .list({ limit: 200 }, t)
+        .catch(() => ({ results: [] as Record<string, unknown>[], total: 0, page: 1, limit: 200 }));
+
+      const rows = (res.results as Array<{
+        kind: 'card' | 'transfer' | 'rtp';
+        paymentExecutionInstanceReference: string;
+        direction: 'sent' | 'received';
+        grossAmount?: number;
+        currency: string;
+        paymentExecutionStatus: string;
+        paymentExecutionRail: string | null;
+        concept: string | null;
+        beneficiaryName: string | null;
+        destinationAccountMasked: string | null;
+        initiatedAt: string | null;
+        completedAt: string | null;
+        merchantCategoryCode?: string | null;
+        channel?: string | null;
+        acceptanceMethod?: string | null;
+        transactionType?: string | null;
+        linkedPaymentExecutionReference?: string | null;
+        fraudCase?: { created: boolean; status?: string | null; reference?: string | null };
+      }>).map((r) => {
+        const base = {
+          id:        r.paymentExecutionInstanceReference,
+          createdAt: r.completedAt ?? r.initiatedAt ?? new Date().toISOString(),
+          amount:    r.grossAmount ?? 0,
+          currency:  r.currency,
+          status:    r.paymentExecutionStatus,
+          concept:   r.concept,
+        };
+        if (r.kind === 'card') {
           return {
-            id:                  row.cardTransactionInstanceReference,
+            ...base,
             category:            'card' as RowCategory,
-            createdAt:           row.cardTransactionDateTime,
-            amount:              row.cardTransactionAmount?.amount ?? 0,
-            currency:            row.cardTransactionAmount?.currency ?? 'USD',
-            status:              row.cardTransactionStatus,
-            merchant:            row.cardTransactionMerchantName,
-            mcc:                 row.cardTransactionMerchantCategoryCode ?? '',
-            channel:             row.cardTransactionChannel ?? '',
-            acceptanceMethod:    (row as { cardTransactionAcceptanceMethod?: string }).cardTransactionAcceptanceMethod ?? '',
-            cardTransactionType: row.cardTransactionType,
-            maskedPan:           row.cardTransactionMaskedPanDisplay,
-            concept:             row.cardTransactionDescription ?? null,
-            fraudCaseCreated:    !!row.fraudCaseCreated,
-            caseStatus:          row.fraudDiagnosisCaseStatus ?? undefined,
-            caseRef:             row.fraudDiagnosisCaseReference ?? undefined,
+            merchant:            r.beneficiaryName ?? '',
+            mcc:                 r.merchantCategoryCode ?? '',
+            channel:             r.channel ?? '',
+            acceptanceMethod:    r.acceptanceMethod ?? '',
+            cardTransactionType: r.transactionType ?? undefined,
+            maskedPan:           r.destinationAccountMasked ?? '',
+            fraudCaseCreated:    !!r.fraudCase?.created,
+            caseStatus:          r.fraudCase?.status ?? undefined,
+            caseRef:             r.fraudCase?.reference ?? undefined,
           } satisfies HistoryRow;
-        })
-      ).catch(() => [] as HistoryRow[]);
+        }
+        if (r.kind === 'rtp') {
+          return {
+            ...base,
+            category:           'rtp' as RowCategory,
+            // 'requested' = I am the payee (money coming to me); 'to_approve' = I must approve to pay.
+            rtpRole:            r.direction === 'received' ? 'requested' as const : 'to_approve' as const,
+            rtpRequestRef:      r.paymentExecutionInstanceReference,
+            linkedExecutionRef: r.linkedPaymentExecutionReference ?? undefined,
+            fraudCaseCreated:   !!r.fraudCase?.created,
+            caseStatus:         r.fraudCase?.status ?? undefined,
+            caseRef:            r.fraudCase?.reference ?? undefined,
+          } satisfies HistoryRow;
+        }
+        return {
+          ...base,
+          category:         'p2p' as RowCategory,
+          p2pDirection:     r.direction,
+          p2pRail:          r.paymentExecutionRail,
+          p2pNote:          r.concept,
+          fraudCaseCreated: !!r.fraudCase?.created,
+          caseStatus:       r.fraudCase?.status ?? undefined,
+          caseRef:          r.fraudCase?.reference ?? undefined,
+        } satisfies HistoryRow;
+      });
 
-      const p2pPromise = u?.partyRef
-        ? api.accounts.transfers(u.partyRef, t, { limit: 100 }).then(res =>
-            res.results.map((r) => ({
-              id:           r.paymentExecutionInstanceReference,
-              category:     'p2p' as RowCategory,
-              createdAt:    r.initiatedAt ?? r.completedAt ?? new Date().toISOString(),
-              amount:       r.grossAmount,
-              currency:     r.currency,
-              status:       r.paymentExecutionStatus,
-              p2pDirection: r.direction,
-              p2pRail:      r.paymentExecutionRail,
-              p2pNote:      r.paymentExecutionRemittanceInformation ?? r.routingNote,
-            } satisfies HistoryRow))
-          ).catch(() => [] as HistoryRow[])
-        : Promise.resolve([] as HistoryRow[]);
-
-      // RTP (Request to Pay): both what I requested (outbox) and what I must approve (inbox).
-      const rtpPromise = t
-        ? Promise.all([
-            api.rtp.list({ box: 'outbox' }, t).then(r => (r.results ?? []).map(x => ({ x, role: 'requested' as const }))).catch(() => []),
-            api.rtp.list({ box: 'inbox' }, t).then(r => (r.results ?? []).map(x => ({ x, role: 'to_approve' as const }))).catch(() => []),
-          ]).then(([out, inb]) => {
-            const seen = new Set<string>();
-            return [...out, ...inb].filter(({ x }) => {
-              if (seen.has(x.paymentRequestInstanceReference)) return false;
-              seen.add(x.paymentRequestInstanceReference); return true;
-            }).map(({ x, role }) => ({
-              id:            x.paymentRequestInstanceReference,
-              category:      'rtp' as RowCategory,
-              createdAt:     x.recordCreatedDateTime ?? new Date().toISOString(),
-              amount:        x.amount,
-              currency:      x.currency,
-              status:        x.status,
-              rtpRole:       role,
-              rtpRequestRef: x.paymentRequestInstanceReference,
-              linkedExecutionRef: x.linkedPaymentExecutionReference,
-              concept:       x.purpose ?? null,
-            } satisfies HistoryRow));
-          })
-        : Promise.resolve([] as HistoryRow[]);
-
-      const [cards, p2p, rtp] = await Promise.all([cardPromise, p2pPromise, rtpPromise]);
-      // Presentation-only de-dup (BIAN keeps the RTP intent and the execution as SEPARATE
-      // records): when an RTP has a linked execution, show ONLY the RTP row and hide that execution
-      // row so the same movement is not listed twice. The RTP detail links through to the execution.
-      const linkedExecRefs = new Set(rtp.map((r) => r.linkedExecutionRef).filter(Boolean) as string[]);
-      const p2pDeduped = p2p.filter((r) => !linkedExecRefs.has(r.id));
-      const merged = [...cards, ...p2pDeduped, ...rtp].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setRows(merged);
+      setRows(rows);
       setLoading(false);
     };
     load();

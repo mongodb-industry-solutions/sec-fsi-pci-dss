@@ -2635,3 +2635,51 @@ that the read-model could not resolve fails the suite instead of rendering an em
 **Model change.** Two optional plaintext fields on an existing plaintext collection
 (`transactionKind` widened, `paymentRequestInstanceReference` added). No QE field, DEK, index or
 collection change, so `setup/` needs nothing; the seed data ships with the change as required.
+
+### ADR-063: one movement collection, and the merge lives in one place (v36)
+
+**Status.** Accepted.
+
+**Context.** The v36 investigation work exposed three problems in the transaction read surface.
+(a) `GET /transactions/all` and `GET /transactions` were the same resource under two names, and the
+latter answered 400 without a `cardToken`, so a collection GET could not list. (b) The rule for "what
+is a row of movement history" (normalize card + execution + request, de-dup an RTP against the
+execution that settles it, sort by date) was implemented THREE times: in the merchant channel of the
+controller, in the customer history page and in the merchant app. (c) A transfer or RTP reference had
+no detail endpoint an analyst could reach, so the investigation UI had to render a dead reference.
+The `cardToken` filter also guessed by value shape whether it was a token or a masked PAN.
+
+**Decision.**
+
+1. **One collection.** `GET /api/v1/transactions` lists every movement kind by default as
+   `kind`-discriminated rows (`card`, `transfer`, `rtp`), with `kind` as a narrowing filter. Listing is
+   the collection's job; narrowing is what filters are for. `GET /transactions/all` is DELETED, not
+   deprecated: the only callers were internal.
+2. **One merge.** `gateway/services/paymentMovement.service.ts` owns normalization, the RTP de-dup and
+   the paging. The merchant channel and the staff/session channel both consume it, and the customer
+   history page dropped its client-side merge for a single request.
+3. **Explicit filters.** `cardToken` and `maskedPan` are separate parameters. The value-shape heuristic
+   is gone: a token that happened to look like a masked PAN queried the wrong field.
+4. **Every reference resolves.** `GET /transactions/:id` falls through to the movement read-model, so a
+   transfer or an RTP reference returns its movement document instead of 404. The investigation UI can
+   therefore always offer the link.
+5. **Merge in memory, not `$unionWith`.** `cardTransactionLog` is QE-enabled and aggregation stages are
+   restricted over encrypted collections.
+
+**Compatibility.** The one external consumer (leafy-wallet) calls `GET /transactions` with no params on
+the merchant OAuth channel, which is unchanged: same rows, same envelope, same field names, and no RTP
+rows added to a merchant-isolated view (RTP carries no merchant attribution, and those clients fetch it
+themselves). A unit test asserts the consumer's exact field reads. Internal callers were migrated in
+the same change. `movementScope`, an earlier compatibility flag, was dropped as unnecessary once the
+consumer inventory was confirmed: the parameter only affected the session/staff channel, which no
+external system uses.
+
+**Deliberately flow-agnostic.** A row is derived from the STORED record, never from the choreography
+that produced it, and each kind has its own normalizer. A future DB-driven payment-workflow
+orchestrator can add kinds or change the sequence of events for a process without touching this read
+surface: add a normalizer, not a branch in a caller.
+
+**Consequences.** One endpoint, one merge, one place to change a row. The staff card list, the card
+detail and the dashboard stat pin themselves to `kind=card` to keep the card document shape. Response
+schemas gained the movement fields as additive optional properties (they are strict, so an undeclared
+field would be stripped). No collection, index, DEK or seed change.

@@ -7,6 +7,9 @@ import { getByInstanceReference } from '../../customer/services/customerAgreemen
 import { getMerchantById } from '../../gateway/services/merchant.service';
 import { listProcessEvents } from '../../provider/services/businessProcessEvent.service';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../gateway/models/paymentExecution.model';
+import { PAYOUT_ACCOUNT_COLLECTION } from '../../gateway/models/payoutAccount.model';
+import { PARTY_COLLECTION } from '../../identity/models/party.model';
+import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../gateway/models/paymentRequest.model';
 import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
 
@@ -48,16 +51,29 @@ async function buildHrp(db: Db, accountRef: string | undefined) {
 // Counterparty of a non-card movement: the destination the investigator needs to judge the transfer.
 // The PSP owns this data (a registered beneficiary or an RTP payee), so it is available to L1 as well.
 // Minimisation (ADR-048): the label, the masked account, the country and the refs, never the full IBAN.
-async function buildCounterparty(db: Db, exec: Record<string, unknown> | null, request: Record<string, unknown> | null) {
+async function buildCounterparty(
+  db: Db,
+  exec: Record<string, unknown> | null,
+  request: Record<string, unknown> | null,
+  role: UserRole,
+) {
   if (request) {
+    const partyRef = request.requesterPartyReference as string | undefined;
+    // paymentRequestProcedure.payeeName is QE:none and restricted to L2 / auditor: the read client
+    // decrypts it, so it must be withheld here rather than merely not displayed.
+    const canSeePayee = role === 'level2_investigator' || role === 'security_auditor';
+    const party = await buildParty(db, partyRef, canSeePayee);
     return {
       kind: 'payee' as const,
-      label: (request.payeeName as string) ?? null,
+      label: canSeePayee ? ((request.payeeName as string) ?? null) : null,
+      labelRestricted: !canSeePayee,
       accountMasked: null,
       countryCode: null,
-      partyReference: (request.requesterPartyReference as string) ?? null,
+      partyReference: partyRef ?? null,
       arrangementReference: null,
       accountReference: (request.payeeReceivingAccountReference as string) ?? null,
+      ownerParty: party,
+      account: await buildAccountSummary(db, request.payeeReceivingAccountReference as string | undefined, canSeePayee),
     };
   }
   if (!exec) return null;
@@ -68,6 +84,8 @@ async function buildCounterparty(db: Db, exec: Record<string, unknown> | null, r
         .findOne({ counterpartyArrangementReference: arrangementRef })
         .catch(() => null)
     : null;
+  // The beneficiary record names the resolved party; fall back to the execution's own link.
+  const partyRef = arrangement?.counterpartyPartyReference ?? (exec.beneficiaryPartyReference as string | undefined);
 
   return {
     kind: (arrangement ? 'beneficiary' : 'external_account') as 'beneficiary' | 'external_account',
@@ -75,9 +93,66 @@ async function buildCounterparty(db: Db, exec: Record<string, unknown> | null, r
     // Masked at store time (beneficiary hint) or masked at initiation (external account).
     accountMasked: arrangement?.counterpartyLookupHint ?? (exec.destinationAccountMasked as string) ?? null,
     countryCode: (exec.destinationCountry as string) ?? null,
-    partyReference: (exec.beneficiaryPartyReference as string) ?? null,
+    partyReference: partyRef ?? null,
     arrangementReference: arrangementRef ?? null,
     accountReference: (exec.resolvedPayoutAccountReference as string) ?? null,
+    labelRestricted: false,
+    lookupHint: arrangement?.counterpartyLookupHint ?? null,
+    lookupType: arrangement?.counterpartyLookupType ?? null,
+    status: arrangement?.counterpartyArrangementStatus ?? null,
+    registeredAt: arrangement?.recordCreatedDateTime ?? null,
+    // Who is behind the beneficiary, and which account received the money: the two questions an
+    // investigator asks next. Plaintext identity + account metadata only (no IBAN, which is QE:none).
+    ownerParty: await buildParty(db, partyRef),
+    account: await buildAccountSummary(db, exec.resolvedPayoutAccountReference as string | undefined),
+  };
+}
+
+// Party behind a reference, with the agreement id so the client can open the customer record
+// (customers:view). partyName is plaintext by design; email/phone are QE and are NOT read here.
+async function buildParty(db: Db, partyRef?: string, includeName = true) {
+  if (!partyRef) return null;
+  const party = await db.collection(PARTY_COLLECTION)
+    .findOne({ partyInstanceReference: partyRef }, { projection: { _id: 0, partyInstanceReference: 1, partyName: 1, partyType: 1 } })
+    .catch(() => null);
+  if (!party) return null;
+  const agreement = await db.collection(CUSTOMER_AGREEMENT_COLLECTION)
+    .findOne({ partyInstanceReference: partyRef }, { projection: { _id: 0, customerAgreementInstanceReference: 1 } })
+    .catch(() => null);
+  return {
+    reference: partyRef,
+    name: includeName ? ((party as { partyName?: string }).partyName ?? null) : null,
+    type: (party as { partyType?: string }).partyType ?? null,
+    customerAgreementInstanceReference: (agreement as { customerAgreementInstanceReference?: string } | null)?.customerAgreementInstanceReference ?? null,
+  };
+}
+
+// Account metadata + balance: the balance is what shows an investigator that the money is held and
+// not delivered. The IBAN / routing number are QE:none and deliberately not read on this surface.
+async function buildAccountSummary(db: Db, accountRef?: string, includeHolder = true) {
+  if (!accountRef) return null;
+  const acct = await db.collection(PAYOUT_ACCOUNT_COLLECTION).findOne(
+    { payoutAccountInstanceReference: accountRef },
+    { projection: {
+      _id: 0, payoutAccountInstanceReference: 1, payoutAccountAlias: 1, payoutAccountBankName: 1,
+      payoutAccountHolderName: 1, payoutAccountCurrency: 1, payoutAccountCountryCode: 1,
+      payoutAccountType: 1, payoutAccountStatus: 1, payoutAccountBalance: 1, partyInstanceReference: 1,
+    } },
+  ).catch(() => null);
+  if (!acct) return null;
+  const a = acct as Record<string, unknown>;
+  const balance = (a.payoutAccountBalance ?? {}) as { availableAmount?: number; pendingAmount?: number };
+  return {
+    reference: accountRef,
+    alias: (a.payoutAccountAlias as string) ?? null,
+    bankName: (a.payoutAccountBankName as string) ?? null,
+    holderName: includeHolder ? ((a.payoutAccountHolderName as string) ?? null) : null,
+    currency: (a.payoutAccountCurrency as string) ?? null,
+    countryCode: (a.payoutAccountCountryCode as string) ?? null,
+    type: (a.payoutAccountType as string) ?? null,
+    status: (a.payoutAccountStatus as string) ?? null,
+    partyReference: (a.partyInstanceReference as string) ?? null,
+    balance: { available: balance.availableAmount ?? null, pending: balance.pendingAmount ?? null },
   };
 }
 
@@ -182,7 +257,13 @@ export async function getCaseEnrichment(
       : request ? 'rtp' : 'card';
 
   const operation = cardOperation ?? executionOperation(resolvedKind, execution, request);
-  const counterparty = cardOperation ? null : await buildCounterparty(db, execution, request).catch(() => null);
+  const counterparty = cardOperation ? null : await buildCounterparty(db, execution, request, role).catch(() => null);
+  // Payer side of a non-card movement: the account the funds are held on.
+  const sourceAccount = cardOperation ? null : await buildAccountSummary(
+    db,
+    (execution as { sourcePayoutAccountReference?: string } | null)?.sourcePayoutAccountReference
+      ?? (request as { payerFundingAccountReference?: string } | null)?.payerFundingAccountReference,
+  ).catch(() => null);
 
   // ── SDF: score + indicators + fraud_evaluation event history ───────────────
   const assessment = fraudCase.fraudDiagnosisAssessment ?? { riskIndicators: [], fraudDiagnosisScore: undefined };
@@ -243,6 +324,7 @@ export async function getCaseEnrichment(
     operation,
     // Set for a non-card movement; the client renders it in place of the merchant/KYB panel.
     counterparty,
+    sourceAccount,
     sdf,
     hrp,
     kyc,

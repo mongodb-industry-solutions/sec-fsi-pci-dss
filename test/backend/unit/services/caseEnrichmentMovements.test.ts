@@ -38,19 +38,41 @@ const heldExecution = {
   resolutionLog: [{ stepName: 'risk.hold', stepOutcome: 'fallback', stepDateTime: new Date() }],
 };
 
-// Only the collections the read-model reads for a non-card case.
-function db(docs: { execution?: unknown; request?: unknown; arrangement?: unknown }): Db {
+// Only the collections the read-model reads for a non-card case. `account` answers for every account
+// lookup (source and destination), which is enough to assert the shape.
+function db(docs: { execution?: unknown; request?: unknown; arrangement?: unknown; party?: unknown; agreement?: unknown; account?: unknown }): Db {
   return {
     collection: (name: string) => ({
       findOne: vi.fn(async () => {
         if (name === 'paymentExecutionProcedure') return docs.execution ?? null;
         if (name === 'paymentRequestProcedure') return docs.request ?? null;
         if (name === 'counterpartyArrangement') return docs.arrangement ?? null;
+        if (name === 'party') return docs.party ?? null;
+        if (name === 'customerAgreementProcedure') return docs.agreement ?? null;
+        if (name === 'payoutAccountArrangement') return docs.account ?? null;
         return null;
       }),
     }),
   } as unknown as Db;
 }
+
+const ARRANGEMENT = {
+  counterpartyArrangementReference: 'cab-1', counterpartyLabel: 'Carlos (savings)',
+  counterpartyLookupHint: '+34 6** *** 789', counterpartyLookupType: 'phone',
+  counterpartyPartyReference: 'party-2', counterpartyArrangementStatus: 'active',
+  recordCreatedDateTime: new Date('2026-05-01T00:00:00Z'),
+};
+const PARTY = { partyInstanceReference: 'party-2', partyName: 'Carlos Ruiz', partyType: 'individual' };
+const AGREEMENT = { customerAgreementInstanceReference: 'agr-2' };
+const ACCOUNT = {
+  payoutAccountInstanceReference: 'acc-dest', payoutAccountAlias: 'Main',
+  payoutAccountBankName: 'Banco Uno', payoutAccountHolderName: 'Carlos Ruiz',
+  payoutAccountCurrency: 'EUR', payoutAccountCountryCode: 'ES',
+  payoutAccountType: 'internal_ledger', payoutAccountStatus: 'active',
+  partyInstanceReference: 'party-2',
+  payoutAccountBalance: { availableAmount: 300, pendingAmount: 1450 },
+  payoutAccountIban: 'ES9121000418450200051332',
+};
 
 const caseDoc = (over: Record<string, unknown>) => ({
   fraudDiagnosisInstanceReference: 'case-1',
@@ -107,7 +129,8 @@ describe('an RTP case resolves the payee from the request', () => {
       payeeName: 'Ana Ruiz', payeeReceivingAccountReference: 'acc-payee', requesterPartyReference: 'party-3',
       purpose: 'Shared rent', recordCreatedDateTime: new Date('2026-07-09T10:00:00Z'),
     };
-    const out = await getCaseEnrichment(db({ request }), 'case-1', 'level1_analyst');
+    // The payee name is L2-only (QE:none), so read it as L2 here; L1's redaction is asserted below.
+    const out = await getCaseEnrichment(db({ request }), 'case-1', 'level2_investigator');
     expect(out!.operation).toMatchObject({ kind: 'rtp', type: 'request_to_pay', status: 'accepted', heldForReview: true });
     expect(out!.counterparty).toMatchObject({ kind: 'payee', label: 'Ana Ruiz', accountReference: 'acc-payee' });
   });
@@ -156,5 +179,84 @@ describe('an unstamped (legacy) case is resolved by lookup', () => {
     expect(out!.transactionKind).toBe('card');
     expect(out!.operation).toBeNull();
     expect(out!.counterparty).toBeNull();
+  });
+});
+
+// A real investigation needs the identity behind the beneficiary and both accounts, not just a label.
+describe('the counterparty carries the owner and the accounts', () => {
+  beforeEach(() => { h.getTransactionById.mockResolvedValue(null); });
+
+  it('resolves the owner party and the agreement id for the drill-down', async () => {
+    h.getCaseById.mockResolvedValue(caseDoc({ transactionKind: 'p2p', paymentExecutionInstanceReference: EXEC }));
+    const out = await getCaseEnrichment(db({ execution: heldExecution, arrangement: ARRANGEMENT, party: PARTY, agreement: AGREEMENT, account: ACCOUNT }), 'case-1', 'level1_analyst');
+    const cp = out!.counterparty as Record<string, unknown>;
+    expect(cp.ownerParty).toMatchObject({ reference: 'party-2', name: 'Carlos Ruiz', type: 'individual', customerAgreementInstanceReference: 'agr-2' });
+    expect(cp.lookupType).toBe('phone');
+    expect(cp.status).toBe('active');
+  });
+
+  it('summarises the receiving account and the payer account, with the held amount', async () => {
+    h.getCaseById.mockResolvedValue(caseDoc({ transactionKind: 'p2p', paymentExecutionInstanceReference: EXEC }));
+    const out = await getCaseEnrichment(db({ execution: heldExecution, arrangement: ARRANGEMENT, party: PARTY, agreement: AGREEMENT, account: ACCOUNT }), 'case-1', 'level1_analyst');
+    const cp = out!.counterparty as { account?: Record<string, unknown> };
+    expect(cp.account).toMatchObject({ reference: 'acc-dest', holderName: 'Carlos Ruiz', bankName: 'Banco Uno', currency: 'EUR', status: 'active' });
+    expect(out!.sourceAccount).toMatchObject({ balance: { available: 300, pending: 1450 } });
+  });
+
+  it('never exposes the account IBAN on this surface (it is QE:none)', async () => {
+    h.getCaseById.mockResolvedValue(caseDoc({ transactionKind: 'p2p', paymentExecutionInstanceReference: EXEC }));
+    const out = await getCaseEnrichment(db({ execution: heldExecution, arrangement: ARRANGEMENT, party: PARTY, agreement: AGREEMENT, account: ACCOUNT }), 'case-1', 'level1_analyst');
+    expect(JSON.stringify(out)).not.toContain('ES9121000418450200051332');
+    expect(JSON.stringify(out)).not.toContain('payoutAccountIban');
+  });
+
+  it('a card case gets no source account block', async () => {
+    h.getCaseById.mockResolvedValue(caseDoc({ cardTransactionInstanceReference: 'txn-1' }));
+    h.getTransactionById.mockResolvedValue({
+      cardTransactionInstanceReference: 'txn-1', cardTransactionStatus: 'authorized',
+      cardTransactionMerchantName: 'Coffee Ltd', cardTransactionAmount: { amount: 30, currency: 'EUR' },
+      cardTransactionDateTime: new Date(),
+    } as never);
+    const out = await getCaseEnrichment(db({ account: ACCOUNT }), 'case-1', 'level1_analyst');
+    expect(out!.sourceAccount).toBeNull();
+  });
+});
+
+// paymentRequestProcedure.payeeName is QE:none and L2-only. The read client decrypts it, so the
+// read-model must withhold it, not merely leave it unrendered.
+describe('the RTP payee name stays restricted to L2 / auditor', () => {
+  const request = {
+    paymentRequestInstanceReference: REQ, status: 'accepted', amount: 90, currency: 'EUR',
+    payeeName: 'Ana Ruiz', payeeReceivingAccountReference: 'acc-payee', requesterPartyReference: 'party-3',
+    recordCreatedDateTime: new Date(),
+  };
+  const rtpCase = () => caseDoc({ transactionKind: 'rtp', cardTransactionInstanceReference: REQ, paymentRequestInstanceReference: REQ });
+
+  beforeEach(() => { h.getTransactionById.mockResolvedValue(null); });
+
+  it('withholds the payee name (and the account holder) from L1', async () => {
+    h.getCaseById.mockResolvedValue(rtpCase());
+    const out = await getCaseEnrichment(db({ request, party: PARTY, agreement: AGREEMENT, account: ACCOUNT }), 'case-1', 'level1_analyst');
+    const cp = out!.counterparty as Record<string, unknown>;
+    expect(cp.label).toBeNull();
+    expect(cp.labelRestricted).toBe(true);
+    expect(JSON.stringify(out)).not.toContain('Ana Ruiz');
+    expect((cp.account as { holderName?: string }).holderName).toBeNull();
+  });
+
+  it('returns it to L2 and to the auditor', async () => {
+    for (const role of ['level2_investigator', 'security_auditor'] as const) {
+      h.getCaseById.mockResolvedValue(rtpCase());
+      const out = await getCaseEnrichment(db({ request, party: PARTY, agreement: AGREEMENT, account: ACCOUNT }), 'case-1', role);
+      expect((out!.counterparty as Record<string, unknown>).label, role).toBe('Ana Ruiz');
+      expect((out!.counterparty as Record<string, unknown>).labelRestricted, role).toBe(false);
+    }
+  });
+
+  it('a beneficiary label is plaintext by design and stays visible to L1', async () => {
+    h.getCaseById.mockResolvedValue(caseDoc({ transactionKind: 'p2p', paymentExecutionInstanceReference: EXEC }));
+    const out = await getCaseEnrichment(db({ execution: heldExecution, arrangement: ARRANGEMENT, party: PARTY, agreement: AGREEMENT, account: ACCOUNT }), 'case-1', 'level1_analyst');
+    expect((out!.counterparty as Record<string, unknown>).label).toBe('Carlos (savings)');
+    expect((out!.counterparty as Record<string, unknown>).labelRestricted).toBe(false);
   });
 });

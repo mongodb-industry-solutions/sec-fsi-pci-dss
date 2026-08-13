@@ -117,6 +117,18 @@ test.describe('case detail for a non-card movement', () => {
     counterparty: {
       kind: 'beneficiary', label: 'Carlos (savings)', accountMasked: '+34 6** *** 789',
       countryCode: 'ES', partyReference: 'party-2', arrangementReference: 'cab-1', accountReference: 'acc-dest',
+      lookupType: 'phone', status: 'active', registeredAt: '2026-05-01T00:00:00Z',
+      ownerParty: { reference: 'party-2', name: 'Carlos Ruiz', type: 'individual', customerAgreementInstanceReference: 'agr-2' },
+      account: {
+        reference: 'acc-dest', alias: 'Main', bankName: 'Banco Uno', holderName: 'Carlos Ruiz',
+        currency: 'EUR', countryCode: 'ES', type: 'internal_ledger', status: 'active',
+        partyReference: 'party-2', balance: { available: 300, pending: 0 },
+      },
+    },
+    sourceAccount: {
+      reference: 'acc-sender', alias: 'Payroll', bankName: 'Banco Dos', holderName: 'Luis Fernandez',
+      currency: 'EUR', countryCode: 'ES', type: 'internal_ledger', status: 'active',
+      partyReference: 'party-1', balance: { available: 500, pending: 1450 },
     },
     sdf: { score: 78, scorePending: false, indicators: ['fds.high.risk'], conclusion: null, events: [] },
     hrp: { available: false }, kyc: null, kyb: null,
@@ -149,7 +161,7 @@ test.describe('case detail for a non-card movement', () => {
     await expect(page.getByRole('heading', { name: 'Beneficiary' })).toBeVisible();
     await expect(page.getByText('Carlos (savings)').first()).toBeVisible();
     await expect(page.getByText('+34 6** *** 789')).toBeVisible();
-    await expect(page.getByText(/Saved beneficiary of this customer/i)).toBeVisible();
+    await expect(page.getByText(/Saved beneficiary since/i)).toBeVisible();
 
     // The merchant/KYB panel is gone: there is no acquired merchant in a transfer.
     await expect(page.getByRole('heading', { name: /^Merchant/ })).toHaveCount(0);
@@ -162,6 +174,16 @@ test.describe('case detail for a non-card movement', () => {
     // The header names the destination, never a merchant.
     await expect(page.getByText('Destination:').first()).toBeVisible();
     await expect(page.getByText('Merchant:')).toHaveCount(0);
+
+    // The identity behind the beneficiary and both accounts: what a real investigation needs.
+    await expect(page.getByText('Carlos Ruiz').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /Open owner record/i })).toHaveAttribute('href', /\/system\/users\/agr-2/);
+    await expect(page.getByText('Receiving account')).toBeVisible();
+    await expect(page.getByText('Banco Uno')).toBeVisible();
+    await expect(page.getByText('Source account')).toBeVisible();
+    await expect(page.getByText('On hold:')).toBeVisible();
+    // The account drill-down needs accounts:view, which L1 does not hold.
+    await expect(page.getByRole('link', { name: /Open account/i })).toHaveCount(0);
 
     // The plain-language indicators, not the raw gate ids.
     await expect(page.getByText(/Fraud risk detected/i).first()).toBeVisible();

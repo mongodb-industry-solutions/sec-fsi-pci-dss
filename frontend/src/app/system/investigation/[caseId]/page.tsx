@@ -273,13 +273,12 @@ export default function DemoCaseDetailPage() {
         .format(snap.cardTransactionAmount.amount)
     : null;
 
-  // Movement kind comes from the enrichment read-model (the case document response schema is strict and
-  // does not carry the discriminator). It resolves the kind even for a case opened before ADR-062.
-  const movementKind = enrichment?.transactionKind ?? enrichment?.operation?.kind ?? 'card';
+  // Movement kind: the case document carries it (v36 P6), with the enrichment read-model as the
+  // fallback, which also resolves the kind for a case opened before ADR-062.
+  const movementKind = fraudCase.transactionKind ?? enrichment?.transactionKind ?? enrichment?.operation?.kind ?? 'card';
   const isCardMovement = movementKind === 'card';
-  // Only a card payment has a staff-readable detail route. A transfer / RTP execution is reachable
-  // only through account-scoped endpoints an analyst has no permission for, so its reference renders as
-  // text and the movement itself is shown in the panels below (never a link that 404s or 403s).
+  // v36 (ADR-063): every movement reference resolves on the staff transaction route, whatever its
+  // kind, so the link is always offered.
   const operationHref = (ref: string) =>
     `/system/transactions/${ref}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`;
 
@@ -333,19 +332,13 @@ export default function DemoCaseDetailPage() {
                 {fraudCase.cardTransactionInstanceReference && (
                   <>
                     <span className="text-gray-500">{isCardMovement ? 'Transaction ID:' : 'Operation ID:'}</span>
-                    {isCardMovement ? (
-                      <Link
-                        href={operationHref(fraudCase.cardTransactionInstanceReference)}
-                        className="font-mono text-xs text-blue-600 hover:underline break-all"
-                        title="Open the associated transaction"
-                      >
-                        {fraudCase.cardTransactionInstanceReference}
-                      </Link>
-                    ) : (
-                      <span className="font-mono text-xs text-gray-600 break-all" title="Payment execution reference">
-                        {fraudCase.cardTransactionInstanceReference}
-                      </span>
-                    )}
+                    <Link
+                      href={operationHref(fraudCase.cardTransactionInstanceReference)}
+                      className="font-mono text-xs text-blue-600 hover:underline break-all"
+                      title="Open the associated movement"
+                    >
+                      {fraudCase.cardTransactionInstanceReference}
+                    </Link>
                   </>
                 )}
               </div>
@@ -409,12 +402,10 @@ export default function DemoCaseDetailPage() {
                   <CreditCard size={15} className="text-[#001E2B]" />
                   <h2 className="font-semibold text-sm">Operation</h2>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{MOVEMENT_LABEL[kind] ?? kind}</span>
-                  {isCard && (
-                    <Link href={operationHref(enrichment.operation.transactionId)}
-                      className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
-                      Open transaction <ChevronRight size={12} />
-                    </Link>
-                  )}
+                  <Link href={operationHref(enrichment.operation.transactionId)}
+                    className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                    Open movement <ChevronRight size={12} />
+                  </Link>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[#001E2B] text-[#00ED64] capitalize">{enrichment.operation.type.replace(/_/g, ' ')}</span>
@@ -485,23 +476,80 @@ export default function DemoCaseDetailPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <Users size={15} className="text-[#001E2B]" />
                   <h2 className="font-semibold text-sm">{cp ? CP_LABEL[cp.kind] : 'Destination'}</h2>
-                  {cp?.arrangementReference && (
-                    <Link href={`/system/beneficiaries?ref=${cp.arrangementReference}&from=investigation&caseId=${caseId}`}
+                  {/* Who the beneficiary really is: the owner record, reachable with customers:view. */}
+                  {cp?.ownerParty?.customerAgreementInstanceReference && (
+                    <Link href={`/system/users/${cp.ownerParty.customerAgreementInstanceReference}?from=investigation&caseId=${caseId}`}
                       className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
-                      Open beneficiary <ChevronRight size={12} />
+                      Open owner record <ChevronRight size={12} />
                     </Link>
                   )}
                 </div>
                 {cp ? (
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                    <span className="text-gray-500">Name:</span>
-                    <span className="font-medium truncate">{cp.label ?? '-'}</span>
-                    <span className="text-gray-500">Account:</span>
-                    <span className="font-mono text-xs">{cp.accountMasked ?? '-'}</span>
-                    <span className="text-gray-500">Country:</span>
-                    <span className="font-mono text-xs">{cp.countryCode ?? '-'}</span>
-                    <span className="text-gray-500">Registered:</span>
-                    <span>{cp.kind === 'beneficiary' ? 'Saved beneficiary of this customer' : cp.kind === 'payee' ? 'Payee of the payment request' : 'Entered at initiation'}</span>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                      <span className="text-gray-500">Label:</span>
+                      <span className="font-medium truncate">
+                        {cp.label ?? (cp.labelRestricted ? <span className="text-gray-400 italic">Restricted (requires L2 access)</span> : '-')}
+                      </span>
+                      <span className="text-gray-500">Owner:</span>
+                      <span className="font-medium truncate">{cp.ownerParty?.name ?? '-'}{cp.ownerParty?.type ? ` (${cp.ownerParty.type})` : ''}</span>
+                      <span className="text-gray-500">Contact hint:</span>
+                      <span className="font-mono text-xs">{cp.accountMasked ?? '-'}</span>
+                      <span className="text-gray-500">Registered:</span>
+                      <span>{cp.kind === 'beneficiary' ? `Saved beneficiary${cp.registeredAt ? ` since ${new Date(cp.registeredAt).toLocaleDateString()}` : ''}` : cp.kind === 'payee' ? 'Payee of the payment request' : 'Entered at initiation'}</span>
+                      {cp.status && (<><span className="text-gray-500">Status:</span><span className="capitalize">{cp.status}</span></>)}
+                    </div>
+
+                    {/* Receiving account: where the money would land. Deep account drill-down needs
+                        accounts:view, so the link is only offered to the roles that hold it. */}
+                    {cp.account && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="text-xs font-semibold text-gray-600 uppercase">Receiving account</p>
+                          {canSeeAll && (
+                            <Link href={`/system/accounts/${cp.account.reference}?from=investigation&caseId=${caseId}`}
+                              className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                              Open account <ChevronRight size={12} />
+                            </Link>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                          <span className="text-gray-500">Holder:</span>
+                          <span className="truncate">{cp.account.holderName ?? cp.ownerParty?.name ?? '-'}</span>
+                          <span className="text-gray-500">Bank:</span>
+                          <span className="truncate">{cp.account.bankName ?? cp.account.alias ?? '-'}</span>
+                          <span className="text-gray-500">Currency / country:</span>
+                          <span className="font-mono text-xs">{cp.account.currency ?? '-'} / {cp.account.countryCode ?? cp.countryCode ?? '-'}</span>
+                          <span className="text-gray-500">Status:</span>
+                          <span className="capitalize">{cp.account.status ?? '-'}</span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Payer side: the balance shows the amount sitting on hold, not delivered. */}
+                    {enrichment.sourceAccount && (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <p className="text-xs font-semibold text-gray-600 uppercase">Source account</p>
+                          {canSeeAll && (
+                            <Link href={`/system/accounts/${enrichment.sourceAccount.reference}?from=investigation&caseId=${caseId}`}
+                              className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                              Open account <ChevronRight size={12} />
+                            </Link>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                          <span className="text-gray-500">Holder:</span>
+                          <span className="truncate">{enrichment.sourceAccount.holderName ?? '-'}</span>
+                          <span className="text-gray-500">Bank:</span>
+                          <span className="truncate">{enrichment.sourceAccount.bankName ?? enrichment.sourceAccount.alias ?? '-'}</span>
+                          <span className="text-gray-500">Available:</span>
+                          <span className="font-mono text-xs">{enrichment.sourceAccount.balance.available ?? '-'} {enrichment.sourceAccount.currency ?? ''}</span>
+                          <span className="text-gray-500">On hold:</span>
+                          <span className="font-mono text-xs text-amber-700">{enrichment.sourceAccount.balance.pending ?? '-'} {enrichment.sourceAccount.currency ?? ''}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-gray-400">The destination of this movement is not available yet.</p>

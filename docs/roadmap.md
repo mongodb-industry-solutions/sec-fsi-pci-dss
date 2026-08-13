@@ -1103,3 +1103,39 @@ ISO 20022 pain.013 serialization, CPM merchant-scans-consumer flow (deferred, ne
 - [ ] E2E: a QR renders on all three consumers (RTP page, request page, `RequestMoneyModal`) and `encodedPayload` survives the response schema; a `sepa_epc` QR on a seeded RTP request renders a valid EPC payload.
 
 *Added 2026-08-05 (v35).*
+
+## v36: Risk hold across every movement + unified movement API
+
+A risk signal (fraud, sanctions, AML) no longer rejects a payment: it holds it, opens an investigation
+and waits for L1/L2. The investigation UI works for every movement kind, and the transaction read
+surface becomes one collection with one merge.
+
+| FR | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v36-01 | A fraud verdict holds a card payment, never declines it | `fds.scoring.completed` always carries `outcome: 'approved'` with the verdict; a `review`/`decline` recommendation authorizes the payment, withholds the payout (no execution, no ledger movement) and opens a case for L1 |
+| FR-v36-02 | A sanctions match holds and opens a case | `hrp.screening.completed` carries `sanctionsMatch` and completes approved; the saga merges it into the risk verdict (`review`, score floored at 90, `rulesFired += sanctions_match`) so the case is opened and the payment never completes without an explicit resolution |
+| FR-v36-03 | An AML alert is supervised | an AML-only alert opens a case; a payout still `routing`/`scheduled` is recalled and withheld; once handed to the rail it is not recallable and that is recorded as `payout.recall.not.possible` |
+| FR-v36-04 | A transfer is held, not rejected | bank/P2P: sender funds held, execution in `pending` + `risk.hold` step, nothing dispatched; the route answers 202 `status: 'pending'` with `holdReason`; any AML severity holds |
+| FR-v36-05 | The investigation outcome closes the movement | `fraud.case.resolved` → `cleared` releases the withheld payout / submits the held transfer; `confirmed_fraud` returns the hold and declines (card) or reverses (transfer); only a still-held movement is actionable |
+| FR-v36-06 | A held RTP approval follows the investigation | funds held, execution `pending` + `risk.hold` linked to the request, request stays `accepted`; released → `payment_initiated`, reversed → `payment_failed`; VoP mismatch keeps rejecting |
+| FR-v36-07 | The case detail supports every movement kind | `transactionKind` + execution/request link on the case; the read-model resolves the operation, the counterparty (beneficiary / external account / payee) with the owner party and both accounts, and infers the kind for cases opened before ADR-062; no merchant panel on a non-card movement |
+| FR-v36-08 | Restricted identity stays restricted | the RTP `payeeName` (QE:none) and the payee account holder are withheld from L1 with `labelRestricted: true`; account IBAN / routing number never reach this surface; the account drill-down link is offered only with `accounts:view` |
+| FR-v36-09 | One movement collection | `GET /transactions` returns every kind by default as `kind`-discriminated rows, `kind` narrows, filters `status`/`merchant`/`cardToken`/`maskedPan`/`email`/`transactionId`, single `{results,total,page,limit}` envelope; `/transactions/all` removed; `GET /transactions/:id` resolves any kind |
+| FR-v36-10 | The merge exists once | `gateway/services/paymentMovement.service.ts` owns normalization, RTP de-dup and paging; the merchant channel and the staff/session channel consume it; the customer history page issues one request and no longer merges |
+| FR-v36-11 | The external consumer is unaffected | leafy-wallet's merchant-OAuth call keeps its rows, envelope and field names; no RTP rows are added to a merchant-isolated view; a unit test asserts the consumer's exact field reads |
+| FR-v36-12 | Gate indicators read as plain language | `formatRiskIndicator` translates `fds.*`, `hrp.*`, `aml.*`, `vop.*` and the engine rule ids; the transaction detail uses the formatter |
+
+### Definition of Done
+
+- [x] `test:unit` green (82 files / 764 cases at close), including `paymentMovement.test.ts` (22),
+      `caseEnrichmentMovements.test.ts` (18), `riskHoldParity.test.ts` (9), `transferRiskHold.test.ts` (11)
+      and `payoutInvestigationHold.test.ts` (8).
+- [x] `npx playwright test --project=chromium` green (110 specs).
+- [x] Backend and frontend type-checks clean.
+- [x] ADR-059..063 recorded in `engineering-proposal.md`; `technical-spec.md` updated (gate policy, hold
+      lifecycle, case discriminator, movement collection).
+- [x] **No schema change**: two optional plaintext fields on `fraudDiagnosisCase` and one additive RTP
+      state-machine transition. No collection, index, DEK or QE map change → no `--reset`. Seed gains a
+      held beneficiary transfer + its `p2p` case so the non-card investigation path is demonstrable.
+
+*Added 2026-08-13 (v36).*

@@ -114,13 +114,29 @@ test.describe('FR-v1-01/03: new payment wizard', () => {
 });
 
 test.describe('FR-v1-01: payment history', () => {
+  // v36 (ADR-063): the history reads the canonical collection, which returns normalized movement rows
+  // for every kind. `/transactions/all` is gone.
   test('customer sees their transaction history', async ({ page, context }) => {
-    await page.route('**/api/v1/transactions/all**', (r) => r.fulfill(json({ page: 1, limit: 100, total: 1, results: [
-      { cardTransactionInstanceReference: 'txn-h1', cardTransactionAmount: { amount: 42.5, currency: 'USD' }, cardTransactionDateTime: '2026-06-01T10:00:00Z', cardTransactionStatus: 'authorized', cardTransactionMerchantName: 'TechGadgets Ltd.', cardTransactionMaskedPanDisplay: '****-****-****-4242', cardTransactionChannel: 'online' },
+    await page.route('**/api/v1/transactions?**', (r) => r.fulfill(json({ page: 1, limit: 200, total: 2, results: [
+      {
+        kind: 'card', paymentExecutionInstanceReference: 'txn-h1', direction: 'sent',
+        grossAmount: 42.5, currency: 'USD', paymentExecutionStatus: 'authorized', paymentExecutionRail: 'card',
+        concept: 'TECHGADGETS', beneficiaryName: 'TechGadgets Ltd.', destinationAccountMasked: '****-****-****-4242',
+        merchantCategoryCode: '5732', channel: 'online', initiatedAt: '2026-06-01T10:00:00Z', completedAt: '2026-06-01T10:00:00Z',
+        fraudCase: { created: false },
+      },
+      {
+        kind: 'transfer', paymentExecutionInstanceReference: 'exec-h1', direction: 'sent',
+        grossAmount: 90, currency: 'EUR', paymentExecutionStatus: 'completed', paymentExecutionRail: 'sepa',
+        concept: 'Rent share', beneficiaryName: 'Carlos', destinationAccountMasked: 'ES12••••5477',
+        initiatedAt: '2026-06-02T10:00:00Z', completedAt: '2026-06-02T11:00:00Z', fraudCase: { created: false },
+      },
     ] })));
     await loginAs(context, 'customer');
     await page.goto('/system/payment/history');
     await expect(page.getByRole('heading', { name: 'Payment History', exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('TechGadgets Ltd.').first()).toBeVisible({ timeout: 8000 });
+    // One list, every movement kind: the transfer row comes from the same response.
+    await expect(page.getByText('Rent share').first()).toBeVisible({ timeout: 8000 });
   });
 });

@@ -646,26 +646,9 @@ export async function getDistinctMerchants(db: Db) {
   return results as { name: string; mcc: string }[];
 }
 
-export async function getTransactionsByCardToken(db: Db, value: string) {
-  // Detect masked PAN (contains * or matches ****-****-****-XXXX pattern)
-  // and route to the correct plaintext field.
-  const isMaskedPan = value.includes('*') || /^\*{4}[-\s]?\*{4}[-\s]?\*{4}[-\s]?\d{4}$/.test(value);
-
-  const query = isMaskedPan
-    ? { cardTransactionMaskedPanDisplay: value }
-    : { paymentCardReference: value };
-
-  const results = await db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)
-    .find(query as Partial<CardTransactionLogControlRecord>)
-    .sort({ cardTransactionDateTime: -1 })
-    .toArray();
-
-  return { results, count: results.length };
-}
-
 export async function getAllTransactions(
   db: Db,
-  filters: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string },
+  filters: { status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string; transactionId?: string },
   page: number,
   limit: number
 ) {
@@ -673,6 +656,9 @@ export async function getAllTransactions(
   if (filters.status)        query['cardTransactionStatus']            = filters.status;
   if (filters.merchant)      query['cardTransactionMerchantName']      = { $regex: filters.merchant, $options: 'i' };
   if (filters.cardToken)     query['paymentCardReference']             = filters.cardToken;
+  // v36: the masked PAN is its own filter. It used to be inferred from the shape of `cardToken`,
+  // which misclassified any token that happened to look like a masked PAN.
+  if (filters.maskedPan)     query['cardTransactionMaskedPanDisplay']  = filters.maskedPan;
   if (filters.transactionId) query['cardTransactionInstanceReference'] = filters.transactionId;
 
   // Lookup by email resolves the customer's canonical account reference, then

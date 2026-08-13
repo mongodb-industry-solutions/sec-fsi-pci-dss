@@ -4083,6 +4083,15 @@ fire-and-forget and never blocks the auth response (Req 10.2.1).
 
 **Collection `domainEvent`** (regular, not time-series: carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
 
+**Movement collection (v36 / ADR-063).** `GET /api/v1/transactions` is the single collection for every
+financial movement. Rows are `kind`-discriminated (`card` | `transfer` | `rtp`) and every kind is
+returned by default; `kind` narrows. Filters: `status`, `merchant`, `cardToken`, `maskedPan`, `email`,
+`transactionId`, `page`, `limit`. Envelope `{ results, total, page, limit }`. Channels are resolved by
+authentication (customer → own movements, merchant OAuth → merchant-isolated, staff → `transactions:view`).
+`GET /transactions/all` was removed (same resource, non-REST alias). `GET /transactions/:id` resolves a
+reference of ANY kind: a card payment returns its `cardTransaction` document, a transfer/RTP returns the
+movement row. Normalization, RTP de-dup and paging live in `gateway/services/paymentMovement.service.ts`.
+
 **Async payment authorization.** `POST /api/v1/transactions` returns `202 { cardTransactionInstanceReference, cardTransactionStatus: 'pending' }`. The client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, `skipAuth`, no PII/CHD, race-safe) for the terminal `authorized`/`declined`. Transient `cardVerification { cardNumber, cvv, expiry }` on create is forwarded to the issuer only and never stored or logged.
 - **Phase 1 gate** (parallel, out-of-band): `card-issuer` + `fds` + `hrp` (sanctions) + `funds`. Each publishes its `*.completed` verdict; `PaymentAuthorizationSaga` aggregates, any hard decline gives `payment.declined`, all approve gives `payment.authorized`.
 - **Eligibility vs risk.** Only eligibility gates hard-decline: `card-issuer` (invalid card/CVV/owner), `funds` (insufficient funds) and `hrp` (sanctions match, a regulatory block). `fds` is a RISK gate: a `review`/`decline` recommendation always completes as `approved` and instead flags the payment for investigation, so the payment is authorized and `under_review` with a `fraudDiagnosisCase` for L1 (escalating to L2), never auto-declined.

@@ -68,8 +68,10 @@ export default function TransactionsPage() {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await api.transactions.listAll(
+      const res = await api.transactions.list(
         {
+          // Staff card-transaction list: the card document shape (MCC, masked PAN, channel).
+          kind:      'card',
           status:    filterStatus    || undefined,
           merchant:  filterMerchant  || undefined,
           cardToken: filterCardToken || undefined,
