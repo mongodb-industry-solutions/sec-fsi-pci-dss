@@ -264,12 +264,14 @@ the Merchant Name selector. No authentication required (public, simulator mode).
     request.raw.on('close', () => { clearInterval(keepAlive); sub.unsubscribe(); res.end(); });
   });
 
-  // Dual-auth without the `dualAuth` route flag: `/api/v1/transactions` is a PUBLIC_EXACT path
-  // (simulator reads without a session), so we must NOT 401 anonymous callers. Detect a merchant
-  // OAuth Bearer best-effort (scope-gated); otherwise fall back to the existing session/public RBAC.
+  // v36: the collection serves TWO authenticated channels, so it declares `dualAuth`: the middleware
+  // accepts a first-party session JWT (HS256) OR a merchant OAuth Bearer (RS256) and 401s otherwise.
+  // The path is PUBLIC_EXACT for POST only (simulator payment creation); listing is never anonymous.
   fastify.get('/', {
+    config: { dualAuth: true },
     preHandler: async (request, reply) => {
-      const mc = await tryMerchantContext(request);
+      // dualAuth already resolved the merchant channel when the caller used an OAuth token.
+      const mc = request.merchantContext ?? await tryMerchantContext(request);
       if (mc) {
         if (!mc.scopes.includes('read:transactions')) {
           return reply.status(403).send({ error: 'insufficient_scope', error_description: 'Required scope: read:transactions' });

@@ -35,7 +35,16 @@ async function client(): Promise<PspClient> {
 function toResult(fn: () => Promise<ActionResult>): Promise<ActionResult> {
   return fn().catch((e) => {
     if (e instanceof PspError) {
-      return { ok: false, message: e.isAuth ? 'Not authorised (scope not granted or session expired).' : `PSP error ${e.status}` };
+      if (e.isAuth) return { ok: false, message: 'Not authorised (scope not granted or session expired).' };
+      // PspClient already extracts `error_description` into the message: show the REASON, and keep the
+      // status only as a fallback when the PSP sent none ("PSP error 402" tells a merchant nothing).
+      const reason = (e.message ?? '').trim();
+      return {
+        ok: false,
+        message: reason && reason !== String(e.status)
+          ? (e.status === 402 ? `Payment declined: ${reason}` : reason)
+          : `The PSP rejected the request (HTTP ${e.status}).`,
+      };
     }
     return { ok: false, message: (e as Error).message ?? 'Unexpected error' };
   });
@@ -200,10 +209,15 @@ export async function sendToBeneficiary(input: {
     if (data.status === 'failed') {
       return { ok: false, message: data.failureReason ?? 'Transfer failed.', data };
     }
+    // The UI renders the outcome (amount, state, reference, link), so the message stays human and the
+    // machine-readable parts travel in `data`. A held transfer is accepted but NOT delivered (ADR-060).
+    const held = data.status === 'pending';
     return {
       ok: true,
       data,
-      message: `Sent ${data.amount} ${data.currency}. Reference ${data.transferReference} (${data.status}).`,
+      message: held
+        ? 'Accepted and held for security review. The amount is reserved, not delivered yet.'
+        : 'Payment sent. The funds are on their way to the beneficiary.',
     };
   });
 }
