@@ -113,7 +113,7 @@ describe('cvvMode config resolution', () => {
  * tokenizes the PAN before authorizing, so an unseen card always resolved as "not registered", and the
  * whole simulator declined with 56 (or 54 first, when the demo card had also expired).
  */
-describe('registration checks apply to card-on-file, not to a card presented in full', () => {
+describe('registration checks apply to card-on-file, not to a card the payer presents', () => {
   const fullCard = {
     cardToken: 'pm_freshly_tokenized',
     maskedPan: '****-****-****-4242',
@@ -123,13 +123,24 @@ describe('registration checks apply to card-on-file, not to a card presented in 
     cvvExpected: true,
   };
 
-  it('approves a full-card payment even when the token is unknown to the PSP', () => {
+  it('approves a presented card even when the token is unknown to the PSP', () => {
     const out = validateCard(fullCard, DEFAULT_CARD_ISSUER_CONFIG, { cardRegistered: false, hasFundingAccount: false });
     expect(out.approved).toBe(true);
     expect(out.decisionReason).toBe('approved');
   });
 
-  it('still declines an unregistered card-on-file charge (no PAN presented)', () => {
+  // The hosted checkout and payment-link pages tokenize in the browser and post token + CVV + expiry,
+  // never the PAN, so a presentation must be recognised without one.
+  it('approves a hosted-page payment: token + CVV + expiry, no PAN', () => {
+    const out = validateCard(
+      { cardToken: 'pm_hosted', maskedPan: '****-****-****-1212', cvv: '123', expiry: '12/28', cvvExpected: true },
+      DEFAULT_CARD_ISSUER_CONFIG,
+      { cardRegistered: false, hasFundingAccount: false },
+    );
+    expect(out.approved).toBe(true);
+  });
+
+  it('still declines an unregistered card-on-file charge (token only, no credentials)', () => {
     const out = validateCard({ cardToken: 'pm_unknown', maskedPan: '****-****-****-4242' }, DEFAULT_CARD_ISSUER_CONFIG, { cardRegistered: false });
     expect(out.approved).toBe(false);
     expect(out.decisionReason).toBe('card_not_registered');

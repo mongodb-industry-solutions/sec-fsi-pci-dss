@@ -244,16 +244,18 @@ export function validateCard(
   // funding/payout account, is declined. These facts are resolved by the caller via the Card Reference /
   // Funding Account ports and are only enforced when the caller asserts them.
   //
-  // They apply to a CARD-ON-FILE charge, where the token IS the credential and must therefore be a card
-  // the PSP holds. They must NOT apply when the payer presents the full card (PAN + CVV + expiry): that
-  // is a first-time payment, the ordinary case at a checkout, and the card is validated on its own
-  // credentials. Enforcing registration there made every first payment impossible (the client tokenizes
-  // the PAN before authorizing, so an unseen card always looked "not registered").
-  const presentsFullCard = !!fullPan;
-  if (!presentsFullCard && opts.cardRegistered === false) {
+  // They apply to a CARD-ON-FILE charge, where the token IS the only credential and must therefore name
+  // a card the PSP holds. They must NOT apply when the payer PRESENTS the card, which is a first-time
+  // payment and the ordinary case at a checkout: the card is then validated on its own credentials.
+  //
+  // A presentation is the full PAN, or the CVV together with the expiry. The hosted pages (checkout and
+  // payment link) tokenize in the browser and never send the PAN, so requiring one would have declined
+  // every first payment through them with `card_not_registered` even though the payer typed the card.
+  const presentsCardCredentials = !!fullPan || (!!cvv && !!expiry);
+  if (!presentsCardCredentials && opts.cardRegistered === false) {
     return { approved: false, responseCode: '56', network, cvvValidationResult: 'not_provided', decisionReason: 'card_not_registered', last4 };
   }
-  if (!presentsFullCard && opts.hasFundingAccount === false) {
+  if (!presentsCardCredentials && opts.hasFundingAccount === false) {
     return { approved: false, responseCode: '57', network, cvvValidationResult: 'not_provided', decisionReason: 'no_funding_account', last4 };
   }
 
