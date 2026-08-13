@@ -311,7 +311,7 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
           transactionId: { type: 'string', description: 'Filter by exact movement reference.' },
           kind: { type: 'string', enum: ['card', 'transfer', 'rtp'], description: 'Narrow to one movement kind. Omitted returns every kind.' },
           page: { type: 'number', default: 1 },
-          limit: { type: 'number', default: 20, maximum: 100 },
+          limit: { type: 'number', default: 20, maximum: 200, description: 'Page size (max 200).' },
         },
       },
       // No strict 200 response schema: this route now serves TWO shapes, the session card-token list
@@ -370,7 +370,7 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
       transactionId?: string; kind?: 'card' | 'transfer' | 'rtp'; page?: number; limit?: number;
     };
     const page = Math.max(1, Number(q.page ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(q.limit ?? 20)));
+    const limit = Math.min(200, Math.max(1, Number(q.limit ?? 20)));
     const { userRole } = request as unknown as AuthenticatedRequest;
     const jwtEmail = (request as unknown as { user?: { email?: string } }).user?.email;
     // Privacy: a customer may only list their OWN movements. Ignore any email they pass.
