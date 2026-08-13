@@ -9,7 +9,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
-import { getToken, decodeToken } from '../../../../lib/auth';
+import { getToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
 import { useDebugMode } from '../../../../lib/debugMode';
 

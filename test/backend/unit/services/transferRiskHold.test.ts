@@ -147,3 +147,4 @@ describe('the held transfer is only movable through a resolution', () => {
     expect(h.releaseCardHold).not.toHaveBeenCalled();
   });
 });
+

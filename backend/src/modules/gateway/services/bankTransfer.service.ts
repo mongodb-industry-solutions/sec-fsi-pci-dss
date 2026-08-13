@@ -17,6 +17,7 @@ import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/b
 import { screenTransfer, openTransferFraudCase, TransferScreeningResult } from './transferRiskGate';
 import { RISK_HOLD_STEP } from './transferReview.service';
 import { getPayoutAccount } from './payoutAccount.service';
+import { holdCardFunds } from './payoutAccountBalance.service';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
@@ -144,6 +145,18 @@ export async function executeBankTransfer(
   // A risk signal holds the transfer instead of rejecting it: the execution is parked in `pending` and
   // nothing is dispatched to the rail until the investigation closes (ADR-060).
   if (screen.hold) {
+    // Immobilise the funds FIRST when the transfer is drawn from an internal account: a held movement
+    // must have its money reserved, and `reverseHeldTransfer` releases exactly this hold on confirmed
+    // fraud. Parking the execution without holding would make that reversal move money that was never
+    // reserved. No source account (transfer not drawn from a PSP account) means nothing to hold.
+    if (input.fromAccountRef) {
+      const held = await holdCardFunds(db, input.fromAccountRef, input.amount);
+      if (!held) {
+        const errors = ['Insufficient available balance to hold this transfer for review.'];
+        await recordException(db, executionRef, input, errors, now);
+        return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors };
+      }
+    }
     await recordRiskHold(db, executionRef, input, rail, screen, now);
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
     await openTransferFraudCase(db, {

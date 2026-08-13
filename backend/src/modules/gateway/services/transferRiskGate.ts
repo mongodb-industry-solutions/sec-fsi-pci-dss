@@ -2,8 +2,9 @@
 // Runs FDS (fraud), HRP (sanctions) and AML monitoring through their providers BEFORE any funds move
 // or any rail is engaged. Shared by the bank-transfer and P2P flows (DRY). ADR-059/060: a risk signal
 // is never a hard block; it HOLDS the movement for investigation (funds immobilised, nothing delivered)
-// until L1/L2 resolve the case. Lower AML alerts still pass to post-initiation monitoring
-// (P2PComplianceProcess).
+// until L1/L2 resolve the case. ADR-061: an AML alert of ANY severity holds, so nothing reaches the
+// rail and is only reviewed afterwards. P2PComplianceProcess still runs post-initiation for a transfer
+// that passed the gate and is flagged later.
 //
 // Providers are reached only through dispatchProvider (ADR-039): built-in or external, replaceable.
 

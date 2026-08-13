@@ -194,3 +194,47 @@ describe('4. a held RTP approval follows the investigation outcome', () => {
     expect(h.transitionRequest).not.toHaveBeenCalled();
   });
 });
+
+// PR #116 review: the case severity must mirror the alert. Mapping every non-high/critical alert to
+// `medium` inflated a low alert and lost the distinction the analyst triages by.
+describe('an AML case carries the severity of its alert', () => {
+  function wire() {
+    const db = {
+      collection: (name: string) => ({
+        findOne: vi.fn(async () => (name === 'fraudDiagnosisCase' ? null : { cardTransactionInstanceReference: TXN, cardTransactionAmount: { amount: 100, currency: 'USD' } })),
+        updateOne: vi.fn(async () => ({ matchedCount: 1 })),
+      }),
+    } as unknown as Db;
+    const bus = new EventBusInProcess();
+    new PostAuthorizationProcess(db, bus).register();
+    return bus;
+  }
+  const alert = (severity?: string) => makeEvent({
+    eventType: 'aml.monitoring.completed', correlationId: TXN, businessProcess: 'fraud_investigation' as const,
+    payload: { transactionId: TXN, outcome: 'alert', alert: true, ...(severity ? { severity } : {}) },
+  });
+
+  beforeEach(clearMocks);
+
+  it.each([
+    ['critical', 'critical'],
+    ['high', 'high'],
+    ['medium', 'medium'],
+    ['low', 'low'],
+  ])('maps a %s alert to a %s case', async (severity, expected) => {
+    await wire().publish(alert(severity));
+    await flush();
+    expect(h.createFraudCase).toHaveBeenCalled();
+    expect(h.createFraudCase.mock.calls[0][4]).toBe(expected);
+  });
+
+  it('falls back to medium for an absent or unknown severity', async () => {
+    await wire().publish(alert(undefined));
+    await flush();
+    expect(h.createFraudCase.mock.calls[0][4]).toBe('medium');
+    clearMocks();
+    await wire().publish(alert('spicy'));
+    await flush();
+    expect(h.createFraudCase.mock.calls[0][4]).toBe('medium');
+  });
+});

@@ -129,7 +129,12 @@ export class PostAuthorizationProcess {
       customerAgreementInstanceReference?: string;
     }>(CARD_TRANSACTION_COLLECTION).findOne({ cardTransactionInstanceReference: txnId });
     if (!txn) return undefined;
-    const mapped: RiskSeverity = severity === 'critical' ? 'critical' : severity === 'high' ? 'high' : 'medium';
+    // The case severity mirrors the alert: an explicit low/medium is kept, and only an unknown or
+    // absent severity falls back to medium (an AML alert is never negligible).
+    const SEVERITIES: readonly RiskSeverity[] = ['low', 'medium', 'high', 'critical'];
+    const mapped: RiskSeverity = SEVERITIES.includes(severity as RiskSeverity)
+      ? (severity as RiskSeverity)
+      : 'medium';
     try {
       const created = await createFraudCase(
         this.db, txnId,
