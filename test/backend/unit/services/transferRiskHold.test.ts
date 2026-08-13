@@ -148,3 +148,58 @@ describe('the held transfer is only movable through a resolution', () => {
   });
 });
 
+
+/**
+ * PR #116 review: an RTP case stores the REQUEST reference, because the case is opened at screening
+ * time, before the approval creates the execution (which gets a fresh UUID and is linked back on the
+ * request). Resolving such a case must still reach the held execution, or the request stays `accepted`
+ * with the funds held forever.
+ */
+describe('a resolution reaches the held execution of an RTP request', () => {
+  const REQUEST = 'req-1';
+
+  // The reference resolves either directly (an execution) or through the request link.
+  const dbFor = (docs: { execution?: unknown; request?: unknown }): Db => ({
+    collection: (name: string) => ({
+      findOne: vi.fn(async (filter: Record<string, unknown>) => {
+        if (name === 'paymentRequestProcedure') return docs.request ?? null;
+        // The execution lookup is keyed by reference: only answer for the linked execution id.
+        return filter.paymentExecutionInstanceReference === EXEC ? (docs.execution ?? null) : null;
+      }),
+    }),
+  } as unknown as Db);
+
+  beforeEach(() => { for (const fn of Object.values(h)) (fn as { mockReset?: () => void }).mockReset?.(); });
+
+  it('resolves the request reference to its linked execution', async () => {
+    const db = dbFor({ execution: execDoc(), request: { linkedPaymentExecutionReference: EXEC } });
+    const exec = await getHeldExecution(db, REQUEST);
+    expect(exec?.paymentExecutionInstanceReference).toBe(EXEC);
+  });
+
+  it('cleared: submits the linked execution, not the request reference', async () => {
+    h.dispatchProvider.mockResolvedValue({ provider: 'internal', status: 'received' });
+    const db = dbFor({ execution: execDoc(), request: { linkedPaymentExecutionReference: EXEC } });
+    expect(await submitHeldTransfer(db, REQUEST)).toBe(true);
+    expect(h.dispatchProvider).toHaveBeenCalledWith(
+      expect.anything(), 'payment_initiation', 'provider.payment_initiation.transfer.requested',
+      expect.objectContaining({ paymentExecutionInstanceReference: EXEC }),
+      expect.anything(),
+    );
+    expect(h.transitionExecution).toHaveBeenCalledWith(expect.anything(), EXEC, 'in_flight', undefined);
+  });
+
+  it('confirmed fraud: returns the funds of the linked execution', async () => {
+    const db = dbFor({ execution: execDoc(), request: { linkedPaymentExecutionReference: EXEC } });
+    expect(await reverseHeldTransfer(db, REQUEST)).toBe(true);
+    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), 'acc-sender', 900);
+    expect(h.transitionExecution).toHaveBeenCalledWith(expect.anything(), EXEC, 'reversed', expect.anything());
+  });
+
+  it('does nothing when the request has no linked execution yet', async () => {
+    const db = dbFor({ execution: execDoc(), request: { linkedPaymentExecutionReference: undefined } });
+    expect(await getHeldExecution(db, REQUEST)).toBeNull();
+    expect(await submitHeldTransfer(db, REQUEST)).toBe(false);
+    expect(h.dispatchProvider).not.toHaveBeenCalled();
+  });
+});

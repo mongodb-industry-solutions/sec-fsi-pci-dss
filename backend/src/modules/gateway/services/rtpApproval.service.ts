@@ -14,6 +14,7 @@ import { PAYMENT_REQUEST_COLLECTION, PaymentRequestProcedure } from '../models/p
 import { getRtpRequest, transitionRequest, RtpError } from './rtpRequest.service';
 import { screenRtpRequest } from './rtpScreening.service';
 import { RISK_HOLD_STEP } from './transferReview.service';
+import { linkCaseExecution } from '../../fraud/services/fraudDiagnosis.service';
 import { createNotification, markReadByRelated } from '../../notification/notifications.service';
 
 export interface ApproveRtpInput {
@@ -135,6 +136,9 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
         linkedPaymentExecutionReference: executionRef,
       },
     });
+    // The case was opened at screening time with the REQUEST reference; give it the execution too so
+    // the investigation outcome can reach the held movement by either reference.
+    await linkCaseExecution(db, ref, executionRef);
     emitComplianceEvent(db, {
       entityType: 'payment_request', entityId: ref, processType: 'payment_processing',
       processAction: 'transfer.held.for.review', processOutcome: 'pending',

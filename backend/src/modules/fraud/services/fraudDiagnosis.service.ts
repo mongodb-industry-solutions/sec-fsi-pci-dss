@@ -494,6 +494,27 @@ async function publishCaseResolved(
   }
 }
 
+/**
+ * Stamp the execution a case's movement ended up using. An RTP case is opened at screening time, when
+ * the approval has not created its execution yet, so the case only knows the request reference. Called
+ * by the approval once the execution exists, which keeps the case resolvable by either reference.
+ */
+export async function linkCaseExecution(
+  db: Db,
+  movementReference: string,
+  paymentExecutionInstanceReference: string,
+): Promise<void> {
+  try {
+    await db.collection(FRAUD_DIAGNOSIS_COLLECTION).updateOne(
+      { cardTransactionInstanceReference: movementReference, fraudDiagnosisCaseStatus: { $nin: RESOLVED_STATUSES } },
+      { $set: { paymentExecutionInstanceReference, recordUpdatedDateTime: new Date() } },
+    );
+  } catch (err) {
+    // Never block the movement on bookkeeping: the read path also resolves through the request link.
+    console.error('[fraud] linkCaseExecution failed:', err);
+  }
+}
+
 export async function getCaseEvents(db: Db, caseId: string) {
   const events = await db.collection<FraudDiagnosisCaseEventRecord>(FRAUD_DIAGNOSIS_EVENTS_COLLECTION)
     .find({ fraudDiagnosisInstanceReference: caseId })
