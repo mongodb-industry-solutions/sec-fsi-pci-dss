@@ -81,7 +81,9 @@ export async function screenRtpRequest(db: Db, req: PaymentRequestProcedure): Pr
 
   const vopBlocks = vop.decision === 'block';
   const indicators = [...gate.indicators, ...(vopBlocks ? [`vop.${vop.matchResult}`] : [])];
-  const blocked = gate.blocked || vopBlocks;
+  // A risk hold and a VoP failure both stop the approval here: no funds move and the request stays
+  // presented, so the payer can approve again once the investigation clears (ADR-060 follow-up).
+  const blocked = gate.hold || vopBlocks;
   const reason = gate.reason ?? (vopBlocks ? `Verification of Payee ${vop.matchResult} (name mismatch).` : undefined);
 
   if (blocked) {

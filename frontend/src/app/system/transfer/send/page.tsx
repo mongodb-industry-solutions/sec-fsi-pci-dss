@@ -71,7 +71,7 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
         { fromAccountRef, amount: parsed, note: note.trim() || undefined },
         token,
       );
-      setResult({ ref: res.transferReference, amount: parsed, currency: res.currency, status: res.status, reason: res.failureReason });
+      setResult({ ref: res.transferReference, amount: parsed, currency: res.currency, status: res.status, reason: res.holdReason ?? res.failureReason });
     } catch (err) {
       // Pre-creation failure (no transfer persisted): fix the form and retry.
       setError(err instanceof Error ? err.message : 'Transfer failed.');
@@ -85,15 +85,16 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
       ? `${selectedAccount.payoutAccountAlias || selectedAccount.payoutAccountBankName || 'Account'} · ${selectedAccount.payoutAccountCurrency}`
       : fromAccountRef;
     const ok = result.status === 'submitted';
-    const blocked = result.status === 'exception';
-    const tone = ok ? 'green' : blocked ? 'amber' : 'red';
-    const toneBg = ok ? 'bg-green-100' : blocked ? 'bg-amber-100' : 'bg-red-100';
-    const toneText = ok ? 'text-green-600' : blocked ? 'text-amber-600' : 'text-red-600';
+    // Held for review: accepted, funds reserved, nothing delivered until the review closes.
+    const held = result.status === 'pending' || result.status === 'exception';
+    const tone = ok ? 'green' : held ? 'amber' : 'red';
+    const toneBg = ok ? 'bg-green-100' : held ? 'bg-amber-100' : 'bg-red-100';
+    const toneText = ok ? 'text-green-600' : held ? 'text-amber-600' : 'text-red-600';
     const title = ok ? `${fmtAmount(result.amount, result.currency)} sent`
-      : blocked ? 'Transfer blocked for review'
+      : held ? 'Transfer held for review'
       : 'Transfer could not be completed';
     const statusLine = ok ? 'Status: pending settlement'
-      : blocked ? 'Status: exception · under fraud review'
+      : held ? 'Status: on hold · under review'
       : 'Status: failed';
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
@@ -106,8 +107,8 @@ function SendForm({ partyRef, token, onDone }: { partyRef: string; token: string
           {!ok && result.reason && (
             <p className={`text-xs ${tone === 'amber' ? 'text-amber-700' : 'text-red-700'} mt-2 max-w-md mx-auto`}>{result.reason}</p>
           )}
-          {blocked && (
-            <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto">A case has been opened for review by our team. No funds were moved. You can review the created transfer or try again.</p>
+          {held && (
+            <p className="text-xs text-gray-500 mt-2 max-w-md mx-auto">A case has been opened for review by our team. The amount is reserved on your account and has not been delivered; the transfer completes only if the review clears it.</p>
           )}
         </div>
 

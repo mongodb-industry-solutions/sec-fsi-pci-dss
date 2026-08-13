@@ -2349,7 +2349,7 @@ export const api = {
       body: { fromAccountRef: string; amount: number; note?: string },
       token: string,
     ) =>
-      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; recipientHint?: string }>(
+      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; holdReason?: string; recipientHint?: string }>(
         `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}/transfer`,
         { method: 'POST', body: JSON.stringify(body) },
         token,

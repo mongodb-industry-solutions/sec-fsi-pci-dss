@@ -2503,3 +2503,45 @@ is which value `outcome` takes for a fraud signal. No schema, DEK or seed change
 activity is investigated and reported) and satisfies the sanctions freeze obligation *provided* nothing
 releases a withheld payment except an explicit resolution: no timeout, no scheduled settlement job. The
 sanctions gate itself is left as a hard decline, since a confirmed match should not be accepted at all.
+
+### ADR-060: the risk hold applies to every money movement, not only card payments (v36)
+
+**Status.** Accepted.
+
+**Context.** ADR-059 fixed card payments: a fraud signal holds the payment instead of declining it. The
+transfer rails still did the opposite, and worse. `transferRiskGate.screenTransfer` returned `blocked`,
+and because the FDS branch flagged on `fraudFlag` (true for any non-`approve` recommendation), a plain
+**review** verdict rejected the transfer outright: the execution was written as `exception`, a case was
+opened for L1, and nothing could ever move that transfer again. Clearing the case had no effect, so the
+customer's only option was to retry and be rejected by the same rule. Money was never at risk (the
+rejection happened before any ledger movement), but the operation was dead, and a false positive was
+indistinguishable from confirmed fraud.
+
+**Decision.** One policy for every movement type: a risk signal (fraud, sanctions, severe AML) HOLDS,
+it never rejects. Only eligibility failures reject (invalid card/CVV/owner, insufficient funds, no
+supported rail, Verification of Payee mismatch).
+
+1. **Held, in `pending`.** The screening result is `hold`, not `blocked`. The execution is created in
+   `pending` (an existing status: "created, not yet routed") with a `risk.hold` resolution step, and
+   nothing is dispatched to the payout rail. For P2P the sender funds are held FIRST
+   (available -> pending) so the money is immobilised, not merely undelivered.
+2. **Only a resolution can move it.** `getHeldExecution` gates every path on `pending` + the
+   `risk.hold` step, so a settled, failed or reversed execution is never re-processed.
+   `fraud.case.resolved` then either submits the transfer to the rail (`cleared`) or returns the held
+   funds and reverses the execution (`confirmed_fraud`). A transfer case carries the execution
+   reference in the same field a card case uses, so one event serves both.
+3. **`pending` is inert by construction.** Nothing consumes a `pending` execution: settlement is driven
+   by the rail's `bank.transfer.settled`, which cannot arrive because the transfer was never dispatched.
+   That is what makes the hold safe without a new lifecycle state.
+
+**Consequences.** A flagged transfer is now recoverable: cleared by L1/L2 it completes, confirmed fraud
+returns the funds. False positives cost a review, not a lost operation. The transfer response gains
+`status: 'pending'` with a `holdReason`, and a flagged transfer answers 202 (accepted) where it used to
+answer 422 (rejected). No route, field removal or schema change: `paymentExecutionStatus` already had
+`pending`, and the transfer routes carry no response schema, so nothing is stripped or invalidated. An
+integrator that polls `GET /gateway/transfers/:ref/status` sees `pending` and then the terminal state.
+
+**Not included.** RTP approval keeps its current shape: a risk hold (or a VoP mismatch) leaves the
+request `presented` with no funds moved and a case opened, and the payer re-approves once it clears. The
+money-safety invariant already holds there (nothing is reserved, nothing is delivered), so aligning it
+to the `pending` execution model is a follow-up, not a correctness fix.

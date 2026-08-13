@@ -51,17 +51,23 @@ export class PayoutOrchestrationProcess {
     }
   }
 
-  // Investigation closed: a cleared case releases the withheld payout, a confirmed fraud never
-  // completes the payment (the hold is returned to the cardholder and the transaction is declined).
+  // Investigation closed: a cleared case releases the withheld movement, a confirmed fraud never
+  // completes it (the hold goes back to the payer and the movement is declined/reversed). Applies to
+  // both card payments and held transfers: a transfer case carries the execution reference in the same
+  // field, so the transfer branch runs when no card transaction matches.
   private async onCaseResolved(e: DomainEvent): Promise<void> {
     const p = e.payload as { outcome?: string; cardTransactionInstanceReference?: string };
-    const txnId = p.cardTransactionInstanceReference;
-    if (!txnId) return;
+    const ref = p.cardTransactionInstanceReference;
+    if (!ref) return;
+    if (p.outcome !== 'cleared' && p.outcome !== 'confirmed_fraud') return;
 
+    const txnId = ref;
     const txn = await this.db.collection<{ cardTransactionStatus?: string; cardTransactionAmount?: { amount: number; currency: string } }>(CARD_TRANSACTION_COLLECTION)
       .findOne({ cardTransactionInstanceReference: txnId }, { projection: { cardTransactionStatus: 1, cardTransactionAmount: 1 } });
+
+    if (!txn) { await this.resolveHeldTransfer(ref, p.outcome); return; }
     // Only a still-withheld authorization is actionable: a settled or already declined payment is done.
-    if (txn?.cardTransactionStatus !== 'authorized') return;
+    if (txn.cardTransactionStatus !== 'authorized') return;
 
     try {
       if (p.outcome === 'cleared') {
@@ -76,6 +82,17 @@ export class PayoutOrchestrationProcess {
       }
     } catch (err) {
       console.error(`[payout-orch] Failed to apply case resolution for txn ${txnId}:`, err);
+    }
+  }
+
+  // Held transfer (bank / P2P): cleared submits it to the rail, confirmed fraud returns the funds.
+  private async resolveHeldTransfer(executionRef: string, outcome: string): Promise<void> {
+    const { submitHeldTransfer, reverseHeldTransfer } = await import('./transferReview.service');
+    try {
+      if (outcome === 'cleared') await submitHeldTransfer(this.db, executionRef);
+      else await reverseHeldTransfer(this.db, executionRef);
+    } catch (err) {
+      console.error(`[payout-orch] Failed to apply case resolution for transfer ${executionRef}:`, err);
     }
   }
 

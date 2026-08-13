@@ -138,7 +138,7 @@ describe('case resolution closes the withheld payment', () => {
     expect(h.declineTransaction).not.toHaveBeenCalled();
   });
 
-  it('ignores a resolution with no linked card transaction', async () => {
+  it('ignores a resolution with no linked reference at all', async () => {
     const bus = wire('authorized');
     await bus.publish(makeEvent({
       eventType: 'fraud.case.resolved', correlationId: 'exec-9', businessProcess: 'fraud_investigation' as const,
@@ -147,5 +147,33 @@ describe('case resolution closes the withheld payment', () => {
     await flush();
     expect(h.releaseCardHold).not.toHaveBeenCalled();
     expect(h.debitPending).not.toHaveBeenCalled();
+  });
+});
+
+// A transfer case carries the execution reference in the same field, so the resolution falls through
+// to the held-transfer branch when the reference is not a card transaction.
+describe('case resolution on a held transfer', () => {
+  beforeEach(() => { for (const fn of Object.values(h)) (fn as { mockClear?: () => void }).mockClear?.(); });
+
+  function wireNoCardTxn() {
+    const bus = new EventBusInProcess();
+    const db = { collection: () => ({ findOne: vi.fn(async () => null), updateOne: vi.fn(async () => ({ matchedCount: 0 })) }) } as unknown as Db;
+    new PayoutOrchestrationProcess(db, bus).register();
+    return bus;
+  }
+
+  it('routes a cleared resolution to the transfer branch, not the card branch', async () => {
+    await wireNoCardTxn().publish(caseResolved('cleared'));
+    await flush();
+    // No card transaction exists, so nothing on the card path ran.
+    expect(h.declineTransaction).not.toHaveBeenCalled();
+    expect(h.debitPending).not.toHaveBeenCalled();
+  });
+
+  it('ignores an unknown resolution outcome', async () => {
+    await wireNoCardTxn().publish(caseResolved('referred'));
+    await flush();
+    expect(h.declineTransaction).not.toHaveBeenCalled();
+    expect(h.releaseCardHold).not.toHaveBeenCalled();
   });
 });

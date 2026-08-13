@@ -14,7 +14,8 @@ import {
 } from '../../../shared/services/bankTransfer';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
+import { screenTransfer, openTransferFraudCase, TransferScreeningResult } from './transferRiskGate';
+import { RISK_HOLD_STEP } from './transferReview.service';
 import { getPayoutAccount } from './payoutAccount.service';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
@@ -92,11 +93,12 @@ export interface ExecuteBankTransferInput {
 
 export interface ExecuteBankTransferResult {
   executionReference: string;
-  status: 'submitted' | 'failed' | 'exception';
+  status: 'submitted' | 'failed' | 'exception' | 'pending';
   rail?: BankRail;
   feeAmount?: number;
   currency: string;
   errors?: string[];
+  holdReason?: string;             // set with status 'pending': held for investigation, not delivered
 }
 
 /**
@@ -139,19 +141,21 @@ export async function executeBankTransfer(
     initiatorPartyRef: input.initiatorPartyRef,
     destinationCountry: input.destination.countryCode,
   });
-  if (screen.blocked) {
-    await recordException(db, executionRef, input, [screen.reason ?? 'Blocked by risk screening', ...screen.indicators], now);
+  // A risk signal holds the transfer instead of rejecting it: the execution is parked in `pending` and
+  // nothing is dispatched to the rail until the investigation closes (ADR-060).
+  if (screen.hold) {
+    await recordRiskHold(db, executionRef, input, rail, screen, now);
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
     await openTransferFraudCase(db, { transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount: input.amount, currency: input.currency });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: executionRef,
-      processType: 'payment_processing', processAction: 'bank.transfer.blocked',
-      processOutcome: 'rejected',
+      processType: 'payment_processing', processAction: 'transfer.held.for.review',
+      processOutcome: 'pending',
       performedByPartyReference: input.initiatorPartyRef, performedByRole: 'customer',
       eventSummary: { amount: input.amount, currency: input.currency, rail, indicators: screen.indicators, score: screen.score },
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     });
-    return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors: [screen.reason ?? 'Blocked by risk screening'] };
+    return { executionReference: executionRef, status: 'pending', rail, currency: input.currency, holdReason: screen.reason ?? 'Held for security review.' };
   }
 
   // 2. Persist the execution in routing state (append-only resolution log).
@@ -237,6 +241,33 @@ export async function executeBankTransfer(
     feeAmount: preview.feeAmount,
     currency: input.currency,
   };
+}
+
+// Held for investigation: same immutable record as any other execution, parked in `pending` with the
+// risk-hold step so only the resolution path can move it forward.
+async function recordRiskHold(
+  db: Db, executionRef: string, input: ExecuteBankTransferInput, rail: PaymentExecutionProcedure['paymentExecutionRail'],
+  screen: TransferScreeningResult, now: Date,
+): Promise<void> {
+  const execution: PaymentExecutionProcedure = {
+    paymentExecutionInstanceReference: executionRef,
+    paymentOrderInstanceReference: executionRef,
+    beneficiaryType: 'user',
+    initiatorPartyReference: input.initiatorPartyRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
+    ...(input.fromAccountRef ? { sourcePayoutAccountReference: input.fromAccountRef } : {}),
+    ...buildRecipientSnapshot(input.destination),
+    grossAmount: input.amount, netAmount: input.amount, feeAmount: 0, currency: input.currency,
+    paymentExecutionRail: rail,
+    routingNote: 'Bank transfer held for investigation by the pre-initiation risk gate',
+    ...(input.reference ? { paymentExecutionRemittanceInformation: input.reference } : {}),
+    paymentExecutionStatus: 'pending',
+    initiatedAt: now,
+    resolutionLog: [{ stepName: RISK_HOLD_STEP, stepOutcome: 'fallback', stepNote: screen.indicators.join(', ') || 'risk hold', stepDateTime: now }],
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
+  };
+  await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
 }
 
 async function recordException(

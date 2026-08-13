@@ -1,8 +1,9 @@
-// v17.1 (G4c): pre-initiation risk gate for bank transfers (/83/99).
-// Runs FDS (fraud), HRP (sanctions) and AML monitoring through their providers BEFORE any funds
-// move or any rail is engaged, and returns a hard block decision. Shared by the bank-transfer and
-// P2P flows (DRY). Sanctions match and an FDS block recommendation are hard blocks; a high/critical
-// AML alert is a hard block, lower AML alerts pass to post-initiation monitoring (P2PComplianceProcess).
+// v17.1 (G4c): pre-initiation risk gate for bank transfers.
+// Runs FDS (fraud), HRP (sanctions) and AML monitoring through their providers BEFORE any funds move
+// or any rail is engaged. Shared by the bank-transfer and P2P flows (DRY). ADR-059/060: a risk signal
+// is never a hard block; it HOLDS the movement for investigation (funds immobilised, nothing delivered)
+// until L1/L2 resolve the case. Lower AML alerts still pass to post-initiation monitoring
+// (P2PComplianceProcess).
 //
 // Providers are reached only through dispatchProvider (ADR-039): built-in or external, replaceable.
 
@@ -23,10 +24,10 @@ export interface TransferScreeningInput {
 }
 
 export interface TransferScreeningResult {
-  blocked: boolean;
+  hold: boolean;          // a risk signal fired: hold the movement for investigation, never deliver it
   indicators: string[];   // e.g. ['hrp.sanctions.match', 'fds.high.risk: velocity']
   score: number;          // FDS risk score (0 when unavailable)
-  reason?: string;        // first human-readable block reason
+  reason?: string;        // first human-readable hold reason
 }
 
 export async function screenTransfer(
@@ -50,18 +51,18 @@ export async function screenTransfer(
   if (fdsR.flag) indicators.push(`fds.high.risk${fdsR.reason ? ': ' + fdsR.reason : ''}`);
   if (amlR.alert) indicators.push(`aml.alert${amlR.severity ? ': ' + amlR.severity : ''}`);
 
-  // Hard block: sanctions match, FDS block, or a high/critical AML alert.
+  // Hold for investigation: sanctions match, FDS flag, or a high/critical AML alert.
   const severe = amlR.severity === 'high' || amlR.severity === 'critical';
-  const blocked = hrpR.match || fdsR.flag || (amlR.alert && severe);
+  const hold = hrpR.match || fdsR.flag || (amlR.alert && severe);
   const reason = hrpR.match
     ? 'Sanctions screening match (HRP).'
     : fdsR.flag
-      ? `Fraud risk block${fdsR.reason ? ': ' + fdsR.reason : ''} (FDS).`
+      ? `Fraud risk${fdsR.reason ? ': ' + fdsR.reason : ''} (FDS).`
       : (amlR.alert && severe)
         ? `AML alert (${amlR.severity}).`
         : undefined;
 
-  return { blocked, indicators, score: fdsR.score, reason };
+  return { hold, indicators, score: fdsR.score, reason };
 }
 
 /**
