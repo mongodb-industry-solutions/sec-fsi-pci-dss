@@ -97,6 +97,7 @@ export async function screenRtpRequest(db: Db, req: PaymentRequestProcedure): Pr
       amount: req.amount,
       currency: req.currency,
       destinationRef: req.payeeReceivingAccountReference,
+      kind: 'rtp', beneficiaryLabel: req.payeeName,
     });
   }
 

@@ -18,6 +18,7 @@ import {
 const INITIATOR = 'b0000001-0000-4000-8000-000000000001';       // Luis
 const SOURCE_ACCOUNT = 'pao00001-0000-4000-8000-000000000001';  // Luis' default (EUR)
 const NOW = new Date('2026-07-01T10:00:00.000Z');
+const HELD_AT = new Date('2026-07-08T09:20:00.000Z');
 
 // v18: Espresso Works Ltd , merchant the commission fee is attributed to.
 const ESPRESSO = 'm0000001-0000-4000-8000-000000000001';
@@ -101,6 +102,30 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     ],
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
+  },
+  // 4. Beneficiary transfer HELD for investigation (ADR-060/061): funds reserved on the sender, nothing
+  //    dispatched to the rail. Backs the seeded transfer fraud case so the investigation UI shows a
+  //    non-card movement (beneficiary destination, no acquired merchant) without needing a runtime run.
+  {
+    paymentExecutionInstanceReference: 'e0000004-0000-4000-8000-000000000004',
+    paymentOrderInstanceReference:     'e0000004-0000-4000-8000-000000000004',
+    beneficiaryType: 'user',
+    initiatorPartyReference: INITIATOR,
+    beneficiaryPartyReference: 'b0000003-0000-4000-8000-000000000003',
+    beneficiaryArrangementReference: 'cab00002-0000-4000-8000-000000000002',
+    sourcePayoutAccountReference: SOURCE_ACCOUNT,
+    resolvedPayoutAccountReference: 'pau00007-0000-4000-8000-000000000007',
+    grossAmount: 1450, netAmount: 1450, feeAmount: 0, currency: 'EUR',
+    paymentExecutionRail: 'sepa',
+    routingNote: 'P2P transfer held for investigation by the pre-initiation risk gate',
+    paymentExecutionRemittanceInformation: 'Car deposit',
+    paymentExecutionStatus: 'pending',
+    initiatedAt: HELD_AT,
+    resolutionLog: [
+      { stepName: 'risk.hold', stepOutcome: 'fallback', stepNote: 'fds.high.risk', stepDateTime: HELD_AT },
+    ],
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    recordCreatedDateTime: HELD_AT, recordUpdatedDateTime: HELD_AT, schemaVersion: 1,
   },
   // v18: three Espresso Works commission executions across two months → dashboard revenue.
   commissionExecution('e0000101-0000-4000-8000-000000000101', 48.0, new Date('2026-06-12T09:00:00.000Z')),

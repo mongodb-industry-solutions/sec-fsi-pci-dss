@@ -9,6 +9,8 @@ export { RiskSeverity, AnalystRole };
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
 export const FRAUD_DIAGNOSIS_EVENTS_COLLECTION = 'fraudDiagnosisCaseEvents';
 
+export type FraudCaseTransactionKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+
 export interface FraudDiagnosisControlRecord {
   // Identifiers
   fraudDiagnosisInstanceReference: string;               // UUID, primary key
@@ -17,8 +19,11 @@ export interface FraudDiagnosisControlRecord {
   // Links to protected records (plaintext keys by design: no PII in these refs)
   cardTransactionInstanceReference: string;              // FK to cardTransactionLog 
   customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure 
-  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure ; set for P2P cases
-  transactionKind?: 'card' | 'p2p';                     // discriminator; absent = 'card' for legacy docs
+  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure ; set for every non-card case
+  paymentRequestInstanceReference?: string;              // FK to paymentRequestProcedure ; set for RTP cases
+  // Movement discriminator; absent = 'card' for legacy docs. Drives which counterparty the
+  // investigation read-model resolves (acquired merchant vs registered beneficiary vs payee).
+  transactionKind?: FraudCaseTransactionKind;
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.

@@ -14,7 +14,7 @@ import { SensitiveReveal } from '../../../../components/SensitiveReveal';
 import { humanize, fmtAddress } from '../../../../components/record/format';
 import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
-import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight, RotateCcw } from 'lucide-react';
+import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight, RotateCcw, Users } from 'lucide-react';
 import { useConfirm } from '../../../../components/ui/ConfirmProvider';
 
 const ACTION_LABELS: Record<string, string> = {
@@ -273,6 +273,16 @@ export default function DemoCaseDetailPage() {
         .format(snap.cardTransactionAmount.amount)
     : null;
 
+  // Movement kind comes from the enrichment read-model (the case document response schema is strict and
+  // does not carry the discriminator). It resolves the kind even for a case opened before ADR-062.
+  const movementKind = enrichment?.transactionKind ?? enrichment?.operation?.kind ?? 'card';
+  const isCardMovement = movementKind === 'card';
+  // Only a card payment has a staff-readable detail route. A transfer / RTP execution is reachable
+  // only through account-scoped endpoints an analyst has no permission for, so its reference renders as
+  // text and the movement itself is shown in the panels below (never a link that 404s or 403s).
+  const operationHref = (ref: string) =>
+    `/system/transactions/${ref}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`;
+
   return (
     <div className="min-h-full bg-gray-50">
       <main className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
@@ -308,24 +318,34 @@ export default function DemoCaseDetailPage() {
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                 <span className="text-gray-500">Amount:</span>
                 <span className="font-semibold text-red-700">{formattedAmount}</span>
-                <span className="text-gray-500">Merchant:</span>
-                <span className="font-medium">{snap.cardTransactionMerchantName}</span>
-                <span className="text-gray-500">Card:</span>
-                <span className="font-mono">{snap.cardTransactionMaskedPanDisplay}</span>
+                <span className="text-gray-500">{isCardMovement ? 'Merchant:' : 'Destination:'}</span>
+                <span className="font-medium">{enrichment?.counterparty?.label ?? snap.cardTransactionMerchantName}</span>
+                {isCardMovement && (
+                  <>
+                    <span className="text-gray-500">Card:</span>
+                    <span className="font-mono">{snap.cardTransactionMaskedPanDisplay}</span>
+                  </>
+                )}
                 <span className="text-gray-500">Date:</span>
                 <span>{new Date(snap.cardTransactionDateTime).toLocaleString()}</span>
                 <span className="text-gray-500">Status:</span>
                 <span className="capitalize">{snap.cardTransactionStatus}</span>
                 {fraudCase.cardTransactionInstanceReference && (
                   <>
-                    <span className="text-gray-500">Transaction ID:</span>
-                    <Link
-                      href={`/system/transactions/${fraudCase.cardTransactionInstanceReference}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
-                      className="font-mono text-xs text-blue-600 hover:underline break-all"
-                      title="Open the associated transaction"
-                    >
-                      {fraudCase.cardTransactionInstanceReference}
-                    </Link>
+                    <span className="text-gray-500">{isCardMovement ? 'Transaction ID:' : 'Operation ID:'}</span>
+                    {isCardMovement ? (
+                      <Link
+                        href={operationHref(fraudCase.cardTransactionInstanceReference)}
+                        className="font-mono text-xs text-blue-600 hover:underline break-all"
+                        title="Open the associated transaction"
+                      >
+                        {fraudCase.cardTransactionInstanceReference}
+                      </Link>
+                    ) : (
+                      <span className="font-mono text-xs text-gray-600 break-all" title="Payment execution reference">
+                        {fraudCase.cardTransactionInstanceReference}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -368,8 +388,19 @@ export default function DemoCaseDetailPage() {
           )}
         </div>
 
-        {/* -- Investigation enrichment (read-model: operation + SDF history + KYB + KYC) -- */}
-        {enrichment && (
+        {/* -- Investigation enrichment (read-model: operation + SDF history + counterparty + KYC) -- */}
+        {enrichment && (() => {
+        const kind = movementKind;
+        const isCard = isCardMovement;
+        const MOVEMENT_LABEL: Record<string, string> = {
+          card: 'Card payment', p2p: 'Transfer to contact',
+          bank_transfer: 'Bank transfer', rtp: 'Request to Pay',
+        };
+        const cp = enrichment.counterparty;
+        const CP_LABEL: Record<string, string> = {
+          beneficiary: 'Beneficiary', external_account: 'Destination account', payee: 'Payee',
+        };
+        return (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Operation */}
             {enrichment.operation && (
@@ -377,10 +408,13 @@ export default function DemoCaseDetailPage() {
                 <div className="flex items-center gap-2 mb-3">
                   <CreditCard size={15} className="text-[#001E2B]" />
                   <h2 className="font-semibold text-sm">Operation</h2>
-                  <Link href={`/system/transactions/${enrichment.operation.transactionId}?from=investigation&caseId=${caseId}&caseRef=${encodeURIComponent(fraudCase.fraudDiagnosisCaseReference ?? '')}`}
-                    className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
-                    Open transaction <ChevronRight size={12} />
-                  </Link>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{MOVEMENT_LABEL[kind] ?? kind}</span>
+                  {isCard && (
+                    <Link href={operationHref(enrichment.operation.transactionId)}
+                      className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                      Open transaction <ChevronRight size={12} />
+                    </Link>
+                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mb-3">
                   <span className="text-xs px-2 py-0.5 rounded-full font-medium bg-[#001E2B] text-[#00ED64] capitalize">{enrichment.operation.type.replace(/_/g, ' ')}</span>
@@ -390,17 +424,30 @@ export default function DemoCaseDetailPage() {
                     'bg-green-100 text-green-700'
                   }`}>{enrichment.operation.status}</span>
                   {enrichment.operation.channel && <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{enrichment.operation.channel}</span>}
+                  {enrichment.operation.heldForReview && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">Funds held, not delivered</span>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                   <span className="text-gray-500">Amount:</span>
                   <span className="font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: enrichment.operation.amount.currency }).format(enrichment.operation.amount.amount)}</span>
-                  <span className="text-gray-500">Merchant:</span>
-                  <span className="font-medium truncate">{enrichment.operation.merchantName}</span>
-                  <span className="text-gray-500">MCC:</span>
-                  <span className="font-mono text-xs">{enrichment.operation.merchantCategoryCode ?? '-'}</span>
-                  <span className="text-gray-500">Card:</span>
-                  <span className="font-mono text-xs">{enrichment.operation.maskedPan}</span>
-                  {enrichment.operation.description && (<><span className="text-gray-500">Descriptor:</span><span className="truncate">{enrichment.operation.description}</span></>)}
+                  {isCard ? (
+                    <>
+                      <span className="text-gray-500">Merchant:</span>
+                      <span className="font-medium truncate">{enrichment.operation.merchantName}</span>
+                      <span className="text-gray-500">MCC:</span>
+                      <span className="font-mono text-xs">{enrichment.operation.merchantCategoryCode ?? '-'}</span>
+                      <span className="text-gray-500">Card:</span>
+                      <span className="font-mono text-xs">{enrichment.operation.maskedPan}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-gray-500">Destination:</span>
+                      <span className="font-medium truncate">{cp?.label ?? '-'}</span>
+                      {enrichment.operation.rail && (<><span className="text-gray-500">Rail:</span><span className="uppercase text-xs">{enrichment.operation.rail}</span></>)}
+                    </>
+                  )}
+                  {enrichment.operation.description && (<><span className="text-gray-500">{isCard ? 'Descriptor:' : 'Reference:'}</span><span className="truncate">{enrichment.operation.description}</span></>)}
                 </div>
               </div>
             )}
@@ -431,7 +478,45 @@ export default function DemoCaseDetailPage() {
               {debugMode && <p className="mt-3 text-[10px] font-mono text-gray-400">processType fraud_evaluation · asOf {new Date(enrichment.asOf).toLocaleTimeString()}</p>}
             </div>
 
-            {/* Merchant; acquired (KYB record) or external (descriptor only, no KYB) */}
+            {/* Counterparty of a non-card movement: beneficiary, external account or RTP payee.
+                The PSP owns this record, so L1 sees it without an escalation (masked account only). */}
+            {!isCard && (
+              <div className="bg-white rounded-xl border p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <Users size={15} className="text-[#001E2B]" />
+                  <h2 className="font-semibold text-sm">{cp ? CP_LABEL[cp.kind] : 'Destination'}</h2>
+                  {cp?.arrangementReference && (
+                    <Link href={`/system/beneficiaries?ref=${cp.arrangementReference}&from=investigation&caseId=${caseId}`}
+                      className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
+                      Open beneficiary <ChevronRight size={12} />
+                    </Link>
+                  )}
+                </div>
+                {cp ? (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
+                    <span className="text-gray-500">Name:</span>
+                    <span className="font-medium truncate">{cp.label ?? '-'}</span>
+                    <span className="text-gray-500">Account:</span>
+                    <span className="font-mono text-xs">{cp.accountMasked ?? '-'}</span>
+                    <span className="text-gray-500">Country:</span>
+                    <span className="font-mono text-xs">{cp.countryCode ?? '-'}</span>
+                    <span className="text-gray-500">Registered:</span>
+                    <span>{cp.kind === 'beneficiary' ? 'Saved beneficiary of this customer' : cp.kind === 'payee' ? 'Payee of the payment request' : 'Entered at initiation'}</span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400">The destination of this movement is not available yet.</p>
+                )}
+                {debugMode && (
+                  <p className="mt-3 text-[10px] font-mono text-gray-400">
+                    exec {enrichment.references.executionRef ?? '-'} · request {enrichment.references.paymentRequestRef ?? '-'}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Merchant; acquired (KYB record) or external (descriptor only, no KYB). Card movements only:
+                a transfer has no acquired merchant, so the panel would only ever say "not acquired". */}
+            {isCard && (
             <div className="bg-white rounded-xl border p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Store size={15} className="text-[#001E2B]" />
@@ -471,6 +556,7 @@ export default function DemoCaseDetailPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* KYC; single, unified customer card (summary + contact + sensitive, role-gated) */}
             {enrichment.kyc && (
@@ -549,7 +635,8 @@ export default function DemoCaseDetailPage() {
               </div>
             )}
           </div>
-        )}
+        );
+        })()}
 
         {/* -- Notes -- */}
         {token && <CaseNotesPanel caseId={caseId} token={token} role={role} onActivity={() => reload(token)} />}

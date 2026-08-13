@@ -91,3 +91,81 @@ test.describe('FR-v2-11: case detail', () => {
     await expect(page.getByRole('button', { name: /Approve Escalation/i })).toBeVisible({ timeout: 8000 });
   });
 });
+
+// A non-card case (transfer / RTP) must show its own counterparty, never an empty merchant panel.
+test.describe('case detail for a non-card movement', () => {
+  const TRANSFER_CASE = {
+    ...CASE,
+    transactionKind: 'p2p',
+    paymentExecutionInstanceReference: 'exec-1',
+    fraudDiagnosisAssessment: { riskIndicators: ['fds.high.risk', 'aml.alert: medium'], fraudDiagnosisScore: 78 },
+    transactionSnapshot: {
+      cardTransactionAmount: { amount: 1450, currency: 'EUR' },
+      cardTransactionMerchantName: 'Transfer to Carlos (savings)',
+      cardTransactionDateTime: '2026-07-08T09:20:00Z',
+      cardTransactionStatus: 'pending',
+      cardTransactionMaskedPanDisplay: 'Bank transfer',
+    },
+  };
+  const ENRICHMENT = {
+    caseId: 'FD-0001', asOf: '2026-07-08T09:30:00Z', transactionKind: 'p2p',
+    operation: {
+      transactionId: 'exec-1', kind: 'p2p', type: 'transfer', status: 'pending', channel: 'transfer',
+      rail: 'sepa', heldForReview: true, amount: { amount: 1450, currency: 'EUR' },
+      dateTime: '2026-07-08T09:20:00Z', description: 'Car deposit',
+    },
+    counterparty: {
+      kind: 'beneficiary', label: 'Carlos (savings)', accountMasked: '+34 6** *** 789',
+      countryCode: 'ES', partyReference: 'party-2', arrangementReference: 'cab-1', accountReference: 'acc-dest',
+    },
+    sdf: { score: 78, scorePending: false, indicators: ['fds.high.risk'], conclusion: null, events: [] },
+    hrp: { available: false }, kyc: null, kyb: null,
+    references: { caseId: 'FD-0001', transactionId: 'exec-1', customerId: 'CA-1', merchantId: null, accountRef: null, executionRef: 'exec-1', paymentRequestRef: null },
+  };
+
+  test('L1 sees the beneficiary and the hold, and no merchant panel', async ({ page, context }) => {
+    await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 1, byStatus: [], bySeverity: [] })));
+    await page.route('**/api/v1/customer**', (r) => r.fulfill(json({ customerName: 'Jane Doe' })));
+    await page.route('**/api/v1/fraud**', (route) => {
+      const p = new URL(route.request().url()).pathname;
+      if (p.endsWith('/events')) return route.fulfill(json({ caseId: 'FD-0001', events: [] }));
+      if (p.endsWith('/notes')) return route.fulfill(json({ notes: [] }));
+      if (p.endsWith('/questions')) return route.fulfill(json({ questions: [] }));
+      if (p.endsWith('/enrichment')) return route.fulfill(json(ENRICHMENT));
+      if (p.includes('/hrpc/')) return route.fulfill(json({ match: false }));
+      if (/\/fraud\/[^/]+$/.test(p)) return route.fulfill(json(TRANSFER_CASE));
+      return route.fulfill(json({ results: [TRANSFER_CASE], total: 1, page: 1, limit: 20 }));
+    });
+    await loginAs(context, 'level1_analyst');
+    await page.goto('/system/investigation/FD-0001');
+    await expect(page.getByText('CASE-2026-0001').first()).toBeVisible({ timeout: 15000 });
+
+    // Movement type + hold state on the operation panel.
+    await expect(page.getByText('Transfer to contact')).toBeVisible();
+    await expect(page.getByText(/Funds held, not delivered/i)).toBeVisible();
+    await expect(page.getByText('SEPA')).toBeVisible();
+
+    // Counterparty panel with the PSP-owned beneficiary data, masked.
+    await expect(page.getByRole('heading', { name: 'Beneficiary' })).toBeVisible();
+    await expect(page.getByText('Carlos (savings)').first()).toBeVisible();
+    await expect(page.getByText('+34 6** *** 789')).toBeVisible();
+    await expect(page.getByText(/Saved beneficiary of this customer/i)).toBeVisible();
+
+    // The merchant/KYB panel is gone: there is no acquired merchant in a transfer.
+    await expect(page.getByRole('heading', { name: /^Merchant/ })).toHaveCount(0);
+    await expect(page.getByText(/not acquired by this PSP/i)).toHaveCount(0);
+
+    // The reference is text, not a link into the card-transaction route (which would 404 / 403).
+    await expect(page.getByText('Operation ID:')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'exec-1' })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Open transaction/i })).toHaveCount(0);
+    // The header names the destination, never a merchant.
+    await expect(page.getByText('Destination:').first()).toBeVisible();
+    await expect(page.getByText('Merchant:')).toHaveCount(0);
+
+    // The plain-language indicators, not the raw gate ids.
+    await expect(page.getByText(/Fraud risk detected/i).first()).toBeVisible();
+    await expect(page.getByText(/Money-laundering alert \(medium severity\)/i).first()).toBeVisible();
+    await expect(page.getByText('fds.high.risk')).toHaveCount(0);
+  });
+});

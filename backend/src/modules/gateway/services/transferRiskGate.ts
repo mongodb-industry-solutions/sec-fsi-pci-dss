@@ -10,6 +10,7 @@
 import { Db } from 'mongodb';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
+import { FRAUD_DIAGNOSIS_COLLECTION, type FraudCaseTransactionKind } from '../../fraud/models/fraudDiagnosis.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import type { RiskSeverity } from '../../../shared/models/risk.model';
 import type { TransactionSnapshot } from '../../../shared/models/transaction.model';
@@ -73,10 +74,18 @@ export async function screenTransfer(
  */
 export async function openTransferFraudCase(
   db: Db,
-  input: { transferRef: string; initiatorPartyRef?: string; indicators: string[]; score: number; amount: number; currency: string; destinationRef?: string },
+  input: {
+    transferRef: string; initiatorPartyRef?: string; indicators: string[]; score: number;
+    amount: number; currency: string; destinationRef?: string;
+    // Movement kind, stamped on the case so the investigation read-model resolves the right
+    // counterparty (a beneficiary or a payee, never an acquired merchant).
+    kind?: FraudCaseTransactionKind;
+    beneficiaryLabel?: string;
+  },
 ): Promise<void> {
   try {
     const { transferRef, initiatorPartyRef, indicators, score, amount, currency, destinationRef } = input;
+    const kind: FraudCaseTransactionKind = input.kind ?? 'bank_transfer';
     // Resolve the initiator's customer agreement (falls back to the party ref).
     let customerRef = initiatorPartyRef ?? transferRef;
     if (initiatorPartyRef) {
@@ -88,14 +97,25 @@ export async function openTransferFraudCase(
     const snapshot = {
       cardTransactionInstanceReference: transferRef,
       cardTransactionMaskedPanDisplay: 'Bank transfer',
-      cardTransactionMerchantName: `Transfer → ${destinationRef?.slice(0, 8) ?? 'external account'}`,
+      cardTransactionMerchantName: input.beneficiaryLabel
+        ? `Transfer to ${input.beneficiaryLabel}`
+        : `Transfer to ${destinationRef?.slice(0, 8) ?? 'external account'}`,
       cardTransactionMerchantCategoryCode: '6012',
       cardTransactionAmount: { amount, currency },
       cardTransactionDateTime: new Date(),
       cardTransactionStatus: 'exception',
       cardTransactionChannel: 'transfer',
     } as unknown as TransactionSnapshot;
-    await createFraudCase(db, transferRef, customerRef, indicators.length ? indicators : ['transfer.risk.block'], severity, snapshot, score);
+    const created = await createFraudCase(db, transferRef, customerRef, indicators.length ? indicators : ['transfer.risk.block'], severity, snapshot, score);
+    // Stamp the discriminator + execution/request link so the case is resolvable to its movement.
+    await db.collection(FRAUD_DIAGNOSIS_COLLECTION).updateOne(
+      { fraudDiagnosisInstanceReference: created.fraudDiagnosisInstanceReference },
+      { $set: {
+        transactionKind: kind,
+        ...(kind === 'rtp' ? { paymentRequestInstanceReference: transferRef } : { paymentExecutionInstanceReference: transferRef }),
+        recordUpdatedDateTime: new Date(),
+      } },
+    );
   } catch { /* case-opening must never block the (already-blocked) transfer response */ }
 }
 

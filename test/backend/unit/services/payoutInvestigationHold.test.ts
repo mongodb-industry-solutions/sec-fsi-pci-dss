@@ -51,6 +51,12 @@ import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 import { PayoutOrchestrationProcess } from '../../../../backend/src/modules/gateway/services/payoutOrchestration.process';
 
 const flush = () => new Promise((r) => setTimeout(r, 20));
+// The resolution path resolves its collaborators with dynamic import() (avoiding a circular import),
+// which is slow on a cold module registry: poll instead of assuming a fixed delay.
+async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
+  const started = Date.now();
+  while (!cond() && Date.now() - started < timeoutMs) await new Promise((r) => setTimeout(r, 10));
+}
 const TXN = 'txn-1';
 
 // Fake Db: only the reads the payout path performs. `status` drives the transaction state under test.
@@ -117,7 +123,7 @@ describe('case resolution closes the withheld payment', () => {
 
   it('cleared: releases the withheld payout', async () => {
     await wire('authorized').publish(caseResolved('cleared'));
-    await flush();
+    await waitFor(() => h.createExecution.mock.calls.length > 0);
     expect(h.debitPending).toHaveBeenCalled();
     expect(h.createExecution).toHaveBeenCalled();
     expect(h.declineTransaction).not.toHaveBeenCalled();
@@ -125,7 +131,7 @@ describe('case resolution closes the withheld payment', () => {
 
   it('confirmed fraud: returns the cardholder hold and declines, without paying the merchant', async () => {
     await wire('authorized').publish(caseResolved('confirmed_fraud'));
-    await flush();
+    await waitFor(() => h.declineTransaction.mock.calls.length > 0);
     expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), 'acc-holder', 100);
     expect(h.declineTransaction).toHaveBeenCalledWith(expect.anything(), TXN, 'confirmed_fraud', 'fraud_confirmed');
     expect(h.debitPending).not.toHaveBeenCalled();
@@ -134,6 +140,8 @@ describe('case resolution closes the withheld payment', () => {
   it('ignores a resolution for an already settled transaction', async () => {
     await wire('settled').publish(caseResolved('confirmed_fraud'));
     await flush();
+    // Give the (correctly skipped) resolution path the same window the acting paths get.
+    await new Promise((r) => setTimeout(r, 200));
     expect(h.releaseCardHold).not.toHaveBeenCalled();
     expect(h.declineTransaction).not.toHaveBeenCalled();
   });

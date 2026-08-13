@@ -332,20 +332,37 @@ export interface RawDocumentResponse {
   document: Record<string, unknown>;
 }
 
+export type CaseMovementKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+
 export interface CaseEnrichment {
   caseId: string;
   asOf: string;
+  // Movement kind: decides whether the counterparty is a merchant, a beneficiary or a payee.
+  transactionKind?: CaseMovementKind;
   operation: {
     transactionId: string;
+    kind?: CaseMovementKind;
     type: string;
     status: string;
     channel: string | null;
-    merchantCategoryCode: string | null;
-    merchantName: string;
-    maskedPan: string;
+    merchantCategoryCode?: string | null;
+    merchantName?: string;
+    maskedPan?: string;
+    rail?: string | null;
+    heldForReview?: boolean;
     amount: { amount: number; currency: string };
     dateTime: string;
     description: string | null;
+  } | null;
+  // Non-card movements only: the destination of the money (PSP-owned data, visible to L1).
+  counterparty?: {
+    kind: 'beneficiary' | 'external_account' | 'payee';
+    label: string | null;
+    accountMasked: string | null;
+    countryCode: string | null;
+    partyReference: string | null;
+    arrangementReference: string | null;
+    accountReference: string | null;
   } | null;
   sdf: {
     score: number | null;
@@ -390,6 +407,8 @@ export interface CaseEnrichment {
     customerId: string | null;
     merchantId: string | null;
     accountRef: string | null;
+    executionRef?: string | null;
+    paymentRequestRef?: string | null;
   };
 }
 

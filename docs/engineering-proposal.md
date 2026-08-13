@@ -2594,3 +2594,44 @@ request that was accepted, held and then confirmed fraudulent; a held approval s
 **Consequences.** Every risk outcome on every movement type is now supervised: something is held, a case
 exists, and a human decides. The single remaining unrecallable window is an AML alert that lands after
 the rail has taken the transfer, which is documented rather than papered over.
+
+### ADR-062: an investigation case is about a money movement, not about a card payment (v36)
+
+**Status.** Accepted.
+
+**Context.** The investigation case detail was written for card payments and had no other shape. A
+transfer case (P2P, bank transfer, RTP) carries the execution reference in
+`cardTransactionInstanceReference`, so the read-model's card lookup missed, `operation` came back null,
+`merchantId` was undefined and the UI fell back to its "external merchant: not acquired by this PSP, so
+there is no KYB record" panel. For a transfer to a registered beneficiary that message is not just
+unhelpful, it is wrong: there is no merchant in the movement at all, and the PSP owns the destination
+record in full. L1 was left with a screen that named a merchant that did not exist and hid the
+beneficiary that did.
+
+**Decision.**
+
+1. **Stamp the movement kind at case creation.** `transactionKind` widens to
+   `'card' | 'p2p' | 'bank_transfer' | 'rtp'` and `openTransferFraudCase` writes it together with
+   `paymentExecutionInstanceReference` (or the new `paymentRequestInstanceReference` for RTP). The
+   snapshot descriptor becomes "Transfer to <beneficiary label>" instead of a truncated account ref.
+2. **The read-model resolves the movement it actually is.** For a non-card case the enrichment builds
+   `operation` from the payment execution or the payment request (status, rail, remittance info,
+   `heldForReview`) and adds a `counterparty` block: a registered beneficiary, an unregistered
+   destination account, or an RTP payee. `kyb` stays null and the client drops the merchant panel.
+3. **Minimisation holds (ADR-048).** The counterparty exposes the label, the MASKED account, the
+   country and the references. The full IBAN is never added to this surface: it stays behind the
+   existing escalation-gated endpoints. This is PSP-owned counterparty data, so L1 sees it without an
+   escalation, which is the point of the fix.
+4. **Seeded, not only runtime.** `seedPaymentExecutions` gains a held beneficiary transfer and
+   `fraudCases.json` a matching `p2p` case, so the non-card investigation path is demonstrable after a
+   reseed instead of requiring someone to trigger a hold live.
+
+**Consequences.** One case-detail layout serves every movement type: the operation panel adapts (card +
+MCC vs destination + rail) and the counterparty panel replaces the merchant panel when there is no
+merchant. The seed-integrity guard is now kind-aware: the `case → card transaction` rule applies to card
+cases only, and a new rule requires every non-card case to carry the link to its movement, so a case
+that the read-model could not resolve fails the suite instead of rendering an empty panel.
+
+**Model change.** Two optional plaintext fields on an existing plaintext collection
+(`transactionKind` widened, `paymentRequestInstanceReference` added). No QE field, DEK, index or
+collection change, so `setup/` needs nothing; the seed data ships with the change as required.

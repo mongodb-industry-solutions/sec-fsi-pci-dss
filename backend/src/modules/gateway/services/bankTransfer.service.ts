@@ -146,7 +146,11 @@ export async function executeBankTransfer(
   if (screen.hold) {
     await recordRiskHold(db, executionRef, input, rail, screen, now);
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
-    await openTransferFraudCase(db, { transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount: input.amount, currency: input.currency });
+    await openTransferFraudCase(db, {
+      transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators,
+      score: screen.score, amount: input.amount, currency: input.currency, kind: 'bank_transfer',
+      beneficiaryLabel: input.destination.beneficiaryName,
+    });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: executionRef,
       processType: 'payment_processing', processAction: 'transfer.held.for.review',

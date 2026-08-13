@@ -115,7 +115,11 @@ export async function executeP2PTransfer(
     };
     await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(heldExec);
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
-    await openTransferFraudCase(db, { transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount, currency: transferCurrency, destinationRef: recipientAccount.payoutAccountInstanceReference });
+    await openTransferFraudCase(db, {
+      transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount,
+      currency: transferCurrency, destinationRef: recipientAccount.payoutAccountInstanceReference,
+      kind: 'p2p', beneficiaryLabel: arrangement.counterpartyLabel,
+    });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: transferRef,
       processType: 'payment_processing', processAction: 'transfer.held.for.review', processOutcome: 'pending',

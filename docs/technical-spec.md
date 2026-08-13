@@ -330,6 +330,12 @@ export interface FraudDiagnosisControlRecord {
   // Links to protected records: BIAN *InstanceReference FK naming pattern
   cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
   customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
+  // ADR-061: a case can cover any money movement, not only a card payment. The discriminator decides
+  // which counterparty the investigation read-model resolves (merchant vs beneficiary vs payee) and
+  // which link is authoritative. Absent = 'card' (legacy docs).
+  transactionKind?: 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+  paymentExecutionInstanceReference?: string;             // FK to paymentExecutionProcedure (SD-65), non-card
+  paymentRequestInstanceReference?: string;               // FK to paymentRequestProcedure (SD-64), RTP
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
@@ -2985,7 +2991,7 @@ Counts are the v33 population.
 | `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
 | `backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
 | `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 20 | `bin/seed-generate.ts` |
+| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 21 | `bin/seed-generate.ts` + 1 curated non-card case (`transactionKind: 'p2p'`, linked to the held execution seeded in `seedPaymentExecutions`) |
 | `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
 | `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
