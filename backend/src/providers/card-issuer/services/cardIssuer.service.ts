@@ -240,14 +240,20 @@ export function validateCard(
     return { approved: false, responseCode: '82', network, cvvValidationResult: 'not_provided', decisionReason: 'cvv_required', last4 };
   }
 
-  // Registration + funding-account checks (v30): a card the PSP does not know, or one without a
-  // known funding/payout account, is declined. These facts are resolved by the caller via the Card
-  // Reference / Funding Account ports; they are only enforced when the caller asserts them (the
-  // direct simulator test path leaves them undefined and stays lenient).
-  if (opts.cardRegistered === false) {
+  // Registration + funding-account checks (v30): a card the PSP does not know, or one without a known
+  // funding/payout account, is declined. These facts are resolved by the caller via the Card Reference /
+  // Funding Account ports and are only enforced when the caller asserts them.
+  //
+  // They apply to a CARD-ON-FILE charge, where the token IS the credential and must therefore be a card
+  // the PSP holds. They must NOT apply when the payer presents the full card (PAN + CVV + expiry): that
+  // is a first-time payment, the ordinary case at a checkout, and the card is validated on its own
+  // credentials. Enforcing registration there made every first payment impossible (the client tokenizes
+  // the PAN before authorizing, so an unseen card always looked "not registered").
+  const presentsFullCard = !!fullPan;
+  if (!presentsFullCard && opts.cardRegistered === false) {
     return { approved: false, responseCode: '56', network, cvvValidationResult: 'not_provided', decisionReason: 'card_not_registered', last4 };
   }
-  if (opts.hasFundingAccount === false) {
+  if (!presentsFullCard && opts.hasFundingAccount === false) {
     return { approved: false, responseCode: '57', network, cvvValidationResult: 'not_provided', decisionReason: 'no_funding_account', last4 };
   }
 
