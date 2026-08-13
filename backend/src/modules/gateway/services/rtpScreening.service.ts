@@ -48,7 +48,8 @@ export async function verifyPayeeForRequest(db: Db, req: PaymentRequestProcedure
 }
 
 export interface RtpScreeningResult {
-  blocked: boolean;
+  hold: boolean;              // risk signal: accept and hold the payment for investigation
+  blocked: boolean;           // eligibility failure (VoP mismatch): the approval cannot proceed
   indicators: string[];
   score: number;
   reason?: string;
@@ -81,12 +82,13 @@ export async function screenRtpRequest(db: Db, req: PaymentRequestProcedure): Pr
 
   const vopBlocks = vop.decision === 'block';
   const indicators = [...gate.indicators, ...(vopBlocks ? [`vop.${vop.matchResult}`] : [])];
-  // A risk hold and a VoP failure both stop the approval here: no funds move and the request stays
-  // presented, so the payer can approve again once the investigation clears (ADR-060 follow-up).
-  const blocked = gate.hold || vopBlocks;
+  // A risk signal holds the payment (accepted, funds reserved, nothing delivered); a VoP mismatch is an
+  // eligibility failure and still rejects the approval outright (ADR-061).
+  const hold = gate.hold;
+  const blocked = vopBlocks;
   const reason = gate.reason ?? (vopBlocks ? `Verification of Payee ${vop.matchResult} (name mismatch).` : undefined);
 
-  if (blocked) {
+  if (blocked || hold) {
     await openTransferFraudCase(db, {
       transferRef: req.paymentRequestInstanceReference,
       initiatorPartyRef: req.payerPartyReference,
@@ -98,5 +100,5 @@ export async function screenRtpRequest(db: Db, req: PaymentRequestProcedure): Pr
     });
   }
 
-  return { blocked, indicators, score: gate.score, reason, decisions, vop };
+  return { hold, blocked, indicators, score: gate.score, reason, decisions, vop };
 }

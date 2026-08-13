@@ -4,6 +4,9 @@ import { dispatchProvider } from '../../provider/services/integrationDispatch.se
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../models/cardTransaction.model';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
+import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
+import type { RiskSeverity } from '../../../shared/models/risk.model';
+import type { TransactionSnapshot } from '../../../shared/models/transaction.model';
 
 // Phase 2 (dev.v8 F5): post-authorization, async. AML monitoring runs after the payment is authorized
 // (it never blocks the payment), and the investigation case is ENRICHED from the correlated subsystem
@@ -103,12 +106,48 @@ export class PostAuthorizationProcess {
     });
   }
 
-  // A late AML alert enriches the case too (if one exists for the transaction).
+  // A late AML alert enriches the existing case, and opens one when the alert is the ONLY signal:
+  // otherwise an AML-only alert would leave a suspicious payment with nobody assigned to review it.
+  // The payout hold is applied by PayoutOrchestrationProcess, which consumes the same event.
   private async onAmlCompleted(e: DomainEvent): Promise<void> {
-    if (!(e.payload as { alert?: boolean }).alert) return;
+    const p = e.payload as { alert?: boolean; severity?: string };
+    if (!p.alert) return;
+    const txnId = e.correlationId;
     const caseDoc = await this.db.collection<{ fraudDiagnosisInstanceReference: string }>(FRAUD_DIAGNOSIS_COLLECTION)
-      .findOne({ cardTransactionInstanceReference: e.correlationId }, { projection: { _id: 0, fraudDiagnosisInstanceReference: 1 } });
-    if (caseDoc) await this.enrichCase(e.correlationId, caseDoc.fraudDiagnosisInstanceReference);
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { _id: 0, fraudDiagnosisInstanceReference: 1 } });
+    const caseRef = caseDoc?.fraudDiagnosisInstanceReference ?? await this.openAmlCase(txnId, p.severity);
+    if (caseRef) await this.enrichCase(txnId, caseRef);
+  }
+
+  // Open an investigation from an AML alert alone. Reuses the fraud module's case factory (the owning
+  // module keeps the case semantics); returns undefined if the transaction is gone.
+  private async openAmlCase(txnId: string, severity?: string): Promise<string | undefined> {
+    const txn = await this.db.collection<{
+      cardTransactionAmount?: { amount: number; currency: string };
+      cardTransactionMerchantName?: string; cardTransactionMaskedPanDisplay?: string;
+      cardTransactionAccountReference?: string; cardTransactionStatus?: string;
+      customerAgreementInstanceReference?: string;
+    }>(CARD_TRANSACTION_COLLECTION).findOne({ cardTransactionInstanceReference: txnId });
+    if (!txn) return undefined;
+    const mapped: RiskSeverity = severity === 'critical' ? 'critical' : severity === 'high' ? 'high' : 'medium';
+    try {
+      const created = await createFraudCase(
+        this.db, txnId,
+        txn.customerAgreementInstanceReference ?? txn.cardTransactionAccountReference ?? txnId,
+        [`aml.alert${severity ? ': ' + severity : ''}`], mapped,
+        {
+          cardTransactionAmount: txn.cardTransactionAmount ?? { amount: 0, currency: 'USD' },
+          cardTransactionMerchantName: txn.cardTransactionMerchantName ?? '',
+          cardTransactionDateTime: new Date(),
+          cardTransactionStatus: (txn.cardTransactionStatus ?? 'authorized') as 'authorized',
+          cardTransactionMaskedPanDisplay: txn.cardTransactionMaskedPanDisplay ?? '',
+        } as TransactionSnapshot,
+      );
+      return created.fraudDiagnosisInstanceReference;
+    } catch (err) {
+      console.error('[post-auth] could not open an AML case:', err);
+      return undefined;
+    }
   }
 
   // A5: After a card event, update the PSP internal ledger balance for the funding payout account.

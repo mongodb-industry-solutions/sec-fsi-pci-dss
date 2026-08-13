@@ -110,3 +110,41 @@ describe('demoPublicUrl', () => {
     expect(demoPublicUrl('/simulator')).toBe('/simulator');
   });
 });
+
+// No raw identifier ever reaches a user: every gate indicator resolves to plain language.
+describe('formatRiskIndicator: gate indicators', () => {
+  it('translates the FDS gate indicator, with and without a qualifier', () => {
+    expect(formatRiskIndicator('fds.high.risk')).toBe('Fraud risk detected');
+    expect(formatRiskIndicator('fds.high.risk: velocity')).toBe('Fraud risk detected (velocity)');
+  });
+
+  it('translates a sanctions match however it is spelled', () => {
+    expect(formatRiskIndicator('hrp.sanctions.match')).toBe('Sanctions screening match');
+    expect(formatRiskIndicator('sanctions_match')).toBe('Sanctions screening match');
+  });
+
+  it('translates an AML alert and keeps its severity readable', () => {
+    expect(formatRiskIndicator('aml.alert')).toBe('Money-laundering alert');
+    expect(formatRiskIndicator('aml.alert: high')).toBe('Money-laundering alert (high severity)');
+  });
+
+  it('translates a payee-verification mismatch', () => {
+    expect(formatRiskIndicator('vop.no_match')).toBe('Payee name did not match the account holder');
+  });
+
+  it('translates the fraud-engine rule ids', () => {
+    expect(formatRiskIndicator('HIGH_VALUE_TXN')).toMatch(/High-value transaction/);
+    expect(formatRiskIndicator('RISKY_MCC')).toBe('High-risk merchant category');
+    expect(formatRiskIndicator('VELOCITY_24H')).toMatch(/24 hours/);
+    expect(formatRiskIndicator('transfer.risk.block')).toBe('Transfer flagged by risk screening');
+  });
+
+  it('keeps the existing amount and MCC labels working', () => {
+    expect(formatRiskIndicator('amount_threshold')).toMatch(/High-value transaction/);
+    expect(formatRiskIndicator('high_risk_mcc_7995')).toBe('High-risk merchant category: MCC 7995 (Gambling / Betting)');
+  });
+
+  it('never leaves dots or underscores in an unknown indicator', () => {
+    expect(formatRiskIndicator('some.new_signal')).toBe('some new signal');
+  });
+});

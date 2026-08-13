@@ -85,15 +85,50 @@ const MCC_LABELS: Record<string, string> = {
   '7995': 'Gambling / Betting',
 };
 
+// Plain-language label per indicator. Keys cover the fraud-engine rule ids and the gate indicators
+// (`fds.*`, `hrp.*`, `aml.*`, `vop.*`) that reach a case, so no raw identifier is shown to a user.
+const RISK_INDICATOR_LABELS: Record<string, string> = {
+  amount_threshold: 'High-value transaction (amount exceeds fraud threshold)',
+  high_value_txn: 'High-value transaction (amount exceeds fraud threshold)',
+  elevated_value_txn: 'Elevated transaction amount',
+  very_high_value_txn: 'Very high transaction amount',
+  risky_mcc: 'High-risk merchant category',
+  velocity_24h: 'Unusual number of transactions in 24 hours',
+  sanctions_match: 'Sanctions screening match',
+  fds_flagged: 'Flagged by fraud detection',
+  transfer_risk_block: 'Transfer flagged by risk screening',
+};
+
+const SEVERITY_WORDS: Record<string, string> = {
+  critical: 'critical', high: 'high', medium: 'medium', low: 'low',
+};
+
 export function formatRiskIndicator(indicator: string): string {
-  if (indicator === 'amount_threshold') {
-    return 'High-value transaction (amount exceeds fraud threshold)';
-  }
   const mccMatch = indicator.match(/^high_risk_mcc_(\d+)$/);
   if (mccMatch) {
     const mcc = mccMatch[1];
     const label = MCC_LABELS[mcc];
     return `High-risk merchant category: MCC ${mcc}${label ? ` (${label})` : ''}`;
   }
-  return indicator.replace(/_/g, ' ');
+
+  // Gate indicators arrive as `family.detail` with an optional ": qualifier" suffix,
+  // e.g. "fds.high.risk: velocity", "aml.alert: high", "hrp.sanctions.match".
+  const [rawKey, qualifier] = indicator.split(':').map((s) => s.trim());
+  const key = rawKey.toLowerCase().replace(/[.\s]+/g, '_');
+
+  if (RISK_INDICATOR_LABELS[key]) {
+    return qualifier ? `${RISK_INDICATOR_LABELS[key]} (${qualifier.replace(/_/g, ' ')})` : RISK_INDICATOR_LABELS[key];
+  }
+  if (key.startsWith('hrp_')) return 'Sanctions screening match';
+  if (key.startsWith('fds_')) {
+    const detail = qualifier ? RISK_INDICATOR_LABELS[qualifier.toLowerCase().replace(/[.\s]+/g, '_')] ?? qualifier.replace(/_/g, ' ') : '';
+    return detail ? `Fraud risk detected (${detail})` : 'Fraud risk detected';
+  }
+  if (key.startsWith('aml_')) {
+    const sev = SEVERITY_WORDS[(qualifier ?? '').toLowerCase()];
+    return sev ? `Money-laundering alert (${sev} severity)` : 'Money-laundering alert';
+  }
+  if (key.startsWith('vop_')) return 'Payee name did not match the account holder';
+
+  return indicator.replace(/[._]+/g, ' ');
 }

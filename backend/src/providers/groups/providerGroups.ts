@@ -286,21 +286,23 @@ export class ProviderGroups {
     }));
   }
 
-  // Sanctions/HRP screening. Fail-open on transport error; a match is a hard decline.
+  // Sanctions/HRP screening. Fail-open on transport error. A match holds the payment for investigation
+  // (funds frozen, nothing delivered) rather than declining it: the freeze obligation is met by never
+  // completing the payment, and only an explicit L1/L2 resolution can release or reverse it.
   private async onHrp(e: DomainEvent): Promise<void> {
     const p = e.payload as Record<string, unknown>;
-    let approved = true;
+    let sanctionsMatch = false;
     let reason: string | undefined;
     try {
       const r = await dispatchProvider(this.db, 'hrp_sanctions', 'hrp.screening.requested', {
         cardTransactionInstanceReference: e.correlationId, accountReference: p.accountReference, merchantName: p.merchantName,
       }, { entityType: 'transaction', entityId: e.correlationId, processType: 'aml_screening' });
       const b = r.responseBody as { hrpcMatch?: boolean; match?: boolean } | undefined;
-      if (b && (b.hrpcMatch ?? b.match)) { approved = false; reason = 'sanctions_match'; }
+      if (b && (b.hrpcMatch ?? b.match)) { sanctionsMatch = true; reason = 'sanctions_review'; }
     } catch { /* fail-open */ }
     void this.bus.publish(makeEvent({
       eventType: 'hrp.screening.completed', correlationId: e.correlationId, businessProcess: 'card_payment', source: 'callback.hrp', causationId: e.eventId,
-      payload: { transactionId: e.correlationId, outcome: approved ? 'approved' : 'declined', approved, reason },
+      payload: { transactionId: e.correlationId, outcome: 'approved', approved: true, sanctionsMatch, reason },
       bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
     }));
   }

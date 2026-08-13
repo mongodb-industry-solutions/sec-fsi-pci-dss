@@ -51,15 +51,16 @@ export async function screenTransfer(
   if (fdsR.flag) indicators.push(`fds.high.risk${fdsR.reason ? ': ' + fdsR.reason : ''}`);
   if (amlR.alert) indicators.push(`aml.alert${amlR.severity ? ': ' + amlR.severity : ''}`);
 
-  // Hold for investigation: sanctions match, FDS flag, or a high/critical AML alert.
-  const severe = amlR.severity === 'high' || amlR.severity === 'critical';
-  const hold = hrpR.match || fdsR.flag || (amlR.alert && severe);
+  // Hold for investigation on ANY risk signal: sanctions match, FDS flag or an AML alert of any
+  // severity. A pre-initiation alert holds the movement instead of letting it reach the rail and be
+  // reviewed afterwards, so the money is always immobilised while the case is open.
+  const hold = hrpR.match || fdsR.flag || amlR.alert;
   const reason = hrpR.match
     ? 'Sanctions screening match (HRP).'
     : fdsR.flag
       ? `Fraud risk${fdsR.reason ? ': ' + fdsR.reason : ''} (FDS).`
-      : (amlR.alert && severe)
-        ? `AML alert (${amlR.severity}).`
+      : amlR.alert
+        ? `AML alert${amlR.severity ? ` (${amlR.severity})` : ''}.`
         : undefined;
 
   return { hold, indicators, score: fdsR.score, reason };

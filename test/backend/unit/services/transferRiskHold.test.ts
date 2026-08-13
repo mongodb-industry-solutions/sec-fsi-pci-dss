@@ -79,11 +79,13 @@ describe('screenTransfer: a risk signal is a hold, not a block', () => {
     expect(r.indicators).toContain('hrp.sanctions.match');
   });
 
-  it('holds on a severe AML alert but passes a low one to post-initiation monitoring', async () => {
-    providerVerdicts({ aml: { alert: true, severity: 'high' } });
-    expect((await screenTransfer({} as Db, input)).hold).toBe(true);
-    providerVerdicts({ aml: { alert: true, severity: 'low' } });
-    expect((await screenTransfer({} as Db, input)).hold).toBe(false);
+  // ADR-061: any AML alert holds. Before, a low alert let the transfer reach the rail and was only
+  // reviewed afterwards, so the money was gone while the case was open.
+  it('holds on an AML alert of any severity', async () => {
+    for (const severity of ['critical', 'high', 'medium', 'low']) {
+      providerVerdicts({ aml: { alert: true, severity } });
+      expect((await screenTransfer({} as Db, input)).hold, severity).toBe(true);
+    }
   });
 
   it('does not hold a clean transfer', async () => {

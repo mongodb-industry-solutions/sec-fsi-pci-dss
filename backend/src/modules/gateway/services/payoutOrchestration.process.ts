@@ -7,7 +7,7 @@ import { Db } from 'mongodb';
 import { EventBus, DomainEvent } from '../../../vendors/eventbus';
 import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransaction.model';
 import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
-import type { PaymentExecutionStatus } from '../models/paymentExecution.model';
+import { PAYMENT_EXECUTION_COLLECTION, type PaymentExecutionStatus } from '../models/paymentExecution.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution, resolveMerchantFee } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
@@ -26,6 +26,7 @@ export class PayoutOrchestrationProcess {
   register(): void {
     this.bus.subscribe('card.payment.authorization.completed', (e) => this.onAuthorized(e));
     this.bus.subscribe('fraud.case.resolved', (e) => this.onCaseResolved(e));
+    this.bus.subscribe('aml.monitoring.completed', (e) => this.onAmlAlert(e));
     this.bus.subscribe('bank.transfer.settled', (e) => this.onTransferSettled(e));
     this.bus.subscribe('bank.transfer.failed', (e) => this.onTransferFailed(e));
   }
@@ -83,6 +84,38 @@ export class PayoutOrchestrationProcess {
     } catch (err) {
       console.error(`[payout-orch] Failed to apply case resolution for txn ${txnId}:`, err);
     }
+  }
+
+  // AML runs after authorization, so its alert can land once the payout is already moving. Recall it
+  // while that is still possible (nothing handed to the rail yet) and hold it for the investigation.
+  // Past that point the rail owns the transfer: record it, and the case reviews it post-settlement.
+  private async onAmlAlert(e: DomainEvent): Promise<void> {
+    if (!(e.payload as { alert?: boolean }).alert) return;
+    const txnId = e.correlationId;
+    const exec = await this.db.collection<{ paymentExecutionInstanceReference: string; paymentExecutionStatus: string; grossAmount?: number; currency: string; resolvedPayoutAccountReference?: string; merchantAgreementReference?: string }>(PAYMENT_EXECUTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId });
+    if (!exec) { await this.withholdPayout(txnId); return; }
+
+    const recallable = exec.paymentExecutionStatus === 'routing' || exec.paymentExecutionStatus === 'scheduled';
+    if (!recallable) {
+      emitProcessEvent(this.db, {
+        entityType: 'execution', entityId: exec.paymentExecutionInstanceReference,
+        processType: 'payment_processing', processAction: 'payout.recall.not.possible',
+        processOutcome: 'pending',
+        performedByPartyReference: null, performedByRole: null,
+        eventSummary: { txnId, reason: 'aml_alert_after_rail_dispatch', executionStatus: exec.paymentExecutionStatus },
+        bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+      });
+      return;
+    }
+
+    const heldAmount = await this.convert(exec.grossAmount ?? 0, exec.currency, await this.accountCurrency(exec.resolvedPayoutAccountReference ?? ''));
+    await this.abortPayout({
+      execRef: exec.paymentExecutionInstanceReference, status: 'exception', reason: 'Recalled and held for AML investigation',
+      payoutAccountRef: exec.resolvedPayoutAccountReference ?? '', heldAmount,
+      merchantRef: exec.merchantAgreementReference ?? '', txnId,
+    });
+    await this.withholdPayout(txnId);
   }
 
   // Held transfer (bank / P2P): cleared submits it to the rail, confirmed fraud returns the funds.

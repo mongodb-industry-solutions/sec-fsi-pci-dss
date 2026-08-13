@@ -13,6 +13,7 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { PAYMENT_REQUEST_COLLECTION, PaymentRequestProcedure } from '../models/paymentRequest.model';
 import { getRtpRequest, transitionRequest, RtpError } from './rtpRequest.service';
 import { screenRtpRequest } from './rtpScreening.service';
+import { RISK_HOLD_STEP } from './transferReview.service';
 import { createNotification, markReadByRelated } from '../../notification/notifications.service';
 
 export interface ApproveRtpInput {
@@ -84,7 +85,8 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
     return { status: 'blocked', request: current!, reason: screen.reason };
   }
 
-  // 3. Hold payer funds (available -> pending), conditional on sufficient available balance.
+  // 3. Hold payer funds (available -> pending), conditional on sufficient available balance. Applies to
+  // both paths: a risk hold reserves the funds exactly the same, it just never reaches the rail.
   const held = await holdCardFunds(db, funding.payoutAccountInstanceReference, req.amount);
   if (!held) throw new RtpError('insufficient_funds', 'Insufficient available balance to approve this request', 422);
 
@@ -105,13 +107,50 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
     paymentExecutionRail: rail,
     routingNote: `RTP approval for request ${ref}`,
     ...(req.purpose ? { paymentExecutionRemittanceInformation: req.purpose } : {}),
-    paymentExecutionStatus: 'routing',
+    paymentExecutionStatus: screen.hold ? 'pending' : 'routing',
     initiatedAt: now,
-    resolutionLog: [{ stepName: 'rtp.approved', stepOutcome: 'found', stepNote: `request=${ref}`, stepDateTime: now }],
+    resolutionLog: [
+      { stepName: 'rtp.approved', stepOutcome: 'found', stepNote: `request=${ref}`, stepDateTime: now },
+      ...(screen.hold ? [{ stepName: RISK_HOLD_STEP, stepOutcome: 'fallback' as const, stepNote: screen.indicators.join(', ') || 'risk hold', stepDateTime: now }] : []),
+    ],
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
   };
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
+
+  // 4b. Held for investigation: the payer's funds are reserved and the execution is linked, but nothing
+  // is dispatched. The request stays `accepted`; the case resolution moves it forward (ADR-061).
+  if (screen.hold) {
+    await transitionRequest(db, ref, 'accepted', {
+      action: 'rtp.request.accepted', actor: input.actor, role: input.role, outcome: 'pending',
+      attribution: input.attribution, summary: 'RTP approved by payer; held for security review',
+      set: {
+        authorizationContext: {
+          authMethod: input.authMethod ?? 'session_jwt', subject: input.actor, channel: 'in_app',
+          deviceUserAgent: input.deviceUserAgent, authenticatedAt: new Date(), authResult: 'approved',
+        },
+        payerFundingAccountReference: funding.payoutAccountInstanceReference,
+        policyDecisions: screen.decisions,
+        riskFlags: screen.indicators,
+        linkedPaymentExecutionReference: executionRef,
+      },
+    });
+    emitComplianceEvent(db, {
+      entityType: 'payment_request', entityId: ref, processType: 'payment_processing',
+      processAction: 'transfer.held.for.review', processOutcome: 'pending',
+      performedByPartyReference: input.actor, performedByRole: input.role ?? 'customer',
+      eventSummary: { amount: req.amount, currency: req.currency, executionReference: executionRef, indicators: screen.indicators, score: screen.score },
+      bianServiceDomain: BIAN_SD, bianControlRecordType: BIAN_CR, attribution: input.attribution,
+    });
+    if (req.payerPartyReference) await createNotification(db, {
+      recipientPartyReference: req.payerPartyReference, notificationType: 'payment_request',
+      title: 'Payment approved and held for review',
+      detail: 'The amount is reserved on your account and has not been sent. The payment completes once the review closes.',
+      href: `/system/payment/history/${ref}`, relatedReference: ref, actionable: false,
+    });
+    const heldRequest = await getRtpRequest(db, ref);
+    return { status: 'accepted', request: heldRequest!, executionReference: executionRef, reason: screen.reason };
+  }
 
   // 5. Dispatch through payment_initiation (ADR-039). Settlement arrives async as bank.transfer.settled/failed.
   const dispatch = await dispatchProvider(db, 'payment_initiation', 'provider.payment_initiation.transfer.requested', {

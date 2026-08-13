@@ -10,6 +10,7 @@ import { Check, Copy, Eye, EyeOff, Info } from 'lucide-react';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
 import { useNotificationsStream } from '../../../../../lib/useNotificationsStream';
+import { formatRiskIndicator } from '../../../../../lib/constants';
 
 // Inline tooltip with floating popup.
 function FieldInfo({ label, description }: { label: string; description: string }) {
@@ -606,7 +607,7 @@ export default function TransactionDetailPage() {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {fc.riskIndicators.map((ind) => (
-                    <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{ind}</span>
+                    <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{formatRiskIndicator(ind)}</span>
                   ))}
                 </div>
               </div>

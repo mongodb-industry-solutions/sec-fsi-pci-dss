@@ -2545,3 +2545,52 @@ integrator that polls `GET /gateway/transfers/:ref/status` sees `pending` and th
 request `presented` with no funds moved and a case opened, and the payer re-approves once it clears. The
 money-safety invariant already holds there (nothing is reserved, nothing is delivered), so aligning it
 to the `pending` execution model is a follow-up, not a correctness fix.
+
+### ADR-061: one risk policy for every movement, with no unsupervised outcome (v36)
+
+**Status.** Accepted.
+
+**Context.** ADR-059/060 unified the happy path but left four asymmetries where a risk signal still had
+an unsupervised outcome: (a) a sanctions match on a card payment declined the payment and, because the
+saga's decline branch publishes `fraudCaseCreated: false`, opened NO case, so a sanctions hit was a
+silent rejection nobody reviewed; (b) an AML alert on a card payment only enriched a case that already
+existed, so an AML-only alert settled with nobody assigned to it; (c) a non-severe AML alert on a
+transfer let the movement reach the rail and opened the case afterwards, money already gone; (d) an RTP
+approval held for review kept the request `presented` with no linked execution, so the resolution had no
+effect and the payer had to re-approve into the same rule.
+
+**Decision.** Risk signals (fraud, sanctions, AML) hold and always open a case; eligibility failures
+reject. Applied per surface:
+
+1. **Sanctions on cards hold.** `hrp.screening.completed` carries `sanctionsMatch` and completes as
+   approved. The saga merges it into the risk verdict handed to `completeAuthorized`
+   (`recommendation: 'review'`, `rulesFired += 'sanctions_match'`, score floored at 90), so the payment
+   is authorized, the payout withheld and a high-severity case opened. The freeze obligation is met by
+   never completing the payment: only an L1/L2 resolution can release or reverse it.
+2. **An AML-only alert opens a case.** `PostAuthorizationProcess` opens one through the fraud module's
+   own factory when no case exists, then enriches it as before.
+3. **The AML alert recalls a recallable payout.** `PayoutOrchestrationProcess` consumes
+   `aml.monitoring.completed`: while the execution is still `routing`/`scheduled` it aborts the payout
+   (existing compensation releases the merchant reservation) and withholds it. Once the rail has the
+   transfer, it is NOT recallable: that is recorded as `payout.recall.not.possible` and the case reviews
+   it post-settlement, which is AML's designed post-hoc nature. No invented reversal.
+4. **Any AML alert holds a transfer.** The gate no longer distinguishes severity.
+5. **A held RTP approval joins the model.** The payer's funds are held and the execution is created in
+   `pending` with the `risk.hold` step and linked to the request, which stays `accepted` (accepted, not
+   initiated). `RtpLifecycleProcess` consumes the hold outcome: released -> `payment_initiated` (the
+   rail then settles it as usual), reversed -> `payment_failed`. VoP keeps rejecting: a payee-name
+   mismatch is a verification failure, not a risk score.
+
+**Architecture.** No deviation: every cross-module reaction is an event (`fraud.case.resolved`,
+`aml.monitoring.completed`, `transfer.hold.released/reversed`), every provider call still goes through
+`dispatchProvider`, and each decision stays in its owning module (case semantics in `fraud`, ledger and
+rail in `gateway`, authorization in `transaction`). No new collection, field, DEK or index, so nothing
+to add to `setup/` or `seed/` and no `--reset`.
+
+**API.** Unchanged. The only additive state-machine change is `accepted -> payment_failed` for an RTP
+request that was accepted, held and then confirmed fraudulent; a held approval still answers
+`status: 'accepted'`.
+
+**Consequences.** Every risk outcome on every movement type is now supervised: something is held, a case
+exists, and a human decides. The single remaining unrecallable window is an AML alert that lands after
+the rail has taken the transfer, which is documented rather than papered over.
