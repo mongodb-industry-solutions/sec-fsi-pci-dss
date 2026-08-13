@@ -1123,14 +1123,15 @@ surface becomes one collection with one merge.
 | FR-v36-09 | One movement collection | `GET /transactions` returns every kind by default as `kind`-discriminated rows, `kind` narrows, filters `status`/`merchant`/`cardToken`/`maskedPan`/`email`/`transactionId`, single `{results,total,page,limit}` envelope; `/transactions/all` removed; `GET /transactions/:id` resolves any kind |
 | FR-v36-10 | The merge exists once | `gateway/services/paymentMovement.service.ts` owns normalization, RTP de-dup and paging; the merchant channel and the staff/session channel consume it; the customer history page issues one request and no longer merges |
 | FR-v36-11 | The external consumer is unaffected | leafy-wallet's merchant-OAuth call keeps its rows, envelope and field names; no RTP rows are added to a merchant-isolated view; a unit test asserts the consumer's exact field reads |
-| FR-v36-12 | Gate indicators read as plain language | `formatRiskIndicator` translates `fds.*`, `hrp.*`, `aml.*`, `vop.*` and the engine rule ids; the transaction detail uses the formatter |
+| FR-v36-12 | Every movement is visible to oversight roles | `/system/transactions` lists card payments, transfers and payment requests for L1 / L2 / auditor with a kind badge, counterparty, destination, rail and the `held` / `case` markers; each row reaches its detail. Panels awaiting the enrichment read-model render an animated skeleton with `role="status"` instead of nothing |
+| FR-v36-13 | Gate indicators read as plain language | `formatRiskIndicator` translates `fds.*`, `hrp.*`, `aml.*`, `vop.*` and the engine rule ids; the transaction detail uses the formatter |
 
 ### Definition of Done
 
 - [x] `test:unit` green (82 files / 764 cases at close), including `paymentMovement.test.ts` (22),
       `caseEnrichmentMovements.test.ts` (18), `riskHoldParity.test.ts` (9), `transferRiskHold.test.ts` (11)
       and `payoutInvestigationHold.test.ts` (8).
-- [x] `npx playwright test --project=chromium` green (110 specs).
+- [x] `npx playwright test --project=chromium` green (113 specs).
 - [x] Backend and frontend type-checks clean.
 - [x] ADR-059..063 recorded in `engineering-proposal.md`; `technical-spec.md` updated (gate policy, hold
       lifecycle, case discriminator, movement collection).

@@ -93,6 +93,37 @@ test.describe('FR-v2-11: case detail', () => {
 });
 
 // A non-card case (transfer / RTP) must show its own counterparty, never an empty merchant panel.
+// Panels that are still loading must animate, or the page reads as "data missing".
+test.describe('case detail loading state', () => {
+  test('shows a skeleton while the enrichment is in flight', async ({ page, context }) => {
+    await page.route('**/api/v1/fraud/stats**', (r) => r.fulfill(json({ total: 1, byStatus: [], bySeverity: [] })));
+    await page.route('**/api/v1/customer**', (r) => r.fulfill(json({ customerName: 'Jane Doe' })));
+    await page.route('**/api/v1/fraud**', async (route) => {
+      const p = new URL(route.request().url()).pathname;
+      if (p.endsWith('/events')) return route.fulfill(json({ caseId: 'FD-0001', events: [] }));
+      if (p.endsWith('/notes')) return route.fulfill(json({ notes: [] }));
+      if (p.endsWith('/questions')) return route.fulfill(json({ questions: [] }));
+      // Hold the enrichment so the skeleton is observable.
+      if (p.endsWith('/enrichment')) {
+        await new Promise((r) => setTimeout(r, 2500));
+        return route.fulfill(json({ caseId: 'FD-0001', asOf: '2026-06-01T10:00:00Z' }));
+      }
+      if (p.includes('/hrpc/')) return route.fulfill(json({ match: false }));
+      if (/\/fraud\/[^/]+$/.test(p)) return route.fulfill(json(CASE));
+      return route.fulfill(json({ results: [CASE], total: 1, page: 1, limit: 20 }));
+    });
+    await loginAs(context, 'level1_analyst');
+    await page.goto('/system/investigation/FD-0001');
+    await expect(page.getByText('CASE-2026-0001').first()).toBeVisible({ timeout: 15000 });
+    // The skeleton announces itself and animates.
+    const skeleton = page.getByRole('status').filter({ hasText: 'Loading investigation details' });
+    await expect(skeleton).toBeAttached();
+    await expect(skeleton.locator('.animate-pulse').first()).toBeVisible();
+    // And it gives way to the real panels.
+    await expect(skeleton).toHaveCount(0, { timeout: 10000 });
+  });
+});
+
 test.describe('case detail for a non-card movement', () => {
   const TRANSFER_CASE = {
     ...CASE,

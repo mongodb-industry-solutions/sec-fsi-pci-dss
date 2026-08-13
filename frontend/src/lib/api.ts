@@ -945,11 +945,11 @@ export const api = {
     // returns the paginated envelope like every other query.
     getByCardToken: (cardToken: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(
-        `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}&limit=100`, {}, token
+        `/api/v1/transactions?kind=card&cardToken=${encodeURIComponent(cardToken)}&limit=100`, {}, token
       ),
     getByMaskedPan: (maskedPan: string, token: string) =>
       apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(
-        `/api/v1/transactions?maskedPan=${encodeURIComponent(maskedPan)}&limit=100`, {}, token
+        `/api/v1/transactions?kind=card&maskedPan=${encodeURIComponent(maskedPan)}&limit=100`, {}, token
       ),
     getNotes: (txnId: string, token: string) =>
       apiFetch<TransactionNotesResponse>(`/api/v1/transactions/${txnId}/notes`, {}, token),

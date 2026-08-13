@@ -141,6 +141,8 @@ export default function CardDetailPage() {
     setTxnsLoading(true);
     try {
       const params: Parameters<typeof api.transactions.list>[0] = {
+        // This panel renders card transactions: ask for the card document shape.
+        kind: 'card',
         cardToken,
         page,
         limit: 10,

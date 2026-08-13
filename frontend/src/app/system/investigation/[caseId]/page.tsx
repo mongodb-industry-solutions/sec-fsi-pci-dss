@@ -74,6 +74,9 @@ export default function DemoCaseDetailPage() {
   const [events, setEvents] = useState<ActionEvent[]>([]);
   const [hrpc, setHrpc] = useState<HrpcCheckResponse | null>(null);
   const [enrichment, setEnrichment] = useState<CaseEnrichment | null>(null);
+  // The enrichment read-model arrives after the case document: without this the panels would simply
+  // be absent and the page would look like it was missing data.
+  const [enrichmentLoading, setEnrichmentLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   // Customer profile linked to the case (auto-loaded from customerAgreementInstanceReference)
@@ -147,6 +150,7 @@ export default function DemoCaseDetailPage() {
   // hardcoded lookup). Eventual consistency: the read-model reports `asOf` and pending fields.
   useEffect(() => {
     if (!token || !caseId) return;
+    setEnrichmentLoading(true);
     api.fraud.enrichment(caseId, token, escalationToken ?? undefined)
       .then((e) => {
         setEnrichment(e);
@@ -161,7 +165,8 @@ export default function DemoCaseDetailPage() {
           setHrpc(null);
         }
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => setEnrichmentLoading(false));
   }, [token, caseId, escalationToken]);
 
   async function handleAction(body: Parameters<typeof api.fraud.update>[1], successMsg: string) {
@@ -380,6 +385,29 @@ export default function DemoCaseDetailPage() {
             </div>
           )}
         </div>
+
+        {/* Panels in flight: a skeleton keeps the layout and says the data is coming. */}
+        {enrichmentLoading && !enrichment && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" role="status" aria-live="polite">
+            <span className="sr-only">Loading investigation details…</span>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="bg-white rounded-xl border p-5 animate-pulse">
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-4 w-4 rounded bg-gray-200" />
+                  <div className="h-3 w-32 rounded bg-gray-200" />
+                </div>
+                <div className="space-y-2">
+                  {[0, 1, 2, 3].map((r) => (
+                    <div key={r} className="grid grid-cols-2 gap-4">
+                      <div className="h-3 rounded bg-gray-100" />
+                      <div className="h-3 rounded bg-gray-200" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* -- Investigation enrichment (read-model: operation + SDF history + counterparty + KYC) -- */}
         {enrichment && (() => {

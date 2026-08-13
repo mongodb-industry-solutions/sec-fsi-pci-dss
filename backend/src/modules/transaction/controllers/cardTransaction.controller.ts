@@ -376,10 +376,10 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
     // Privacy: a customer may only list their OWN movements. Ignore any email they pass.
     const effectiveEmail = userRole === 'customer' ? jwtEmail : q.email;
 
-    // A card-only query (by kind, or by a filter only a card can satisfy) is served by the QE-aware
-    // card query alone: its shape is the card document, as it has always been.
-    const cardOnly = q.kind === 'card' || !!q.cardToken || !!q.maskedPan || !!q.merchant;
-    if (cardOnly) {
+    // ONLY an explicit `kind=card` returns the card document shape (what card-specific consumers
+    // expect). Everything else returns normalized movement rows, so the response shape depends on one
+    // parameter and nothing else.
+    if (q.kind === 'card') {
       return reply.send(await getAllTransactions(
         fastify.db,
         { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, transactionId: q.transactionId },
@@ -392,15 +392,20 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
       ? (request as unknown as { user?: { partyRef?: string } }).user?.partyRef
       : undefined;
     const canSeePayeeName = userRole === 'level2_investigator' || userRole === 'security_auditor';
-    const nonCard = q.kind === 'transfer' || q.kind === 'rtp' || !q.kind
+    // A card-only filter (token / masked PAN / merchant name) cannot match a transfer or a request,
+    // so those sources are skipped rather than queried and discarded.
+    const cardOnlyFilter = !!q.cardToken || !!q.maskedPan || !!q.merchant;
+    const nonCard = !q.kind && !cardOnlyFilter
       ? await listNonCardMovements(fastify.db, { partyRef, includePayeeName: canSeePayeeName })
-      : [];
+      : q.kind === 'transfer' || q.kind === 'rtp'
+        ? await listNonCardMovements(fastify.db, { partyRef, includePayeeName: canSeePayeeName })
+        : [];
     // Card rows are fetched unpaged for the merge; the page is applied to the merged set.
-    const cardRows = q.kind
+    const cardRows = q.kind === 'transfer' || q.kind === 'rtp'
       ? []
       : (await getAllTransactions(
           fastify.db,
-          { status: q.status, email: effectiveEmail, transactionId: q.transactionId },
+          { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, transactionId: q.transactionId },
           1, 500,
         )).results.map((r) => normalizeCardRow(r as Record<string, unknown>));
 
