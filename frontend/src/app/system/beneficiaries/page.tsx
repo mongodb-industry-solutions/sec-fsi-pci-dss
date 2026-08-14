@@ -12,6 +12,7 @@ import { AuditTrailLink } from '../../../components/AuditTrailLink';
 import { downloadJsonFile, appliedFilters } from '../../../lib/downloadJson';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
+import { formatAmount } from '../../../lib/money';
 
 interface Beneficiary {
   counterpartyArrangementReference: string;
@@ -34,7 +35,7 @@ interface PayoutAccountOption {
 }
 
 function fmtAmount(n: number, currency: string) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n);
+  return formatAmount(n, currency, { locale: 'en-GB' });
 }
 
 // ── Send Money Modal ──────────────────────────────────────────────────────────

@@ -7,11 +7,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, X, Info, ArrowDownLeft, ArrowUpRight, ArrowLeft, ExternalLink } from 'lucide-react';
 import { api, RtpRequestDTO } from '../lib/api';
+import { formatAmount } from '../lib/money';
 
 const PENDING = ['created', 'validated', 'presented', 'delivered', 'viewed'];
 
 function fmt(n: number, ccy: string) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: ccy }).format(n);
+  return formatAmount(n, ccy);
 }
 
 const STATUS_COLOR: Record<string, string> = {

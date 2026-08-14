@@ -17,6 +17,7 @@ import { AccessDenied } from '../../../../components/AccessDenied';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { Tooltip } from '../../../../components/Tooltip';
 import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { formatAmount } from '../../../../lib/money';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -265,7 +266,7 @@ export default function TransactionDetailPage() {
   if (movement.kind && movement.kind !== 'card') {
     const KIND_LABEL: Record<string, string> = { transfer: 'Transfer', rtp: 'Request to Pay' };
     const amount = movement.grossAmount != null && movement.currency
-      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: movement.currency }).format(movement.grossAmount)
+      ? formatAmount(movement.grossAmount, movement.currency)
       : '-';
     const at = movement.completedAt ?? movement.initiatedAt;
     return (
@@ -354,7 +355,7 @@ export default function TransactionDetailPage() {
   }
 
   const formattedAmount = txn.cardTransactionAmount
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)
+    ? formatAmount(txn.cardTransactionAmount.amount, txn.cardTransactionAmount.currency)
     : '-';
 
   const crumbs: Crumb[] = fromCase
@@ -434,7 +435,7 @@ export default function TransactionDetailPage() {
           {feeAmount != null && (
             <>
               <InfoLabel label="Merchant commission" tip="acquiring commission captured on this payment (fee attributed to the merchant), in the settlement currency." />
-              <span className="font-mono text-xs">{currency ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(feeAmount) : feeAmount}</span>
+              <span className="font-mono text-xs">{currency ? formatAmount(feeAmount, currency) : feeAmount}</span>
             </>
           )}
           {txn.cardTransactionChannel && (

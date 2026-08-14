@@ -5,6 +5,7 @@ import { SectionHeader } from '../../../../../components/SectionHeader';
 import { Pagination } from '../../../../../components/Pagination';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { api } from '../../../../../lib/api';
+import { formatAmount } from '../../../../../lib/money';
 
 interface PaymentLink {
   paymentLinkInstanceReference: string;
@@ -203,7 +204,7 @@ export default function LinksSectionPage() {
                   </div>
                   <div className="text-sm text-gray-700 mt-0.5 truncate">{link.paymentLinkDescription}</div>
                   <div className="text-xs text-gray-400">
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: link.paymentLinkCurrency }).format(link.paymentLinkAmount)}
+                    {formatAmount(link.paymentLinkAmount, link.paymentLinkCurrency)}
                     {' · '}{link.paymentLinkCurrentUses} use{link.paymentLinkCurrentUses !== 1 ? 's' : ''}
                   </div>
                 </div>

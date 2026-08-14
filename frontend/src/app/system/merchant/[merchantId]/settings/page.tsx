@@ -5,6 +5,7 @@ import { SectionHeader } from '../../../../../components/SectionHeader';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { api } from '../../../../../lib/api';
+import { formatAmount } from '../../../../../lib/money';
 
 const CURRENCY_OPTIONS = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF'];
 const SETTLEMENT_OPTIONS = ['T+1', 'T+2', 'T+3'];
@@ -130,7 +131,7 @@ export default function SettingsSectionPage() {
   }
 
   const fmtLimit = (n?: number) =>
-    n === undefined ? '-' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+    n === undefined ? '-' : formatAmount(n, 'USD');
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5">

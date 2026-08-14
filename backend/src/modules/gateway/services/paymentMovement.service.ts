@@ -70,6 +70,12 @@ export interface MovementRow {
 const iso = (d?: Date | string | null): string | null =>
   d ? (d instanceof Date ? d.toISOString() : new Date(d).toISOString()) : null;
 
+// Contract fields: emitting undefined breaks a consumer that formats them, so both fall back here.
+const UNKNOWN_STATUS = 'unknown';
+const FALLBACK_CURRENCY = 'USD';
+const status = (value?: string | null): string => (value && value.trim()) || UNKNOWN_STATUS;
+const currencyOf = (value?: string | null): string => (value && value.trim().toUpperCase()) || FALLBACK_CURRENCY;
+
 const isHeld = (exec: { paymentExecutionStatus?: string; resolutionLog?: Array<{ stepName?: string }> }): boolean =>
   exec.paymentExecutionStatus === 'pending' && !!exec.resolutionLog?.some((s) => s.stepName === RISK_HOLD_STEP);
 
@@ -83,9 +89,9 @@ export function normalizeExecutionRow(exec: PaymentExecutionProcedure, viewerPar
     grossAmount: exec.grossAmount,
     netAmount: exec.netAmount,
     feeAmount: exec.feeAmount,
-    currency: exec.currency,
+    currency: currencyOf(exec.currency),
     paymentExecutionRail: exec.paymentExecutionRail ?? null,
-    paymentExecutionStatus: exec.paymentExecutionStatus,
+    paymentExecutionStatus: status(exec.paymentExecutionStatus),
     concept: exec.paymentExecutionRemittanceInformation ?? exec.routingNote ?? null,
     beneficiaryName: exec.beneficiaryName ?? null,
     destinationAccountMasked: exec.destinationAccountMasked ?? null,
@@ -110,9 +116,9 @@ export function normalizeRequestRow(
     paymentExecutionInstanceReference: req.paymentRequestInstanceReference,
     direction: opts.viewerPartyRef && req.requesterPartyReference === opts.viewerPartyRef ? 'received' : 'sent',
     grossAmount: req.amount,
-    currency: req.currency,
+    currency: currencyOf(req.currency),
     paymentExecutionRail: null,
-    paymentExecutionStatus: req.status,
+    paymentExecutionStatus: status(req.status),
     concept: req.purpose ?? null,
     beneficiaryName: opts.includePayeeName ? (req.payeeName ?? null) : null,
     destinationAccountMasked: null,
@@ -134,9 +140,9 @@ export function normalizeCardRow(txn: Record<string, unknown>): MovementRow {
     paymentExecutionInstanceReference: txn.cardTransactionInstanceReference as string,
     direction: 'sent',
     grossAmount: amount.amount,
-    currency: amount.currency ?? 'USD',
+    currency: currencyOf(amount.currency),
     paymentExecutionRail: 'card',
-    paymentExecutionStatus: txn.cardTransactionStatus as string,
+    paymentExecutionStatus: status(txn.cardTransactionStatus as string | undefined),
     concept: (txn.cardTransactionDescription as string) ?? null,
     beneficiaryName: (txn.cardTransactionMerchantName as string) ?? null,
     destinationAccountMasked: (txn.cardTransactionMaskedPanDisplay as string) ?? null,
@@ -197,6 +203,75 @@ export async function attachFraudCases(db: Db, rows: MovementRow[]): Promise<Mov
       },
     };
   });
+}
+
+// ── Filters, applied to the merged set before paging, so `total` is the filtered count ──────────
+
+/** Movement method: the two-axis taxonomy (how it was accepted) as opposed to its lifecycle state. */
+export type MovementMethod = 'card' | 'payment_link' | 'redirect' | 'p2p' | 'bank' | 'rtp';
+
+export interface MovementFilters {
+  /** Lifecycle states; a UI status group covers several, so this is a list. */
+  statuses?: string[];
+  /** Money direction from the viewer's perspective. */
+  direction?: 'in' | 'out';
+  method?: MovementMethod;
+  /** `any` = flagged, `none` = not flagged, anything else = that case status. Needs fraud attached. */
+  fraud?: string;
+  /** Free text over merchant/beneficiary, masked PAN, concept, reference and amount. */
+  q?: string;
+}
+
+const BANK_RAILS = new Set(['sepa', 'ach', 'swift', 'local_bank']);
+// A card refund/adjustment is money in; a state that moved nothing is neither in nor out.
+const CARD_CREDIT_TYPES = new Set(['refund', 'adjustment']);
+const NON_MOVEMENT_STATUS = new Set(['declined', 'failed', 'voided', 'expired', 'rejected', 'cancelled']);
+
+export function movementDirection(row: MovementRow): 'in' | 'out' | 'neutral' {
+  if (row.kind !== 'card') return row.direction === 'received' ? 'in' : 'out';
+  if (NON_MOVEMENT_STATUS.has(row.paymentExecutionStatus)) return 'neutral';
+  return row.transactionType && CARD_CREDIT_TYPES.has(row.transactionType) ? 'in' : 'out';
+}
+
+export function movementMethod(row: MovementRow): MovementMethod {
+  if (row.kind === 'rtp') return 'rtp';
+  if (row.kind === 'transfer') return BANK_RAILS.has((row.paymentExecutionRail ?? '').toLowerCase()) ? 'bank' : 'p2p';
+  const accepted = (row.acceptanceMethod ?? '').toLowerCase();
+  if (accepted === 'payment_link') return 'payment_link';
+  if (accepted === 'redirect_checkout') return 'redirect';
+  return 'card';
+}
+
+function matchesText(row: MovementRow, needle: string): boolean {
+  const haystack = [
+    row.beneficiaryName, row.destinationAccountMasked, row.concept, row.paymentExecutionInstanceReference,
+    row.paymentExecutionRail, row.merchantCategoryCode, row.fraudCase?.reference,
+    row.grossAmount != null ? String(row.grossAmount) : null,
+  ];
+  return haystack.some((v) => (v ?? '').toLowerCase().includes(needle));
+}
+
+export function filterMovements(rows: MovementRow[], filters: MovementFilters): MovementRow[] {
+  const statuses = filters.statuses?.length ? new Set(filters.statuses) : undefined;
+  const needle = filters.q?.trim().toLowerCase();
+  return rows.filter((row) => {
+    if (statuses && !statuses.has(row.paymentExecutionStatus)) return false;
+    if (filters.direction && movementDirection(row) !== filters.direction) return false;
+    if (filters.method && movementMethod(row) !== filters.method) return false;
+    if (filters.fraud) {
+      const flagged = !!row.fraudCase?.created;
+      if (filters.fraud === 'none' && flagged) return false;
+      if (filters.fraud === 'any' && !flagged) return false;
+      if (filters.fraud !== 'none' && filters.fraud !== 'any' && row.fraudCase?.status !== filters.fraud) return false;
+    }
+    if (needle && !matchesText(row, needle)) return false;
+    return true;
+  });
+}
+
+/** True when the filter set can only be resolved with investigation data attached. */
+export function needsFraudCases(filters: MovementFilters): boolean {
+  return !!filters.fraud || !!filters.q?.trim();
 }
 
 export function sortAndPage(rows: MovementRow[], page: number, limit: number): { results: MovementRow[]; total: number } {

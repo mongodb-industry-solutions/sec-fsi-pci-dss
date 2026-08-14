@@ -5,6 +5,7 @@ import { api } from '../../../../lib/api';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
 import { Lock, CreditCard, CheckCircle, XCircle, Clock, Eye, EyeOff } from 'lucide-react';
+import { formatAmount } from '../../../../lib/money';
 
 type SessionData = Awaited<ReturnType<typeof api.checkout.getSession>>;
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'expired' | 'completed' | 'error';
@@ -184,9 +185,6 @@ function CheckoutPageInner() {
       setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     }
   }
-
-  const formatAmount = (amount: number, currency: string) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 
   // ── Static states ──────────────────────────────────────────────────────────
   if (state === 'loading') {

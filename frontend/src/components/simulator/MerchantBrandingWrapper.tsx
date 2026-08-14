@@ -1,4 +1,5 @@
 'use client';
+import { formatAmount } from '../../lib/money';
 
 interface Props {
   merchantName: string;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export function MerchantBrandingWrapper({ merchantName, amount, currency, description, children }: Props) {
-  const formatted = new Intl.NumberFormat('en-EU', { style: 'currency', currency }).format(amount);
+  const formatted = formatAmount(amount, currency, { locale: 'en-EU' });
   return (
     <div className="max-w-2xl mx-auto">
       {/* Simulated merchant site header */}

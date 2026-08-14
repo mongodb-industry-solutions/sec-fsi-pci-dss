@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api } from '../../../lib/api';
+import { formatAmount } from '../../../lib/money';
 
 export interface Beneficiary {
   counterpartyArrangementReference: string;
@@ -20,7 +21,7 @@ export interface PayoutAccountOption {
 }
 
 export function fmtAmount(n: number, currency: string) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n);
+  return formatAmount(n, currency, { locale: 'en-GB' });
 }
 
 export function useAccountsAndBeneficiaries(partyRef: string, token: string) {

@@ -9,6 +9,7 @@ import { useDebugMode } from '../../../../lib/debugMode';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { SensitiveReveal } from '../../../../components/SensitiveReveal';
+import { formatAmount } from '../../../../lib/money';
 
 // Owner self-service detail for one saved card . Shows the surrogate token, expiry
 // (QE:none, owner-visible), lifecycle dates and status. The alias/note are the ONLY editable
@@ -659,7 +660,7 @@ export default function CardDetailPage() {
                           <td className="py-2.5 pr-3 text-gray-800 truncate max-w-[180px]">{txn.cardTransactionMerchantName || '-'}</td>
                           <td className="py-2.5 pr-3 text-gray-800 text-right font-mono whitespace-nowrap">
                             {txn.cardTransactionAmount
-                              ? new Intl.NumberFormat(undefined, { style: 'currency', currency: txn.cardTransactionAmount.currency, minimumFractionDigits: 2 }).format(txn.cardTransactionAmount.amount)
+                              ? formatAmount(txn.cardTransactionAmount.amount, txn.cardTransactionAmount.currency, { minimumFractionDigits: 2 })
                               : '-'}
                           </td>
                           <td className="py-2.5 text-right">

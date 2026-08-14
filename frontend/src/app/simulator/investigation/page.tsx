@@ -8,6 +8,7 @@ import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
 import { getSimTokenForRole, getSimToken } from '../../../lib/simulatorAuth';
 import { ROLE_LABELS } from '../../../lib/constants';
 import { LoadingIndicator } from '../../../components/LoadingIndicator';
+import { formatAmount } from '../../../lib/money';
 
 type SearchField = 'caseRef' | 'email' | 'phone' | 'accountRef' | 'cardToken';
 
@@ -152,9 +153,6 @@ export default function SimulatorInvestigationPage() {
     loadCases(newPage);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-
-  const formatAmount = (amount: number, currency: string) =>
-    new Intl.NumberFormat('en-EU', { style: 'currency', currency }).format(amount);
 
   return (
     <div className="space-y-6">

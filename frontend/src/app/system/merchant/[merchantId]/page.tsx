@@ -9,6 +9,7 @@ import { useMerchant } from '../../../../lib/merchantContext';
 import { StatCard, MonthlyBars, BreakdownBars } from '../../../../components/dashboard/Stats';
 import { Pagination } from '../../../../components/Pagination';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
+import { formatAmount } from '../../../../lib/money';
 
 type Stats = Awaited<ReturnType<typeof api.merchants.stats>>;
 type Sale = {
@@ -160,7 +161,7 @@ export default function StaffMerchantDetailPage() {
   const topCurrency = stats?.byCurrency[0];
   const now = new Date();
   const thisMonth = stats?.byMonth.find((x) => x.year === now.getFullYear() && x.month === now.getMonth() + 1);
-  const fmt = (a: number, c: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(a);
+  const fmt = (a: number, c: string) => formatAmount(a, c);
   const isOfficer = role === 'merchant_officer';
   const pending = status === 'under_review' || status === 'initiated';
   const auditDerived = events.length === 0;

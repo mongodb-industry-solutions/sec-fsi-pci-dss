@@ -7,6 +7,7 @@ import { useRequireActiveMerchant } from '../../../../../../lib/merchantContext'
 import { useDebugMode } from '../../../../../../lib/debugMode';
 import { api, type TransactionNotesResponse } from '../../../../../../lib/api';
 import { Breadcrumb, type Crumb } from '../../../../../../components/Breadcrumb';
+import { formatAmount } from '../../../../../../lib/money';
 
 type MerchantTxnDetail = Awaited<ReturnType<typeof api.merchants.transactionById>>;
 
@@ -96,10 +97,7 @@ export default function MerchantTransactionDetailPage() {
   );
 
   const dt = new Date(txn.cardTransactionDateTime);
-  const formattedAmount = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: txn.cardTransactionAmount.currency,
-  }).format(txn.cardTransactionAmount.amount);
+  const formattedAmount = formatAmount(txn.cardTransactionAmount.amount, txn.cardTransactionAmount.currency);
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-5">

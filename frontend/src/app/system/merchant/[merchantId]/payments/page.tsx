@@ -7,6 +7,7 @@ import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { useDebugMode } from '../../../../../lib/debugMode';
 import { api } from '../../../../../lib/api';
 import { Pagination } from '../../../../../components/Pagination';
+import { formatAmount } from '../../../../../lib/money';
 
 interface Sale {
   cardTransactionInstanceReference: string;
@@ -232,7 +233,7 @@ export default function PaymentsSectionPage() {
                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${statusClass(s.cardTransactionStatus)}`}>{s.cardTransactionStatus}</span>
                   </td>
                   <td className="px-4 py-2.5 text-right font-semibold text-gray-900 whitespace-nowrap">
-                    {new Intl.NumberFormat('en-US', { style: 'currency', currency: s.cardTransactionAmount.currency }).format(s.cardTransactionAmount.amount)}
+                    {formatAmount(s.cardTransactionAmount.amount, s.cardTransactionAmount.currency)}
                   </td>
                   <td className="px-4 py-2.5">
                     <Link

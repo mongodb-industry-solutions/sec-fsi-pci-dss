@@ -8,6 +8,7 @@ import { SectionHeader } from '../../../components/SectionHeader';
 import { Breadcrumb, type Crumb } from '../../../components/Breadcrumb';
 import { EncryptedKycSearch } from '../../../components/EncryptedKycSearch';
 import { Users } from 'lucide-react';
+import { formatAmount } from '../../../lib/money';
 
 type SearchField = 'email' | 'phone' | 'accountRef';
 
@@ -332,7 +333,7 @@ export default function UsersPage() {
                 <div className="text-right shrink-0">
                   {txn.cardTransactionAmount && (
                     <p className="font-semibold text-sm">
-                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)}
+                      {formatAmount(txn.cardTransactionAmount.amount, txn.cardTransactionAmount.currency)}
                     </p>
                   )}
                   <span className={`text-xs px-1.5 py-0.5 rounded ${

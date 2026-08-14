@@ -19,7 +19,8 @@ import { listQuestionsByTransaction, submitResponse } from '../../fraud/services
 import { requirePermission } from '../../../vendors/middleware/acl';
 import {
   listNonCardMovements, dedupeRtpExecutions, sortAndPage, normalizeCardRow, attachFraudCases,
-  getMovementByRef, type MovementRow,
+  getMovementByRef, filterMovements, needsFraudCases, type MovementRow, type MovementFilters,
+  type MovementMethod,
 } from '../../gateway/services/paymentMovement.service';
 import { resolveOwner } from '../../../vendors/middleware/dualAuth';
 import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
@@ -296,6 +297,9 @@ Every movement kind is returned by default as \`kind\`-discriminated rows (\`car
 narrow. An RTP that has a linked execution is listed once, as the RTP row (BIAN keeps both records;
 the duplicate presentation is what is collapsed).
 
+Filtering is server-side (status list, direction, method, investigation status, free text) so a page
+carries the filtered \`total\`: narrowing a single page in a client would report the wrong count.
+
 Card-token and masked-PAN lookups are explicit filters. The card token is a PAN surrogate and is NOT
 Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
       security: [{ bearerAuth: [] }],
@@ -307,11 +311,15 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
             description: 'Card surrogate token. Same value as `paymentCardReference` in the `paymentCard` collection.',
           },
           maskedPan: { type: 'string', description: 'Masked PAN display value, e.g. `****-****-****-4242`.' },
-          status:    { type: 'string', description: 'Filter by movement status (`authorized`, `declined`, `pending`, `settled`, `disputed`).' },
+          status:    { type: 'string', description: 'Movement status. Comma-separated list allowed, so one request covers a status group (e.g. `settled,completed`).' },
           merchant:  { type: 'string', description: 'Case-insensitive partial match on merchant name.' },
           email:     { type: 'string', description: 'Filter by customer email (QE:equality → account reference). Ignored for the customer role, which is scoped to its own email.' },
           transactionId: { type: 'string', description: 'Filter by exact movement reference.' },
           kind: { type: 'string', enum: ['card', 'transfer', 'rtp'], description: 'Narrow to one movement kind. Omitted returns every kind.' },
+          direction: { type: 'string', enum: ['in', 'out'], description: 'Money direction from the caller perspective. A card refund/adjustment is `in`; a state that moved no money matches neither.' },
+          method: { type: 'string', enum: ['card', 'payment_link', 'redirect', 'p2p', 'bank', 'rtp'], description: 'How the payment was accepted, as opposed to its lifecycle state.' },
+          fraud: { type: 'string', description: 'Investigation status: `any` (flagged), `none` (not flagged) or an exact case status.' },
+          q: { type: 'string', description: 'Free text over merchant/beneficiary, masked PAN, concept, reference, rail, MCC, case reference and amount.' },
           page: { type: 'number', default: 1 },
           limit: { type: 'number', default: 20, maximum: 200, description: 'Page size (max 200).' },
         },
@@ -370,6 +378,7 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
     const q = request.query as {
       cardToken?: string; maskedPan?: string; status?: string; merchant?: string; email?: string;
       transactionId?: string; kind?: 'card' | 'transfer' | 'rtp'; page?: number; limit?: number;
+      direction?: 'in' | 'out'; method?: MovementMethod; fraud?: string; q?: string;
     };
     const page = Math.max(1, Number(q.page ?? 1));
     const limit = Math.min(200, Math.max(1, Number(q.limit ?? 20)));
@@ -407,18 +416,29 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
       ? []
       : (await getAllTransactions(
           fastify.db,
-          { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, transactionId: q.transactionId },
+          // One state narrows the DB query; a list is resolved on the merged set (this matches one).
+          { status: q.status?.includes(',') ? undefined : q.status,
+            merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan,
+            email: effectiveEmail, transactionId: q.transactionId },
           1, 500,
         )).results.map((r) => normalizeCardRow(r as Record<string, unknown>));
 
-    const rows = [...cardRows, ...nonCard]
+    const merged = dedupeRtpExecutions([...cardRows, ...nonCard])
       .filter((r) => (q.kind ? r.kind === q.kind : true))
-      .filter((r) => (q.status ? r.paymentExecutionStatus === q.status : true))
       .filter((r) => (q.transactionId ? r.paymentExecutionInstanceReference === q.transactionId : true));
 
-    const { results, total } = sortAndPage(dedupeRtpExecutions(rows), page, limit);
-    // Investigation status per row, one lookup for the page (any movement kind).
-    return reply.send({ results: await attachFraudCases(fastify.db, results), total, page, limit });
+    // `status` accepts a list, so a status group (several states, one label) is a single request.
+    const filters: MovementFilters = {
+      statuses: q.status ? q.status.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
+      direction: q.direction, method: q.method, fraud: q.fraud, q: q.q,
+    };
+    // Filtering by investigation status or free text needs the cases attached before paging.
+    const enriched = needsFraudCases(filters) ? await attachFraudCases(fastify.db, merged) : merged;
+    const { results, total } = sortAndPage(filterMovements(enriched, filters), page, limit);
+    return reply.send({
+      results: needsFraudCases(filters) ? results : await attachFraudCases(fastify.db, results),
+      total, page, limit,
+    });
   });
 
   fastify.get('/:id', {

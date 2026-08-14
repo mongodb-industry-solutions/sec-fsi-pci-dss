@@ -9,6 +9,7 @@ import { EncryptionBadge } from '../../../../components/EncryptionBadge';
 import { LoadingIndicator } from '../../../../components/LoadingIndicator';
 import { RawDocumentPanel } from '../../../../components/RawDocumentPanel';
 import { SEVERITY_COLORS, STATUS_COLORS, formatRiskIndicator } from '../../../../lib/constants';
+import { formatAmount } from '../../../../lib/money';
 
 // L1 = level1_analyst, L2 = level2_investigator. The simulator obtains a REAL
 // JWT for each role (via /api/v1/auth/login with the demo credential) and drives
@@ -270,7 +271,7 @@ export default function SimulatorCaseDetailPage() {
           <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-700">
             <span className="font-medium text-gray-500">Amount:</span>
             <span className="font-semibold text-red-700">
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: snap.cardTransactionAmount.currency }).format(snap.cardTransactionAmount.amount)}
+              {formatAmount(snap.cardTransactionAmount.amount, snap.cardTransactionAmount.currency)}
             </span>
             <span className="font-medium text-gray-500">Merchant:</span>
             <span>{snap.cardTransactionMerchantName}</span>
@@ -608,7 +609,7 @@ function L2ResolveView({ fraudCase, busy, isResolved, canResolve, onResolve }: {
 function CustomerView({ fraudCase }: { fraudCase: FraudCase }) {
   const snap = fraudCase.transactionSnapshot;
   const amount = snap
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: snap.cardTransactionAmount.currency }).format(snap.cardTransactionAmount.amount)
+    ? formatAmount(snap.cardTransactionAmount.amount, snap.cardTransactionAmount.currency)
     : 'N/A';
   const outcome = fraudCase.fraudDiagnosisResolutionRecord?.resolutionOutcome;
   const isFraud = fraudCase.caseStatus === 'resolved_fraud' || outcome === 'confirmed_fraud';

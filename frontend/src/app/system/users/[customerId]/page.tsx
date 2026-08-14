@@ -21,6 +21,7 @@ import { RecordGroup, RecordGroupGrid } from '../../../../components/record/Reco
 import { RecordField } from '../../../../components/record/RecordField';
 import { IdentityDocumentBlock } from '../../../../components/record/IdentityDocumentBlock';
 import { humanize, fmtAddress, fmtDate } from '../../../../components/record/format';
+import { formatAmount } from '../../../../lib/money';
 
 const SEGMENT_LABELS: Record<string, string> = { retail: 'Retail', premium: 'Premium', corporate: 'Corporate', sme: 'SME' };
 
@@ -33,7 +34,7 @@ function staffQuery(customerId: string, partyRef: string): string {
 
 function money(amount?: number, currency?: string): string {
   if (amount == null) return '-';
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount); }
+  try { return formatAmount(amount, currency || 'USD'); }
   catch { return `${amount.toFixed(2)} ${currency ?? ''}`.trim(); }
 }
 
