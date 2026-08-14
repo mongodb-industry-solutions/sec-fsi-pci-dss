@@ -16,6 +16,7 @@ import { Breadcrumb } from '../../../../components/Breadcrumb';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { ArrowUpFromLine, CheckCircle, XCircle, ShieldAlert, Activity, Store, CreditCard, UserCheck, ChevronRight, RotateCcw, Users } from 'lucide-react';
 import { useConfirm } from '../../../../components/ui/ConfirmProvider';
+import { formatAmount } from '../../../../lib/money';
 
 const ACTION_LABELS: Record<string, string> = {
   case_opened: 'Case opened',
@@ -274,8 +275,7 @@ export default function DemoCaseDetailPage() {
   const l2HasAccepted = !!fraudCase.escalationAcceptedAt;
 
   const formattedAmount = snap
-    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: snap.cardTransactionAmount.currency })
-        .format(snap.cardTransactionAmount.amount)
+    ? formatAmount(snap.cardTransactionAmount.amount, snap.cardTransactionAmount.currency)
     : null;
 
   // Movement kind: the case document carries it (v36 P6), with the enrichment read-model as the
@@ -449,7 +449,7 @@ export default function DemoCaseDetailPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
                   <span className="text-gray-500">Amount:</span>
-                  <span className="font-semibold">{new Intl.NumberFormat('en-US', { style: 'currency', currency: enrichment.operation.amount.currency }).format(enrichment.operation.amount.amount)}</span>
+                  <span className="font-semibold">{formatAmount(enrichment.operation.amount.amount, enrichment.operation.amount.currency)}</span>
                   {isCard ? (
                     <>
                       <span className="text-gray-500">Merchant:</span>

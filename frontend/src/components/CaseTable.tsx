@@ -2,16 +2,17 @@
 import { FraudCase, TransactionSnapshot } from '../lib/api';
 import { SEVERITY_COLORS, STATUS_COLORS } from '../lib/constants';
 import Link from 'next/link';
+import { formatAmount } from '../lib/money';
 
 interface Props {
   cases: FraudCase[];
   basePath: string;
 }
 
-function formatAmount(snap?: TransactionSnapshot): string {
+function snapshotAmount(snap?: TransactionSnapshot): string {
   if (!snap) return '-';
   const { amount, currency } = snap.cardTransactionAmount;
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  return formatAmount(amount, currency);
 }
 
 export function CaseTable({ cases, basePath }: Props) {
@@ -53,7 +54,7 @@ export function CaseTable({ cases, basePath }: Props) {
                 {c.transactionSnapshot?.cardTransactionMaskedPanDisplay ?? '-'}
               </td>
               <td className="px-4 py-3 text-gray-800 font-medium">
-                {formatAmount(c.transactionSnapshot)}
+                {snapshotAmount(c.transactionSnapshot)}
               </td>
               <td className="px-4 py-3 text-gray-600 truncate max-w-[160px]">
                 {c.transactionSnapshot?.cardTransactionMerchantName ?? '-'}

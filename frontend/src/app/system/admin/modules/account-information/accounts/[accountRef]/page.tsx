@@ -12,6 +12,7 @@ import { useConfirm, useNotify } from '../../../../../../../components/ui/Confir
 import { Breadcrumb } from '../../../../../../../components/Breadcrumb';
 import { RequirePermission } from '../../../../../../../components/RequirePermission';
 import { useEffectivePermissions } from '../../../../../../../lib/permissions';
+import { formatAmount } from '../../../../../../../lib/money';
 
 // v29.2 global payout-account-administration DETAIL page (built-in account-information module).
 // Dedicated page (not a modal) so the operations officer sees every QE-stripped field with room to act.
@@ -77,7 +78,7 @@ function fmtDate(iso?: string): string {
 function fmtMoney(amount?: number, currency?: string): string {
   if (typeof amount !== 'number') return '-';
   try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR', minimumFractionDigits: 2 }).format(amount);
+    return formatAmount(amount, currency || 'EUR', { minimumFractionDigits: 2 });
   } catch { return `${amount} ${currency ?? ''}`; }
 }
 

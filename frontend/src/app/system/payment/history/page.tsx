@@ -4,14 +4,15 @@ import Link from 'next/link';
 import {
   Plus, ClipboardList, ArrowDownLeft, ArrowUpRight, SlidersHorizontal, HandCoins,
   CreditCard, ArrowLeftRight, CheckCircle2, XCircle, Clock, AlertTriangle, Search, Ban,
-  MinusCircle, RotateCcw, Mail, ChevronRight,
+  MinusCircle, Mail, ChevronRight,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
 import { getToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
 import { useDebugMode } from '../../../../lib/debugMode';
+import { paymentStatusMeta, type StatusMeta } from '../../../../lib/paymentStatus';
+import { formatAmount } from '../../../../lib/money';
 
 // ── Unified history row ───────────────────────────────────────────────────────
 // Each row is either a card transaction or a P2P transfer .
@@ -66,25 +67,9 @@ const TYPE_COLORS: Record<string, string> = {
   adjustment:       'bg-gray-100 text-gray-600',
 };
 
-// ── Payment authorization status ──────────────────────────────────────────────
-// Every status carries a lucide icon: one visual language across the list and the detail view.
-type StatusMeta = { label: string; color: string; Icon: LucideIcon };
-const PAYMENT_STATUS: Record<string, StatusMeta> = {
-  authorized: { label: 'Authorized',  color: 'bg-green-100 text-green-800',        Icon: CheckCircle2 },
-  settled:    { label: 'Settled',     color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
-  captured:   { label: 'Captured',    color: 'bg-teal-100 text-teal-800',          Icon: CheckCircle2 },
-  pending:    { label: 'Pending',     color: 'bg-amber-100 text-amber-800',        Icon: Clock },
-  declined:   { label: 'Declined',    color: 'bg-red-100 text-red-800',            Icon: XCircle },
-  voided:     { label: 'Voided',      color: 'bg-gray-100 text-gray-500',          Icon: MinusCircle },
-  refunded:   { label: 'Refunded',    color: 'bg-purple-100 text-purple-700',      Icon: RotateCcw },
-  failed:     { label: 'Failed',      color: 'bg-red-100 text-red-800',            Icon: XCircle },
-  expired:    { label: 'Expired',     color: 'bg-gray-100 text-gray-500',          Icon: MinusCircle },
-  completed:  { label: 'Completed',   color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
-};
-
 // One chip renderer, so a status looks the same wherever it is shown.
 function StatusChip({ meta, title }: { meta: StatusMeta; title?: string }) {
-  const { Icon } = meta;
+  const Icon = meta.Icon ?? Clock;
   return (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${meta.color}`} title={title}>
       <Icon size={12} className="shrink-0" />
@@ -102,18 +87,6 @@ const FRAUD_STATUS: Record<string, StatusMeta> = {
   resolved_cleared: { label: 'Cleared, legitimate', color: 'bg-green-100 text-green-800',   Icon: CheckCircle2 },
   closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',     Icon: MinusCircle },
 };
-
-// Intl rejects a missing or non ISO 4217 currency, and throwing here blanks the page instead of a row.
-function fmtAmount(amount: number, currency?: string | null) {
-  const code = (currency ?? '').trim().toUpperCase();
-  const value = Number.isFinite(amount) ? amount : 0;
-  if (!/^[A-Z]{3}$/.test(code)) return value.toFixed(2);
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(value);
-  } catch {
-    return `${value.toFixed(2)} ${code}`;
-  }
-}
 
 // ── Card money direction ─────────────────────────────────────────────
 // Any operation that debits the funding account is shown as a discount (−, red), mirroring the P2P
@@ -183,6 +156,7 @@ const STATUS_STATES_BY_KEY: Record<string, string[]> = Object.fromEntries(STATUS
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function TransactionHistoryPage() {
   const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -202,14 +176,23 @@ export default function TransactionHistoryPage() {
   function clearAll() { setQInput(''); setQ(''); setDirectionFilter(''); setTypeFilter(''); setStatusFilter(''); setFraudFilter(''); setPage(1); }
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       const t = getToken() ?? '';
+      setLoading(true);
 
-      // v36 (ADR-063): ONE request. The collection returns every movement kind by default, already
-      // merged, RTP-de-duped and scoped to the caller, so the client re-implements none of it.
+      // v36 (ADR-063): one request for the page shown; the collection merges, scopes and filters.
       const res = await api.transactions
-        .list({ limit: 200 }, t)
-        .catch(() => ({ results: [] as Record<string, unknown>[], total: 0, page: 1, limit: 200 }));
+        .list({
+          page,
+          limit: pageSize,
+          ...(statusFilter ? { status: (STATUS_STATES_BY_KEY[statusFilter] ?? [statusFilter]).join(',') } : {}),
+          ...(directionFilter ? { direction: directionFilter } : {}),
+          ...(typeFilter ? { method: typeFilter } : {}),
+          ...(fraudFilter ? { fraud: fraudFilter } : {}),
+          ...(q ? { q } : {}),
+        }, t)
+        .catch(() => ({ results: [] as Record<string, unknown>[], total: 0, page, limit: pageSize }));
 
       const rows = ((res.results ?? []) as Array<{
         kind: 'card' | 'transfer' | 'rtp';
@@ -281,55 +264,23 @@ export default function TransactionHistoryPage() {
         } satisfies HistoryRow;
       });
 
+      if (cancelled) return;
       setRows(rows);
+      setTotal(res.total ?? rows.length);
       setLoading(false);
     };
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [page, pageSize, statusFilter, directionFilter, typeFilter, fraudFilter, q]);
 
-  // ── Filter logic ────────────────────────────────────────────────────────────
-  const fraudKeys = Array.from(new Set(
-    rows.filter(r => r.fraudCaseCreated && r.caseStatus).map(r => r.caseStatus as string)
-  ));
-  const ql = q.toLowerCase();
+  // ── Filters (server-side): the page renders as received and `total` is the filtered count ────
+  const fraudKeys = Array.from(new Set([
+    ...rows.filter(r => r.fraudCaseCreated && r.caseStatus).map(r => r.caseStatus as string),
+    ...Object.keys(FRAUD_STATUS),
+  ]));
 
-  const filtered = rows.filter((r) => {
-    if (directionFilter && rowDirection(r) !== directionFilter) return false;
-    if (typeFilter && rowTypeKey(r) !== typeFilter) return false;
-    // Status is matched by canonical group (a group can cover several raw statuses, e.g. Settled).
-    if (statusFilter) {
-      const states = STATUS_STATES_BY_KEY[statusFilter];
-      if (states) { if (!states.includes(r.status)) return false; }
-      else if (r.status !== statusFilter) return false;
-    }
-    if (fraudFilter === 'none' && r.fraudCaseCreated) return false;
-    if (fraudFilter === 'any' && !r.fraudCaseCreated) return false;
-    if (fraudFilter && fraudFilter !== 'none' && fraudFilter !== 'any' && r.caseStatus !== fraudFilter) return false;
-    if (!ql) return true;
-    if (r.category === 'card') {
-      return (
-        (r.merchant ?? '').toLowerCase().includes(ql) ||
-        (r.maskedPan ?? '').toLowerCase().includes(ql) ||
-        (r.concept ?? '').toLowerCase().includes(ql) ||
-        (r.paymentReference ?? '').toLowerCase().includes(ql) ||
-        (r.caseRef ?? '').toLowerCase().includes(ql) ||
-        r.id.toLowerCase().includes(ql) ||
-        String(r.amount).includes(ql)
-      );
-    }
-    // p2p + rtp
-    return (
-      (r.p2pNote ?? '').toLowerCase().includes(ql) ||
-      (r.concept ?? '').toLowerCase().includes(ql) ||
-      r.id.toLowerCase().includes(ql) ||
-      String(r.amount).includes(ql) ||
-      (r.p2pDirection ?? '').includes(ql) ||
-      (r.rtpRole ?? '').includes(ql)
-    );
-  });
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const paginated = rows;
   const isFiltering = !!(q || qInput || directionFilter || typeFilter || statusFilter || fraudFilter);
   const showCardFilters = typeFilter === '' || typeFilter === 'card' || typeFilter === 'payment_link' || typeFilter === 'redirect';
 
@@ -351,9 +302,10 @@ export default function TransactionHistoryPage() {
           />
         </div>
 
-        {loading ? (
+        {loading && rows.length === 0 ? (
           <div className="text-center py-8 text-gray-400">Loading your payment history…</div>
-        ) : rows.length === 0 ? (
+        ) : rows.length === 0 && !isFiltering ? (
+          // Only an unfiltered empty history hides the controls, else the filter cannot be cleared.
           <div className="bg-white rounded-xl border p-6 text-center text-gray-500">
             <p className="mb-2">No transactions yet.</p>
             <Link href="/system/payment" className="mt-4 inline-block text-blue-600 hover:underline text-sm">
@@ -424,7 +376,7 @@ export default function TransactionHistoryPage() {
             )}
             {!showAdvanced && <div className="mb-5" />}
 
-            {filtered.length === 0 ? (
+            {paginated.length === 0 ? (
               <div className="bg-white rounded-xl border p-6 text-center text-gray-500">
                 No entries match your filters.
               </div>
@@ -433,7 +385,7 @@ export default function TransactionHistoryPage() {
                 <div className="space-y-3 mb-5">
                   {paginated.map((row) => {
                     if (row.category === 'card') {
-                      const pay = PAYMENT_STATUS[row.status] ?? { label: row.status.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700' };
+                      const pay = paymentStatusMeta(row.status);
                       const fraud = (row.fraudCaseCreated && row.caseStatus)
                         ? (FRAUD_STATUS[row.caseStatus] ?? { label: row.caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', Icon: AlertTriangle })
                         : null;
@@ -467,7 +419,7 @@ export default function TransactionHistoryPage() {
                                   const dir = cardDirection(row.cardTransactionType, row.status);
                                   const cls = dir === 'debit' ? 'text-red-600' : dir === 'credit' ? 'text-green-700' : 'text-gray-900';
                                   const sign = dir === 'debit' ? '−' : dir === 'credit' ? '+' : '';
-                                  return <p className={`font-bold ${cls}`}>{sign}{fmtAmount(row.amount, row.currency)}</p>;
+                                  return <p className={`font-bold ${cls}`}>{sign}{formatAmount(row.amount, row.currency)}</p>;
                                 })()}
                                 <p className="text-xs text-gray-500 font-mono">{row.maskedPan}</p>
                               </div>
@@ -523,7 +475,7 @@ export default function TransactionHistoryPage() {
                             <div className="flex items-start gap-3 shrink-0">
                               <div className="text-right">
                                 <p className={`font-bold ${isIncoming ? 'text-green-700' : 'text-red-600'}`}>
-                                  {isIncoming ? '+' : '−'}{fmtAmount(row.amount, row.currency)}
+                                  {isIncoming ? '+' : '−'}{formatAmount(row.amount, row.currency)}
                                 </p>
                               </div>
                               <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
@@ -542,7 +494,7 @@ export default function TransactionHistoryPage() {
                       );
                     }
 
-                    const pay = PAYMENT_STATUS[row.status] ?? { label: row.status.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700' };
+                    const pay = paymentStatusMeta(row.status);
                     const isSent = row.p2pDirection === 'sent';
                     return (
                       <Link key={row.id} href={`/system/payment/history/${row.id}`}
@@ -561,7 +513,7 @@ export default function TransactionHistoryPage() {
                           <div className="flex items-start gap-3 shrink-0">
                             <div className="text-right">
                               <p className={`font-bold ${isSent ? 'text-red-600' : 'text-green-700'}`}>
-                                {isSent ? '−' : '+'}{fmtAmount(row.amount, row.currency)}
+                                {isSent ? '−' : '+'}{formatAmount(row.amount, row.currency)}
                               </p>
                               {row.p2pRail && <p className="text-xs text-gray-400 capitalize">{row.p2pRail.replace(/_/g, ' ')}</p>}
                             </div>
@@ -583,7 +535,7 @@ export default function TransactionHistoryPage() {
                 <Pagination
                   page={page}
                   totalPages={totalPages}
-                  total={filtered.length}
+                  total={total}
                   limit={pageSize}
                   onPageChange={setPage}
                   onLimitChange={handleLimitChange}

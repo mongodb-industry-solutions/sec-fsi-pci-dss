@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Briefcase, AlertTriangle, ShieldCheck, CheckCircle2, Receipt, TrendingUp, CalendarDays, Store, Clock, Plug, CreditCard, Landmark } from 'lucide-react';
 import { api } from '../../lib/api';
 import { StatCard, MonthlyBars, BreakdownBars } from './Stats';
+import { formatAmount } from '../../lib/money';
 
 const STATUS_COLOR: Record<string, string> = {
   open: 'bg-blue-500', under_review: 'bg-amber-500', escalated: 'bg-orange-500',
@@ -81,7 +82,7 @@ function CustomerStats({ token }: { token: string }) {
   const topCur = [...byCurrency.entries()].sort((a, b) => b[1] - a[1])[0];
   const months = monthly(rows.map((t) => t.cardTransactionDateTime));
   const thisMonth = months.find((m) => m.year === now.getFullYear() && m.month === now.getMonth() + 1);
-  const fmt = (a: number, c: string) => new Intl.NumberFormat('en-US', { style: 'currency', currency: c }).format(a);
+  const fmt = (a: number, c: string) => formatAmount(a, c);
   const statuses = tally(rows, (t) => t.cardTransactionStatus);
   return (
     <div className="space-y-4">

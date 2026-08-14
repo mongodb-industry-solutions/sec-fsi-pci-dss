@@ -15,6 +15,7 @@ import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
 import { useNotificationsStream } from '../../../../../lib/useNotificationsStream';
 import { formatRiskIndicator } from '../../../../../lib/constants';
+import { formatAmount } from '../../../../../lib/money';
 
 // Inline tooltip with floating popup.
 function FieldInfo({ label, description }: { label: string; description: string }) {
@@ -405,7 +406,7 @@ export default function TransactionDetailPage() {
             <div className="text-right shrink-0">
               <p className={`text-2xl font-bold ${direction === 'sent' ? 'text-red-600' : 'text-green-700'}`}>
                 {direction === 'sent' ? '−' : '+'}
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}
+                {formatAmount(p2pTransfer.grossAmount, p2pTransfer.currency)}
               </p>
             </div>
           </div>
@@ -536,19 +537,19 @@ export default function TransactionDetailPage() {
           <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5">
             <MetaRow label="Gross amount" info="Amount transferred before any fees.">
               <span className="font-semibold">
-                {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}
+                {formatAmount(p2pTransfer.grossAmount, p2pTransfer.currency)}
                 <span className="ml-1 text-xs font-normal text-gray-400">{p2pTransfer.currency}</span>
               </span>
             </MetaRow>
 
             {p2pTransfer.feeAmount > 0 && (
               <MetaRow label="Fee" info="PSP processing fee deducted from the gross amount.">
-                <span className="text-red-600">{new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.feeAmount)}</span>
+                <span className="text-red-600">{formatAmount(p2pTransfer.feeAmount, p2pTransfer.currency)}</span>
               </MetaRow>
             )}
 
             <MetaRow label="Net amount" info="Amount credited to the recipient after fee deduction. Equal to gross when fee is zero.">
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.netAmount)}
+              {formatAmount(p2pTransfer.netAmount, p2pTransfer.currency)}
             </MetaRow>
 
             {p2pTransfer.fxRate != null && p2pTransfer.recipientCurrency && (
@@ -557,7 +558,7 @@ export default function TransactionDetailPage() {
                   1 {p2pTransfer.currency} = {p2pTransfer.fxRate.toFixed(6)} {p2pTransfer.recipientCurrency}
                   {p2pTransfer.recipientAmount != null && (
                     <span className="ml-2 text-gray-400">
-                      <ArrowRight size={11} className="inline" /> {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.recipientCurrency }).format(p2pTransfer.recipientAmount)}
+                      <ArrowRight size={11} className="inline" /> {formatAmount(p2pTransfer.recipientAmount, p2pTransfer.recipientCurrency)}
                     </span>
                   )}
                 </span>
@@ -695,7 +696,7 @@ export default function TransactionDetailPage() {
           <div className="text-right shrink-0">
             <p className={`text-2xl font-bold ${cardDirection === 'debit' ? 'text-red-600' : 'text-green-700'}`}>
               {cardDirection === 'debit' ? '−' : '+'}
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.currency }).format(txn.amount)}
+              {formatAmount(txn.amount, txn.currency)}
             </p>
             <span className="text-xs text-gray-400 font-normal">{txn.currency}</span>
           </div>
@@ -756,13 +757,13 @@ export default function TransactionDetailPage() {
         <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5">
           <MetaRow label="Gross amount" info="Transaction amount as submitted by the merchant at authorisation. Pending amounts may differ from final settled amount.">
             <span className="font-semibold">
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.currency }).format(txn.amount)}
+              {formatAmount(txn.amount, txn.currency)}
               <span className="ml-1 text-xs font-normal text-gray-400">{txn.currency}</span>
             </span>
           </MetaRow>
 
           <MetaRow label="Net amount" info="Final settled amount after any adjustments, reversals, or partial captures. Equal to gross for standard single-capture authorisations.">
-            {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.currency }).format(txn.amount)}
+            {formatAmount(txn.amount, txn.currency)}
           </MetaRow>
 
           <MetaRow label="Status" info="Lifecycle status of this card transaction. 'authorized' = hold placed; 'settled' = funds disbursed to merchant; 'under_review' = fraud investigation open.">

@@ -8,6 +8,7 @@ import {
 import { SectionHeader } from '../../../../../components/SectionHeader';
 import { useRequireActiveMerchant, isActiveOwner, type MerchantRecord } from '../../../../../lib/merchantContext';
 import { api } from '../../../../../lib/api';
+import { formatAmount } from '../../../../../lib/money';
 
 type Stats = {
   count: number; totalAmount: number; avgAmount: number;
@@ -289,7 +290,7 @@ export default function OverviewSectionPage() {
   const topCurrency = stats?.byCurrency[0];
   const maxMonth = Math.max(1, ...(stats?.byMonth.map((m) => m.count) ?? [1]));
   const fmt = (amount: number, currency: string) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+  formatAmount(amount, currency);
 
   return (
     <div className="w-full px-5 sm:px-8 py-6 space-y-6">

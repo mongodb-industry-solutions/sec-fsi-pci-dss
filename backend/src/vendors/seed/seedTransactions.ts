@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import * as path from 'path';
 import * as fs from 'fs';
-import { CARD_TRANSACTION_COLLECTION } from '../../modules/transaction/models/cardTransaction.model';
+import { CARD_TRANSACTION_COLLECTION, CARD_TRANSACTION_STATUSES } from '../../modules/transaction/models/cardTransaction.model';
 import {
   repointTransactionsToCards,
   type AgreementSeed,
@@ -27,6 +27,19 @@ export async function seedTransactions(db: Db) {
     readFixture<CardSeed>('paymentCards.json'),
     readFixture<AgreementSeed>('customerAgreements.json'),
   );
+
+  // A status outside the declared domain fails in the consumers that map it, so the seed refuses it.
+  const domain = new Set<string>(CARD_TRANSACTION_STATUSES);
+  const offDomain = [...new Set(
+    txns.map((t) => (t as { cardTransactionStatus?: string }).cardTransactionStatus)
+      .filter((s): s is string => !domain.has(s as string)),
+  )];
+  if (offDomain.length > 0) {
+    throw new Error(
+      `cardTransactions.json carries statuses outside CardTransactionStatus: ${offDomain.join(', ')}. ` +
+      'Add them to the model and to the consumers, or fix the fixture.',
+    );
+  }
 
   for (const record of txns) {
     await db.collection(CARD_TRANSACTION_COLLECTION).updateOne(

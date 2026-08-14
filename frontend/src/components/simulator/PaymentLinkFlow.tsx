@@ -8,6 +8,7 @@ import { SimulatorStateManager } from './SimulatorStateManager';
 import type { SimulatorScenario } from '../../types/simulator';
 import simulatorConfig from '../../config/simulator.json';
 import { variedAmountNum, variedDescription } from '../../lib/simVary';
+import { formatAmount } from '../../lib/money';
 
 interface Props {
   scenario: SimulatorScenario;
@@ -39,7 +40,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
     const d = variedDescription(prefill.merchantName, description);
     setAmount(a);
     setDescription(d);
-    setVaryNote(`Distinct values generated. Find it by amount ${new Intl.NumberFormat('en-EU', { style: 'currency', currency: prefill.currency }).format(a)} or descriptor “${d}”.`);
+    setVaryNote(`Distinct values generated. Find it by amount ${formatAmount(a, prefill.currency, { locale: 'en-EU' })} or descriptor “${d}”.`);
   }
 
   // Restore from sessionStorage on reload

@@ -969,6 +969,10 @@ export const api = {
       params: {
         status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string;
         transactionId?: string; kind?: 'card' | 'transfer' | 'rtp'; page?: number; limit?: number;
+        // Server-side narrowing (v36): the page carries the filtered total, so the client never
+        // filters a page it already received.
+        direction?: 'in' | 'out'; method?: 'card' | 'payment_link' | 'redirect' | 'p2p' | 'bank' | 'rtp';
+        fraud?: string; q?: string;
       },
       token: string
     ) => {
