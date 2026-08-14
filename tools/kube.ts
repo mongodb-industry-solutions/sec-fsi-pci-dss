@@ -58,6 +58,16 @@ const KUBE_DIR = join(HOME, process.env.KUBE_CONFIG_DIR ?? ".kube");
 const CICD_TOKEN_SECRET = process.env.KUBE_CICD_TOKEN_SECRET ?? "kanopy-cicd-token";
 const ECR_SECRET_NAME = process.env.KUBE_ECR_SECRET_NAME ?? "ecr";
 
+// -- Target cluster --
+// Every read/write command runs against ONE cluster, the selected target, using that cluster's own
+// kubeconfig. Merging both files made kubectl resolve the first file's current-context, so a command
+// silently reported staging right after a prod login, and a `use-context` write could strip the
+// current-context from the other file.
+type ClusterEnv = "staging" | "prod";
+let TARGET: ClusterEnv = process.env.KUBE_TARGET_ENV === "prod" ? "prod" : "staging";
+const kubeconfigPath = (env: ClusterEnv): string => join(KUBE_DIR, `config.${env}`);
+const apiServerOf = (env: ClusterEnv): string => (env === "prod" ? PROD_API : STAGING_API);
+
 // -- Helpers --
 const GREEN = "\x1b[32m";
 const YELLOW = "\x1b[33m";
@@ -287,54 +297,81 @@ async function kanopyLogin() {
   const input = await ask("Which cluster to login? ");
   const clusters = input === "2" ? ["prod"] : input === "3" ? ["staging", "prod"] : ["staging"];
 
-  for (const cluster of clusters) {
-    const cfg = join(KUBE_DIR, `config.${cluster}`);
+  for (const cluster of clusters as ClusterEnv[]) {
+    const cfg = kubeconfigPath(cluster);
     if (!existsSync(cfg)) { fail(`Kubeconfig not found: ${cfg}. Run option 6 first.`); continue; }
-    const env = { ...process.env, KUBECONFIG: cfg };
-    const apiServer = cluster === "prod" ? PROD_API : STAGING_API;
-    const ctx = contextName(apiServer);
 
-    // kanopy-oidc kube login authenticates the kubeconfig's current-context.
-    // If the file's current-context points at another cluster (e.g. prod),
-    // login fails with "context ... does not exist". Pin it first.
-    action(`Selecting context '${ctx}' in ${cfg}`);
-    const setCtx = spawnSync("kubectl", ["config", "use-context", ctx], { shell: IS_WIN, stdio: "pipe", env });
-    if (setCtx.status !== 0) {
-      warn(`Context '${ctx}' not found in ${cfg}. Regenerate it with option 6.`);
-      continue;
-    }
+    // kanopy-oidc kube login authenticates the kubeconfig's current-context, so pin it first:
+    // pointing at another cluster fails with "context ... does not exist".
+    action(`Selecting context '${contextName(apiServerOf(cluster))}' in ${cfg}`);
+    if (!pinContext(cluster)) continue;
 
     action(`Logging in with config: ${cfg}`);
-    const result = spawnSync("kanopy-oidc", ["kube", "login"], { shell: IS_WIN, stdio: "inherit", env });
-    result.status === 0 ? ok(`Login successful for ${cluster}`) : fail(`Login failed for ${cluster}`);
+    const result = spawnSync("kanopy-oidc", ["kube", "login"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv(cluster) });
+    if (result.status !== 0) { fail(`Login failed for ${cluster}`); continue; }
+    // Login exiting 0 is not proof of a usable token, so confirm against the API server.
+    tokenIsValid(cluster)
+      ? ok(`Login successful for ${cluster}`)
+      : fail(`Login reported success for ${cluster} but the token is not accepted. Retry option 7 for ${cluster} alone.`);
   }
+
+  // Follow the last cluster logged in, so the next command reads the cluster just authenticated.
+  TARGET = (clusters[clusters.length - 1] as ClusterEnv) ?? TARGET;
+  ok(`Target cluster: ${TARGET}`);
 }
 
 async function switchContext() {
-  console.log("\n  1. staging\n  2. prod");
-  const input = await ask("Context: ");
-  const target = input === "2" ? PROD_API : STAGING_API;
-  const kubeconfig = `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}`;
-  const env = { ...process.env, KUBECONFIG: kubeconfig };
-  spawnSync("kubectl", ["config", "use-context", contextName(target)], { shell: IS_WIN, stdio: "inherit", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "inherit", env });
-  ok(`Switched to ${target} / ${IST_NAMESPACE}`);
+  const target = await selectTarget("Context");
+  if (!pinContext(target)) return;
+  TARGET = target;
+  ok(`Switched to ${apiServerOf(target)} / ${IST_NAMESPACE}`);
 }
 
 async function verifyAccess() {
-  action("Verifying cluster access...");
-  const kubeconfig = `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}`;
-  const env = { ...process.env, KUBECONFIG: kubeconfig };
-  const result = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
-  result.status === 0 ? ok("Access verified.") : fail("Access failed. Try: kanopy-oidc kube login");
+  action(`Verifying cluster access (${TARGET})...`);
+  const result = spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
+  result.status === 0 ? ok(`Access verified (${TARGET}).`) : fail(`Access failed for ${TARGET}. Try option 7 (login) for ${TARGET}.`);
 }
 
 // ============================================================
 //  3. SECRETS
 // ============================================================
 
-function kubeEnv(): NodeJS.ProcessEnv {
-  return { ...process.env, KUBECONFIG: `${join(KUBE_DIR, "config.staging")}${IS_WIN ? ";" : ":"}${join(KUBE_DIR, "config.prod")}` };
+function kubeEnv(env: ClusterEnv = TARGET): NodeJS.ProcessEnv {
+  return { ...process.env, KUBECONFIG: kubeconfigPath(env) };
+}
+
+// Pin context + namespace inside a single kubeconfig, never a merged one, so the file stays usable
+// on its own (a merged write leaves the other file without a current-context).
+function pinContext(env: ClusterEnv): boolean {
+  const target = { ...process.env, KUBECONFIG: kubeconfigPath(env) };
+  const ctx = contextName(apiServerOf(env));
+  if (spawnSync("kubectl", ["config", "use-context", ctx], { shell: IS_WIN, stdio: "pipe", env: target }).status !== 0) {
+    warn(`Context '${ctx}' not found in ${kubeconfigPath(env)}. Regenerate it with option 6.`);
+    return false;
+  }
+  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], {
+    shell: IS_WIN, stdio: "pipe", env: target,
+  });
+  return true;
+}
+
+// A token can be expired even when login reported success, so check it against the API server.
+function tokenIsValid(env: ClusterEnv): boolean {
+  return spawnSync("kubectl", ["get", "namespace", IST_NAMESPACE, "-o", "name"], {
+    shell: IS_WIN, stdio: "pipe", env: kubeEnv(env),
+  }).status === 0;
+}
+
+// Printed by every cluster command: which cluster the output belongs to is never a guess.
+function targetBanner() {
+  console.log(`${DIM}[cluster] ${TARGET} (${apiServerOf(TARGET)}) ns=${IST_NAMESPACE}${NC}`);
+}
+
+async function selectTarget(prompt = "Target cluster"): Promise<ClusterEnv> {
+  console.log(`\n  1. staging (current: ${TARGET})\n  2. prod`);
+  const input = await ask(`${prompt}: `);
+  return input === "2" ? "prod" : "staging";
 }
 
 const KSEC_EXCLUDE_PREFIXES = ["KUBE_"];
@@ -343,14 +380,13 @@ async function createSecrets() {
   console.log("\nCreate ksec secrets for which environment?");
   console.log("  1. staging (default)\n  2. production");
   const input = await ask("Choice: ");
-  const isProd = input === "2";
-  const secretName = isProd ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
-  const apiServer = isProd ? PROD_API : STAGING_API;
+  const chosen: ClusterEnv = input === "2" ? "prod" : "staging";
+  const secretName = chosen === "prod" ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
 
-  action(`Switching context to ${apiServer}...`);
-  const env = kubeEnv();
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
+  // The secret is pushed to the cluster chosen here, not to the current target.
+  action(`Using ${chosen} (${apiServerOf(chosen)})...`);
+  if (!pinContext(chosen)) return;
+  const env = kubeEnv(chosen);
 
   if (!existsSync(ENV_PATH)) { fail(`.env not found at ${ENV_PATH}`); return; }
 
@@ -384,11 +420,13 @@ async function createSecrets() {
 }
 
 async function listSecrets() {
+  targetBanner();
   action("Listing ksec secrets in current context...");
   spawnSync("helm", ["ksec", "list"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function getSecret() {
+  targetBanner();
   console.log(`\n  Known secrets:`);
   console.log(`    - ${KSEC_SECRET_STAGING} (staging)`);
   console.log(`    - ${KSEC_SECRET_PROD} (production)\n`);
@@ -400,14 +438,13 @@ async function manageSecretKeys() {
   console.log(`\n${CYAN}=== Manage ksec secret keys ===${NC}\n`);
   console.log("  1. staging (default)\n  2. production");
   const envInput = await ask("Environment: ");
-  const isProd = envInput === "2";
-  const secretName = isProd ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
-  const apiServer = isProd ? PROD_API : STAGING_API;
-  const env = kubeEnv();
+  const chosen: ClusterEnv = envInput === "2" ? "prod" : "staging";
+  const secretName = chosen === "prod" ? KSEC_SECRET_PROD : KSEC_SECRET_STAGING;
 
-  action(`Switching context to ${apiServer}...`);
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
+  // Keys are edited on the cluster chosen here, not on the current target.
+  action(`Using ${chosen} (${apiServerOf(chosen)})...`);
+  if (!pinContext(chosen)) return;
+  const env = kubeEnv(chosen);
 
   console.log(`\n  Secret: ${CYAN}${secretName}${NC}\n`);
   console.log("  1. Set/overwrite a key");
@@ -453,10 +490,12 @@ async function manageSecretKeys() {
 // `app.kubernetes.io/instance in (a,b)` contains spaces/parens that the Windows shell mangles under
 // spawnSync (shell: IS_WIN) and it also silently excluded the merchant — so list them all with -o wide.
 async function getPods() {
+  targetBanner();
   spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "wide"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function getAll() {
+  targetBanner();
   const env = kubeEnv();
   console.log("--- Pods ---");
   spawnSync("kubectl", ["get", "pods", "-n", IST_NAMESPACE, "-o", "wide"], { shell: IS_WIN, stdio: "inherit", env });
@@ -469,6 +508,7 @@ async function getAll() {
 }
 
 async function podLogs() {
+  targetBanner();
   // Custom covers anything not fixed here (e.g. the merchant, which isn't always deployed, or any
   // pod visible under option 14) — enter its exact pod name.
   console.log("\n  1. backend\n  2. frontend\n  3. custom (enter a pod name)");
@@ -506,6 +546,7 @@ async function podLogs() {
 }
 
 async function helmStatus() {
+  targetBanner();
   const env = kubeEnv();
   console.log("--- Backend ---");
   spawnSync("helm", ["status", RELEASE_BACKEND, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
@@ -514,6 +555,7 @@ async function helmStatus() {
 }
 
 async function rolloutRestart() {
+  targetBanner();
   console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. all");
   const input = await ask("Restart which? ");
   if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
@@ -529,6 +571,7 @@ async function rolloutRestart() {
 }
 
 async function resourceUsage() {
+  targetBanner();
   spawnSync("kubectl", ["top", "pods", "-n", IST_NAMESPACE, "--containers"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
@@ -553,11 +596,10 @@ function decodeB64(raw: string): string {
 
 async function extractDroneSecrets() {
   console.log(`\n${CYAN}=== Extract Drone secrets (view only) ===${NC}\n`);
-  const env = kubeEnv();
-
-  action("Switching to staging context...");
-  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: IS_WIN, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
+  // Drone reads the infra tokens from staging, whatever the current target.
+  action("Using staging for the cluster tokens...");
+  pinContext("staging");
+  const env = kubeEnv("staging");
 
   console.log("\n--- staging_kubernetes_token ---");
   const stagingToken = runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`);
@@ -607,11 +649,10 @@ async function configureDroneSecrets() {
 
   // ── 1. Cluster secrets (4 infra tokens) ──────────────────────
   action("Extracting cluster secrets...\n");
-  const env = kubeEnv();
+  // Same as the extract flow: the cluster tokens live in staging.
+  pinContext("staging");
+  const env = kubeEnv("staging");
   const clusterSecrets: Array<{ name: string; value: string }> = [];
-
-  spawnSync("kubectl", ["config", "use-context", contextName(STAGING_API)], { shell: IS_WIN, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   const stagingToken = decodeB64(runCapture(`kubectl get secret ${CICD_TOKEN_SECRET} -o jsonpath="{.data.token}" --kubeconfig="${join(KUBE_DIR, "config.staging")}"`).stdout);
   if (stagingToken) clusterSecrets.push({ name: "staging_kubernetes_token", value: stagingToken });
@@ -707,6 +748,7 @@ async function showDroneInfo() {
 // ============================================================
 
 async function describePod() {
+  targetBanner();
   const env = kubeEnv();
   let podName = await ask("Pod name (Enter to list): ");
   if (!podName) {
@@ -717,6 +759,7 @@ async function describePod() {
 }
 
 async function execIntoPod() {
+  targetBanner();
   console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
   if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
@@ -727,6 +770,7 @@ async function execIntoPod() {
 }
 
 async function checkEnvVars() {
+  targetBanner();
   console.log("\n  1. backend\n  2. frontend\n  3. merchant");
   const input = await ask("Which service? ");
   if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
@@ -736,10 +780,12 @@ async function checkEnvVars() {
 }
 
 async function getIngress() {
+  targetBanner();
   spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
 
 async function describeIngress() {
+  targetBanner();
   const env = kubeEnv();
   const result = spawnSync("kubectl", ["get", "ingress", "-n", IST_NAMESPACE, "-o", "name"], { shell: IS_WIN, encoding: "utf-8", env });
   const names = (result.stdout || "").split(/\r?\n/).filter(Boolean);
@@ -765,6 +811,7 @@ async function describeIngress() {
 }
 
 async function helmGetValues() {
+  targetBanner();
   console.log("\n  1. backend\n  2. frontend\n  3. both");
   const input = await ask("Which release? ");
   const env = kubeEnv();
@@ -918,10 +965,10 @@ async function deployEnvSetup() {
     return;
   }
 
-  // Switch context
+  // Follow the environment being deployed for the rest of the checklist.
+  TARGET = isProd ? "prod" : "staging";
+  pinContext(TARGET);
   const env = kubeEnv();
-  spawnSync("kubectl", ["config", "use-context", contextName(apiServer)], { shell: IS_WIN, stdio: "pipe", env });
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], { shell: IS_WIN, stdio: "pipe", env });
 
   // ── Phase 4: Verify cluster access ────────────────────────
   console.log(`\n${CYAN}── 4. Cluster access ──${NC}\n`);
@@ -1119,9 +1166,9 @@ async function fixMesh302() {
 //  MAIN MENU
 // ============================================================
 
-const MENU = `
+const menu = (): string => `
 ============================================
- Menu
+ Menu  (target: ${TARGET})
 ============================================
   --- Setup ---
   1.  Full setup (install all prerequisites)
@@ -1132,7 +1179,7 @@ const MENU = `
   --- Cluster ---
   6.  Generate kubeconfig (staging/prod/both)
   7.  Login (re-authenticate token)
-  8.  Switch context (staging/prod)
+  8.  Switch target cluster (staging/prod)
   9.  Verify cluster access
   --- Secrets ---
   10. Create/update ksec secrets
@@ -1175,7 +1222,7 @@ async function main() {
   console.log(`${CYAN}============================================${NC}`);
 
   while (true) {
-    console.log(MENU);
+    console.log(menu());
     const choice = await ask("Select an option: ");
 
     switch (choice) {
