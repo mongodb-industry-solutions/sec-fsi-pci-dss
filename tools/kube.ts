@@ -350,9 +350,14 @@ function pinContext(env: ClusterEnv): boolean {
     warn(`Context '${ctx}' not found in ${kubeconfigPath(env)}. Regenerate it with option 6.`);
     return false;
   }
-  spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], {
+  // An unpinned namespace would send Helm and kubectl to `default` while everything looks fine.
+  const ns = spawnSync("kubectl", ["config", "set-context", "--current", `--namespace=${IST_NAMESPACE}`], {
     shell: IS_WIN, stdio: "pipe", env: target,
   });
+  if (ns.status !== 0) {
+    fail(`Could not pin namespace '${IST_NAMESPACE}' in ${kubeconfigPath(env)}: ${(ns.stderr ?? "").toString().trim()}`);
+    return false;
+  }
   return true;
 }
 
@@ -620,7 +625,7 @@ async function extractDroneSecrets() {
   console.log(`\n${CYAN}=== Extract Drone secrets (view only) ===${NC}\n`);
   // Drone reads the infra tokens from staging, whatever the current target.
   action("Using staging for the cluster tokens...");
-  pinContext("staging");
+  if (!pinContext("staging")) return;
   const env = kubeEnv("staging");
 
   console.log("\n--- staging_kubernetes_token ---");
@@ -672,7 +677,7 @@ async function configureDroneSecrets() {
   // ── 1. Cluster secrets (4 infra tokens) ──────────────────────
   action("Extracting cluster secrets...\n");
   // Same as the extract flow: the cluster tokens live in staging.
-  pinContext("staging");
+  if (!pinContext("staging")) return;
   const env = kubeEnv("staging");
   const clusterSecrets: Array<{ name: string; value: string }> = [];
 
@@ -989,7 +994,7 @@ async function deployEnvSetup() {
 
   // Follow the environment being deployed for the rest of the checklist.
   TARGET = isProd ? "prod" : "staging";
-  pinContext(TARGET);
+  if (!pinContext(TARGET)) { fail(`Cannot target ${TARGET}: fix the kubeconfig (option 6) and retry.`); return; }
   const env = kubeEnv();
 
   // ── Phase 4: Verify cluster access ────────────────────────

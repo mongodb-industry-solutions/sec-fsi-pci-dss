@@ -29,15 +29,19 @@ export async function seedTransactions(db: Db) {
   );
 
   // A status outside the declared domain fails in the consumers that map it, so the seed refuses it.
+  // An absent or non-string status is reported apart: it is a broken record, not a new state.
   const domain = new Set<string>(CARD_TRANSACTION_STATUSES);
+  const statuses = txns.map((t) => (t as { cardTransactionStatus?: unknown }).cardTransactionStatus);
+  const malformed = statuses.filter((s) => typeof s !== 'string' || s.trim() === '').length;
   const offDomain = [...new Set(
-    txns.map((t) => (t as { cardTransactionStatus?: string }).cardTransactionStatus)
-      .filter((s): s is string => !domain.has(s as string)),
+    statuses.filter((s): s is string => typeof s === 'string' && s.trim() !== '' && !domain.has(s.trim())),
   )];
-  if (offDomain.length > 0) {
+  if (malformed > 0 || offDomain.length > 0) {
     throw new Error(
-      `cardTransactions.json carries statuses outside CardTransactionStatus: ${offDomain.join(', ')}. ` +
-      'Add them to the model and to the consumers, or fix the fixture.',
+      `cardTransactions.json fails the CardTransactionStatus domain: ` +
+      `${malformed} record(s) without a usable status` +
+      (offDomain.length > 0 ? `, unknown status(es): ${offDomain.join(', ')}` : '') +
+      '. Add the state to the model and its consumers, or fix the fixture.',
     );
   }
 
