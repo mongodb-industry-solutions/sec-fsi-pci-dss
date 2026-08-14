@@ -22,7 +22,7 @@ interface HistoryRow {
   category: RowCategory;
   createdAt: string;
   amount: number;
-  currency: string;
+  currency?: string | null;
   status: string;
   // Card-specific
   merchant?: string;
@@ -103,8 +103,16 @@ const FRAUD_STATUS: Record<string, StatusMeta> = {
   closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',     Icon: MinusCircle },
 };
 
-function fmtAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+// Intl rejects a missing or non ISO 4217 currency, and throwing here blanks the page instead of a row.
+function fmtAmount(amount: number, currency?: string | null) {
+  const code = (currency ?? '').trim().toUpperCase();
+  const value = Number.isFinite(amount) ? amount : 0;
+  if (!/^[A-Z]{3}$/.test(code)) return value.toFixed(2);
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${code}`;
+  }
 }
 
 // ── Card money direction ─────────────────────────────────────────────
@@ -203,13 +211,14 @@ export default function TransactionHistoryPage() {
         .list({ limit: 200 }, t)
         .catch(() => ({ results: [] as Record<string, unknown>[], total: 0, page: 1, limit: 200 }));
 
-      const rows = (res.results as Array<{
+      const rows = ((res.results ?? []) as Array<{
         kind: 'card' | 'transfer' | 'rtp';
         paymentExecutionInstanceReference: string;
         direction: 'sent' | 'received';
         grossAmount?: number;
-        currency: string;
-        paymentExecutionStatus: string;
+        // Optional on purpose: a legacy movement may predate either field and must still render.
+        currency?: string | null;
+        paymentExecutionStatus?: string | null;
         paymentExecutionRail: string | null;
         concept: string | null;
         beneficiaryName: string | null;
@@ -228,7 +237,8 @@ export default function TransactionHistoryPage() {
           createdAt: r.completedAt ?? r.initiatedAt ?? new Date().toISOString(),
           amount:    r.grossAmount ?? 0,
           currency:  r.currency,
-          status:    r.paymentExecutionStatus,
+          // A status-less movement must render, and the status lookups throw on undefined.
+          status:    r.paymentExecutionStatus ?? 'unknown',
           concept:   r.concept,
         };
         if (r.kind === 'card') {

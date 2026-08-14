@@ -299,10 +299,10 @@ async function kanopyLogin() {
 
   for (const cluster of clusters as ClusterEnv[]) {
     const cfg = kubeconfigPath(cluster);
-    if (!existsSync(cfg)) { fail(`Kubeconfig not found: ${cfg}. Run option 6 first.`); continue; }
+    // A kubeconfig can exist yet have lost its contexts, and then login succeeds while nothing authenticates.
+    if (!ensureKubeconfig(cluster)) continue;
 
-    // kanopy-oidc kube login authenticates the kubeconfig's current-context, so pin it first:
-    // pointing at another cluster fails with "context ... does not exist".
+    // kanopy-oidc kube login authenticates the kubeconfig's current-context, so pin it first.
     action(`Selecting context '${contextName(apiServerOf(cluster))}' in ${cfg}`);
     if (!pinContext(cluster)) continue;
 
@@ -354,6 +354,28 @@ function pinContext(env: ClusterEnv): boolean {
     shell: IS_WIN, stdio: "pipe", env: target,
   });
   return true;
+}
+
+// Rebuild the kubeconfig when the file is missing or no longer declares the cluster's context.
+function ensureKubeconfig(env: ClusterEnv): boolean {
+  const cfg = kubeconfigPath(env);
+  const ctx = contextName(apiServerOf(env));
+  const listed = spawnSync("kubectl", ["config", "get-contexts", "-o", "name"], {
+    shell: IS_WIN, encoding: "utf-8", env: { ...process.env, KUBECONFIG: cfg },
+  });
+  if (existsSync(cfg) && (listed.stdout ?? "").split(/\r?\n/).map((l) => l.trim()).includes(ctx)) return true;
+
+  warn(`${cfg} does not declare context '${ctx}', regenerating it.`);
+  try {
+    if (!existsSync(KUBE_DIR)) mkdirSync(KUBE_DIR, { recursive: true });
+    const output = execSync(`kanopy-oidc kube setup ${env}`, { encoding: "utf-8", env: { ...process.env, KUBECONFIG: cfg } });
+    writeFileSync(cfg, output, "utf-8");
+    ok(`Kubeconfig regenerated at ${cfg}`);
+    return true;
+  } catch (e: any) {
+    fail(`Could not regenerate ${cfg}: ${e.message}`);
+    return false;
+  }
 }
 
 // A token can be expired even when login reported success, so check it against the API server.
