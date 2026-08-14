@@ -10,7 +10,8 @@ const ALLOWED: Record<PaymentRequestStatus, PaymentRequestStatus[]> = {
   presented: ['delivered', 'viewed', 'accepted', 'rejected', 'cancelled', 'expired'],
   delivered: ['viewed', 'accepted', 'rejected', 'cancelled', 'expired'],
   viewed: ['accepted', 'rejected', 'cancelled', 'expired'],
-  accepted: ['payment_initiated'],
+  // payment_failed: accepted but held for investigation and then confirmed fraudulent (ADR-061).
+  accepted: ['payment_initiated', 'payment_failed'],
   payment_initiated: ['payment_processing', 'payment_settled', 'payment_failed'],
   payment_processing: ['payment_settled', 'payment_failed'],
   payment_settled: ['reversed', 'disputed'],

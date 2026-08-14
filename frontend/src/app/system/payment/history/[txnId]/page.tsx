@@ -6,10 +6,15 @@ import { api, FraudCase, ActionEvent, TransactionNotesResponse, RtpRequestDTO } 
 import { RtpDetailView } from '../../../../../components/RtpDetailView';
 import { getToken, decodeToken } from '../../../../../lib/auth';
 import { useDebugMode } from '../../../../../lib/debugMode';
-import { Check, Copy, Eye, EyeOff, Info } from 'lucide-react';
+import {
+  Check, Copy, Eye, EyeOff, Info, ArrowLeft, ArrowRight, ArrowUpRight, ArrowDownLeft, ExternalLink,
+  CheckCircle2, XCircle, Clock, AlertTriangle, Search, Ban, MinusCircle, Mail, CircleDot,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { RawMongoPanel } from '../../../../../components/RawMongoPanel';
 import { CustomerQuestionsPanel } from '../../../../../components/CustomerQuestionsPanel';
 import { useNotificationsStream } from '../../../../../lib/useNotificationsStream';
+import { formatRiskIndicator } from '../../../../../lib/constants';
 
 // Inline tooltip with floating popup.
 function FieldInfo({ label, description }: { label: string; description: string }) {
@@ -46,7 +51,7 @@ function FieldLabel({ children, info }: { children: React.ReactNode; info: strin
   );
 }
 
-// One-click copy with a transient ✓ confirmation.
+// One-click copy with a transient confirmation icon.
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
@@ -63,7 +68,7 @@ function CopyButton({ value }: { value: string }) {
   );
 }
 
-// Label + value row for the shared metadata grid — two fixed columns.
+// Label + value row for the shared metadata grid: two fixed columns.
 function MetaRow({ label, info, children }: { label: string; info: string; children: React.ReactNode }) {
   return (
     <>
@@ -91,25 +96,34 @@ function BlockRow({ label, info, children }: { label: string; info: string; chil
   );
 }
 
-// Common status → display mapping shared by card + P2P sections.
-function StatusChip({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    completed: 'bg-emerald-100 text-emerald-800',
-    authorized: 'bg-green-100 text-green-800',
-    settled: 'bg-emerald-100 text-emerald-800 font-semibold',
-    under_review: 'bg-amber-100 text-amber-800',
-    open: 'bg-amber-100 text-amber-800',
-    escalated: 'bg-orange-100 text-orange-800',
-    resolved_cleared: 'bg-green-100 text-green-800',
-    resolved_fraud: 'bg-red-100 text-red-800',
-    closed: 'bg-gray-100 text-gray-700',
-    declined: 'bg-red-100 text-red-800',
-    failed: 'bg-red-100 text-red-800',
-    pending: 'bg-blue-100 text-blue-800',
-  };
+// One status vocabulary for the whole view: colour AND icon per status, so a chip looks the same
+// wherever it appears (card section, transfer section, RTP section).
+const STATUS_ICONS: Record<string, { color: string; Icon: LucideIcon }> = {
+  completed:        { color: 'bg-emerald-100 text-emerald-800',                Icon: CheckCircle2 },
+  authorized:       { color: 'bg-green-100 text-green-800',                    Icon: CheckCircle2 },
+  settled:          { color: 'bg-emerald-100 text-emerald-800 font-semibold',  Icon: CheckCircle2 },
+  under_review:     { color: 'bg-amber-100 text-amber-800',                    Icon: AlertTriangle },
+  open:             { color: 'bg-amber-100 text-amber-800',                    Icon: AlertTriangle },
+  escalated:        { color: 'bg-orange-100 text-orange-800',                  Icon: Search },
+  resolved_cleared: { color: 'bg-green-100 text-green-800',                    Icon: CheckCircle2 },
+  resolved_fraud:   { color: 'bg-red-100 text-red-800',                        Icon: Ban },
+  closed:           { color: 'bg-gray-100 text-gray-700',                      Icon: MinusCircle },
+  declined:         { color: 'bg-red-100 text-red-800',                        Icon: XCircle },
+  failed:           { color: 'bg-red-100 text-red-800',                        Icon: XCircle },
+  pending:          { color: 'bg-blue-100 text-blue-800',                      Icon: Clock },
+  reversed:         { color: 'bg-red-100 text-red-800',                        Icon: XCircle },
+};
+
+// Common status chip shared by the card, transfer and RTP sections.
+function StatusChip({ status }: { status?: string | null }) {
+  // A missing status must degrade to a neutral chip, never crash the detail view.
+  const value = status ?? '';
+  const meta = STATUS_ICONS[value];
+  const Icon = meta?.Icon ?? CircleDot;
   return (
-    <span className={`inline-flex items-center text-xs px-2 py-0.5 rounded font-medium w-fit ${map[status] ?? 'bg-gray-100 text-gray-600'}`}>
-      {status.replace(/_/g, ' ')}
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium w-fit ${meta?.color ?? 'bg-gray-100 text-gray-600'}`}>
+      <Icon size={12} className="shrink-0" />
+      {value ? value.replace(/_/g, ' ') : 'n/a'}
     </span>
   );
 }
@@ -132,16 +146,17 @@ interface StoredTransaction {
   paymentReference?: string | null;
 }
 
-const STATUS_DISPLAY: Record<string, { label: string; color: string; icon: string }> = {
-  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800',         icon: '✓' },
-  settled:          { label: 'Settled (funds disbursed)',        color: 'bg-emerald-100 text-emerald-800 font-semibold', icon: '✓' },
-  under_review:     { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  icon: '●' },
-  open:             { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  icon: '●' },
-  escalated:        { label: 'In investigation',                color: 'bg-orange-100 text-orange-800',icon: '●' },
-  resolved_cleared: { label: 'Cleared',                         color: 'bg-green-100 text-green-800',  icon: '✓' },
-  resolved_fraud:   { label: 'Fraud confirmed – refund issued', color: 'bg-red-100 text-red-800',      icon: '!' },
-  closed:           { label: 'Closed',                          color: 'bg-gray-100 text-gray-700',    icon: '–' },
-  declined:         { label: 'Declined',                        color: 'bg-red-100 text-red-800',      icon: '✗' },
+const STATUS_DISPLAY: Record<string, { label: string; color: string; Icon: LucideIcon }> = {
+  authorized:       { label: 'Authorized',                      color: 'bg-green-100 text-green-800',         Icon: CheckCircle2 },
+  settled:          { label: 'Settled (funds disbursed)',        color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
+  under_review:     { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  Icon: AlertTriangle },
+  open:             { label: 'Under review',                    color: 'bg-amber-100 text-amber-800',  Icon: AlertTriangle },
+  escalated:        { label: 'In investigation',                color: 'bg-orange-100 text-orange-800',Icon: Search },
+  resolved_cleared: { label: 'Cleared',                         color: 'bg-green-100 text-green-800',  Icon: CheckCircle2 },
+  resolved_fraud:   { label: 'Fraud confirmed, refund issued',  color: 'bg-red-100 text-red-800',      Icon: Ban },
+  closed:           { label: 'Closed',                          color: 'bg-gray-100 text-gray-700',    Icon: MinusCircle },
+  declined:         { label: 'Declined',                        color: 'bg-red-100 text-red-800',      Icon: XCircle },
+  pending:          { label: 'Pending',                         color: 'bg-blue-100 text-blue-800',    Icon: Clock },
 };
 
 const CHANNEL_LABELS: Record<string, string> = {
@@ -151,13 +166,13 @@ const CHANNEL_LABELS: Record<string, string> = {
   atm:         'ATM withdrawal',
 };
 
-const EVENT_META: Record<string, { label: string; icon: string; dotColor: string }> = {
-  case_opened:    { label: 'Transaction flagged for security review',  icon: '!', dotColor: 'border-amber-400 bg-amber-50' },
-  escalated:      { label: 'Review escalated to specialist team',      icon: '↑', dotColor: 'border-orange-400 bg-orange-50' },
-  note_added:     { label: 'Update added to your case',                icon: '✉', dotColor: 'border-blue-400 bg-blue-50' },
-  resolved:       { label: 'Review completed',                         icon: '✓', dotColor: 'border-green-400 bg-green-50' },
-  closed:         { label: 'Case closed',                              icon: '–', dotColor: 'border-gray-300 bg-gray-50' },
-  field_accessed: { label: 'Account details verified',                 icon: '●', dotColor: 'border-purple-400 bg-purple-50' },
+const EVENT_META: Record<string, { label: string; Icon: LucideIcon; dotColor: string }> = {
+  case_opened:    { label: 'Transaction flagged for security review',  Icon: AlertTriangle, dotColor: 'border-amber-400 bg-amber-50' },
+  escalated:      { label: 'Review escalated to specialist team',      Icon: ArrowUpRight,  dotColor: 'border-orange-400 bg-orange-50' },
+  note_added:     { label: 'Update added to your case',                Icon: Mail,          dotColor: 'border-blue-400 bg-blue-50' },
+  resolved:       { label: 'Review completed',                         Icon: CheckCircle2,  dotColor: 'border-green-400 bg-green-50' },
+  closed:         { label: 'Case closed',                              Icon: MinusCircle,   dotColor: 'border-gray-300 bg-gray-50' },
+  field_accessed: { label: 'Account details verified',                 Icon: Search,        dotColor: 'border-purple-400 bg-purple-50' },
 };
 
 function CardTokenField({ token }: { token: string }) {
@@ -249,17 +264,22 @@ export default function TransactionDetailPage() {
     setToken(t);
     if (showLoading) setLoading(true);
 
-    // Real source of truth: fetch the transaction from the API.
-    const data = await api.transactions.getById(txnId, t).catch(() => null);
+    // Real source of truth: fetch the movement from the API.
+    // v36 (ADR-063): /transactions/:id resolves EVERY movement kind, so a non-card reference now
+    // answers 200 with a movement row instead of 404. This page renders each kind from its own
+    // domain endpoint, so anything that is not a card transaction falls through to those.
+    const raw = await api.transactions.getById(txnId, t).catch(() => null);
+    const movementKind = (raw as { kind?: string } | null)?.kind;
+    const data = movementKind && movementKind !== 'card' ? null : raw;
     if (!data) {
-      // Fallback: try P2P transfer lookup (BIAN SD-65)
+      // Fallback: try P2P transfer lookup 
       const p2p = await api.accounts.getTransfer(txnId, t).catch(() => null);
       if (p2p) {
         setP2pTransfer(p2p);
         if (showLoading) setLoading(false);
         return;
       }
-      // RTP (Request to Pay): the id is a paymentRequestInstanceReference (intent domain, SD-65).
+      // RTP (Request to Pay): the id is a paymentRequestInstanceReference (intent domain).
       const rtp = await api.rtp.getById(txnId, t).catch(() => null);
       if (rtp) {
         setRtpRequest(rtp);
@@ -327,7 +347,7 @@ export default function TransactionDetailPage() {
 
   const currentStatus = fraudCase?.caseStatus ?? txn?.status ?? '';
   const statusMeta = STATUS_DISPLAY[currentStatus] ?? {
-    label: currentStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '●',
+    label: currentStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', Icon: CircleDot,
   };
 
   const shell = { user, debugMode };
@@ -349,13 +369,13 @@ export default function TransactionDetailPage() {
       <div className="text-center py-12 text-gray-500">
         <p className="mb-3">Transaction not found.</p>
         <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
-          ← Back to transactions
+          <ArrowLeft size={14} /> Back to transactions
         </Link>
       </div>
     </PageShell>
   );
 
-  // P2P transfer detail view (BIAN SD-65)
+  // P2P transfer detail view 
   if (p2pTransfer) {
     const isSent = p2pTransfer.initiatorPartyReference === user?.partyRef;
     const direction = isSent ? 'sent' : 'received';
@@ -364,21 +384,23 @@ export default function TransactionDetailPage() {
     return (
       <PageShell {...shell}>
         <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
-          ← Back to transactions
+          <ArrowLeft size={14} /> Back to transactions
         </Link>
         <div className="bg-white rounded-xl border p-5 mb-4">
           <div className="flex items-start justify-between gap-4 mb-4">
             <div>
               <h1 className="text-xl font-bold text-gray-900">P2P Transfer</h1>
               <div className="flex items-center gap-2 mt-1">
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${direction === 'sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-                  {direction === 'sent' ? '↑ Sent' : '↓ Received'}
+                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${direction === 'sent' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                  {direction === 'sent'
+                    ? <><ArrowUpRight size={12} className="shrink-0" /> Sent</>
+                    : <><ArrowDownLeft size={12} className="shrink-0" /> Received</>}
                 </span>
-                <span className={`text-xs px-2 py-0.5 rounded font-medium ${p2pTransfer.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${p2pTransfer.paymentExecutionStatus === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
                   {p2pTransfer.paymentExecutionStatus}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 mt-1">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString() : '—'}</p>
+              <p className="text-sm text-gray-500 mt-1">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString(): '—'}</p>
             </div>
             <div className="text-right shrink-0">
               <p className={`text-2xl font-bold ${direction === 'sent' ? 'text-red-600' : 'text-green-700'}`}>
@@ -388,49 +410,49 @@ export default function TransactionDetailPage() {
             </div>
           </div>
 
-          {/* Sender ↔ Recipient — customer only sees their own account (GDPR / privacy) */}
+          {/* Sender ↔ Recipient: customer only sees their own account (GDPR / privacy) */}
           {(() => {
             const isCustomer = user?.role === 'customer';
             const isReceived = p2pTransfer.beneficiaryPartyReference === user?.partyRef;
             // Privacy: a recipient does not see the sender's source account. But the SENDER always
             // sees the recipient they chose (their registered beneficiary / destination account),
-            // and the recipient sees their own destination — so the Recipient block is visible to
+            // and the recipient sees their own destination, so the Recipient block is visible to
             // both involved parties; only the Sender block is hidden from the recipient.
             const canSeeSource = !isCustomer || isSent;
             const canSeeDest   = !isCustomer || isSent || isReceived;
-            // The beneficiary arrangement (SD-54) belongs to the SENDER (it is their saved contact),
+            // The beneficiary arrangement belongs to the SENDER (it is their saved contact),
             // so only the sender or staff may open it. For the RECIPIENT the arrangement is a foreign
-            // record (access denied), and it is also redundant — they are the beneficiary. Show them
-            // their own credited payout account (SD-66) instead, so they can verify the funds landed.
+            // record (access denied), and it is also redundant: they are the beneficiary. Show them
+            // their own credited payout account instead, so they can verify the funds landed.
             const showBeneficiaryLink = !!p2pTransfer.beneficiaryArrangementReference && (isSent || !isCustomer);
             return (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
                 <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
                   <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
                     Sender
-                    <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer (BIAN SD-65 initiator). Their payout account (SD-66) is debited atomically." />
+                    <FieldInfo label="Sender" description="The party who initiated and funded this P2P transfer. Their payout account is debited atomically." />
                   </div>
                   {(p2pTransfer.initiatorName || canSeeSource || p2pTransfer.sourceAccountMasked) ? (
                     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
                       {/* Payer name: shown to both parties, as on a SEPA/PSD2 statement (debtor name to payee). */}
                       {p2pTransfer.initiatorName && (
-                        <BlockRow label="From" info="Name of the party who initiated and funded this transfer (BIAN SD-65 initiator, SD-13 party). Disclosed to the recipient the same way a SEPA/PSD2 credit transfer shows the payer name on the payee's statement.">
+                        <BlockRow label="From" info="Name of the party who initiated and funded this transfer. Disclosed to the recipient the same way a SEPA/PSD2 credit transfer shows the payer name on the payee's statement.">
                           <span className="text-gray-800">{p2pTransfer.initiatorName}</span>
                         </BlockRow>
                       )}
                       {canSeeSource ? (
                         // Account owner (sender) or authorised staff: full reference + link to the account.
-                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement debited for this transfer. Only the account holder and authorised staff see the full reference and can open the account.">
+                        <BlockRow label="Payout account" info="Payout Account Arrangement debited for this transfer. Only the account holder and authorised staff see the full reference and can open the account.">
                           {p2pTransfer.sourcePayoutAccountReference ? (
                             <Link href={`/system/accounts/${p2pTransfer.sourcePayoutAccountReference}`}
                               className="font-mono text-blue-600 hover:underline">
-                              {p2pTransfer.sourcePayoutAccountReference} ↗
+                              {p2pTransfer.sourcePayoutAccountReference} <ExternalLink size={11} className="inline" />
                             </Link>
-                          ) : <span className="text-gray-400">—</span>}
+                          ): <span className="text-gray-400">—</span>}
                         </BlockRow>
                       ) : p2pTransfer.sourceAccountMasked ? (
                         // Recipient: origin account masked to last-4 (GDPR minimisation). No full IBAN,
-                        // no openable link to the sender's account (a foreign SD-66 record). Not PCI-scoped
+                        // no openable link to the sender's account (a foreign record). Not PCI-scoped
                         // (a bank account/IBAN is not card data), so no PAN is involved.
                         <BlockRow label="Source account" info="Origin account masked to the last 4 digits (GDPR data minimisation). Enough to reconcile the incoming payment without exposing the sender's full IBAN or their account record.">
                           <span className="font-mono text-gray-700">{p2pTransfer.sourceAccountMasked}</span>
@@ -445,37 +467,37 @@ export default function TransactionDetailPage() {
                 <div className="bg-green-50 rounded-lg p-3 border border-green-100">
                   <div className="text-xs font-semibold text-green-700 uppercase tracking-wide mb-2 flex items-center gap-1">
                     Recipient
-                    <FieldInfo label="Recipient" description="The PSP-registered party receiving the funds (BIAN SD-54 Counterparty Administration). Their payout account is credited at execution time." />
+                    <FieldInfo label="Recipient" description="The PSP-registered party receiving the funds. Their payout account is credited at execution time." />
                   </div>
                   {canSeeDest ? (
                     // One link per known resource, no duplication (priority order):
-                    //  1. saved beneficiary (SD-54)  → link the contact only, and ONLY for the sender
-                    //     or staff (the recipient does not own this arrangement — see showBeneficiaryLink)
-                    //  2. registered payout account (SD-66) → link the destination account (the
+                    //  1. saved beneficiary → link the contact only, and ONLY for the sender
+                    //     or staff (the recipient does not own this arrangement: see showBeneficiaryLink)
+                    //  2. registered payout account → link the destination account (the
                     //     recipient's own credited account when they are viewing a received transfer)
                     //  3. unregistered external → full IBAN the user typed (GDPR Art. 32 / PSD2:
                     //     QE-encrypted at rest, shown to the owner; not PCI-scoped card data)
                     showBeneficiaryLink ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-                        {/* Friendly alias first (owner-defined SD-54 label), then the opaque reference link. */}
+                        {/* Friendly alias first (owner-defined label), then the opaque reference link. */}
                         {(p2pTransfer.beneficiaryAlias || p2pTransfer.beneficiaryName) && (
-                          <BlockRow label="To" info="The saved payee this transfer was sent to: your own label for the beneficiary (SD-54 counterpartyLabel), or the account holder name.">
+                          <BlockRow label="To" info="The saved payee this transfer was sent to: your own label for the beneficiary, or the account holder name.">
                             <span className="text-gray-800">{p2pTransfer.beneficiaryAlias ?? p2pTransfer.beneficiaryName}</span>
                           </BlockRow>
                         )}
-                        <BlockRow label="Beneficiary" info="SD-54 Counterparty Administration — the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
+                        <BlockRow label="Beneficiary" info="Counterparty Administration: the saved contact this transfer was sent to. Open it to see the beneficiary's details.">
                           <Link href={`/system/beneficiaries/${encodeURIComponent(p2pTransfer.beneficiaryArrangementReference!)}`}
                             className="font-mono text-green-600 hover:underline">
-                            {p2pTransfer.beneficiaryArrangementReference} ↗
+                            {p2pTransfer.beneficiaryArrangementReference} <ExternalLink size={11} className="inline" />
                           </Link>
                         </BlockRow>
                       </dl>
                     ) : p2pTransfer.resolvedPayoutAccountReference ? (
                       <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-                        <BlockRow label="Payout account" info="SD-66 Payout Account Arrangement credited for this transfer — a registered destination account. Open it to see the account details.">
+                        <BlockRow label="Payout account" info="Payout Account Arrangement credited for this transfer: a registered destination account. Open it to see the account details.">
                           <Link href={`/system/accounts/${p2pTransfer.resolvedPayoutAccountReference}`}
                             className="font-mono text-green-600 hover:underline">
-                            {p2pTransfer.resolvedPayoutAccountReference} ↗
+                            {p2pTransfer.resolvedPayoutAccountReference} <ExternalLink size={11} className="inline" />
                           </Link>
                         </BlockRow>
                       </dl>
@@ -486,7 +508,7 @@ export default function TransactionDetailPage() {
                             ? <span>{p2pTransfer.beneficiaryName}</span>
                             : <span className="text-gray-400">not provided</span>}
                         </BlockRow>
-                        <BlockRow label="Destination IBAN" info="Full destination IBAN (ISO 13616) for this transfer. Stored encrypted at rest (GDPR Art. 32 / PSD2) and shown to the account owner and authorised staff — this is bank data, not PCI-scoped card data.">
+                        <BlockRow label="Destination IBAN" info="Full destination IBAN (ISO 13616) for this transfer. Stored encrypted at rest (GDPR Art. 32 / PSD2) and shown to the account owner and authorised staff: this is bank data, not PCI-scoped card data.">
                           {p2pTransfer.destinationIban
                             ? <span className="font-mono break-all">{p2pTransfer.destinationIban}</span>
                             : p2pTransfer.destinationAccountMasked
@@ -512,7 +534,7 @@ export default function TransactionDetailPage() {
 
           {/* Shared metadata grid */}
           <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5">
-            <MetaRow label="Gross amount" info="Amount transferred before any fees (BIAN SD-65 paymentExecutionGrossAmount).">
+            <MetaRow label="Gross amount" info="Amount transferred before any fees.">
               <span className="font-semibold">
                 {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.currency }).format(p2pTransfer.grossAmount)}
                 <span className="ml-1 text-xs font-normal text-gray-400">{p2pTransfer.currency}</span>
@@ -530,19 +552,19 @@ export default function TransactionDetailPage() {
             </MetaRow>
 
             {p2pTransfer.fxRate != null && p2pTransfer.recipientCurrency && (
-              <MetaRow label="FX rate" info={`Exchange rate applied at execution time (BIAN SD-65). Sender was debited in ${p2pTransfer.currency}; recipient was credited in ${p2pTransfer.recipientCurrency} at this rate.`}>
+              <MetaRow label="FX rate" info={`Exchange rate applied at execution time. Sender was debited in ${p2pTransfer.currency}; recipient was credited in ${p2pTransfer.recipientCurrency} at this rate.`}>
                 <span className="font-mono">
                   1 {p2pTransfer.currency} = {p2pTransfer.fxRate.toFixed(6)} {p2pTransfer.recipientCurrency}
                   {p2pTransfer.recipientAmount != null && (
                     <span className="ml-2 text-gray-400">
-                      → {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.recipientCurrency }).format(p2pTransfer.recipientAmount)}
+                      <ArrowRight size={11} className="inline" /> {new Intl.NumberFormat('en-US', { style: 'currency', currency: p2pTransfer.recipientCurrency }).format(p2pTransfer.recipientAmount)}
                     </span>
                   )}
                 </span>
               </MetaRow>
             )}
 
-            <MetaRow label="Status" info="Lifecycle status of this payment execution (BIAN SD-65). 'completed' means funds have settled.">
+            <MetaRow label="Status" info="Lifecycle status of this payment execution. 'completed' means funds have settled.">
               <StatusChip status={p2pTransfer.paymentExecutionStatus} />
             </MetaRow>
 
@@ -558,15 +580,15 @@ export default function TransactionDetailPage() {
               </MetaRow>
             )}
 
-            <MetaRow label="Initiated at" info="UTC timestamp when the sender submitted the transfer (BIAN SD-65 PaymentExecutionProcedure initiation datetime).">
-              <span className="text-xs">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString() : '—'}</span>
+            <MetaRow label="Initiated at" info="UTC timestamp when the sender submitted the transfer.">
+              <span className="text-xs">{p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString(): '—'}</span>
             </MetaRow>
 
             <MetaRow label="Completed at" info="UTC timestamp when funds were confirmed as credited to the recipient's account.">
-              <span className="text-xs">{p2pTransfer.completedAt ? new Date(p2pTransfer.completedAt).toLocaleString() : (p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString() : '—')}</span>
+              <span className="text-xs">{p2pTransfer.completedAt ? new Date(p2pTransfer.completedAt).toLocaleString(): (p2pTransfer.initiatedAt ? new Date(p2pTransfer.initiatedAt).toLocaleString(): '—')}</span>
             </MetaRow>
 
-            <MetaRow label="Transaction ID" info="Unique immutable reference for this payment execution (BIAN SD-65 paymentExecutionInstanceReference). Use to look up audit events, compliance logs, or open a dispute.">
+            <MetaRow label="Transaction ID" info="Unique immutable reference for this payment execution. Use to look up audit events, compliance logs, or open a dispute.">
               <span className="flex items-center gap-1 min-w-0">
                 <span className="font-mono text-xs text-gray-500 break-all">{p2pTransfer.paymentExecutionInstanceReference}</span>
                 <CopyButton value={p2pTransfer.paymentExecutionInstanceReference} />
@@ -579,7 +601,7 @@ export default function TransactionDetailPage() {
           <div className="bg-white rounded-xl border p-5 mb-4">
             <h2 className="font-semibold text-gray-800 mb-3 flex items-center gap-1">
               Security Review
-              <FieldInfo label="Security Review" description="A FraudDiagnosisCase (BIAN SD-83) opened automatically when FDS, HRP (sanctions), or AML providers signal risk during the compliance pipeline. Opened in parallel with transfer settlement — does not block funds." />
+              <FieldInfo label="Security Review" description="A FraudDiagnosisCase opened automatically when FDS, HRP (sanctions), or AML providers signal risk during the compliance pipeline. Opened in parallel with transfer settlement: does not block funds." />
             </h2>
             <div className="flex items-center gap-2 mb-3">
               <span className="font-mono text-xs text-gray-500">{fc.fraudDiagnosisCaseReference}</span>
@@ -606,7 +628,7 @@ export default function TransactionDetailPage() {
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {fc.riskIndicators.map((ind) => (
-                    <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{ind}</span>
+                    <span key={ind} className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 border border-red-200">{formatRiskIndicator(ind)}</span>
                   ))}
                 </div>
               </div>
@@ -624,13 +646,13 @@ export default function TransactionDetailPage() {
 
             {isAnalyst && (
               <Link href={`/system/investigation/${fc.fraudDiagnosisInstanceReference}`} className="inline-flex items-center gap-1.5 text-sm text-[#001E2B] hover:underline font-medium">
-                Open fraud investigation ↗
+                Open fraud investigation <ExternalLink size={12} />
               </Link>
             )}
           </div>
         ) : (
           <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
-            ✓ No security review triggered for this transfer.
+            <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} className="text-green-600" /> No security review triggered for this transfer.</span>
           </div>
         )}
       </PageShell>
@@ -645,7 +667,7 @@ export default function TransactionDetailPage() {
   return (
     <PageShell {...shell}>
       <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
-        ← Back to transactions
+        <ArrowLeft size={14} /> Back to transactions
       </Link>
 
       {/* Main transaction card */}
@@ -658,11 +680,13 @@ export default function TransactionDetailPage() {
           <div>
             <h1 className="text-xl font-bold text-gray-900">{txn.merchant}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`text-xs px-2 py-0.5 rounded font-medium border ${cardDirection === 'debit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
-                {cardDirection === 'debit' ? '↑ Sent' : '↓ Received'}
+              <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium border ${cardDirection === 'debit' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+                {cardDirection === 'debit'
+                  ? <><ArrowUpRight size={12} /> Sent</>
+                  : <><ArrowDownLeft size={12} /> Received</>}
               </span>
               <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${statusMeta.color}`}>
-                <span>{statusMeta.icon}</span>
+                <statusMeta.Icon size={12} className="shrink-0" />
                 {statusMeta.label}
               </span>
             </div>
@@ -677,18 +701,18 @@ export default function TransactionDetailPage() {
           </div>
         </div>
 
-        {/* Sender ↔ Recipient — consistent layout across all transaction types */}
+        {/* Sender ↔ Recipient: consistent layout across all transaction types */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm border-t pt-4 mb-4">
           <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
             <div className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 flex items-center gap-1">
               Sender
-              <FieldInfo label="Sender" description="The cardholder who authorised this transaction (BIAN SD-88). The funding payout account (SD-66) is debited at authorisation; the hold is cleared at settlement." />
+              <FieldInfo label="Sender" description="The cardholder who authorised this transaction. The funding payout account is debited at authorisation; the hold is cleared at settlement." />
             </div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
-              <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS Req 3.3. The full PAN is never stored after authorisation. Click to manage the card.">
+              <BlockRow label="Card" info="PAN masked to last 4 digits per PCI DSS. The full PAN is never stored after authorisation. Click to manage the card.">
                 {matchedCardId ? (
                   <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
-                    className="font-mono text-blue-600 hover:underline">{txn.maskedPan} ↗</Link>
+                    className="font-mono text-blue-600 hover:underline">{txn.maskedPan} <ExternalLink size={11} className="inline" /></Link>
                 ) : (
                   <span className="font-mono text-gray-700">{txn.maskedPan}</span>
                 )}
@@ -699,12 +723,12 @@ export default function TransactionDetailPage() {
                 </BlockRow>
               )}
               {(apiTxn?.paymentCardReference || txn.cardToken) && (
-                <BlockRow label="Card token" info="Opaque reference replacing the PAN for downstream processing (tokenisation per PCI DSS Req 3.5). Use this token to link the card to related transactions.">
+                <BlockRow label="Card token" info="Opaque reference replacing the PAN for downstream processing (tokenisation per PCI DSS). Use this token to link the card to related transactions.">
                   <span className="flex items-center gap-1.5 flex-wrap">
                     <CardTokenField token={(apiTxn?.paymentCardReference ?? txn.cardToken)!} />
                     {matchedCardId && (
                       <Link href={`/system/cards/${matchedCardId}?from=history&txnId=${txnId}`}
-                        className="text-[#001E2B] hover:underline shrink-0">Manage ↗</Link>
+                        className="inline-flex items-center gap-1 text-[#001E2B] hover:underline shrink-0">Manage <ExternalLink size={11} /></Link>
                     )}
                   </span>
                 </BlockRow>
@@ -715,7 +739,7 @@ export default function TransactionDetailPage() {
           <div className="bg-orange-50 rounded-lg p-3 border border-orange-100">
             <div className="text-xs font-semibold text-orange-700 uppercase tracking-wide mb-2 flex items-center gap-1">
               Recipient
-              <FieldInfo label="Recipient (Merchant)" description="The merchant who received the funds (BIAN SD-89 Merchant Agreement). MCC is disclosed to cardholders per Visa/Mastercard Core Rules — it appears on official statements." />
+              <FieldInfo label="Recipient (Merchant)" description="The merchant who received the funds. MCC is disclosed to cardholders per Visa/Mastercard Core Rules: it appears on official statements." />
             </div>
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
               <BlockRow label="Merchant" info="Name of the merchant as reported by the acquiring bank in the authorisation request.">
@@ -728,9 +752,9 @@ export default function TransactionDetailPage() {
           </div>
         </div>
 
-        {/* Shared metadata grid — no duplication of Sender/Recipient data above */}
+        {/* Shared metadata grid, no duplication of Sender/Recipient data above */}
         <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5">
-          <MetaRow label="Gross amount" info="Transaction amount as submitted by the merchant at authorisation (BIAN SD-254 cardTransactionAmount). Pending amounts may differ from final settled amount.">
+          <MetaRow label="Gross amount" info="Transaction amount as submitted by the merchant at authorisation. Pending amounts may differ from final settled amount.">
             <span className="font-semibold">
               {new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.currency }).format(txn.amount)}
               <span className="ml-1 text-xs font-normal text-gray-400">{txn.currency}</span>
@@ -758,14 +782,14 @@ export default function TransactionDetailPage() {
           </MetaRow>
 
           {(apiTxn?.cardTransactionInitiationType || txn.initiationType) && (
-            <MetaRow label="Initiation" info="CIT = Customer Initiated Transaction (cardholder present). MIT = Merchant Initiated (no real-time cardholder interaction — subscriptions, instalments). Governed by EMVCo 3DS and Visa/Mastercard stored-credential rules.">
+            <MetaRow label="Initiation" info="CIT = Customer Initiated Transaction (cardholder present). MIT = Merchant Initiated (no real-time cardholder interaction: subscriptions, instalments). Governed by EMVCo 3DS and Visa/Mastercard stored-credential rules.">
               {(apiTxn?.cardTransactionInitiationType ?? txn.initiationType) === 'customerInitiated'
                 ? 'Customer Initiated (CIT)' : 'Merchant Initiated (MIT)'}
             </MetaRow>
           )}
 
           {apiTxn?.cardTransactionType && (
-            <MetaRow label="Transaction type" info="Subtype: purchase (debit), refund (credit to cardholder), fee, or reversal. Determines the direction of the balance movement on the SD-66 payout account.">
+            <MetaRow label="Transaction type" info="Subtype: purchase (debit), refund (credit to cardholder), fee, or reversal. Determines the direction of the balance movement on the payout account.">
               <span className="capitalize">{apiTxn.cardTransactionType.replace('_', ' ')}</span>
             </MetaRow>
           )}
@@ -777,12 +801,12 @@ export default function TransactionDetailPage() {
           )}
 
           {fraudCase?.fraudDiagnosisCaseReference && (
-            <MetaRow label="Case reference" info="FraudDiagnosisCase reference (BIAN SD-83). Present when FDS, HRP (sanctions), or AML flagged a risk during post-authorisation compliance checks.">
+            <MetaRow label="Case reference" info="FraudDiagnosisCase reference. Present when FDS, HRP (sanctions), or AML flagged a risk during post-authorisation compliance checks.">
               <span className="font-mono text-xs">{fraudCase.fraudDiagnosisCaseReference}</span>
             </MetaRow>
           )}
 
-          <MetaRow label="Initiated at" info="UTC timestamp of the original authorisation request (BIAN SD-254 cardTransactionDateTime). This is when the card was first presented and the hold was placed.">
+          <MetaRow label="Initiated at" info="UTC timestamp of the original authorisation request. This is when the card was first presented and the hold was placed.">
             <span className="text-xs">{new Date(txn.createdAt).toLocaleString()}</span>
           </MetaRow>
 
@@ -790,7 +814,7 @@ export default function TransactionDetailPage() {
             <span className="text-xs">{new Date(txn.createdAt).toLocaleString()}</span>
           </MetaRow>
 
-          <MetaRow label="Transaction ID" info="Unique immutable identifier (BIAN SD-254 cardTransactionInstanceReference). Use this ID to search audit events, the correlated event trail, or to reference this transaction in a dispute or investigation.">
+          <MetaRow label="Transaction ID" info="Unique immutable identifier. Use this ID to search audit events, the correlated event trail, or to reference this transaction in a dispute or investigation.">
             <span className="flex items-center gap-1 min-w-0">
               <span className="font-mono text-xs text-gray-500 break-all">{txn.txnId}</span>
               <CopyButton value={txn.txnId} />
@@ -837,10 +861,18 @@ export default function TransactionDetailPage() {
             </div>
           )}
 
+          {/* An open investigation holds the payment: authorized, but nothing is charged yet. */}
+          {txn.status === 'authorized' && !['resolved_cleared', 'resolved_fraud', 'closed'].includes(caseNotes.fraudDiagnosisCaseStatus ?? '') && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              This payment is accepted but on hold while the review is open. The amount is reserved on your
+              account and has not been charged; it is only completed once the review closes.
+            </p>
+          )}
+
           {/* Customer-visible notes list */}
           {caseNotes.notes && caseNotes.notes.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-blue-700 uppercase">✉ Messages from security team</p>
+              <p className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 uppercase"><Mail size={12} /> Messages from security team</p>
               {caseNotes.notes.map((note) => (
                 <div key={note.noteId} className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                   <p className="text-sm text-blue-900">{note.noteText}</p>
@@ -879,10 +911,10 @@ export default function TransactionDetailPage() {
             ? 'bg-red-50 border-red-200 text-red-900'
             : 'bg-green-50 border-green-200 text-green-900'
         }`}>
-          <p className="font-semibold mb-1">
+          <p className="inline-flex items-center gap-1.5 font-semibold mb-1">
             {fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud'
-              ? '! Unauthorized transaction confirmed'
-              : '✓ Transaction cleared'}
+              ? <><Ban size={14} /> Unauthorized transaction confirmed</>
+              : <><CheckCircle2 size={14} /> Transaction cleared</>}
           </p>
           <p>
             {fraudCase.fraudDiagnosisResolutionRecord.resolutionOutcome === 'confirmed_fraud'
@@ -903,11 +935,11 @@ export default function TransactionDetailPage() {
             <div className="absolute left-3 top-2 bottom-2 w-px bg-gray-200" />
             <div className="space-y-5">
               {visibleEvents.map((e, i) => {
-                const meta = EVENT_META[e.actionType] ?? { label: e.actionType, icon: '●', dotColor: 'border-gray-300 bg-gray-50' };
+                const meta = EVENT_META[e.actionType] ?? { label: e.actionType, Icon: CircleDot, dotColor: 'border-gray-300 bg-gray-50' };
                 return (
                   <div key={i} className="relative">
-                    <div className={`absolute -left-8 w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-bold ${meta.dotColor}`}>
-                      {meta.icon}
+                    <div className={`absolute -left-8 w-6 h-6 rounded-full border-2 flex items-center justify-center ${meta.dotColor}`}>
+                      <meta.Icon size={12} className="text-gray-700" />
                     </div>
                     <p className="text-sm font-medium text-gray-800">{meta.label}</p>
                     <p className="text-xs text-gray-400 mt-0.5">{new Date(e.actionDateTime).toLocaleString()}</p>
@@ -919,10 +951,15 @@ export default function TransactionDetailPage() {
         </div>
       )}
 
-      {/* No fraud case */}
-      {!txn.fraudCaseCreated && (
+      {/* No fraud case: the "no review needed" note only makes sense for a payment that went through. */}
+      {!txn.fraudCaseCreated && txn.status !== 'declined' && txn.status !== 'under_review' && (
         <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
-          ✓ This transaction was processed normally and did not require additional review.
+          <span className="inline-flex items-center gap-1"><CheckCircle2 size={13} className="text-green-600" /> This transaction was processed normally and did not require additional review.</span>
+        </div>
+      )}
+      {!txn.fraudCaseCreated && txn.status === 'declined' && (
+        <div className="bg-white rounded-xl border p-5 text-center text-sm text-gray-500">
+          This payment was not completed, so no amount was charged.
         </div>
       )}
 
@@ -950,7 +987,7 @@ export default function TransactionDetailPage() {
                   amount: true, merchantName: true, status: true,
                 },
                 neverStored: ['full PAN', 'CVV / CVV2', 'PIN', 'magnetic track data'],
-                alignment: { bian: 'SD-254 Card Transaction', pciDss: ['Req 3 (no PAN/CVV at rest)', 'Req 10 (auditable)'] },
+                alignment: { bian: 'Card Transaction', pciDss: ['no PAN/CVV at rest', 'auditable'] },
               },
             },
             {
@@ -987,7 +1024,7 @@ export default function TransactionDetailPage() {
               id: txn.caseId,
               label: 'fraudDiagnosisCase',
               labelColor: 'text-blue-400',
-              description: 'Raw fraud case document as stored in Atlas (SD-83)',
+              description: 'Raw fraud case document as stored in Atlas',
             }] : []),
           ]}
           />

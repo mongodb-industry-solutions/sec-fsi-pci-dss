@@ -1,4 +1,4 @@
-// BIAN SD-83: Fraud Diagnosis (no QE: operational metadata only)
+// Fraud Diagnosis (no QE: operational metadata only)
 
 import { RiskSeverity } from '../../../shared/models/risk.model';
 import { AnalystRole } from '../../../shared/models/identity.model';
@@ -9,16 +9,21 @@ export { RiskSeverity, AnalystRole };
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
 export const FRAUD_DIAGNOSIS_EVENTS_COLLECTION = 'fraudDiagnosisCaseEvents';
 
+export type FraudCaseTransactionKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+
 export interface FraudDiagnosisControlRecord {
   // Identifiers
   fraudDiagnosisInstanceReference: string;               // UUID, primary key
   fraudDiagnosisCaseReference: string;                   // FD-2026-001234
 
   // Links to protected records (plaintext keys by design: no PII in these refs)
-  cardTransactionInstanceReference: string;              // FK to cardTransactionLog (SD-254)
-  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure (SD-53)
-  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure (SD-65); set for P2P cases
-  transactionKind?: 'card' | 'p2p';                     // discriminator; absent = 'card' for legacy docs
+  cardTransactionInstanceReference: string;              // FK to cardTransactionLog 
+  customerAgreementInstanceReference: string;            // FK to customerAgreementProcedure 
+  paymentExecutionInstanceReference?: string;            // FK to paymentExecutionProcedure ; set for every non-card case
+  paymentRequestInstanceReference?: string;              // FK to paymentRequestProcedure ; set for RTP cases
+  // Movement discriminator; absent = 'card' for legacy docs. Drives which counterparty the
+  // investigation read-model resolves (acquired merchant vs registered beneficiary vs payee).
+  transactionKind?: FraudCaseTransactionKind;
 
   // Extended Reference Pattern: stable display fields from cardTransaction.
   // Embedded to make fraud investigation display a single-collection query.
@@ -107,7 +112,7 @@ export interface FraudDiagnosisCaseEventRecord {
   fraudDiagnosisInstanceReference: string;               // FK to fraudDiagnosisCase
   actionDateTime: Date;
   actionType: ActionType;
-  performedByInstanceReference: string;   // unique acting-user id (partyRef/sub) — PCI DSS Req 10.2.1
+  performedByInstanceReference: string;   // unique acting-user id (partyRef/sub), PCI DSS
   performedByName?: string;                // acting user's display name (shown in the activity log)
   performedByRole: AnalystRole;
   actionDetails: Record<string, unknown>;
@@ -131,9 +136,9 @@ export type ActionType =
   | 'escalated'
   | 'ai_review'
   | 'resolved'
-  | 'reopened'            // SD-83: a resolved/closed case was reopened for further review
+  | 'reopened'            // a resolved/closed case was reopened for further review
   | 'closed'
-  | 'question_created'    // SD-83: investigator posed a question to the customer
-  | 'question_answered';  // SD-83: customer submitted an (immutable) response
+  | 'question_created'    // investigator posed a question to the customer
+  | 'question_answered';  // customer submitted an (immutable) response
 
 export type ResolutionOutcome = 'cleared' | 'confirmed_fraud' | 'referred';

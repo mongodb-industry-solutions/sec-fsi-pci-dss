@@ -4,7 +4,7 @@
 // Process class an event belongs to, used to group events for audit/investigation.
 export type BusinessProcess =
   | 'card_payment'
-  | 'payment_processing'    // SD-65 payout execution + settlement (v17)
+  | 'payment_processing'    // payout execution + settlement (v17)
   | 'fraud_investigation'
   | 'card_management'
   | 'customer_onboarding'
@@ -13,7 +13,7 @@ export type BusinessProcess =
   | 'system';
 
 export interface DomainEvent<T = Record<string, unknown>> {
-  /** uuid v4 — idempotency key (a consumer/store may dedupe on this). */
+  /** uuid v4: idempotency key (a consumer/store may dedupe on this). */
   eventId: string;
   /** Dotted, module/domain-prefixed, e.g. 'card.payment.authorization.requested'. */
   eventType: string;
@@ -33,7 +33,7 @@ export interface DomainEvent<T = Record<string, unknown>> {
   actor?: { partyRef?: string | null; role?: string | null };
   /** BIAN mapping for the event. */
   bian?: { serviceDomain: string; controlRecord: string };
-  /** Sanitized domain data — NEVER cardholder data (stripped on publish). */
+  /** Sanitized domain data, NEVER cardholder data (stripped on publish). */
   payload: T;
   /** Envelope schema version. */
   schemaVersion: number;

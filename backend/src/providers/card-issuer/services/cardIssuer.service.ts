@@ -3,7 +3,7 @@
 // per-network number-format checks, and the set of supported card networks) are data-driven and
 // stored in the capability module config, so new networks/rules can be added without code changes.
 //
-// PCI DSS Req 3.2: NO sensitive authentication data is stored. The CVV is only compared in memory
+// PCI DSS: NO sensitive authentication data is stored. The CVV is only compared in memory
 // against the configured value; neither the PAN nor the CVV is ever returned or logged.
 import { CardIssuerInboundPayload } from '../../../modules/provider/models/externalProviderArrangement.model';
 
@@ -32,7 +32,11 @@ export interface CardNetworkRule {
 export type CvvMode = 'both' | 'global' | 'per_card';
 
 export interface CardIssuerSimulatorConfig {
-  /** The single global CVV the simulator accepts (escape hatch). A fixed demo value, never a real card secret. */
+  /**
+   * The global CVV the simulator accepts (escape hatch). NOT hardcoded: it is part of the
+   * card-issuer module configuration, edited at runtime by `operations_officer` or `manager`
+   * (`modules:manage`) via PUT /config. A demo value, never a real card secret and never stored.
+   */
   validCvv: string;
   /** CVV acceptance mode (see CvvMode). Defaults to `both` so existing v29 demos keep working. */
   cvvMode: CvvMode;
@@ -48,8 +52,10 @@ export interface CardIssuerSimulatorConfig {
   networks: CardNetworkRule[];
 }
 
-// Built-in defaults. The admin can override any of these via the module config; missing keys fall
-// back here, so the simulator always has a working rule set.
+// Seed defaults only, NOT the acceptance rule: every key here is overridden by the stored
+// card-issuer module configuration, which `operations_officer` (or `manager`) edits at runtime with
+// `modules:manage`. They apply while a key has never been configured, so the module always has a
+// working rule set. Change the accepted CVV in the module admin, never in this constant.
 export const DEFAULT_CARD_ISSUER_CONFIG: CardIssuerSimulatorConfig = {
   validCvv: '123',
   cvvMode: 'both',
@@ -226,7 +232,7 @@ export function validateCard(
   }
 
   // D1 (P13.1): on a CVV-bearing channel (interactive checkout / payment-link / simulator), the PSP
-  // sets `cvvExpected`. A missing CVV there is a decline (82) — the card-present-style verification
+  // sets `cvvExpected`. A missing CVV there is a decline (82): the card-present-style verification
   // was required but absent. Card-on-file / recurring tokenized payments do not set the flag, so they
   // keep approving without a CVV.
   const cvvExpected = input.cvvExpected === true || input.cvvExpected === 'true';
@@ -234,14 +240,22 @@ export function validateCard(
     return { approved: false, responseCode: '82', network, cvvValidationResult: 'not_provided', decisionReason: 'cvv_required', last4 };
   }
 
-  // Registration + funding-account checks (v30): a card the PSP does not know, or one without a
-  // known funding/payout account, is declined. These facts are resolved by the caller via the Card
-  // Reference / Funding Account ports; they are only enforced when the caller asserts them (the
-  // direct simulator test path leaves them undefined and stays lenient).
-  if (opts.cardRegistered === false) {
+  // Registration + funding-account checks (v30): a card the PSP does not know, or one without a known
+  // funding/payout account, is declined. These facts are resolved by the caller via the Card Reference /
+  // Funding Account ports and are only enforced when the caller asserts them.
+  //
+  // They apply to a CARD-ON-FILE charge, where the token IS the only credential and must therefore name
+  // a card the PSP holds. They must NOT apply when the payer PRESENTS the card, which is a first-time
+  // payment and the ordinary case at a checkout: the card is then validated on its own credentials.
+  //
+  // A presentation is the full PAN, or the CVV together with the expiry. The hosted pages (checkout and
+  // payment link) tokenize in the browser and never send the PAN, so requiring one would have declined
+  // every first payment through them with `card_not_registered` even though the payer typed the card.
+  const presentsCardCredentials = !!fullPan || (!!cvv && !!expiry);
+  if (!presentsCardCredentials && opts.cardRegistered === false) {
     return { approved: false, responseCode: '56', network, cvvValidationResult: 'not_provided', decisionReason: 'card_not_registered', last4 };
   }
-  if (opts.hasFundingAccount === false) {
+  if (!presentsCardCredentials && opts.hasFundingAccount === false) {
     return { approved: false, responseCode: '57', network, cvvValidationResult: 'not_provided', decisionReason: 'no_funding_account', last4 };
   }
 

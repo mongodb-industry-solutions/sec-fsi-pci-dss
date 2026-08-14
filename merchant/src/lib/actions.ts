@@ -1,5 +1,5 @@
 'use server';
-// Server actions — the only place pages trigger PSP writes. Secrets stay server-side.
+// Server actions: the only place pages trigger PSP writes. Secrets stay server-side.
 import { randomUUID } from 'crypto';
 import { PspClient, PspError } from './PspClient';
 import { ENV } from './env';
@@ -35,13 +35,22 @@ async function client(): Promise<PspClient> {
 function toResult(fn: () => Promise<ActionResult>): Promise<ActionResult> {
   return fn().catch((e) => {
     if (e instanceof PspError) {
-      return { ok: false, message: e.isAuth ? 'Not authorised (scope not granted or session expired).' : `PSP error ${e.status}` };
+      if (e.isAuth) return { ok: false, message: 'Not authorised (scope not granted or session expired).' };
+      // PspClient already extracts `error_description` into the message: show the REASON, and keep the
+      // status only as a fallback when the PSP sent none ("PSP error 402" tells a merchant nothing).
+      const reason = (e.message ?? '').trim();
+      return {
+        ok: false,
+        message: reason && reason !== String(e.status)
+          ? (e.status === 402 ? `Payment declined: ${reason}` : reason)
+          : `The PSP rejected the request (HTTP ${e.status}).`,
+      };
     }
     return { ok: false, message: (e as Error).message ?? 'Unexpected error' };
   });
 }
 
-// ── Product checkout — dispatches by payment method ─────────────────────────────
+// ── Product checkout: dispatches by payment method ─────────────────────────────
 export async function payForProduct(productId: string): Promise<ActionResult> {
   return toResult(async () => {
     const product = findProduct(productId);
@@ -88,7 +97,7 @@ export async function payForProduct(productId: string): Promise<ActionResult> {
         // Server-to-server charge: the merchant's OWN client_credentials token (write:payments), NOT the
         // user session token. No CHD in the merchant; the PSP charges a tokenised card. We forward the
         // acting user's OAuth subject (from the session) purely for ATTRIBUTION so the charge is traceable
-        // to the buyer (payment history + operations view) — the charge itself stays merchant-authenticated.
+        // to the buyer (payment history + operations view): the charge itself stays merchant-authenticated.
         const c = await client();
         const order = await PspClient.apiPaymentServerToServer(
           {
@@ -147,7 +156,7 @@ export async function previewTransfer(input: {
   });
 }
 
-// Add (register) a beneficiary via the PSP (SD-54). The merchant sends only a phone/email + optional
+// Add (register) a beneficiary via the PSP . The merchant sends only a phone/email + optional
 // label; the PSP resolves it to an opaque token (never revealing the recipient's identity). The PSP
 // is anti-enumeration: it returns { found: false } for a non-existent OR already-saved contact, so we
 // surface a neutral message either way.
@@ -172,7 +181,7 @@ export async function addBeneficiary(input: {
   });
 }
 
-// Remove (soft-delete) a saved beneficiary via the PSP (SD-54). The merchant sends only the opaque
+// Remove (soft-delete) a saved beneficiary via the PSP . The merchant sends only the opaque
 // arrangement reference; the PSP scopes the delete to the acting user (token.sub). The arrangement is
 // soft-deleted server-side and can be re-added later (which reactivates it).
 export async function removeBeneficiary(input: { beneficiaryToken: string }): Promise<ActionResult> {
@@ -184,7 +193,7 @@ export async function removeBeneficiary(input: { beneficiaryToken: string }): Pr
   });
 }
 
-// Send money to a saved beneficiary (P2P, SD-65). The merchant supplies only the beneficiary
+// Send money to a saved beneficiary (P2P). The merchant supplies only the beneficiary
 // token + amount; the PSP resolves the source account and recipient server-side (no CHD/IBAN).
 export async function sendToBeneficiary(input: {
   beneficiaryToken: string;
@@ -200,10 +209,15 @@ export async function sendToBeneficiary(input: {
     if (data.status === 'failed') {
       return { ok: false, message: data.failureReason ?? 'Transfer failed.', data };
     }
+    // The UI renders the outcome (amount, state, reference, link), so the message stays human and the
+    // machine-readable parts travel in `data`. A held transfer is accepted but NOT delivered (ADR-060).
+    const held = data.status === 'pending';
     return {
       ok: true,
       data,
-      message: `Sent ${data.amount} ${data.currency}. Reference ${data.transferReference} (${data.status}).`,
+      message: held
+        ? 'Accepted and held for security review. The amount is reserved, not delivered yet.'
+        : 'Payment sent. The funds are on their way to the beneficiary.',
     };
   });
 }
@@ -243,7 +257,7 @@ export async function bankTransfer(input: {
   });
 }
 
-// ── Request to Pay (RTP) — merchant requests / approves money (v28) ─────────────
+// ── Request to Pay (RTP): merchant requests / approves money (v28) ─────────────
 export async function requestMoney(input: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payerCounterpartyReference?: string }): Promise<ActionResult> {
   return toResult(async () => {
     const c = await client();

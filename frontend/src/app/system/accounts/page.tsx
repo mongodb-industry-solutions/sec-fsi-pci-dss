@@ -1,6 +1,6 @@
 'use client';
-// BIAN SD-66: Payout Account — Account List Page (v17 Phase C)
-// PCI DSS Req 3.3: IBAN never shown in full. PCI DSS Req 7: partyRef from JWT enforced server-side.
+// Payout Account, Account List Page (v17 Phase C)
+// PCI DSS: IBAN never shown in full. PCI DSS: partyRef from JWT enforced server-side.
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
@@ -53,14 +53,14 @@ const RAIL_LABELS: Record<string, string> = {
 };
 
 const STATUS_OPTIONS = [
-  { value: '', label: 'All statuses' },
+  { value : '', label: 'All statuses' },
   { value: 'active', label: 'Active' },
   { value: 'suspended', label: 'Suspended' },
   { value: 'closed', label: 'Closed' },
 ];
 
 const TYPE_OPTIONS = [
-  { value: '', label: 'All types' },
+  { value : '', label: 'All types' },
   { value: 'bank_account', label: 'Bank Account' },
   { value: 'wallet', label: 'Wallet' },
   { value: 'internal_ledger', label: 'PSP Ledger' },
@@ -147,20 +147,20 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [form, setForm] = useState({
     payoutAccountType: 'bank_account',
-    payoutAccountAlias: '',
+    payoutAccountAlias : '',
     payoutAccountCurrency: 'EUR',
-    payoutAccountCountryCode: '',
+    payoutAccountCountryCode : '',
     payoutAccountPreferredRail: 'sepa',
     // Bank details
-    payoutAccountHolderName: '',
-    payoutAccountBankName: '',
-    payoutAccountBicSwift: '',
-    payoutAccountBankAddress: '',
+    payoutAccountHolderName : '',
+    payoutAccountBankName : '',
+    payoutAccountBicSwift : '',
+    payoutAccountBankAddress : '',
     // Account identifiers (QE-encrypted fields)
-    payoutAccountIban: '',
-    payoutAccountRoutingNumber: '',
+    payoutAccountIban : '',
+    payoutAccountRoutingNumber : '',
     // Advanced
-    payoutAccountCorrespondentBic: '',
+    payoutAccountCorrespondentBic : '',
   });
   const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
 
@@ -188,13 +188,13 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
       if (!form.payoutAccountBicSwift.trim()) {
         e.payoutAccountBicSwift = 'BIC/SWIFT is required for bank accounts';
       } else if (!BIC_RE.test(form.payoutAccountBicSwift.trim().toUpperCase())) {
-        e.payoutAccountBicSwift = 'Invalid BIC format — must be 8 or 11 chars (e.g. DEUTDEDB or DEUTDEDBXXX)';
+        e.payoutAccountBicSwift = 'Invalid BIC format: must be 8 or 11 chars (e.g. DEUTDEDB or DEUTDEDBXXX)';
       }
       if (form.payoutAccountIban && !IBAN_RE.test(form.payoutAccountIban.replace(/\s/g, '').toUpperCase())) {
-        e.payoutAccountIban = 'Invalid IBAN format — country code + check digits + BBAN (e.g. DE89370400440532013000)';
+        e.payoutAccountIban = 'Invalid IBAN format: country code + check digits + BBAN (e.g. DE89370400440532013000)';
       }
       if (form.payoutAccountCorrespondentBic && !BIC_RE.test(form.payoutAccountCorrespondentBic.trim().toUpperCase())) {
-        e.payoutAccountCorrespondentBic = 'Invalid BIC format — 8 or 11 chars (e.g. CHASUS33)';
+        e.payoutAccountCorrespondentBic = 'Invalid BIC format: 8 or 11 chars (e.g. CHASUS33)';
       }
     }
 
@@ -219,7 +219,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
         if (form.payoutAccountBankName.trim()) body.payoutAccountBankName = form.payoutAccountBankName.trim();
         if (form.payoutAccountBicSwift.trim()) body.payoutAccountBicSwift = form.payoutAccountBicSwift.trim().toUpperCase();
         if (form.payoutAccountBankAddress.trim()) body.payoutAccountBankAddress = form.payoutAccountBankAddress.trim();
-        // QE-encrypted — only send when non-empty (omitting prevents error 31041)
+        // QE-encrypted, only send when non-empty (omitting prevents error 31041)
         const iban = form.payoutAccountIban.replace(/\s/g, '').toUpperCase();
         if (iban) body.payoutAccountIban = iban;
         if (form.payoutAccountRoutingNumber.trim()) body.payoutAccountRoutingNumber = form.payoutAccountRoutingNumber.trim();
@@ -250,7 +250,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
             </div>
             <div>
               <h2 className="font-bold text-[#001E2B] leading-none">Register Payout Account</h2>
-              <p className="text-xs text-gray-400 mt-0.5">BIAN SD-66 · PCI DSS Req 3.3</p>
+              <p className="text-xs text-gray-400 mt-0.5">PCI DSS</p>
             </div>
           </div>
           <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -423,7 +423,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
 
               <div className="rounded-lg bg-blue-50 border border-blue-200 px-3 py-2 flex items-start gap-2 text-xs text-blue-700">
                 <Lock size={13} className="mt-0.5 shrink-0" />
-                <span>IBAN and routing number are stored encrypted at rest (MongoDB Queryable Encryption · PCI DSS Req 3.3). Only authorised Level 2 users can decrypt them.</span>
+                <span>IBAN and routing number are stored encrypted at rest (MongoDB Queryable Encryption · PCI DSS). Only authorised Level 2 users can decrypt them.</span>
               </div>
 
               <div>
@@ -469,7 +469,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
                 onClick={() => setShowAdvanced((v) => !v)}
                 className="w-full flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-400 hover:text-gray-600 transition-colors pt-1"
               >
-                <span>Advanced — correspondent bank</span>
+                <span>Advanced: correspondent bank</span>
                 {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
 
@@ -488,7 +488,7 @@ function RegisterAccountModal({ partyRef, token, onClose, onCreated }: RegisterM
                     className={`${inputCls(errors.payoutAccountCorrespondentBic)} uppercase font-mono tracking-wider`}
                   />
                   <p className="text-xs text-gray-400 mt-1">
-                    Required when the destination bank cannot be reached directly — used for SWIFT cover payments (MT202).
+                    Required when the destination bank cannot be reached directly: used for SWIFT cover payments (MT202).
                   </p>
                   <FieldError msg={errors.payoutAccountCorrespondentBic} />
                 </div>
@@ -635,7 +635,7 @@ export default function AccountsPage() {
           icon={Landmark}
           title="Payout Accounts"
           description="Manage your registered payout and settlement accounts."
-          debugInfo="BIAN SD-66 Payout Account · PCI DSS Req 3.3 (IBAN encrypted QE) · Req 7 (partyRef JWT-scoped) · Req 10 (audited)"
+          debugInfo="Payout Account · PCI DSS: IBAN encrypted QE · partyRef JWT-scoped · audited"
         />
 
         {/* Register Account button (C2) */}

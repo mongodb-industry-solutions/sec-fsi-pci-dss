@@ -167,10 +167,10 @@ export class PspClient {
   // Payment-link + checkout creation are merchant server-to-server operations: see the static
   // PspClient.createPaymentLink / createCheckoutSession above (merchant client_credentials token).
 
-  // API payment — SERVER-TO-SERVER merchant charge (Item 2). Uses the merchant's OWN client_credentials
+  // API payment: SERVER-TO-SERVER merchant charge (Item 2). Uses the merchant's OWN client_credentials
   // machine token (scope write:payments), NOT the logged-in user's session/authorization_code token. No
   // CHD in the merchant: the PSP charges a tokenised card and returns the order + card-transaction ref.
-  // Static because it needs no user session — it is the merchant's own identity.
+  // Static because it needs no user session: it is the merchant's own identity.
   static async apiPaymentServerToServer(
     input: { paymentOrderMerchantReference: string; amount: number; currency: string; paymentOrderDescription?: string; actingSubjectReference?: string },
     idempotencyKey: string,
@@ -254,8 +254,8 @@ export class PspClient {
     );
   }
 
-  // Add (register) a beneficiary by resolving a phone/email to a saved payee (SD-54). The merchant
-  // never learns the recipient's identity — the PSP resolves it server-side and returns an opaque
+  // Add (register) a beneficiary by resolving a phone/email to a saved payee . The merchant
+  // never learns the recipient's identity: the PSP resolves it server-side and returns an opaque
   // reference. Anti-enumeration: the PSP returns { found: false } for a non-existent/duplicate contact.
   addBeneficiary(lookupType: 'phone' | 'email', lookupValue: string, label?: string) {
     return this.request<{ found: boolean; counterpartyArrangementReference?: string; counterpartyLabel?: string; counterpartyLookupHint?: string }>(
@@ -271,11 +271,11 @@ export class PspClient {
     rail?: string;
     reference?: string;
   }) {
-    // Money movement to a beneficiary/external account = bank transfer (SD-65).
+    // Money movement to a beneficiary/external account = bank transfer .
     return this.bankTransfer(input);
   }
 
-  // Send money to a saved beneficiary (P2P transfer, SD-65). The merchant sends only the amount,
+  // Send money to a saved beneficiary (P2P transfer). The merchant sends only the amount,
   // the opaque beneficiary reference, an optional chosen source account reference and an optional
   // description; the PSP resolves the recipient (and the default source account, if none chosen)
   // server-side. `:beneficiaryRef` is a resource id (like /orders/:orderId), NOT a credential.
@@ -293,7 +293,7 @@ export class PspClient {
     );
   }
 
-  // ── Request to Pay (RTP) — merchant OAuth on-behalf-of (read:rtp / write:rtp) ──────────
+  // ── Request to Pay (RTP): merchant OAuth on-behalf-of (read:rtp / write:rtp) ──────────
   // RTP is a transfer that requires the payer's approval. The merchant can request money from a
   // payer, review requests awaiting its own approval, and issue a QR. No CIBA (authenticated session).
   createRtpRequest(body: { amount: number; currency?: string; purpose?: string; payerPartyReference?: string; payerCounterpartyReference?: string; payeeReceivingAccountReference?: string }) {
@@ -333,7 +333,7 @@ export class PspClient {
     );
   }
 
-  // ── Bank transfers (ACH / SEPA / SWIFT) — merchant OAuth on-behalf-of (write:transfers) ──
+  // ── Bank transfers (ACH / SEPA / SWIFT): merchant OAuth on-behalf-of (write:transfers) ──
   previewTransfer(input: { destination: Record<string, unknown>; amountCurrency?: { amount: number; currency: string }; rail?: string }) {
     return this.request(`/api/v1/gateway/transfers/preview`, { method: 'POST', body: input });
   }
@@ -342,7 +342,7 @@ export class PspClient {
     return this.request(`/api/v1/gateway/transfers/bank`, { method: 'POST', body: input });
   }
 
-  // ── Accounts (masked IBAN only; GDPR/PSD2 minimisation) — merchant OAuth (read:accounts) ──
+  // ── Accounts (masked IBAN only; GDPR/PSD2 minimisation): merchant OAuth (read:accounts) ──
   listAccounts(page = 1, limit = 20) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(
       `/api/v1/accounts`,
@@ -350,9 +350,9 @@ export class PspClient {
     );
   }
 
-  // ── History (merchant-isolated operation history for this party) — merchant OAuth (read:transactions) ──
-  // Merchant-isolated operation history (SD-89): the PSP /transactions OAuth channel already MERGES
-  // this party's SD-65 executions + card transactions made through THIS merchant. Request up to 100
+  // ── History (merchant-isolated operation history for this party): merchant OAuth (read:transactions) ──
+  // Merchant-isolated operation history : the PSP /transactions OAuth channel already MERGES
+  // this party's executions + card transactions made through THIS merchant. Request up to 100
   // so the merchant's history is not silently truncated (the endpoint default is 20).
   listHistory(page = 1, limit = 100) {
     return this.request<{ results: any[]; total: number; page: number; limit: number }>(

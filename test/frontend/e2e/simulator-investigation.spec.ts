@@ -82,7 +82,11 @@ test.describe('FR-v1-02: Case Detail Page', () => {
   });
 
   test('02.5 encryption badges visible on QE fields (EncryptionBadge component)', async ({ page }) => {
-    await expect(page.locator('text=/🔒/').first()).toBeVisible();
+    // The badge renders a lucide <Lock> icon (not a 🔒 emoji) plus the field label, and carries the
+    // QE mode in its title. Assert the mode, so the test states which protection is shown rather than
+    // how it is drawn: both QE tiers must be distinguishable on the page.
+    await expect(page.locator('[title="QE: equality-searchable"]').first()).toBeVisible();
+    await expect(page.locator('[title="QE: encrypted, not searchable"]').first()).toBeVisible();
   });
 
   test('02.6 shows the investigation workflow step navigator', async ({ page }) => {

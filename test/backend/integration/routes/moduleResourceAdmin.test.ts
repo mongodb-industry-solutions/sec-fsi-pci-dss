@@ -14,7 +14,7 @@
  *  FR-29.6  operations_officer lists all accounts (QE-stripped + hints); other roles 403.
  *  FR-29.7  account CRUD (create/get/patch/close), IBAN never returned.
  *  FR-29.8  gate: an active external provider in the capability group → 409 managed_externally.
- *  Scope    the customer role is blocked from /api/v1/modules (PCI Req 7).
+ *  Scope    the customer role is blocked from /api/v1/modules (PCI DSS).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';

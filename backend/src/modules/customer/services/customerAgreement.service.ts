@@ -32,8 +32,8 @@ function buildResponse(
   canSeeSensitive: boolean,
   caseId?: string,
 ): Record<string, unknown> {
-  // Least-privilege (PCI DSS Req 7 need-to-know · BIAN SD-53/SD-13): contact PII (email,
-  // phone) is QE:equality — searchable while encrypted — but is exposed in responses only to
+  // Least-privilege (PCI DSS need-to-know): contact PII (email,
+  // phone) is QE:equality, searchable while encrypted, but is exposed in responses only to
   // roles with an operational need to contact/verify the customer (L2 investigator, auditor).
   // L1 triages on non-identifying attributes (name, segment, status, KYC outcome) and never
   // receives the contact PII. Deeper QE:none PII (address, gov ID, risk notes) stays gated by
@@ -63,9 +63,9 @@ function buildResponse(
   };
 
   // Sensitive QE:none PII is attached ONLY when the role is explicitly authorized
-  // (auditor, or L2 with a valid escalation token) — never merely because the bytes came
+  // (auditor, or L2 with a valid escalation token), never merely because the bytes came
   // back decrypted. This is fail-closed: if the demo DB stores these fields in plaintext
-  // (QE not active), an unauthorized role still does NOT receive them. PCI DSS Req 7.
+  // (QE not active), an unauthorized role still does NOT receive them. PCI DSS.
   // QE:none values travel in the payload only on the audited escalation path (a caseId, which
   // means maybeAudit emitted field_accessed); otherwise the reveal endpoint is used. ADR-052.
   if (canSeeSensitive && isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) {
@@ -106,10 +106,10 @@ async function findPartyAndAgreement(
 
 async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, doc: CustomerAgreementControlRecord, canSeeSensitive: boolean, actor?: { ref?: string; name?: string }): Promise<void> {
   if (!caseId) return;
-  if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited (Req 10)
+  if (!canSeeSensitive) return; // only an actual sensitive disclosure is audited 
   if (!isSensitiveDecrypted(doc.customerAgreementResidentialAddress)) return;
   await appendAuditEvent(db, caseId, 'field_accessed', role as 'level2_investigator' | 'security_auditor', {
-    // The fields actually disclosed (PCI DSS Req 10.2.2).
+    // The fields actually disclosed (PCI DSS).
     fields: [
       'customerAgreementResidentialAddress',
       'customerAgreementRiskNotes',
@@ -212,7 +212,7 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
     customerAgreementOccupation: isSensitiveDecrypted(doc.customerAgreementOccupation) ? doc.customerAgreementOccupation : null,
     customerAgreementTaxIDNumber: isSensitiveDecrypted(doc.customerAgreementTaxIDNumber) ? doc.customerAgreementTaxIDNumber : null,
     customerAgreementGovernmentID: dec(doc.customerAgreementGovernmentID),
-    // QE:none (L2-only) — null unless the caller decrypted them; offered via the audited reveal endpoint.
+    // QE:none (L2-only), null unless the caller decrypted them; offered via the audited reveal endpoint.
     customerAgreementSourceOfFunds: dec(doc.customerAgreementSourceOfFunds),
     customerAgreementPurposeOfRelationship: dec(doc.customerAgreementPurposeOfRelationship),
     customerAgreementResidentialAddress: dec(doc.customerAgreementResidentialAddress),
@@ -221,8 +221,8 @@ export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole 
 }
 
 // v31: audited on-demand reveal of the QE:none (L2-only) KYC fields for the administration workbench.
-// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited — PCI Req 3.2/3.3
-// for CHD-adjacent identity data, GDPR need-to-know, Req 10). Reads via the L2 QE client so the QE:none
+// Mirrors the operations_officer PAN/IBAN reveal pattern (ephemeral, on demand, audited: PCI DSS
+// for CHD-adjacent identity data, GDPR need-to-know). Reads via the L2 QE client so the QE:none
 // fields decrypt, records a field-access compliance event (field NAMES only, no values), and returns the
 // plaintext to the caller for display only (never persisted). Gated by customers:manage at the route.
 export async function revealKycSensitive(
@@ -259,7 +259,7 @@ export async function revealKycSensitive(
     processOutcome: 'approved',
     performedByPartyReference: actor.performedByPartyReference ?? null,
     performedByRole: actor.performedByRole ?? null,
-    // GDPR minimization / PCI Req 10: log which fields were revealed, never their values.
+    // GDPR minimization / PCI DSS: log which fields were revealed, never their values.
     eventSummary: { revealedFields: Object.keys(fields) },
     bianServiceDomain: 'Customer Agreement',
     bianControlRecordType: 'CustomerAgreementProcedure',
@@ -270,7 +270,7 @@ export async function revealKycSensitive(
 
 const KYC_COMPLETED_STATUSES = ['verified', 'rejected', 'expired'];
 
-// Paged list of parties that COMPLETED KYC. L1 (masked) by default — QE:none sensitive leaves come back
+// Paged list of parties that COMPLETED KYC. L1 (masked) by default: QE:none sensitive leaves come back
 // as ciphertext and are never projected here. Index-backed: the ESR compound
 // { kycCheckStatus, customerSegment, recordUpdatedDateTime } serves the filter + sort (no COLLSCAN).
 export async function listKycAdmin(
@@ -284,7 +284,7 @@ export async function listKycAdmin(
       : { $in: KYC_COMPLETED_STATUSES },
   };
   if (filters.segment) query.customerSegment = filters.segment;
-  // riskRating is QE:equality — queryable on the QE client via a plain equality predicate.
+  // riskRating is QE:equality, queryable on the QE client via a plain equality predicate.
   if (filters.riskRating) query['customerAgreementKycCheck.customerAgreementKycCheckRiskRating'] = filters.riskRating;
 
   // v31: party-side search. partyType/email/phone/nationality live on the `party` record and are
@@ -357,7 +357,7 @@ const KYC_EDITABLE_FIELDS = new Set([
 export type KycPatchResult = { status: 'not_found' } | { status: 'invalid'; error: string } | { status: 'ok' };
 
 // Correct KYC data. Writes through the L2 QE client so QE leaves encrypt on write. Rejects any write to
-// customerAgreementKycCheckStatus (verdict is not editable here — decision 2). Emits kyc.record.amended
+// customerAgreementKycCheckStatus (verdict is not editable here: decision 2). Emits kyc.record.amended
 // with changed FIELD NAMES only (no before/after PII in the ledger, GDPR minimization).
 export async function patchKycData(
   db: Db,
@@ -414,13 +414,13 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
     customerAgreementEnrollmentDate:    doc.customerAgreementEnrollmentDate,
     customerAgreementPreferredLanguage: doc.customerAgreementPreferredLanguage,
     customerAgreementKycCheck:          doc.customerAgreementKycCheck ?? null,
-    // v27 KYC identity (SD-53). Self-profile runs on the L2/auditor client, so the QE-encrypted
+    // v27 KYC identity . Self-profile runs on the L2/auditor client, so the QE-encrypted
     // scalar leaves (govId .number QE:suffix, .type/.issuingCountry QE:equality, .expiryDate
     // QE:range; taxId QE:prefix; occupation QE:equality) are decrypted for the owner.
     customerAgreementGovernmentID:      doc.customerAgreementGovernmentID ?? null,
     customerAgreementTaxIDNumber:       doc.customerAgreementTaxIDNumber,
     customerAgreementOccupation:        doc.customerAgreementOccupation,
-    // SD-13 party demographics, decrypted here for the owner (QE:range DOB, QE:equality rest).
+    // party demographics, decrypted here for the owner (QE:range DOB, QE:equality rest).
     partyDateOfBirth:                   party.partyDateOfBirth,
     partyNationality:                   party.partyNationality,
     partyPlaceOfBirth:                  party.partyPlaceOfBirth,
@@ -453,7 +453,7 @@ export async function updateSelfProfile(
 
   let matched = false;
 
-  // PII fields that live in party (SD-13)
+  // PII fields that live in party 
   const partyPatch: Record<string, unknown> = {};
   if (patch.customerMobilePhoneNumber) {
     partyPatch.partyMobilePhoneNumber = patch.customerMobilePhoneNumber;
@@ -479,7 +479,7 @@ export async function updateSelfProfile(
         { $set: partyPatch }
       );
     } catch (e: any) {
-      // Concurrent writer won the race for this phone — unique index rejected it.
+      // Concurrent writer won the race for this phone: unique index rejected it.
       if (e?.code === 11000 || e?.code === 11001) {
         throw Object.assign(new Error('Phone number already in use by another party'), { statusCode: 409 });
       }
@@ -545,7 +545,7 @@ export async function updateSelfProfile(
 // which QE query type, the validation rules, the role gate and the tier gate. The frontend
 // renders only what the field registry exposes and enforces nothing the server does not.
 //
-// ROLE GATE (least-privilege, PCI DSS Req 7): this is a discovery capability that returns
+// ROLE GATE (least-privilege, PCI DSS): this is a discovery capability that returns
 // LISTS of customers, so it is restricted to investigator and auditor roles. Level 1 analysts
 // keep only the blind single-record lookup (getByEmail/Phone/AccountRef); they must not be able
 // to enumerate the customer base by attribute. The gate is enforced here (server-side), not in
@@ -586,13 +586,13 @@ const ENC_ENDS = '$encStrEndsWith';
 // All searchable fields are QE lookup-tier (L1+ can decrypt + search). QE:none sensitive fields
 // (address, sourceOfFunds, purpose, screeningRef) are never searchable, so they are not listed.
 const KYC_SEARCH_FIELDS: KycSearchFieldDef[] = [
-  // Contact / account keys (QE:equality) — the same fields as the L1 blind lookup, exposed here so
+  // Contact / account keys (QE:equality), the same fields as the L1 blind lookup, exposed here so
   // L2/auditor can do everything the simple lookup does from the one advanced surface (exact match).
   { key: 'email',                label: 'Email',             collection: 'party',     path: 'partyEmailAddress',      baseMode: 'equality', bsonType: 'string' },
   { key: 'phone',                label: 'Phone',             collection: 'party',     path: 'partyMobilePhoneNumber', baseMode: 'equality', bsonType: 'string' },
   { key: 'accountRef',           label: 'Account reference', collection: 'agreement', path: 'customerAgreementReference', baseMode: 'equality', bsonType: 'string' },
   { key: 'partyName',            label: 'Name',              collection: 'party',     path: 'partyName',            baseMode: 'substring', bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 30, caseSensitive: false, diacriticSensitive: false },
-  { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2020-01-01' },
+  { key: 'partyDateOfBirth',     label: 'Date of birth',     collection: 'party',     path: 'partyDateOfBirth',     baseMode: 'range',     bsonType: 'date',   rangeMin: '1900-01-01', rangeMax: '2035-01-01' },
   { key: 'partyNationality',     label: 'Nationality',       collection: 'party',     path: 'partyNationality',     baseMode: 'equality',  bsonType: 'string', enumValues: ['ES','GB','US','FR','DE','IT','PT','PL','MX','NG'] },
   { key: 'partyPlaceOfBirth',    label: 'Place of birth',    collection: 'party',     path: 'partyPlaceOfBirth',    baseMode: 'equality',  bsonType: 'string' },
   { key: 'govIdNumber',          label: 'Government ID no.', collection: 'agreement', path: 'customerAgreementGovernmentID.number',         baseMode: 'suffix',   bsonType: 'string', minQueryLength: 3, maxQueryLength: 10, inputMaxLength: 20, caseSensitive: true, diacriticSensitive: true },
@@ -719,17 +719,34 @@ function buildKycFilter(def: KycSearchFieldDef, mode: KycSearchMode, req: KycSea
 
   if (mode === 'range') {
     const cond: Record<string, unknown> = {};
-    const coerce = (s: string): Date | number => def.bsonType === 'date' ? new Date(s) : Number(s);
+    const isDate = def.bsonType === 'date';
+    // A date-only bound names a whole calendar day: the lower bound starts at 00:00:00 and the
+    // upper one ends at 23:59:59.999, so from == to matches everything stored on that day
+    // (expiry dates carry a time of day). Both ends are inclusive.
+    const coerce = (v: string, end: boolean): Date | number => {
+      if (!isDate) return Number(v);
+      const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(v);
+      return new Date(dateOnly ? `${v}T${end ? '23:59:59.999' : '00:00:00.000'}Z` : v);
+    };
+    // The QE range index only covers [min, max]; querying outside it is rejected by the driver,
+    // so clamp instead of failing the operator's search.
+    const clamp = (v: Date | number): Date | number => {
+      const lo = def.rangeMin != null ? coerce(String(def.rangeMin), false) : null;
+      const hi = def.rangeMax != null ? coerce(String(def.rangeMax), true) : null;
+      if (lo != null && v < lo) return lo;
+      if (hi != null && v > hi) return hi;
+      return v;
+    };
     if (req.from == null && req.to == null) badRequest(`Range search on ${def.key} needs from and/or to`);
     if (req.from != null) {
-      const lo = coerce(req.from);
-      if (def.bsonType === 'date' ? isNaN((lo as Date).getTime()) : isNaN(lo as number)) badRequest(`Invalid from value for ${def.key}`);
-      cond.$gte = lo;
+      const lo = coerce(req.from, false);
+      if (isDate ? isNaN((lo as Date).getTime()) : isNaN(lo as number)) badRequest(`Invalid from value for ${def.key}`);
+      cond.$gte = clamp(lo);
     }
     if (req.to != null) {
-      const hi = coerce(req.to);
-      if (def.bsonType === 'date' ? isNaN((hi as Date).getTime()) : isNaN(hi as number)) badRequest(`Invalid to value for ${def.key}`);
-      cond.$lte = hi;
+      const hi = coerce(req.to, true);
+      if (isDate ? isNaN((hi as Date).getTime()) : isNaN(hi as number)) badRequest(`Invalid to value for ${def.key}`);
+      cond.$lte = clamp(hi);
     }
     return { [def.path]: cond };
   }
@@ -805,7 +822,7 @@ export async function searchKyc(
 }
 
 // v27 Phase 6: persist a provider-produced HRP screening verdict onto the KYC check sub-document.
-// The Integration Hub (SD-193) dispatches the kyc.screening.requested event to the screening
+// The Integration Hub dispatches the kyc.screening.requested event to the screening
 // provider; the provider-group reactor calls this to store the structured, auditable verdict.
 // Writes go through the L2 QE client so the QE verdict fields (range/equality/none) encrypt on
 // write, exactly like updateSelfProfile. Owning the DB write here keeps it out of the reactor.

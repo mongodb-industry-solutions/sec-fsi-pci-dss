@@ -599,7 +599,7 @@ function L2ResolveView({ fraudCase, busy, isResolved, canResolve, onResolve }: {
         )}
       </div>
       <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-xl p-4 text-sm">
-        <strong>PCI DSS v4.0:</strong> the complete investigation trail satisfies Req 10 (audit logging), Req 3 (CHD protection via QE), and Req 7 (role-based access).
+        <strong>PCI DSS v4.0:</strong> the complete investigation trail satisfies audit logging, CHD protection via QE, and role-based access.
       </div>
     </div>
   );
@@ -633,7 +633,7 @@ function CustomerView({ fraudCase }: { fraudCase: FraudCase }) {
               {isFraud ? 'Your dispute has been resolved' : 'Transaction reviewed and cleared'}
             </p>
             <p className={`text-sm ${isFraud ? 'text-green-700' : 'text-blue-700'}`}>
-              The transaction of <strong>{amount}</strong> at <strong>{snap?.cardTransactionMerchantName ?? 'the merchant'}</strong>{' '}
+              The operation of <strong>{amount}</strong> <strong>{snap?.cardTransactionMerchantName ?? ''}</strong>{' '}
               {isFraud
                 ? 'was confirmed as fraud. A full refund has been issued and a new card will be dispatched.'
                 : 'was reviewed and confirmed legitimate. No action needed on your account.'}

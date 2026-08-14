@@ -1,4 +1,4 @@
-// v31 (SD-89 + SD-13, FATF/4th AMLD): beneficial-owner invariants + ownership helpers.
+// v31 (+ FATF/4th AMLD): beneficial-owner invariants + ownership helpers.
 // Pure, no I/O. Enforced in the service layer (NOT in the DB), per plan §3.2. Reused by controller
 // validation, the owners CRUD path, and the seeder so all three apply the identical rules.
 

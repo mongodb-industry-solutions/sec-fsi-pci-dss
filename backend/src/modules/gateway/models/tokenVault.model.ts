@@ -1,4 +1,4 @@
-// BIAN SD-57: Card eToken  -  Token Vault Control Record
+// Card eToken  -  Token Vault Control Record
 
 export const TOKEN_VAULT_COLLECTION = 'cardEtokenProcedure';
 

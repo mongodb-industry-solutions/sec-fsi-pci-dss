@@ -1,6 +1,6 @@
 /**
  * E2E: Application Mode authentication + role dashboards (FR-v1-05, FR-v4-P8)
- * Route: /system  — login form, then inline role-based dashboard (no redirect).
+ * Route: /system, login form, then inline role-based dashboard (no redirect).
  * Replaces the legacy demo-auth.spec.ts which targeted the removed /demo/* routes.
  */
 import { test, expect } from '@playwright/test';
@@ -80,7 +80,7 @@ test.describe('FR-v1-05: role-based dashboards', () => {
     await loginAs(context, 'level1_analyst');
     await page.goto('/system');
     await expect(page.getByRole('heading', { name: /Welcome,/ })).toBeVisible({ timeout: 15000 });
-    // Sign out lives in the UserMenu dropdown — open it via the header trigger
+    // Sign out lives in the UserMenu dropdown: open it via the header trigger
     // (identified by the signed-in user's name) once the dashboard is hydrated.
     const trigger = page.getByRole('button', { name: /Sarah Chen/i });
     await expect(trigger).toBeVisible({ timeout: 8000 });

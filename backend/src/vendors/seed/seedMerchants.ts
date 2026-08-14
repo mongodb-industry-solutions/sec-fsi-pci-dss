@@ -1,4 +1,4 @@
-// Ch-05: Seed merchantAgreementProcedure (SD-89) with demo merchant records.
+// Ch-05: Seed merchantAgreementProcedure with demo merchant records.
 // Includes: 1 active (dual-role owner), 1 under_review (pending approval), 1 active (standalone).
 
 import { Db } from 'mongodb';

@@ -1,5 +1,5 @@
 // Bus payload contracts for the `card_payment` process (architecture §7.1).
-// Reference-led, no raw cardholder data — CHD rides only in the encrypted `chd` envelope (§7.8).
+// Reference-led, no raw cardholder data: CHD rides only in the encrypted `chd` envelope (§7.8).
 // correlationId = transactionId for every event in this process.
 
 /**
@@ -12,7 +12,7 @@ export interface CardPaymentAuthorizationRequested {
   channel: 'api' | 'checkout' | 'payment_link';
   merchantName: string;
   merchantCategoryCode?: string;
-  maskedPan: string;                        // "411111******1111" — masked only
+  maskedPan: string;                        // "411111******1111", masked only
   cardNetwork?: string;
   cardToken?: string;                       // tokenized card-on-file reference
   accountReference?: string;
@@ -25,7 +25,7 @@ export interface CardPaymentAuthorizationRequested {
  * @note     CHD rides ONLY in encrypted `chd`; persisted temporarily + purged (§7 intro, §7.8).
  */
 export interface CardIssuerValidationRequested {
-  cardToken: string;                        // tokenized card-on-file reference — NOT the PAN
+  cardToken: string;                        // tokenized card-on-file reference, NOT the PAN
   maskedPan: string;
   cardNetwork?: string;
   amount: number;
@@ -42,7 +42,7 @@ export interface CardIssuerValidationCompleted {
   outcome: 'approved' | 'declined';
   responseCode?: string;                    // ISO-8583-style: "00", "05", "51"
   decisionReason?: string;                  // "cvv_mismatch" | "expired_card" | "insufficient_funds"
-  cvvProvided?: boolean;                    // audit signal only — never the CVV value
+  cvvProvided?: boolean;                    // audit signal only, never the CVV value
   cardNetwork?: string;
 }
 
@@ -69,7 +69,7 @@ export interface FdsScoringCompleted {
   outcome: 'approved' | 'declined';         // declined = block
   riskScore?: number;                       // 0..100
   recommendation?: 'approve' | 'review' | 'block';
-  riskFactors?: string[];                   // e.g. ["new_device","geo_mismatch"] — feeds the case
+  riskFactors?: string[];                   // e.g. ["new_device","geo_mismatch"], feeds the case
   reason?: string;
 }
 
@@ -96,7 +96,7 @@ export interface HrpScreeningCompleted {
   outcome: 'approved' | 'declined';         // declined = sanctions/PEP match -> hard stop
   matchType?: 'sanctions' | 'pep' | 'adverse_media';
   matchScore?: number;                      // 0..100 confidence of the watchlist match
-  matchedList?: string;                     // e.g. "OFAC SDN" | "EU consolidated" — feeds the case
+  matchedList?: string;                     // e.g. "OFAC SDN" | "EU consolidated", feeds the case
   reason?: string;
 }
 

@@ -14,7 +14,7 @@ type Stats = {
   byStatus: Array<{ status: string; count: number; amount: number }>;
   byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
   byCurrency: Array<{ currency: string; count: number; amount: number }>;
-  // v18 B-06: commission revenue (SD-89) aggregated from paymentExecution fee (SD-65).
+  // v18 B-06: commission revenue aggregated from paymentExecution fee .
   commissionRevenue?: {
     total: number;
     count: number;
@@ -276,7 +276,7 @@ export default function OverviewSectionPage() {
           icon={LayoutDashboard}
           title="Overview"
           description={`Application status for ${merchant.merchantName}.`}
-          debugInfo="BIAN Merchant Agreement (SD-89) · Application lifecycle"
+          debugInfo="BIAN Merchant Agreement · Application lifecycle"
         />
         <ApplicationStatusCard merchant={merchant} />
       </div>
@@ -297,7 +297,7 @@ export default function OverviewSectionPage() {
         icon={LayoutDashboard}
         title="Overview"
         description={`Acquiring activity for ${merchant.merchantName}.`}
-        debugInfo="BIAN Merchant Activity Analysis (SD-89) · PCI DSS Req 3 & 7 (aggregates only, no payer PII)"
+        debugInfo="BIAN Merchant Activity Analysis · PCI DSS (aggregates only, no payer PII)"
       />
 
       {loading ? (
@@ -316,7 +316,7 @@ export default function OverviewSectionPage() {
             <StatCard icon={<CalendarDays size={14} />} label="This month" value={String(thisMonth?.count ?? 0)} sub={`${MONTHS[now.getMonth()]} ${now.getFullYear()}`} />
           </div>
 
-          {/* v18 B-06: commission revenue (SD-89) — recognized from the fee applied per operation (SD-65). */}
+          {/* v18 B-06: commission revenue , recognized from the fee applied per operation . */}
           {stats.commissionRevenue && stats.commissionRevenue.count > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center gap-2 mb-4">

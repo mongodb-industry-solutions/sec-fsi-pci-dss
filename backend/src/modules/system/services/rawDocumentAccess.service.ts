@@ -1,4 +1,4 @@
-// Authorization for the raw (undecrypted) document view. PCI DSS Req 7.3.1/7.3.3.
+// Authorization for the raw (undecrypted) document view. PCI DSS.
 //
 // Staff roles need `view` on the BIAN resource that owns the collection. The customer is authorized
 // by ownership instead, proven server-side from its own identity (GDPR Art. 15).
@@ -15,12 +15,12 @@ import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.mo
 // Collection to owning BIAN resource. Every collection exposed by the raw view must be listed here;
 // an unlisted collection is denied (default-deny).
 export const RAW_COLLECTION_RESOURCE: Readonly<Record<string, Resource>> = {
-  party: 'customers',                          // SD-13 Party
-  customerAgreementProcedure: 'customers',     // SD-53 Customer Agreement
-  customerAuthenticationAssessment: 'customers', // SD-16, the customer's own auth record
-  cardTransactionLog: 'transactions',          // SD-254 Card Transaction
-  paymentCardManagement: 'cards',              // SD-88 Payment Card
-  fraudDiagnosisCase: 'fraudCases',            // SD-83 Fraud Diagnosis
+  party: 'customers',                          // Party
+  customerAgreementProcedure: 'customers',     // Customer Agreement
+  customerAuthenticationAssessment: 'customers', // the customer's own auth record
+  cardTransactionLog: 'transactions',          // Card Transaction
+  paymentCardManagement: 'cards',              // Payment Card
+  fraudDiagnosisCase: 'fraudCases',            // Fraud Diagnosis
 };
 
 export interface RawAccessCaller {

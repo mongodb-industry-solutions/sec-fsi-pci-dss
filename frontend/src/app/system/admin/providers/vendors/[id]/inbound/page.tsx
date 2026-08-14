@@ -91,7 +91,7 @@ export default function InboundPage() {
   // Load the selected event's inbound config (mapping + HMAC) into the form (§2.4 per-event).
   useEffect(() => {
     const inb = events.find((e) => e.event === selectedEvent)?.inbound;
-    if (!inb) return; // legacy vendor without per-event config — keep vendor-global values
+    if (!inb) return; // legacy vendor without per-event config: keep vendor-global values
     setInboundRules((inb.mapping ?? []).map((m) => ({ location: 'body', sourceField: m.sourcePath, targetField: m.targetPath, required: !!m.required })));
     const hmac = inb.auth?.hmacInbound;
     setSecEnabled(!!hmac?.algorithm);

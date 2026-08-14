@@ -1,8 +1,8 @@
 'use client';
 // v31: KYC administration detail (deep-linkable, §7.2). KYC identity + v27 verdict, data correction
-// (amendmentReason required; never edits the verdict/status — decision 2), re-screen, and the
+// (amendmentReason required; never edits the verdict/status: decision 2), re-screen, and the
 // correlated process timeline (§5bis.5). Sensitive fields are masked unless the caller holds the
-// escalation token (viewSensitive) — the backend is the boundary.
+// escalation token (viewSensitive): the backend is the boundary.
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
@@ -113,52 +113,52 @@ export default function KycDetailPage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'KYC', href: '/system/admin/modules/kyc' }, { label: String(r.customerName ?? r.partyName ?? partyRef).slice(0, 24) }]} />
-      <SectionHeader icon={UserCheck} title={String(r.customerName ?? r.partyName ?? 'Customer')} description="KYC administration: verdict review, data correction, re-screen, process timeline." debugInfo={`party=${partyRef} · SD-53`} />
+      <SectionHeader icon={UserCheck} title={String(r.customerName ?? r.partyName ?? 'Customer')} description="KYC administration: verdict review, data correction, re-screen, process timeline." debugInfo={`party=${partyRef}`} />
 
       {/* Full person profile, distributed across four focused, semantically distinct cards (two columns
           on large screens). Each field carries an info tooltip (what it means + its encryption tier).
           QE-searchable fields are decrypted at rest for the KYC admin (need-to-know). */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 items-stretch">
-        {/* Personal details (SD-13 demographics) */}
+        {/* Personal details (demographics) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><UserCheck size={15} /> Personal details
-            <Tooltip text="SD-13 Party demographics. QE-searchable fields are encrypted at rest in Atlas (Queryable Encryption) and decrypted in-process for a role with need-to-know." /></h3>
+            <Tooltip text="Party demographics. QE-searchable fields are encrypted at rest in Atlas (Queryable Encryption) and decrypted in-process for a role with need-to-know." /></h3>
           <dl className="text-sm">
-            <RecordField label="Full name" value={String(r.customerName ?? '')} info="Legal name of the party (SD-13). Encrypted at rest with QE substring search so it can be found without decrypting server-side." />
-            <RecordField label="Date of birth" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} info="Party date of birth (SD-13). Encrypted at rest with QE range so it is searchable by range without exposing the value." />
-            <RecordField label="Sex" value={humanize(r.partySex)} info="Party sex (SD-13). QE:equality encrypted at rest." />
+            <RecordField label="Full name" value={String(r.customerName ?? '')} info="Legal name of the party. Encrypted at rest with QE substring search so it can be found without decrypting server-side." />
+            <RecordField label="Date of birth" value={r.partyDateOfBirth ? String(r.partyDateOfBirth).slice(0, 10) : ''} info="Party date of birth. Encrypted at rest with QE range so it is searchable by range without exposing the value." />
+            <RecordField label="Sex" value={humanize(r.partySex)} info="Party sex. QE:equality encrypted at rest." />
             <RecordField label="Nationality" value={humanize(r.partyNationality)} info="Declared nationality. QE:equality encrypted (searchable by exact match)." />
             <RecordField label="Place of birth" value={humanize(r.partyPlaceOfBirth)} info="Declared place of birth. QE:equality encrypted at rest." />
           </dl>
         </div>
 
-        {/* Identity document (SD-53): rendered by the shared block (v32 B4), so this page and every
+        {/* Identity document : rendered by the shared block (v32 B4), so this page and every
             other customer surface show the same fields from the same source of truth. */}
         <IdentityDocumentBlock governmentId={govId} taxIdNumber={r.customerAgreementTaxIDNumber} />
 
-        {/* Contact & preferences (SD-13) */}
+        {/* Contact & preferences */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><Mail size={15} /> Contact &amp; preferences
-            <Tooltip text="How the customer is reached (SD-13). Email and phone are QE:equality (encrypted at rest, exact-match searchable), decrypted for the KYC admin's need-to-know. Residential/postal address is under Protected details (audited reveal)." /></h3>
+            <Tooltip text="How the customer is reached. Email and phone are QE:equality (encrypted at rest, exact-match searchable), decrypted for the KYC admin's need-to-know. Residential/postal address is under Protected details (audited reveal)." /></h3>
           <dl className="text-sm">
-            <RecordField label="Email" value={String(r.customerEmailAddress ?? '')} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-            <RecordField label="Phone" value={String(r.customerMobilePhoneNumber ?? '')} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-            <RecordField label="Preferred language" value={humanize(r.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
+            <RecordField label="Email" value={String(r.customerEmailAddress ?? '')} info="Contact email. QE:equality encrypted at rest (exact-match searchable)." />
+            <RecordField label="Phone" value={String(r.customerMobilePhoneNumber ?? '')} info="Contact mobile phone. QE:equality encrypted at rest (exact-match searchable)." />
+            <RecordField label="Preferred language" value={humanize(r.customerAgreementPreferredLanguage)} info="Preferred communication language. Plaintext business metadata." />
           </dl>
         </div>
 
-        {/* Customer agreement (SD-53) — account classification & lifecycle metadata */}
+        {/* Customer agreement : account classification & lifecycle metadata */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="font-semibold text-sm text-gray-900 mb-2 flex items-center gap-1.5"><FileText size={15} /> Customer agreement
-            <Tooltip text="SD-53 customer-agreement classification & lifecycle: party type, commercial segment, declared occupation, lifecycle status, enrolment date and the internal agreement reference." /></h3>
+            <Tooltip text="Customer-agreement classification & lifecycle: party type, commercial segment, declared occupation, lifecycle status, enrolment date and the internal agreement reference." /></h3>
           <dl className="text-sm">
             <RecordField label="Party type" value={humanize(r.partyType)} info="Classification of the party: customer, employee or service account. Not PII; stored in plaintext." />
             <RecordField label="Segment" value={humanize(r.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
             <RecordField label="Occupation" value={humanize(r.customerAgreementOccupation)} info="Declared occupation (KYC/AML risk signal). QE:equality encrypted at rest." />
-            <RecordField label="Agreement status" value={humanize(r.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status (initiated / active / suspended / closed …). Plaintext." />
+            <RecordField label="Agreement status" value={humanize(r.customerAgreementStatus)} info="Agreement lifecycle status (initiated / active / suspended / closed …). Plaintext." />
             <RecordField label="Enrolled" value={r.customerAgreementEnrollmentDate ? String(r.customerAgreementEnrollmentDate).slice(0, 10) : ''} info="Date the customer agreement was enrolled. Plaintext business metadata." />
             <div className="flex items-center justify-between gap-3 py-2.5">
-              <span className="flex items-center gap-1.5 text-gray-500 shrink-0">Agreement reference<Tooltip text="Internal reference for the customer agreement (SD-53), used for lookups. QE:equality encrypted at rest." /></span>
+              <span className="flex items-center gap-1.5 text-gray-500 shrink-0">Agreement reference<Tooltip text="Internal reference for the customer agreement, used for lookups. QE:equality encrypted at rest." /></span>
               <span className="text-gray-800 text-right font-mono text-xs break-all">{String(r.customerAgreementReference ?? partyRef)}</span>
             </div>
           </dl>
@@ -169,7 +169,7 @@ export default function KycDetailPage() {
       <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
           <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><Lock size={15} /> Protected details
-            <Tooltip text="QE:none fields (encrypted at rest, NOT searchable): residential/postal address, source of funds, purpose of relationship, risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI Req 3.2/3.3, GDPR need-to-know, Req 10). The value is never persisted or logged; only the fact of the reveal is audited (field names only)." /></h3>
+            <Tooltip text="QE:none fields (encrypted at rest, NOT searchable): residential/postal address, source of funds, purpose of relationship, risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI DSS, GDPR need-to-know). The value is never persisted or logged; only the fact of the reveal is audited (field names only)." /></h3>
           {debugMode && <EncryptionBadge label="QE: encrypted, not searchable" type="qe-none" />}
         </div>
         <div className="divide-y divide-gray-50">
@@ -196,7 +196,7 @@ export default function KycDetailPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">KYC data<Tooltip text="KYC data fields (occupation, source of funds, purpose). This is data administration, NOT a decision: the verdict/status is not editable here. Click Edit to correct a field; an amendment reason is required (audit, PCI Req 10). Sensitive identity fields require the escalation token to view decrypted." /></h3>
+          <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5">KYC data<Tooltip text="KYC data fields (occupation, source of funds, purpose). This is data administration, NOT a decision: the verdict/status is not editable here. Click Edit to correct a field; an amendment reason is required (audit, PCI DSS). Sensitive identity fields require the escalation token to view decrypted." /></h3>
           {canManage && !editing && <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] font-medium transition-colors"><Pencil size={14} /> Edit</button>}
         </div>
         {sensitiveMasked && (
@@ -232,7 +232,7 @@ export default function KycDetailPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
         <h3 className="font-semibold text-sm text-gray-900 flex items-center gap-1.5"><History size={15} /> Process timeline
-          <Tooltip text="Every event of the KYC journey by correlationId (= partyInstanceReference): bus milestones and provider wire calls (sanitized, PCI Req 10.7)." /></h3>
+          <Tooltip text="Every event of the KYC journey by correlationId (= partyInstanceReference): bus milestones and provider wire calls (sanitized, PCI DSS)." /></h3>
         <div className="overflow-x-auto max-h-96 overflow-y-auto">
           <table className="min-w-full text-xs">
             <thead><tr className="text-left text-gray-500 border-b border-gray-100"><th className="py-1.5 pr-3">When</th><th className="py-1.5 pr-3">Source</th><th className="py-1.5 pr-3">Action</th><th className="py-1.5 pr-3">Outcome</th></tr></thead>

@@ -21,7 +21,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
     await expect(page.locator('input').first()).toBeVisible();
   });
 
-  test('01.2 masks PAN — pre-filled demo card is already shown masked', async ({ page }) => {
+  test('01.2 masks PAN: pre-filled demo card is already shown masked', async ({ page }) => {
     // Page initialises maskedCard from simulatorConfig.defaultCard → ****-****-****-XXXX
     await expect(page.locator('text=/\\*{4}/').first()).toBeVisible({ timeout: 2_000 });
     // Static help text is always visible beneath the card selector
@@ -79,22 +79,30 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
   });
 
   test('01.7 Confirm without fraud shows success screen', async ({ page }) => {
-    await page.route('**/api/v1/card-transactions', (route, req) => {
+    // Same shape as 01.6: the payment is created via POST /api/v1/transactions and the terminal
+    // outcome arrives on the per-transaction SSE stream. Only the outcome differs (no fraud case).
+    await page.route('**/api/v1/transactions', (route, req) => {
       if (req.method() === 'POST') {
         route.fulfill({
           status: 201,
           contentType: 'application/json',
           body: JSON.stringify({
             cardTransactionInstanceReference: 'txn-e2e-sim-002',
-            cardTransactionStatus: 'authorized',
-            fraudCaseCreated: false,
+            cardTransactionStatus: 'pending',
           }),
         });
       } else route.continue();
     });
+    await page.route('**/api/v1/transactions/txn-e2e-sim-002/stream', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: `data: ${JSON.stringify({ status: 'authorized', fraudCaseCreated: false })}\n\n`,
+      });
+    });
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     await page.locator('button:has-text("Confirm"), button:has-text("→")').last().click();
-    await expect(page.locator('text=/Confirmed|✅/i').first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('text=/Payment Confirmed/i').first()).toBeVisible({ timeout: 8_000 });
   });
 });
 

@@ -1,5 +1,5 @@
 'use client';
-// Add-beneficiary control (SD-54). Everything goes through the PSP API: the merchant submits only a
+// Add-beneficiary control . Everything goes through the PSP API: the merchant submits only a
 // phone/email + optional label to the addBeneficiary server action; the PSP resolves it to an opaque
 // token (the merchant never learns the recipient's identity). On success the list is refreshed.
 import { useState, useTransition } from 'react';

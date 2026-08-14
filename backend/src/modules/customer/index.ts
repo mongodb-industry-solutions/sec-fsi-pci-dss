@@ -5,11 +5,11 @@ import { paymentCardController }        from './controllers/paymentCard.controll
 import { customerActivityController }   from './controllers/customerActivity.controller';
 
 export async function customerModule(fastify: FastifyInstance) {
-  // SD-53: customer agreement search  -  /api/v1/customer?email=...
+  // customer agreement search  -  /api/v1/customer?email=...
   await fastify.register(customerAgreementController, { prefix: '/customer' });
-  // SD-53 v31: KYC administration (list/detail/patch/re-screen/process). requirePermission-gated.
+  // v31: KYC administration (list/detail/patch/re-screen/process). requirePermission-gated.
   await fastify.register(customerKycController,       { prefix: '/customer' });
-  // SD-88: payment cards as customer sub-resource  -  /api/v1/customer/:customerId/cards
+  // payment cards as customer sub-resource  -  /api/v1/customer/:customerId/cards
   await fastify.register(paymentCardController,        { prefix: '/customer' });
   // staff transactions sub-resource  -  /api/v1/customer/:customerId/transactions
   await fastify.register(customerActivityController,   { prefix: '/customer' });

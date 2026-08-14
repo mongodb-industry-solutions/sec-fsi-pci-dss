@@ -7,7 +7,7 @@ import { Pagination } from '../../../../../components/Pagination';
 import { useRequireActiveMerchant } from '../../../../../lib/merchantContext';
 import { api } from '../../../../../lib/api';
 
-// v18 B-10/B-11: users who authorized this merchant (OAuth consent grants, SD-16). Display-safe.
+// v18 B-10/B-11: users who authorized this merchant (OAuth consent grants). Display-safe.
 // Standard filter/search/pagination; each row links to that user's activity (filtered).
 type AuthorizationRow = {
   consentId: string;
@@ -57,7 +57,7 @@ export default function MerchantAuthorizationsPage() {
         icon={Users}
         title="Authorizations"
         description="Users who authorized this merchant's app via SSO (OAuth consent grants)."
-        debugInfo="partyAuthConsent (SD-16 ConsentGrant) · PCI DSS Req 10 · display-safe"
+        debugInfo="partyAuthConsent (ConsentGrant) · PCI DSS · display-safe"
       />
 
       {/* Search */}

@@ -1,4 +1,4 @@
-// v17.1 BIAN SD-65/66: Unified bank-transfer service (ACH / SEPA / SWIFT).
+// v17.1/66: Unified bank-transfer service (ACH / SEPA / SWIFT).
 // All rail derivation/validation goes through the shared rail engine (DRY), and execution is
 // dispatched through the payment_initiation provider (ADR-039: never a direct builtin import),
 // so an external PISP can replace the builtin module without changing this flow.
@@ -14,15 +14,17 @@ import {
 } from '../../../shared/services/bankTransfer';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
+import { screenTransfer, openTransferFraudCase, TransferScreeningResult } from './transferRiskGate';
+import { RISK_HOLD_STEP } from './transferReview.service';
 import { getPayoutAccount } from './payoutAccount.service';
+import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
 /**
  * Mask a bank account identifier (IBAN or domestic account number) for display storage.
- * Keeps the first 4 and last 4 characters, masks the middle with bullets — enough to recognise
- * and trace the destination without persisting the full number (PCI DSS Req 3.3).
+ * Keeps the first 4 and last 4 characters, masks the middle with bullets: enough to recognise
+ * and trace the destination without persisting the full number (PCI DSS).
  * "FR7630006000011234567890189" → "FR76••••0189"; short values keep only the last 2.
  */
 export function maskAccountIdentifier(raw: string): string {
@@ -84,24 +86,25 @@ export interface ExecuteBankTransferInput {
   destination: RailDestination;
   rail?: BankRail;                 // user override
   reference?: string;              // ISO 20022 remittance info
-  fromAccountRef?: string;         // optional chosen source payout account (SD-66); validated for ownership
+  fromAccountRef?: string;         // optional chosen source payout account ; validated for ownership
   recurring?: RecurringMandate;
   settlementSchedule?: 'T+0' | 'T+1' | 'T+2' | 'T+3';
-  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
+  merchantAgreementReference?: string; // set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface ExecuteBankTransferResult {
   executionReference: string;
-  status: 'submitted' | 'failed' | 'exception';
+  status: 'submitted' | 'failed' | 'exception' | 'pending';
   rail?: BankRail;
   feeAmount?: number;
   currency: string;
   errors?: string[];
+  holdReason?: string;             // set with status 'pending': held for investigation, not delivered
 }
 
 /**
  * Execute a bank transfer to a (registered or unregistered) external account.
- * Flow: validate via rail engine -> persist SD-65 execution (routing) -> dispatch to the
+ * Flow: validate via rail engine -> persist execution (routing) -> dispatch to the
  * payment_initiation provider -> record submitted + audit. Settlement arrives asynchronously.
  */
 export async function executeBankTransfer(
@@ -139,22 +142,50 @@ export async function executeBankTransfer(
     initiatorPartyRef: input.initiatorPartyRef,
     destinationCountry: input.destination.countryCode,
   });
-  if (screen.blocked) {
-    await recordException(db, executionRef, input, [screen.reason ?? 'Blocked by risk screening', ...screen.indicators], now);
+  // A risk signal holds the transfer instead of rejecting it: the execution is parked in `pending` and
+  // nothing is dispatched to the rail until the investigation closes (ADR-060).
+  if (screen.hold) {
+    // Immobilise the funds FIRST when the transfer is drawn from an internal account: a held movement
+    // must have its money reserved, and `reverseHeldTransfer` releases exactly this hold on confirmed
+    // fraud. Parking the execution without holding would make that reversal move money that was never
+    // reserved. No source account (transfer not drawn from a PSP account) means nothing to hold.
+    if (input.fromAccountRef) {
+      const held = await holdCardFunds(db, input.fromAccountRef, input.amount);
+      if (!held) {
+        const errors = ['Insufficient available balance to hold this transfer for review.'];
+        await recordException(db, executionRef, input, errors, now);
+        return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors };
+      }
+    }
+    // Compensation: a failure past the reservation must not leave the funds held with no execution.
+    try {
+      await recordRiskHold(db, executionRef, input, rail, screen, now);
+    } catch (err) {
+      if (input.fromAccountRef) {
+        await releaseCardHold(db, input.fromAccountRef, input.amount).catch(() => { /* best effort */ });
+      }
+      console.error('[bank-transfer] could not persist the held execution; hold released:', err);
+      const errors = ['Could not hold this transfer for review. No funds were moved.'];
+      return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors };
+    }
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
-    await openTransferFraudCase(db, { transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount: input.amount, currency: input.currency });
+    await openTransferFraudCase(db, {
+      transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators,
+      score: screen.score, amount: input.amount, currency: input.currency, kind: 'bank_transfer',
+      beneficiaryLabel: input.destination.beneficiaryName,
+    });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: executionRef,
-      processType: 'payment_processing', processAction: 'bank.transfer.blocked',
-      processOutcome: 'rejected',
+      processType: 'payment_processing', processAction: 'transfer.held.for.review',
+      processOutcome: 'pending',
       performedByPartyReference: input.initiatorPartyRef, performedByRole: 'customer',
       eventSummary: { amount: input.amount, currency: input.currency, rail, indicators: screen.indicators, score: screen.score },
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     });
-    return { executionReference: executionRef, status: 'exception', rail, currency: input.currency, errors: [screen.reason ?? 'Blocked by risk screening'] };
+    return { executionReference: executionRef, status: 'pending', rail, currency: input.currency, holdReason: screen.reason ?? 'Held for security review.' };
   }
 
-  // 2. Persist the SD-65 execution in routing state (append-only resolution log).
+  // 2. Persist the execution in routing state (append-only resolution log).
   const execution: PaymentExecutionProcedure = {
     paymentExecutionInstanceReference: executionRef,
     paymentOrderInstanceReference: executionRef,
@@ -212,7 +243,7 @@ export async function executeBankTransfer(
     },
   );
 
-  // 4. Audit (PCI DSS Req 10): business + compliance events share the execution ref as correlationId.
+  // 4. Audit (PCI DSS): business + compliance events share the execution ref as correlationId.
   emitProcessEvent(db, {
     entityType: 'execution', entityId: executionRef,
     processType: 'payment_processing', processAction: 'bank.transfer.submitted',
@@ -237,6 +268,33 @@ export async function executeBankTransfer(
     feeAmount: preview.feeAmount,
     currency: input.currency,
   };
+}
+
+// Held for investigation: same immutable record as any other execution, parked in `pending` with the
+// risk-hold step so only the resolution path can move it forward.
+async function recordRiskHold(
+  db: Db, executionRef: string, input: ExecuteBankTransferInput, rail: PaymentExecutionProcedure['paymentExecutionRail'],
+  screen: TransferScreeningResult, now: Date,
+): Promise<void> {
+  const execution: PaymentExecutionProcedure = {
+    paymentExecutionInstanceReference: executionRef,
+    paymentOrderInstanceReference: executionRef,
+    beneficiaryType: 'user',
+    initiatorPartyReference: input.initiatorPartyRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
+    ...(input.fromAccountRef ? { sourcePayoutAccountReference: input.fromAccountRef } : {}),
+    ...buildRecipientSnapshot(input.destination),
+    grossAmount: input.amount, netAmount: input.amount, feeAmount: 0, currency: input.currency,
+    paymentExecutionRail: rail,
+    routingNote: 'Bank transfer held for investigation by the pre-initiation risk gate',
+    ...(input.reference ? { paymentExecutionRemittanceInformation: input.reference } : {}),
+    paymentExecutionStatus: 'pending',
+    initiatedAt: now,
+    resolutionLog: [{ stepName: RISK_HOLD_STEP, stepOutcome: 'fallback', stepNote: screen.indicators.join(', ') || 'risk hold', stepDateTime: now }],
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
+  };
+  await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
 }
 
 async function recordException(

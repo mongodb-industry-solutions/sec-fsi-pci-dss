@@ -1,4 +1,4 @@
-// v17.1 BIAN SD-65/66: Bank transfer REST controller (ACH / SEPA / SWIFT).
+// v17.1/66: Bank transfer REST controller (ACH / SEPA / SWIFT).
 // Routes mounted at /gateway/transfers → /api/v1/gateway/transfers
 //   POST /preview  → stateless rail derivation + validation + fee quote (no side effects)
 //   POST /bank     → execute a transfer to a registered or unregistered external account
@@ -53,7 +53,7 @@ function resolvePreviewCurrency(body: PreviewBody): string {
 
 export async function transferController(fastify: FastifyInstance) {
 
-  // POST /api/v1/gateway/transfers/preview — derive rail, validate, quote fee (stateless, no side effects).
+  // POST /api/v1/gateway/transfers/preview: derive rail, validate, quote fee (stateless, no side effects).
   // Session RBAC (beneficiaries:view) OR OAuth write:transfers (merchant on-behalf-of).
   fastify.post('/preview', {
     config: { dualAuth: true },
@@ -83,7 +83,7 @@ export async function transferController(fastify: FastifyInstance) {
     return reply.send(result);
   });
 
-  // POST /api/v1/gateway/transfers/bank — execute the transfer via the payment_initiation provider.
+  // POST /api/v1/gateway/transfers/bank: execute the transfer via the payment_initiation provider.
   // Session RBAC (beneficiaries:manage) OR OAuth write:transfers (owner from token.sub).
   fastify.post('/bank', {
     config: { dualAuth: true },
@@ -110,7 +110,7 @@ export async function transferController(fastify: FastifyInstance) {
     const body = request.body as ExecuteBody;
 
     if (request.merchantContext) {
-      // OAuth on-behalf-of: owner from token.sub (translate to SD-13 party); attribute the action.
+      // OAuth on-behalf-of: owner from token.sub (translate to party); attribute the action.
       const owner = await resolveOwner(request, reply);
       if (!owner) return;
       if (!owner.ownerPartyRef) {
@@ -125,7 +125,7 @@ export async function transferController(fastify: FastifyInstance) {
         reference: body.reference,
         fromAccountRef: body.fromAccountRef,
         settlementSchedule: body.settlementSchedule,
-        // SD-89: stamp the initiating merchant so this execution is visible only in its history.
+        // stamp the initiating merchant so this execution is visible only in its history.
         merchantAgreementReference: request.merchantContext.merchantId,
       });
       emitProcessEvent(fastify.db, {
@@ -164,7 +164,7 @@ export async function transferController(fastify: FastifyInstance) {
     return reply.code(result.status === 'submitted' ? 202 : 422).send(result);
   });
 
-  // GET /api/v1/gateway/transfers/:ref/status — real-time execution status (customer-scoped).
+  // GET /api/v1/gateway/transfers/:ref/status, real-time execution status (customer-scoped).
   fastify.get('/:ref/status', {
     preHandler: requirePermission('beneficiaries', 'view'),
     schema: {
@@ -198,7 +198,7 @@ export async function transferController(fastify: FastifyInstance) {
 
   // ── Recurring mandates (ACH Direct Debit / SEPA SDD) ──────────────────────────
 
-  // POST /api/v1/gateway/transfers/mandates — create a recurring mandate.
+  // POST /api/v1/gateway/transfers/mandates: create a recurring mandate.
   fastify.post('/mandates', {
     preHandler: requirePermission('beneficiaries', 'manage'),
     schema: {
@@ -232,7 +232,7 @@ export async function transferController(fastify: FastifyInstance) {
     }
   });
 
-  // GET /api/v1/gateway/transfers/mandates — list the caller's mandates.
+  // GET /api/v1/gateway/transfers/mandates: list the caller's mandates.
   fastify.get('/mandates', {
     preHandler: requirePermission('beneficiaries', 'view'),
     schema: { tags: ['transfers'], summary: 'List recurring mandates (SD-66)', security: [{ bearerAuth: [] }] },
@@ -242,7 +242,7 @@ export async function transferController(fastify: FastifyInstance) {
     return reply.send({ results: await listMandates(fastify.db, user.partyRef) });
   });
 
-  // DELETE /api/v1/gateway/transfers/mandates/:ref — cancel a mandate.
+  // DELETE /api/v1/gateway/transfers/mandates/:ref, cancel a mandate.
   fastify.delete('/mandates/:ref', {
     preHandler: requirePermission('beneficiaries', 'manage'),
     schema: { tags: ['transfers'], summary: 'Cancel a recurring mandate (SD-66)', security: [{ bearerAuth: [] }], params: { type: 'object', required: ['ref'], properties: { ref: { type: 'string' } } } },
@@ -254,7 +254,7 @@ export async function transferController(fastify: FastifyInstance) {
     return ok ? reply.send({ cancelled: true }) : reply.code(404).send({ error: 'Mandate not found or not active.' });
   });
 
-  // POST /api/v1/gateway/transfers/mandates/run-due — run all due mandates (scheduler/admin).
+  // POST /api/v1/gateway/transfers/mandates/run-due: run all due mandates (scheduler/admin).
   fastify.post('/mandates/run-due', {
     preHandler: requirePermission('beneficiaries', 'manage'),
     schema: { tags: ['transfers'], summary: 'Run all due recurring mandates (scheduler hook)', security: [{ bearerAuth: [] }] },

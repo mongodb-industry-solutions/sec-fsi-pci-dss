@@ -1,4 +1,4 @@
-// v28 Request to Pay (merchant): two lists — requests awaiting the merchant's approval (payer view)
+// v28 Request to Pay (merchant): two lists, requests awaiting the merchant's approval (payer view)
 // and requests the merchant sent (payee view, with status). Approve/reject reuse the authenticated
 // OAuth session (no CIBA). Server component, scope-gated (read:rtp for view, write:rtp for actions).
 import { redirect } from 'next/navigation';

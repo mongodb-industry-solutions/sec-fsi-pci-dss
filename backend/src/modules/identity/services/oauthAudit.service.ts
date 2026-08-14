@@ -1,6 +1,6 @@
-// OIDC/OAuth flow audit (SD-16 Party Authentication, PCI DSS Req 10). Emits one compliance-ledger
+// OIDC/OAuth flow audit (Party Authentication, PCI DSS). Emits one compliance-ledger
 // event per step of the flow so an integration can be traced end-to-end and a failure pinpointed.
-// Reuses the v7/v8 compliance ledger (emitComplianceEvent + LedgerProjection) — no new store.
+// Reuses the v7/v8 compliance ledger (emitComplianceEvent + LedgerProjection), no new store.
 //
 // Correlation: events of one OAuth flow share an entityId (the ledger's correlationId). We derive it
 // from hash(state) when available (present on both the authorize and token halves), else from `sub`.
@@ -26,7 +26,7 @@ export type OAuthAuditAction =
   | 'oauth.token.revoked';
 
 // Short, non-reversible tag of the OAuth `state` used as the flow correlation key. Never log the raw
-// state — only this hash (a 16-hex-char prefix is collision-safe enough for correlating one session).
+// state, only this hash (a 16-hex-char prefix is collision-safe enough for correlating one session).
 export function hashState(state?: string): string | undefined {
   if (!state) return undefined;
   return `flow:${crypto.createHash('sha256').update(state).digest('hex').slice(0, 16)}`;
@@ -40,7 +40,7 @@ export interface OAuthAuditOpts {
   scopes?: string[];
   grantType?: string;
   outcome?: ProcessEventOutcome;
-  reason?: string;        // raw OAuth error code / description — NEVER a secret/token
+  reason?: string;        // raw OAuth error code / description, NEVER a secret/token
   failureCause?: string;  // classified, human-readable cause (see classifyOAuthFailure)
 }
 
@@ -105,7 +105,7 @@ export function auditOAuth(db: Db, action: OAuthAuditAction, opts: OAuthAuditOpt
 // Recover the OAuth `state` for an authorization code so a /token failure can carry the SAME flowId
 // as the rest of the flow (the token endpoint only receives `code`, not `state`). Best-effort; the
 // code record exists for PKCE/redirect_uri/expired/replayed and bad-secret cases (it is issued at
-// /authorize) — only a truly unknown code returns undefined.
+// /authorize), only a truly unknown code returns undefined.
 export async function stateForCode(db: Db, code?: string): Promise<string | undefined> {
   if (!code) return undefined;
   try {

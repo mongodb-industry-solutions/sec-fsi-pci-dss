@@ -1,6 +1,6 @@
-# PSP Platform — PCI DSS Aligned Payment Architecture
+# PSP Platform: PCI DSS Aligned Payment Architecture
 
-> **Note:** This document describes the **PSP (Payment Service Provider) platform's** internal payment processing architecture. The PSP is the complete payment platform providing merchant onboarding, fraud detection, compliance (AML/KYC/KYB), and payment execution. The *payment gateway subsystem* described in this document is one internal component of the PSP responsible for routing and authorization — it is not the name for the PSP as a whole.
+> **Note:** This document describes the **PSP (Payment Service Provider) platform's** internal payment processing architecture. The PSP is the complete payment platform providing merchant onboarding, fraud detection, compliance (AML/KYC/KYB), and payment execution. The *payment gateway subsystem* described in this document is one internal component of the PSP responsible for routing and authorization, it is not the name for the PSP as a whole.
 
 ## 1. Purpose and scope
 ### 1.1 Objective

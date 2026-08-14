@@ -1,5 +1,5 @@
 /**
- * E2E: SD-88 Card Management — saved-card list, detail actions (remove + deactivate)
+ * E2E: Card Management, saved-card list, detail actions (remove + deactivate)
  *
  * The card-management UI was redesigned: management moved OFF /system/profile onto a
  * dedicated route. The searchable list lives at /system/cards (SavedCardsPanel) and
@@ -22,7 +22,7 @@
  * card is first added). The old SC-1 "PATCH revoked" and SC-2 "PATCH preferred" flows no longer
  * exist in the product, so these tests assert the real replacement flows (DELETE + status PATCH).
  *
- * All backend calls are mocked with page.route — no live stack required for test correctness.
+ * All backend calls are mocked with page.route, no live stack required for test correctness.
  */
 import { test, expect, Page } from '@playwright/test';
 import { loginAs, json } from './support/auth';

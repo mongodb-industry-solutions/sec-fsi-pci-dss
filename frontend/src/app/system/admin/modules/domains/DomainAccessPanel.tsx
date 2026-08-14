@@ -11,7 +11,7 @@ type RoleMapping = { externalClaimOrGroup: string; roleName: string };
 
 const USERS_PAGE_SIZE = 8;
 
-// PII minimization (PCI DSS Req 7 / data minimization): the admin browse-list identifies accounts
+// PII minimization (PCI DSS / data minimization): the admin browse-list identifies accounts
 // by name + role; the full QE-encrypted email is not needed here, so it is masked in the list.
 function maskEmail(email: string): string {
   const [local, domain] = (email ?? '').split('@');
@@ -44,7 +44,7 @@ export function DomainAccessPanel({
   // ── Local: users ──
   const [users, setUsers] = useState<ManagedUserDTO[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(isLocal);
-  const [newUser, setNewUser] = useState({ email: '', name: '', role: 'level1_analyst', password: '', phone: '' });
+  const [newUser, setNewUser] = useState({ email : '', name : '', role: 'level1_analyst', password : '', phone: '' });
   const [newConfirm, setNewConfirm] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   // Inline quick-edit of an existing account's name only (email is immutable; password changes go
@@ -72,7 +72,7 @@ export function DomainAccessPanel({
     setBusy('new');
     try {
       await api.users.create({ ...newUser, domain: domainName, phone: newUser.phone.trim() || undefined }, token);
-      setNewUser({ email: '', name: '', role: 'level1_analyst', password: '', phone: '' });
+      setNewUser({ email : '', name : '', role: 'level1_analyst', password : '', phone: '' });
       setNewConfirm('');
       notify('User created.', 'success'); loadUsers();
     } catch (err) { notify((err as Error).message, 'error'); }
@@ -125,7 +125,7 @@ export function DomainAccessPanel({
   // ── Remote: role mappings ──
   const [mappings, setMappings] = useState<RoleMapping[]>(initialMappings ?? []);
   const [savingMap, setSavingMap] = useState(false);
-  function addMapping() { setMappings((m) => [...m, { externalClaimOrGroup: '', roleName: roleOptions[0] ?? 'level1_analyst' }]); }
+  function addMapping() { setMappings((m) => [...m, { externalClaimOrGroup : '', roleName: roleOptions[0] ?? 'level1_analyst' }]); }
   function updateMapping(i: number, patch: Partial<RoleMapping>) { setMappings((m) => m.map((x, j) => (j === i ? { ...x, ...patch } : x))); }
   function removeMapping(i: number) { setMappings((m) => m.filter((_, j) => j !== i)); }
   async function saveMappings() {
@@ -154,7 +154,7 @@ export function DomainAccessPanel({
       <div className="bg-gray-50 border-t border-gray-100 px-5 py-4 space-y-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-600"><Users size={13} /> Users in this domain</div>
-          <span className="text-[10px] text-gray-400">Identity records (SD-91) · email masked · no cardholder data</span>
+          <span className="text-[10px] text-gray-400">Identity records · email masked · no cardholder data</span>
         </div>
 
         {/* Search + role filter; standard pattern */}

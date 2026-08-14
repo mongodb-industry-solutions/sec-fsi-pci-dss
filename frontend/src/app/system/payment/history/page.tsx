@@ -1,15 +1,20 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ClipboardList, ArrowDownLeft, ArrowUpRight, SlidersHorizontal, HandCoins } from 'lucide-react';
+import {
+  Plus, ClipboardList, ArrowDownLeft, ArrowUpRight, SlidersHorizontal, HandCoins,
+  CreditCard, ArrowLeftRight, CheckCircle2, XCircle, Clock, AlertTriangle, Search, Ban,
+  MinusCircle, RotateCcw, Mail, ChevronRight,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { api } from '../../../../lib/api';
-import { getToken, decodeToken } from '../../../../lib/auth';
+import { getToken } from '../../../../lib/auth';
 import { Pagination } from '../../../../components/Pagination';
 import { useDebugMode } from '../../../../lib/debugMode';
 
 // ── Unified history row ───────────────────────────────────────────────────────
-// Each row is either a card transaction (SD-254) or a P2P transfer (SD-65).
+// Each row is either a card transaction or a P2P transfer .
 type RowCategory = 'card' | 'p2p' | 'rtp';
 
 interface HistoryRow {
@@ -40,7 +45,7 @@ interface HistoryRow {
   // 'to_approve' = someone requested money from me (I must approve to pay, outgoing).
   rtpRole?: 'requested' | 'to_approve';
   rtpRequestRef?: string;
-  linkedExecutionRef?: string; // the SD-65 execution created on accept (money leg of this RTP)
+  linkedExecutionRef?: string; // the execution created on accept (money leg of this RTP)
 }
 
 // ── Card transaction type badges ──────────────────────────────────────────────
@@ -62,34 +67,47 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 // ── Payment authorization status ──────────────────────────────────────────────
-const PAYMENT_STATUS: Record<string, { label: string; color: string }> = {
-  authorized: { label: 'Authorized',  color: 'bg-green-100 text-green-800' },
-  settled:    { label: '✓ Settled',   color: 'bg-emerald-100 text-emerald-800 font-semibold' },
-  captured:   { label: 'Captured',    color: 'bg-teal-100 text-teal-800' },
-  pending:    { label: 'Pending',     color: 'bg-amber-100 text-amber-800' },
-  declined:   { label: 'Declined',    color: 'bg-red-100 text-red-800' },
-  voided:     { label: 'Voided',      color: 'bg-gray-100 text-gray-500' },
-  refunded:   { label: 'Refunded',    color: 'bg-purple-100 text-purple-700' },
-  failed:     { label: 'Failed',      color: 'bg-red-100 text-red-800' },
-  expired:    { label: 'Expired',     color: 'bg-gray-100 text-gray-500' },
-  completed:  { label: '✓ Completed', color: 'bg-emerald-100 text-emerald-800 font-semibold' },
+// Every status carries a lucide icon: one visual language across the list and the detail view.
+type StatusMeta = { label: string; color: string; Icon: LucideIcon };
+const PAYMENT_STATUS: Record<string, StatusMeta> = {
+  authorized: { label: 'Authorized',  color: 'bg-green-100 text-green-800',        Icon: CheckCircle2 },
+  settled:    { label: 'Settled',     color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
+  captured:   { label: 'Captured',    color: 'bg-teal-100 text-teal-800',          Icon: CheckCircle2 },
+  pending:    { label: 'Pending',     color: 'bg-amber-100 text-amber-800',        Icon: Clock },
+  declined:   { label: 'Declined',    color: 'bg-red-100 text-red-800',            Icon: XCircle },
+  voided:     { label: 'Voided',      color: 'bg-gray-100 text-gray-500',          Icon: MinusCircle },
+  refunded:   { label: 'Refunded',    color: 'bg-purple-100 text-purple-700',      Icon: RotateCcw },
+  failed:     { label: 'Failed',      color: 'bg-red-100 text-red-800',            Icon: XCircle },
+  expired:    { label: 'Expired',     color: 'bg-gray-100 text-gray-500',          Icon: MinusCircle },
+  completed:  { label: 'Completed',   color: 'bg-emerald-100 text-emerald-800 font-semibold', Icon: CheckCircle2 },
 };
 
-// ── Fraud / risk status (BIAN SD-83) ──────────────────────────────────────────
-const FRAUD_STATUS: Record<string, { label: string; color: string; icon: string }> = {
-  open:             { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
-  under_review:     { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',  icon: '⚠' },
-  escalated:        { label: 'Under investigation', color: 'bg-orange-100 text-orange-800', icon: '🔍' },
-  resolved_fraud:   { label: 'Confirmed fraud',     color: 'bg-red-100 text-red-800',      icon: '🛑' },
-  resolved_cleared: { label: 'Cleared, legitimate', color: 'bg-green-100 text-green-800',  icon: '✓' },
-  closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',    icon: '•' },
+// One chip renderer, so a status looks the same wherever it is shown.
+function StatusChip({ meta, title }: { meta: StatusMeta; title?: string }) {
+  const { Icon } = meta;
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${meta.color}`} title={title}>
+      <Icon size={12} className="shrink-0" />
+      {meta.label}
+    </span>
+  );
+}
+
+// ── Fraud / risk status ──────────────────────────────────────────
+const FRAUD_STATUS: Record<string, StatusMeta> = {
+  open:             { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',   Icon: AlertTriangle },
+  under_review:     { label: 'Flagged for review',  color: 'bg-amber-100 text-amber-800',   Icon: AlertTriangle },
+  escalated:        { label: 'Under investigation', color: 'bg-orange-100 text-orange-800', Icon: Search },
+  resolved_fraud:   { label: 'Confirmed fraud',     color: 'bg-red-100 text-red-800',       Icon: Ban },
+  resolved_cleared: { label: 'Cleared, legitimate', color: 'bg-green-100 text-green-800',   Icon: CheckCircle2 },
+  closed:           { label: 'Case closed',         color: 'bg-gray-100 text-gray-700',     Icon: MinusCircle },
 };
 
 function fmtAmount(amount: number, currency: string) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 }
 
-// ── Card money direction (SD-254) ─────────────────────────────────────────────
+// ── Card money direction ─────────────────────────────────────────────
 // Any operation that debits the funding account is shown as a discount (−, red), mirroring the P2P
 // "sent" rows. refund / adjustment are credits (+, green). Statuses that never moved money (declined,
 // failed, voided, expired) render neutral (no sign) so we don't show −$X on an uncharged transaction.
@@ -133,8 +151,8 @@ function rowDirection(r: HistoryRow): 'in' | 'out' | 'neutral' {
   return 'out';
 }
 
-// Canonical, deduplicated lifecycle-status groups spanning every BIAN state across card (SD-254),
-// payment execution (SD-65) and RTP (SD-65 intent). Each group's `key` is the filter value; `states`
+// Canonical, deduplicated lifecycle-status groups spanning every BIAN state across card ,
+// payment execution and RTP (intent). Each group's `key` is the filter value; `states`
 // are the raw statuses it matches. This avoids a duplicated "Settled" (settled/completed/payment_settled)
 // and lists every possible state, not only the ones currently present in the loaded rows.
 const STATUS_GROUPS: { key: string; label: string; states: string[] }[] = [
@@ -178,97 +196,82 @@ export default function TransactionHistoryPage() {
   useEffect(() => {
     const load = async () => {
       const t = getToken() ?? '';
-      const u = t ? decodeToken(t) : null;
 
-      const cardPromise = api.transactions.listAll({ email: u?.email, limit: 200 }, t).then(res =>
-        res.results.map((r) => {
-          const row = r as {
-            cardTransactionInstanceReference: string;
-            cardTransactionAmount: { amount: number; currency: string };
-            cardTransactionDateTime: string;
-            cardTransactionStatus: string;
-            cardTransactionType?: string;
-            cardTransactionMerchantName: string;
-            cardTransactionMerchantCategoryCode?: string;
-            cardTransactionChannel?: string;
-            cardTransactionMaskedPanDisplay: string;
-            cardTransactionDescription?: string;
-            fraudCaseCreated?: boolean;
-            fraudDiagnosisCaseStatus?: string | null;
-            fraudDiagnosisCaseReference?: string | null;
-          };
+      // v36 (ADR-063): ONE request. The collection returns every movement kind by default, already
+      // merged, RTP-de-duped and scoped to the caller, so the client re-implements none of it.
+      const res = await api.transactions
+        .list({ limit: 200 }, t)
+        .catch(() => ({ results: [] as Record<string, unknown>[], total: 0, page: 1, limit: 200 }));
+
+      const rows = (res.results as Array<{
+        kind: 'card' | 'transfer' | 'rtp';
+        paymentExecutionInstanceReference: string;
+        direction: 'sent' | 'received';
+        grossAmount?: number;
+        currency: string;
+        paymentExecutionStatus: string;
+        paymentExecutionRail: string | null;
+        concept: string | null;
+        beneficiaryName: string | null;
+        destinationAccountMasked: string | null;
+        initiatedAt: string | null;
+        completedAt: string | null;
+        merchantCategoryCode?: string | null;
+        channel?: string | null;
+        acceptanceMethod?: string | null;
+        transactionType?: string | null;
+        linkedPaymentExecutionReference?: string | null;
+        fraudCase?: { created: boolean; status?: string | null; reference?: string | null };
+      }>).map((r) => {
+        const base = {
+          id:        r.paymentExecutionInstanceReference,
+          createdAt: r.completedAt ?? r.initiatedAt ?? new Date().toISOString(),
+          amount:    r.grossAmount ?? 0,
+          currency:  r.currency,
+          status:    r.paymentExecutionStatus,
+          concept:   r.concept,
+        };
+        if (r.kind === 'card') {
           return {
-            id:                  row.cardTransactionInstanceReference,
+            ...base,
             category:            'card' as RowCategory,
-            createdAt:           row.cardTransactionDateTime,
-            amount:              row.cardTransactionAmount?.amount ?? 0,
-            currency:            row.cardTransactionAmount?.currency ?? 'USD',
-            status:              row.cardTransactionStatus,
-            merchant:            row.cardTransactionMerchantName,
-            mcc:                 row.cardTransactionMerchantCategoryCode ?? '',
-            channel:             row.cardTransactionChannel ?? '',
-            acceptanceMethod:    (row as { cardTransactionAcceptanceMethod?: string }).cardTransactionAcceptanceMethod ?? '',
-            cardTransactionType: row.cardTransactionType,
-            maskedPan:           row.cardTransactionMaskedPanDisplay,
-            concept:             row.cardTransactionDescription ?? null,
-            fraudCaseCreated:    !!row.fraudCaseCreated,
-            caseStatus:          row.fraudDiagnosisCaseStatus ?? undefined,
-            caseRef:             row.fraudDiagnosisCaseReference ?? undefined,
+            merchant:            r.beneficiaryName ?? '',
+            mcc:                 r.merchantCategoryCode ?? '',
+            channel:             r.channel ?? '',
+            acceptanceMethod:    r.acceptanceMethod ?? '',
+            cardTransactionType: r.transactionType ?? undefined,
+            maskedPan:           r.destinationAccountMasked ?? '',
+            fraudCaseCreated:    !!r.fraudCase?.created,
+            caseStatus:          r.fraudCase?.status ?? undefined,
+            caseRef:             r.fraudCase?.reference ?? undefined,
           } satisfies HistoryRow;
-        })
-      ).catch(() => [] as HistoryRow[]);
+        }
+        if (r.kind === 'rtp') {
+          return {
+            ...base,
+            category:           'rtp' as RowCategory,
+            // 'requested' = I am the payee (money coming to me); 'to_approve' = I must approve to pay.
+            rtpRole:            r.direction === 'received' ? 'requested' as const : 'to_approve' as const,
+            rtpRequestRef:      r.paymentExecutionInstanceReference,
+            linkedExecutionRef: r.linkedPaymentExecutionReference ?? undefined,
+            fraudCaseCreated:   !!r.fraudCase?.created,
+            caseStatus:         r.fraudCase?.status ?? undefined,
+            caseRef:            r.fraudCase?.reference ?? undefined,
+          } satisfies HistoryRow;
+        }
+        return {
+          ...base,
+          category:         'p2p' as RowCategory,
+          p2pDirection:     r.direction,
+          p2pRail:          r.paymentExecutionRail,
+          p2pNote:          r.concept,
+          fraudCaseCreated: !!r.fraudCase?.created,
+          caseStatus:       r.fraudCase?.status ?? undefined,
+          caseRef:          r.fraudCase?.reference ?? undefined,
+        } satisfies HistoryRow;
+      });
 
-      const p2pPromise = u?.partyRef
-        ? api.accounts.transfers(u.partyRef, t, { limit: 100 }).then(res =>
-            res.results.map((r) => ({
-              id:           r.paymentExecutionInstanceReference,
-              category:     'p2p' as RowCategory,
-              createdAt:    r.initiatedAt ?? r.completedAt ?? new Date().toISOString(),
-              amount:       r.grossAmount,
-              currency:     r.currency,
-              status:       r.paymentExecutionStatus,
-              p2pDirection: r.direction,
-              p2pRail:      r.paymentExecutionRail,
-              p2pNote:      r.paymentExecutionRemittanceInformation ?? r.routingNote,
-            } satisfies HistoryRow))
-          ).catch(() => [] as HistoryRow[])
-        : Promise.resolve([] as HistoryRow[]);
-
-      // RTP (Request to Pay): both what I requested (outbox) and what I must approve (inbox).
-      const rtpPromise = t
-        ? Promise.all([
-            api.rtp.list({ box: 'outbox' }, t).then(r => (r.results ?? []).map(x => ({ x, role: 'requested' as const }))).catch(() => []),
-            api.rtp.list({ box: 'inbox' }, t).then(r => (r.results ?? []).map(x => ({ x, role: 'to_approve' as const }))).catch(() => []),
-          ]).then(([out, inb]) => {
-            const seen = new Set<string>();
-            return [...out, ...inb].filter(({ x }) => {
-              if (seen.has(x.paymentRequestInstanceReference)) return false;
-              seen.add(x.paymentRequestInstanceReference); return true;
-            }).map(({ x, role }) => ({
-              id:            x.paymentRequestInstanceReference,
-              category:      'rtp' as RowCategory,
-              createdAt:     x.recordCreatedDateTime ?? new Date().toISOString(),
-              amount:        x.amount,
-              currency:      x.currency,
-              status:        x.status,
-              rtpRole:       role,
-              rtpRequestRef: x.paymentRequestInstanceReference,
-              linkedExecutionRef: x.linkedPaymentExecutionReference,
-              concept:       x.purpose ?? null,
-            } satisfies HistoryRow));
-          })
-        : Promise.resolve([] as HistoryRow[]);
-
-      const [cards, p2p, rtp] = await Promise.all([cardPromise, p2pPromise, rtpPromise]);
-      // Presentation-only de-dup (BIAN keeps the RTP intent and the SD-65 execution as SEPARATE
-      // records): when an RTP has a linked execution, show ONLY the RTP row and hide that execution
-      // row so the same movement is not listed twice. The RTP detail links through to the execution.
-      const linkedExecRefs = new Set(rtp.map((r) => r.linkedExecutionRef).filter(Boolean) as string[]);
-      const p2pDeduped = p2p.filter((r) => !linkedExecRefs.has(r.id));
-      const merged = [...cards, ...p2pDeduped, ...rtp].sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      setRows(merged);
+      setRows(rows);
       setLoading(false);
     };
     load();
@@ -328,7 +331,7 @@ export default function TransactionHistoryPage() {
             icon={ClipboardList}
             title="Payment History"
             description="Card transactions and P2P transfers, your complete payment record."
-            debugInfo="BIAN SD-254 Card Transaction · SD-65 Payment Execution · PCI DSS Req 7.2"
+            debugInfo="Card Transaction Payment Execution · PCI DSS"
             actions={
               <Link href="/system/payment" className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">
                 <Plus size={14} />
@@ -360,7 +363,7 @@ export default function TransactionHistoryPage() {
                 placeholder="Search by merchant, card, reference, id…"
                 className="flex-1 min-w-[160px] border rounded-lg px-3 py-2 text-sm"
               />
-              {/* Direction segmented control — simple in/out for casual users. */}
+              {/* Direction segmented control: simple in/out for casual users. */}
               <div className="inline-flex rounded-lg border border-gray-300 overflow-hidden text-sm">
                 {([['', 'All'], ['in', 'In'], ['out', 'Out']] as const).map(([val, label]) => (
                   <button key={val || 'all'} onClick={() => { setDirectionFilter(val); setPage(1); }}
@@ -422,14 +425,24 @@ export default function TransactionHistoryPage() {
                     if (row.category === 'card') {
                       const pay = PAYMENT_STATUS[row.status] ?? { label: row.status.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700' };
                       const fraud = (row.fraudCaseCreated && row.caseStatus)
-                        ? (FRAUD_STATUS[row.caseStatus] ?? { label: row.caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', icon: '⚠' })
+                        ? (FRAUD_STATUS[row.caseStatus] ?? { label: row.caseStatus.replace(/_/g, ' '), color: 'bg-gray-100 text-gray-700', Icon: AlertTriangle })
                         : null;
                       return (
                         <Link key={row.id} href={`/system/payment/history/${row.id}`}
                           className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer">
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="min-w-0">
-                              <p className="font-semibold text-gray-900 truncate">{row.merchant}</p>
+                              <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                                {(() => {
+                                  const dir = cardDirection(row.cardTransactionType, row.status);
+                                  // Outgoing by nature; muted when the attempt moved no money.
+                                  const cls = dir === 'debit' ? 'text-red-600' : dir === 'credit' ? 'text-green-700' : 'text-gray-400';
+                                  return dir === 'credit'
+                                    ? <ArrowDownLeft size={15} className={`${cls} shrink-0`} />
+                                    : <ArrowUpRight size={15} className={`${cls} shrink-0`} />;
+                                })()}
+                                {row.merchant}
+                              </p>
                               <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
                               {row.concept && (
                                 <p className="text-xs text-gray-500 mt-0.5 truncate">Concept: {row.concept}</p>
@@ -448,14 +461,15 @@ export default function TransactionHistoryPage() {
                                 })()}
                                 <p className="text-xs text-gray-500 font-mono">{row.maskedPan}</p>
                               </div>
-                              <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                              <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${pay.color}`} title="Payment authorization status">💳 {pay.label}</span>
-                            {fraud && (
-                              <span className={`text-xs px-2 py-0.5 rounded font-medium ${fraud.color}`} title="Fraud / risk review status">{fraud.icon} {fraud.label}</span>
-                            )}
+                            <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-gray-100 text-gray-700" title="Movement type">
+                              <CreditCard size={12} /> Card
+                            </span>
+                            <StatusChip meta={pay} title="Payment authorization status" />
+                            {fraud && <StatusChip meta={fraud} title="Fraud / risk review status" />}
                             {row.cardTransactionType && (
                               <span className={`text-xs px-2 py-0.5 rounded font-medium ${TYPE_COLORS[row.cardTransactionType] ?? 'bg-gray-100 text-gray-600'}`}>
                                 {TYPE_LABELS[row.cardTransactionType] ?? row.cardTransactionType.replace(/_/g, ' ')}
@@ -466,7 +480,7 @@ export default function TransactionHistoryPage() {
                           </div>
                           {row.customerNote && (
                             <div className="mt-2 bg-blue-50 border border-blue-200 rounded-lg p-2 text-xs text-blue-800">
-                              <span className="font-semibold">✉ Security team: </span>{row.customerNote}
+                              <span className="inline-flex items-center gap-1 font-semibold"><Mail size={12} /> Security team:</span> {row.customerNote}
                             </div>
                           )}
                           {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
@@ -502,12 +516,16 @@ export default function TransactionHistoryPage() {
                                   {isIncoming ? '+' : '−'}{fmtAmount(row.amount, row.currency)}
                                 </p>
                               </div>
-                              <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                              <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium bg-purple-50 text-purple-700 border border-purple-200"><HandCoins size={12} /> Request to Pay</span>
-                            <span className={`text-xs px-2 py-0.5 rounded font-medium ${rtpStatusColor}`}>{rtpStatusLabel}</span>
+                            <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${rtpStatusColor}`}>
+                              {pendingApproval ? <Clock size={12} /> : row.status === 'payment_settled' ? <CheckCircle2 size={12} />
+                                : ['rejected', 'cancelled', 'expired', 'payment_failed'].includes(row.status) ? <XCircle size={12} /> : <Clock size={12} />}
+                              {rtpStatusLabel}
+                            </span>
                           </div>
                           {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
                         </Link>
@@ -521,8 +539,11 @@ export default function TransactionHistoryPage() {
                         className="group block bg-white rounded-xl border p-4 hover:border-[#001E2B]/30 hover:shadow-md transition-all cursor-pointer">
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">
-                              {isSent ? '↑ P2P Transfer sent' : '↓ P2P Transfer received'}
+                            <p className="font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                              {isSent
+                                ? <ArrowUpRight size={15} className="text-red-600 shrink-0" />
+                                : <ArrowDownLeft size={15} className="text-green-700 shrink-0" />}
+                              {isSent ? 'Transfer sent' : 'Transfer received'}
                             </p>
                             <p className="text-xs text-gray-500">{new Date(row.createdAt).toLocaleString()}</p>
                             {row.p2pNote && <p className="text-xs text-gray-400 mt-0.5 truncate">{row.p2pNote}</p>}
@@ -534,14 +555,14 @@ export default function TransactionHistoryPage() {
                               </p>
                               {row.p2pRail && <p className="text-xs text-gray-400 capitalize">{row.p2pRail.replace(/_/g, ' ')}</p>}
                             </div>
-                            <span className="text-gray-300 group-hover:text-[#001E2B] transition-colors text-lg leading-none mt-0.5">›</span>
+                            <ChevronRight size={16} className="text-gray-300 group-hover:text-[#001E2B] transition-colors mt-0.5 shrink-0" />
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${isSent ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-                            ↕ P2P Transfer
+                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-medium ${isSent ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
+                            <ArrowLeftRight size={12} /> Transfer
                           </span>
-                          <span className={`text-xs px-2 py-0.5 rounded font-medium ${pay.color}`}>{pay.label}</span>
+                          <StatusChip meta={pay} title="Payment execution status" />
                         </div>
                         {debugMode && <p className="mt-1.5 text-xs font-mono text-gray-400 truncate">id: {row.id}</p>}
                       </Link>

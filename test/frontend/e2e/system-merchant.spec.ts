@@ -1,5 +1,5 @@
 /**
- * E2E: Merchant lifecycle (FR-v4-P5, FR-v4-P6, BIAN SD-89).
+ * E2E: Merchant lifecycle (FR-v4-P5, FR-v4-P6).
  * Route: /system/merchant (+ /review). Renders different views by role + agreement state.
  */
 import { test, expect, Page } from '@playwright/test';

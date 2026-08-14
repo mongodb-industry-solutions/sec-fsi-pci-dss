@@ -2,7 +2,7 @@
 // Populated by Fastify hooks in bin/server.ts (requests, handler errors, pino warn+),
 // by the console mirror below, and by the admin controller; read by the admin logs SSE endpoint.
 const MAX = 500;
-/** PCI DSS Req 10 / GDPR: entries carry error TYPE + capped MESSAGE, never full stacks. */
+/** PCI DSS / GDPR: entries carry error TYPE + capped MESSAGE, never full stacks. */
 const MAX_LINE = 500;
 
 export const logBuffer: string[] = [];

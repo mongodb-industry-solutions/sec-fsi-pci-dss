@@ -128,8 +128,10 @@ describe('v33 seed-data integrity: referential integrity', () => {
       () => new Set(agreements.map((a) => a.customerAgreementInstanceReference)),
     ],
     [
+      // Card cases only: a non-card case (transfer / RTP) links to a payment execution or a payment
+      // request instead, which the TS seeders own (see the non-card rule below).
       'fraud case → transaction',
-      () => fraudCases.map((c) => c.cardTransactionInstanceReference as string),
+      () => fraudCases.filter((c) => (c.transactionKind ?? 'card') === 'card').map((c) => c.cardTransactionInstanceReference as string),
       () => new Set(transactions.map((t) => t.cardTransactionInstanceReference)),
     ],
     [
@@ -141,6 +143,18 @@ describe('v33 seed-data integrity: referential integrity', () => {
   ])('%s has no orphans', (_label, values, targets) => {
     const target = targets();
     expect(values().filter((v) => !target.has(v))).toEqual([]);
+  });
+
+  // A non-card case must carry the link to its movement, otherwise the investigation read-model cannot
+  // resolve a counterparty and the case detail falls back to an empty merchant panel.
+  it('every non-card fraud case links to its movement', () => {
+    const nonCard = fraudCases.filter((c) => (c.transactionKind ?? 'card') !== 'card');
+    for (const c of nonCard) {
+      const linked = c.transactionKind === 'rtp'
+        ? (c.paymentRequestInstanceReference ?? c.cardTransactionInstanceReference)
+        : (c.paymentExecutionInstanceReference ?? c.cardTransactionInstanceReference);
+      expect(linked, c.fraudDiagnosisCaseReference as string).toBeTruthy();
+    }
   });
 });
 

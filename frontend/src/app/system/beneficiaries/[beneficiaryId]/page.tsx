@@ -10,6 +10,7 @@ import { useDebugMode } from '../../../../lib/debugMode';
 import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 
+import { serviceDomainLabel } from '../../../../lib/serviceDomain';
 interface BeneficiaryDetail {
   counterpartyArrangementReference: string;
   ownerPartyReference: string;
@@ -295,7 +296,7 @@ export default function BeneficiaryDetailPage() {
           <SectionHeader
             icon={UserCheck}
             title={record.counterpartyLabel}
-            description={isCustomer ? 'Saved contact — tap Send to transfer money instantly.' : 'Saved contact registered for transfers and payments.'}
+            description={isCustomer ? 'Saved contact: tap Send to transfer money instantly.': 'Saved contact registered for transfers and payments.'}
             debugInfo={`counterpartyArrangementReference: ${record.counterpartyArrangementReference} · schemaVersion: ${record.schemaVersion}`}
           />
         </div>
@@ -418,7 +419,7 @@ export default function BeneficiaryDetailPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h2 className="font-semibold text-gray-800 text-sm mb-3">BIAN metadata</h2>
           <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
-            <div><dt className="text-gray-500">Service Domain</dt><dd className="font-medium text-gray-700">{record.bianServiceDomain}</dd></div>
+            <div><dt className="text-gray-500">Service Domain</dt><dd className="font-medium text-gray-700">{serviceDomainLabel(record.bianServiceDomain)}</dd></div>
             <div><dt className="text-gray-500">Control Record Type</dt><dd className="font-medium text-gray-700">{record.bianControlRecordType}</dd></div>
             <div><dt className="text-gray-500">Schema Version</dt><dd className="font-medium text-gray-700">{record.schemaVersion}</dd></div>
           </dl>

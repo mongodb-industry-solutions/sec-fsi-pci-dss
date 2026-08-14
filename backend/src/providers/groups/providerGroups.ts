@@ -25,7 +25,7 @@ const FUNDS_DEBIT_TYPES = new Set(['purchase', 'cash_advance', 'fee']);
 
 // Provider Group reactors: each subscribes to a provider category's `*.requested` event, performs the
 // outbound call (the only place dispatchProvider runs for these flows), and publishes the matching
-// `*.completed`. This makes the payment-authorization gates bus-driven — the orchestrator only emits
+// `*.completed`. This makes the payment-authorization gates bus-driven: the orchestrator only emits
 // requests; the actual provider call is a reaction to the bus. Card data (`chd`) is decrypted here,
 // just-in-time, only by the card-issuer reactor; plaintext never returns to the bus.
 
@@ -41,11 +41,11 @@ export class ProviderGroups {
     // VOP is dispatched synchronously via dispatchProvider in the RTP screening flow (never emitted on
     // the bus), so there is intentionally NO 'vop.verification.requested' subscription here.
     this.bus.subscribe('funds.check.requested', (e) => this.onFunds(e));
-    // v27 Phase 6: KYC/HRP customer screening (SD-13 -> SD-53). A customer profile validation
+    // v27 Phase 6: KYC/HRP customer screening (->). A customer profile validation
     // completing triggers a re-screen; the request event is a first-class Integration Hub gate.
     this.bus.subscribe('profile.validation.completed', (e) => this.onProfileValidated(e));
     this.bus.subscribe('kyc.screening.requested', (e) => this.onKycScreening(e));
-    // v31 KYB onboarding chain (§5bis): bridge + entity screening reactors. Fan-out is events-only —
+    // v31 KYB onboarding chain (§5bis): bridge + entity screening reactors. Fan-out is events-only,
     // every provider is reached via dispatchProvider, so the built-in engine is swappable for an
     // external vendor with zero reactor change. correlationId = merchantAgreementInstanceReference.
     this.bus.subscribe('merchant.validation.requested', (e) => this.onMerchantValidated(e));
@@ -196,7 +196,7 @@ export class ProviderGroups {
     }));
   }
 
-  // v17 funds-availability gate (SD-36 AIS). Resolves the funding account from the card token, reads
+  // v17 funds-availability gate (AIS). Resolves the funding account from the card token, reads
   // the balance via the account_information capability (provider-indifferent: built-in module reads the
   // internal ledger, an external PSD2 AIS substitutes it), converts the amount to the account currency
   // (FX), and performs the ATOMIC hold. The hold ($gte-conditional $inc) is the authoritative decision:
@@ -214,7 +214,7 @@ export class ProviderGroups {
       bian: { serviceDomain: 'SD-36 Account Information', controlRecord: 'AccountInformationValidation' },
     }));
 
-    // Non-debit types (refund/balance_transfer/adjustment) never hold funds — the gate approves.
+    // Non-debit types (refund/balance_transfer/adjustment) never hold funds: the gate approves.
     if (!p.cardTransactionType || !FUNDS_DEBIT_TYPES.has(p.cardTransactionType)) {
       publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED });
       return;
@@ -222,7 +222,7 @@ export class ProviderGroups {
 
     // Resolve funding account from the card-on-file token. The internal funds gate ONLY governs cards
     // funded by a PSP-internal payout account (fundingPayoutAccountInstanceReference). A new/unsaved
-    // token or an external card has no internal funding account — its funds are the ISSUER's
+    // token or an external card has no internal funding account: its funds are the ISSUER's
     // responsibility (the card.issuer gate), so this gate passes through (approve, no hold).
     const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
       .findOne({ paymentCardReference: p.cardToken }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
@@ -265,10 +265,10 @@ export class ProviderGroups {
     publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED, available, held: amountInAccountCcy, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
   }
 
-  // Real-time fraud scoring. Fail-open: only an explicit block/decline declines.
+  // Real-time fraud scoring. A fraud signal never declines the payment: the authorization proceeds on
+  // the issuer/funds verdicts and the risk verdict opens an investigation case instead (L1 -> L2).
   private async onFds(e: DomainEvent): Promise<void> {
     const p = e.payload as Record<string, unknown>;
-    let approved = true;
     let reason: string | undefined;
     let verdict: { riskScore?: number; recommendation?: string; fraudFlag?: boolean; rulesFired?: string[] } | undefined;
     try {
@@ -277,30 +277,32 @@ export class ProviderGroups {
         merchantName: p.merchantName, merchantCategoryCode: p.merchantCategoryCode,
       }, { entityType: 'transaction', entityId: e.correlationId, processType: 'fraud_evaluation' });
       verdict = r.responseBody as typeof verdict;
-      if (verdict?.recommendation === 'block' || verdict?.recommendation === 'decline') { approved = false; reason = 'fraud_block'; }
+      if (verdict?.recommendation === 'block' || verdict?.recommendation === 'decline') reason = 'fraud_review';
     } catch { /* fail-open */ }
     void this.bus.publish(makeEvent({
       eventType: 'fds.scoring.completed', correlationId: e.correlationId, businessProcess: 'card_payment', source: 'callback.fds', causationId: e.eventId,
-      payload: { transactionId: e.correlationId, outcome: approved ? 'approved' : 'declined', approved, reason, riskScore: verdict?.riskScore, recommendation: verdict?.recommendation, fraudFlag: verdict?.fraudFlag, rulesFired: verdict?.rulesFired },
+      payload: { transactionId: e.correlationId, outcome: 'approved', approved: true, reason, riskScore: verdict?.riskScore, recommendation: verdict?.recommendation, fraudFlag: verdict?.fraudFlag, rulesFired: verdict?.rulesFired },
       bian: { serviceDomain: 'SD-63 Fraud Evaluation', controlRecord: 'FraudEvaluationAssessment' },
     }));
   }
 
-  // Sanctions/HRP screening. Fail-open on transport error; a match is a hard decline.
+  // Sanctions/HRP screening. Fail-open on transport error. A match holds the payment for investigation
+  // (funds frozen, nothing delivered) rather than declining it: the freeze obligation is met by never
+  // completing the payment, and only an explicit L1/L2 resolution can release or reverse it.
   private async onHrp(e: DomainEvent): Promise<void> {
     const p = e.payload as Record<string, unknown>;
-    let approved = true;
+    let sanctionsMatch = false;
     let reason: string | undefined;
     try {
       const r = await dispatchProvider(this.db, 'hrp_sanctions', 'hrp.screening.requested', {
         cardTransactionInstanceReference: e.correlationId, accountReference: p.accountReference, merchantName: p.merchantName,
       }, { entityType: 'transaction', entityId: e.correlationId, processType: 'aml_screening' });
       const b = r.responseBody as { hrpcMatch?: boolean; match?: boolean } | undefined;
-      if (b && (b.hrpcMatch ?? b.match)) { approved = false; reason = 'sanctions_match'; }
+      if (b && (b.hrpcMatch ?? b.match)) { sanctionsMatch = true; reason = 'sanctions_review'; }
     } catch { /* fail-open */ }
     void this.bus.publish(makeEvent({
       eventType: 'hrp.screening.completed', correlationId: e.correlationId, businessProcess: 'card_payment', source: 'callback.hrp', causationId: e.eventId,
-      payload: { transactionId: e.correlationId, outcome: approved ? 'approved' : 'declined', approved, reason },
+      payload: { transactionId: e.correlationId, outcome: 'approved', approved: true, sanctionsMatch, reason },
       bian: { serviceDomain: 'SD-13 Party Reference', controlRecord: 'PartyReferenceDataDirectoryEntry' },
     }));
   }
@@ -318,7 +320,7 @@ export class ProviderGroups {
     let cardData: { cardNumber?: string; cvv?: string; expiry?: string } = {};
     if (p.chd) {
       try { cardData = await getChdCrypto().decrypt(p.chd, { correlationId: txnId, eventType: ISSUER_AAD_EVENT }); }
-      catch { /* tamper / AAD mismatch — send no CHD on the wire */ }
+      catch { /* tamper / AAD mismatch: send no CHD on the wire */ }
     }
 
     let decision: { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;

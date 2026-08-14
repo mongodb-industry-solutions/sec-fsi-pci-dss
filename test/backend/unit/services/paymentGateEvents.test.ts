@@ -56,7 +56,7 @@ const baseInput = {
   cardTransactionDescription: 'SHOP', gatewayPayload: { source: 'test' },
 };
 
-describe('P5 — per-gate *.requested/*.completed pairs + causation', () => {
+describe('P5: per-gate *.requested/*.completed pairs + causation', () => {
   let store: FakeStore;
   beforeEach(() => {
     store = new FakeStore();
@@ -87,6 +87,19 @@ describe('P5 — per-gate *.requested/*.completed pairs + causation', () => {
       expect(req.causationId, `${g}.requested causation`).toBe(proc.eventId);
       expect(done.causationId, `${g}.completed causation`).toBe(req.eventId);
     }
+  });
+
+  it('never declines on a fraud verdict: the fds gate approves and carries the verdict for the case', async () => {
+    h.dispatchProvider.mockResolvedValue({
+      provider: 'internal', status: 'received',
+      responseBody: { riskScore: 135, recommendation: 'decline', fraudFlag: true, rulesFired: ['HIGH_VALUE_TXN', 'RISKY_MCC'] },
+    });
+    await createTransaction(txDb(), { ...baseInput, amount: 1250 });
+    const fds = store.events.find((e) => e.eventType === 'fds.scoring.completed')!;
+    const payload = fds.payload as { outcome: string; recommendation?: string };
+    expect(payload.outcome).toBe('approved');
+    expect(payload.recommendation).toBe('decline');
+    h.dispatchProvider.mockResolvedValue({ provider: 'internal', status: 'received' });
   });
 
   it('records a pending-correlation entry for the issuer at dispatch (§7.7)', async () => {

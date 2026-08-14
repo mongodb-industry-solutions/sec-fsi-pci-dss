@@ -42,12 +42,12 @@ const RoleObject = {
   },
 };
 
-// ADR-030 / SD-16: data-driven RBAC role administration. Reads need `roles:view`, mutations need
+// ADR-030 / data-driven RBAC role administration. Reads need `roles:view`, mutations need
 // `roles:manage` (manager). Builtin roles are editable (permissions) but cannot be renamed or deleted.
 export async function rolesController(fastify: FastifyInstance) {
   const col = () => fastify.db.collection<RoleRecord>(ROLE_COLLECTION);
 
-  // GET /roles — list all roles
+  // GET /roles: list all roles
   fastify.get('/', {
     preHandler: requirePermission('roles', 'view'),
     schema: {
@@ -111,7 +111,7 @@ export async function rolesController(fastify: FastifyInstance) {
     return role;
   });
 
-  // POST /roles — create a custom role (any subset of the catalog, including full-manage)
+  // POST /roles: create a custom role (any subset of the catalog, including full-manage)
   fastify.post('/', {
     preHandler: requirePermission('roles', 'manage'),
     schema: {
@@ -173,7 +173,7 @@ export async function rolesController(fastify: FastifyInstance) {
     return reply.status(201).send({ ...doc, _id: undefined });
   });
 
-  // PUT /roles/:roleName — update label/description/scope/permissions. Builtin: permissions editable,
+  // PUT /roles/:roleName, update label/description/scope/permissions. Builtin: permissions editable,
   // but it stays builtin and keeps its name.
   fastify.put('/:roleName', {
     preHandler: requirePermission('roles', 'manage'),
@@ -229,14 +229,14 @@ export async function rolesController(fastify: FastifyInstance) {
     return updated;
   });
 
-  // DELETE /roles/:roleName — custom roles only. Builtin roles cannot be deleted (PCI Req 7 baseline).
+  // DELETE /roles/:roleName, custom roles only. Builtin roles cannot be deleted (PCI DSS baseline).
   fastify.delete('/:roleName', {
     preHandler: requirePermission('roles', 'manage'),
     schema: {
       tags: ['roles'],
       summary: 'Delete a custom role',
       description: 'Permanently deletes a custom RBAC role. '
-        + 'Builtin roles (roleIsBuiltin: true) cannot be deleted — they may be deactivated by removing all permissions via PUT. '
+        + 'Builtin roles (roleIsBuiltin: true) cannot be deleted, they may be deactivated by removing all permissions via PUT. '
         + 'Users currently assigned the deleted role will fail permission checks until reassigned. '
         + 'Requires `roles:manage` permission (manager role). '
         + 'Returns 403 if the role is builtin, 404 if the role does not exist.',

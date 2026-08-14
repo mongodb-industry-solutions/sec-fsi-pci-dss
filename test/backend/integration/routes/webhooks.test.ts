@@ -2,7 +2,7 @@
  * Integration tests: /webhooks/* callback routes (FR-v6-09, FR-v6-10)
  * Source: backend/src/modules/provider/controllers/integrationWebhook.controller.ts
  *
- * Requires TEST_MONGODB_URI — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI: skips gracefully when not set.
  * HMAC tests validate the verifyHmacSignature utility directly (unit-level).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';

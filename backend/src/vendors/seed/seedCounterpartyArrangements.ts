@@ -4,8 +4,8 @@ import {
   CounterpartyArrangement,
 } from '../../modules/identity/models/counterpartyArrangement.model';
 
-// Demo beneficiaries for the two most-used customers (BIAN SD-54 Counterparty Administration).
-// Raw phone/email is NEVER stored — only masked hints and resolved partyInstanceReferences.
+// Demo beneficiaries for the two most-used customers (Counterparty Administration).
+// Raw phone/email is NEVER stored, only masked hints and resolved partyInstanceReferences.
 // 3 entries for Luis (b0000001) and 3 for Amara (b0000058) to support demo storyline.
 const DEMO_BENEFICIARIES: Omit<CounterpartyArrangement, 'recordCreatedDateTime' | 'recordUpdatedDateTime'>[] = [
   // ── Luis Morales (b0000001) ────────────────────────────────────────────────

@@ -1,5 +1,5 @@
-// BIAN SD-66: Payout Account Balance — atomic balance operations
-// All mutations use MongoDB $inc — never read-modify-write. PCI DSS Req 10.
+// Payout Account Balance, atomic balance operations
+// All mutations use MongoDB $inc, never read-modify-write. PCI DSS.
 
 import { Db } from 'mongodb';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../models/payoutAccount.model';
@@ -46,6 +46,31 @@ export async function creditAvailable(
 }
 
 /**
+ * Drop an expected incoming credit that will never arrive: the exact inverse of debitPending.
+ * Used when a payout is rejected before or by the rail (beneficiary validation failed, submission
+ * refused, rail returned the transfer).
+ *
+ * pendingAmount -= amount and availableAmount is deliberately NOT credited: the funds never landed,
+ * so crediting them would invent money. That is what separates this from releaseCardHold, which
+ * returns a SENDER's own funds. Leaving the amount in pending instead would show the beneficiary an
+ * incoming credit that can never settle.
+ */
+export async function releasePendingCredit(
+  db: Db,
+  payoutAccountRef: string,
+  amount: number,
+): Promise<boolean> {
+  const result = await db.collection(PAYOUT_ACCOUNT_COLLECTION).updateOne(
+    { payoutAccountInstanceReference: payoutAccountRef, payoutAccountStatus: 'active' },
+    {
+      $inc: { 'payoutAccountBalance.pendingAmount': -amount },
+      $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date(), recordUpdatedDateTime: new Date() },
+    },
+  );
+  return result.modifiedCount === 1;
+}
+
+/**
  * Reserve funds for a dispute hold (debit available, credit reserved).
  */
 export async function reserveFunds(
@@ -68,7 +93,7 @@ export async function reserveFunds(
 
 /**
  * Debit the available balance directly (P2P transfer debit side).
- * Conditional on having sufficient available balance — returns false if insufficient funds.
+ * Conditional on having sufficient available balance: returns false if insufficient funds.
  */
 export async function debitAvailable(
   db: Db,
@@ -110,8 +135,8 @@ export async function creditDirect(
 /**
  * Hold funds on card authorization (cardholder / issuer perspective).
  * Moves amount from availableAmount → pendingAmount atomically.
- * Conditional on sufficient available balance — returns false if insufficient.
- * PCI DSS Req 3: no SAD stored; operates only on PSP-internal UUID references.
+ * Conditional on sufficient available balance: returns false if insufficient.
+ * PCI DSS: no SAD stored; operates only on PSP-internal UUID references.
  */
 export async function holdCardFunds(
   db: Db,
@@ -137,7 +162,7 @@ export async function holdCardFunds(
 
 /**
  * Clear the pending hold when a card purchase settles.
- * Decrements pendingAmount only — available was already reduced at auth time.
+ * Decrements pendingAmount only: available was already reduced at auth time.
  */
 export async function settleCardDebit(
   db: Db,

@@ -1,4 +1,4 @@
-// v17.1 Bank Transfer — pure banking-coordinate validators (no I/O, fully testable).
+// v17.1 Bank Transfer: pure banking-coordinate validators (no I/O, fully testable).
 // Standards: ISO 13616 (IBAN mod-97), ISO 9362 (BIC), NACHA/ABA routing checksum.
 // Reused by RailResolver, the API preview endpoint and the frontend contract. DRY: one implementation.
 
@@ -43,7 +43,7 @@ export function ibanCountry(raw: string | undefined | null): string | undefined 
   return /^[A-Z]{2}/.test(iban) ? iban.slice(0, 2) : undefined;
 }
 
-/** ISO 9362 BIC: 8 or 11 chars — 4 bank, 2 country, 2 location, optional 3 branch. */
+/** ISO 9362 BIC: 8 or 11 chars, 4 bank, 2 country, 2 location, optional 3 branch. */
 export function isValidBic(raw: string | undefined | null): boolean {
   if (!raw) return false;
   return /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(normalise(raw));

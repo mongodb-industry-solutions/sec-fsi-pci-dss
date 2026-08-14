@@ -1,4 +1,4 @@
-// SD-91: Party Authentication. CIBA (OIDC Client-Initiated Backchannel Authentication) session.
+// Party Authentication. CIBA (OIDC Client-Initiated Backchannel Authentication) session.
 // Models the auth_req_id lifecycle. Patterned on partyAuthorizationCode (TTL-expiring, one-time).
 // auth_req_id is an OIDC protocol artifact housed here as the closest BIAN fit (protocol-driven,
 // not a native BIAN business object).
@@ -11,7 +11,7 @@ export type BackchannelDeliveryMode = 'poll' | 'ping' | 'push';
 export interface PartyBackchannelAuthenticationRecord {
   authReqId: string;                 // PK, opaque, unique
   clientId: string;                  // BOUND: only this client may redeem (token endpoint enforces)
-  // Resolved from the CIBA hint. The SD-91 login id (customerAuthenticationInstanceReference / sub).
+  // Resolved from the CIBA hint. The login id (customerAuthenticationInstanceReference / sub).
   customerAuthenticationInstanceReference: string;
   scopes: string[];
   challenge: string;                 // server nonce the device signs (base64url)

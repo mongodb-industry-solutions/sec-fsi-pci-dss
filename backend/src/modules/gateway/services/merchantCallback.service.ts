@@ -1,13 +1,13 @@
-// Merchant payment callback (PSP → merchant) — shared by the checkout (redirect), payment-link and
+// Merchant payment callback (PSP → merchant): shared by the checkout (redirect), payment-link and
 // direct (api-card / simulator) flows. Lives in its own module so the transactions service can fire
 // it without creating an import cycle with checkout.service.
 //
-// THREE complementary effects, on BOTH approval and decline (PCI DSS Req 3: surrogate token + masked
+// THREE complementary effects, on BOTH approval and decline (PCI DSS: surrogate token + masked
 // PAN only, NEVER PAN/CVV):
 //   1. The merchant's OWN webhook (per-merchant `merchantWebhookEndpoint`, HMAC-signed with
-//      `merchantWebhookSecret`) — the real callback to the correct merchant. Carries the transaction id.
+//      `merchantWebhookSecret`): the real callback to the correct merchant. Carries the transaction id.
 //   2. A businessProcessEvent `payment.callback` (entityType=transaction) so the outcome is visible
-//      and searchable in the unified audit (`/system/audit-events`) for manager/auditor — not just
+//      and searchable in the unified audit (`/system/audit-events`) for manager/auditor, not just
 //      `transaction.authorized`.
 //   3. An Integration-Hub `generic` event as the inbound/outbound audit record (ADR-010/025).
 import { Db } from 'mongodb';
@@ -17,7 +17,7 @@ import { dispatchProvider } from '../../provider/services/integrationDispatch.se
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { WebhookService } from './merchantWebhook.service';
 
-// Human-readable decline reasons keyed by the PSP/issuer response code (BIAN SD-15).
+// Human-readable decline reasons keyed by the PSP/issuer response code .
 export const DECLINE_REASONS: Record<string, string> = {
   '0190': 'Authorization declined by the issuer',
   '0540': 'Card deactivated or removed by the cardholder',
@@ -97,8 +97,8 @@ export async function sendMerchantPaymentCallback(db: Db, o: MerchantPaymentCall
     ...(o.declineReason ? { declineReason: o.declineReason } : {}),
   }).catch(() => { /* delivery failure never blocks payment */ });
 
-  // 3) Unified-audit business event (visible + searchable in /system/audit-events) — now WITH the
-  // webhook request (method/headers/body) and the merchant's response, for PCI DSS Req 10.7 auditing.
+  // 3) Unified-audit business event (visible + searchable in /system/audit-events): now WITH the
+  // webhook request (method/headers/body) and the merchant's response, for PCI DSS auditing.
   emitProcessEvent(db, {
     entityType: 'transaction',
     entityId: transactionId ?? o.contextRef,
@@ -128,7 +128,7 @@ export async function sendMerchantPaymentCallback(db: Db, o: MerchantPaymentCall
           response: webhookResult.response,
           ...(webhookResult.error ? { error: webhookResult.error } : {}),
         },
-      } : (webhookConfigured ? {} : { note: 'No webhook endpoint configured for this merchant — set one in /system/merchant/webhooks.' })),
+      }: (webhookConfigured ? {}: { note: 'No webhook endpoint configured for this merchant, set one in /system/merchant/webhooks.' })),
     },
     bianServiceDomain: 'Payment Order',
     bianControlRecordType: 'PaymentOrderProcedure',

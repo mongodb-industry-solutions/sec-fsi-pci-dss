@@ -1,5 +1,5 @@
-// BIAN SD-89 KYB Administration controller (v31). Mounted under /merchants (same prefix as
-// merchant.controller — one merchant surface, no forked API). Provides the KYB *data-administration*
+// KYB Administration controller (v31). Mounted under /merchants (same prefix as
+// merchant.controller: one merchant surface, no forked API). Provides the KYB *data-administration*
 // endpoints for the Operations Officer: review/correct KYB data, administer beneficial owners, and the
 // correlated process timeline. The KYB *decision* (approve/reject) stays on /:id/review (merchant_officer).
 //
@@ -33,7 +33,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
   const canView = requirePermission('merchants', 'view');
   const canManage = requirePermission('merchants', 'manage');
 
-  // GET /:id/kyb — KYB detail incl. beneficial owners (party summaries) + composed owner-layer risk.
+  // GET /:id/kyb, KYB detail incl. beneficial owners (party summaries) + composed owner-layer risk.
   fastify.get('/:id/kyb', {
     schema: {
       tags: ['merchants'],
@@ -56,12 +56,12 @@ export async function merchantKybController(fastify: FastifyInstance) {
     },
   });
 
-  // PATCH /:id/kyb — correct KYB data fields. amendmentReason required. Rejects status/verdict writes.
+  // PATCH /:id/kyb, correct KYB data fields. amendmentReason required. Rejects status/verdict writes.
   fastify.patch('/:id/kyb', {
     schema: {
       tags: ['merchants'],
-      summary: 'Correct KYB data (SD-89, v31) — data administration, not a decision',
-      description: 'Edits permitted KYB data fields (legal entity, MCC, category, name, country, KYB notes). **Rejects (400) any write to a status/verdict field** — approve/reject stays on /:id/review (merchant_officer). Requires `merchants:manage` and an `amendmentReason`. Emits `kyb.record.amended`.',
+      summary: 'Correct KYB data (SD-89, v31), data administration, not a decision',
+      description: 'Edits permitted KYB data fields (legal entity, MCC, category, name, country, KYB notes). **Rejects (400) any write to a status/verdict field**, approve/reject stays on /:id/review (merchant_officer). Requires `merchants:manage` and an `amendmentReason`. Emits `kyb.record.amended`.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['id'], properties: { id: { type: 'string' } } },
       body: {
@@ -94,7 +94,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
     },
   });
 
-  // GET /:id/kyb/owners — the shareholder list. Any merchant owner or staff (merchants:view).
+  // GET /:id/kyb/owners, the shareholder list. Any merchant owner or staff (merchants:view).
   fastify.get('/:id/kyb/owners', {
     schema: {
       tags: ['merchants'],
@@ -119,7 +119,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
     },
   });
 
-  // POST /:id/kyb/owners — add owner (references an existing party). Enforces invariants.
+  // POST /:id/kyb/owners, add owner (references an existing party). Enforces invariants.
   fastify.post('/:id/kyb/owners', {
     schema: {
       tags: ['merchants'],
@@ -148,7 +148,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
     },
   });
 
-  // PATCH /:id/kyb/owners/:partyRef — edit role/percentage/primary flag only (no PII).
+  // PATCH /:id/kyb/owners/:partyRef, edit role/percentage/primary flag only (no PII).
   fastify.patch('/:id/kyb/owners/:partyRef', {
     schema: {
       tags: ['merchants'],
@@ -175,7 +175,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
     },
   });
 
-  // DELETE /:id/kyb/owners/:partyRef — remove owner (blocked if last or primary).
+  // DELETE /:id/kyb/owners/:partyRef, remove owner (blocked if last or primary).
   fastify.delete('/:id/kyb/owners/:partyRef', {
     schema: {
       tags: ['merchants'],
@@ -193,7 +193,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
     },
   });
 
-  // GET /:id/kyb/process — correlated process timeline (§5bis.5): every bus milestone + provider call.
+  // GET /:id/kyb/process, correlated process timeline (§5bis.5): every bus milestone + provider call.
   fastify.get('/:id/kyb/process', {
     schema: {
       tags: ['merchants'],

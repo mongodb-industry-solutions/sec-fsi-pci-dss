@@ -109,14 +109,14 @@ export default function PaymentsSectionPage() {
         icon={Receipt}
         title="Transactions"
         description={`All card transactions involving ${merchant.merchantName}.`}
-        debugInfo="BIAN SD-89 acquiring view · PCI DSS Req 3 & 7 (masked PAN only, no payer PII)"
+        debugInfo="acquiring view · PCI DSS (masked PAN only, no payer PII)"
       />
 
       {debugMode && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 flex items-start gap-2">
           <ShieldCheck size={14} className="text-blue-600 mt-0.5 shrink-0" />
           <p className="text-xs text-blue-700">
-            Data minimization (PCI DSS Req 3 &amp; 7): only the masked PAN and acquiring details are shown. The payer&apos;s account, email and gateway payload are never exposed.
+            Data minimization (PCI DSS &amp; 7): only the masked PAN and acquiring details are shown. The payer&apos;s account, email and gateway payload are never exposed.
           </p>
         </div>
       )}

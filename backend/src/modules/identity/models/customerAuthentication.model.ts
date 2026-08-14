@@ -1,13 +1,13 @@
-// BIAN SD-91: Customer Authentication
+// Customer Authentication
 // CR: CustomerAuthenticationAssessment
 // Owns login credentials, role assignments, and account access state.
-// Linked to party (SD-13) via partyInstanceReference.
+// Linked to party via partyInstanceReference.
 
 export const CUSTOMER_AUTHENTICATION_COLLECTION = 'customerAuthenticationAssessment';
 
 export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationInstanceReference: string;     // PK, UUID
-  partyInstanceReference: string;                      // FK to party (SD-13)
+  partyInstanceReference: string;                      // FK to party 
   // QE equality: used for login lookup
   customerAuthenticationEmailAddress: string;
   customerAuthenticationCredentialHash: string;        // bcrypt 12-round, NOT QE-encrypted
@@ -37,6 +37,6 @@ export type CustomerAuthRole =
   | 'level1_analyst'
   | 'level2_investigator'
   | 'security_auditor'
-  | 'merchant_officer'    // Ch-05: SD-89 Merchant Acquiring bank employee
-  | 'operations_officer' // v29: SD-88/SD-66 cardholder & payout-account operations (built-in module admin)
-  | 'manager';            // SD-193: Integration Hub administrator
+  | 'merchant_officer'    // Ch-05: Merchant Acquiring bank employee
+  | 'operations_officer' // v29: cardholder & payout-account operations (built-in module admin)
+  | 'manager';            // Integration Hub administrator

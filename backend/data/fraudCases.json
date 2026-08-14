@@ -622,5 +622,39 @@
     "recordCreatedDateTime": "2026-05-27T01:01:16.044Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "fraudDiagnosisInstanceReference": "c0000021-0000-4000-8000-000000000021",
+    "fraudDiagnosisCaseReference": "FD-2026-000021",
+    "cardTransactionInstanceReference": "e0000004-0000-4000-8000-000000000004",
+    "paymentExecutionInstanceReference": "e0000004-0000-4000-8000-000000000004",
+    "transactionKind": "p2p",
+    "customerAgreementInstanceReference": "78d58c43-f9dc-426f-b7d8-eb2f3487f541",
+    "transactionSnapshot": {
+      "cardTransactionAmount": {
+        "amount": 1450,
+        "currency": "EUR"
+      },
+      "cardTransactionMerchantName": "Transfer to Carlos (savings)",
+      "cardTransactionDateTime": "2026-07-08T09:20:00.000Z",
+      "cardTransactionStatus": "pending",
+      "cardTransactionMaskedPanDisplay": "Bank transfer"
+    },
+    "fraudDiagnosisCaseStatus": "open",
+    "fraudDiagnosisCaseSeverity": "high",
+    "fraudDiagnosisRequestDateTime": "2026-07-08T09:20:00.000Z",
+    "fraudDiagnosisAssessment": {
+      "riskIndicators": [
+        "fds.high.risk",
+        "aml.alert: medium"
+      ],
+      "fraudDiagnosisScore": 78,
+      "fraudDiagnosisConclusion": "Transfer held for review: amount over the review threshold"
+    },
+    "bianServiceDomain": "Fraud Diagnosis",
+    "bianControlRecordType": "FraudDiagnosis",
+    "recordCreatedDateTime": "2026-07-08T09:20:00.000Z",
+    "recordUpdatedDateTime": "2026-07-08T09:20:00.000Z",
+    "schemaVersion": 1
   }
 ]

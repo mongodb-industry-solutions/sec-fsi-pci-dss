@@ -40,7 +40,7 @@ function sessionRole(request: FastifyRequest): string | undefined {
 /**
  * preHandler: authorize a dual-auth capability route.
  *  · OAuth channel (request.merchantContext present): require the route's scope (403 otherwise).
- *  · Session channel: enforce the RBAC action via can() — identical to requirePermission('view'/'manage').
+ *  · Session channel: enforce the RBAC action via can(), identical to requirePermission('view'/'manage').
  * Separation of duties: an OAuth token is never granted staff RBAC, and a session is never scope-gated.
  */
 export function dualPermission(opts: DualPermissionOptions) {
@@ -71,7 +71,7 @@ export function dualPermission(opts: DualPermissionOptions) {
 
 export interface ResolvedOwner {
   channel: AuthChannel;
-  // SD-13 party the domain data is keyed by. Undefined only when an OAuth subject has no linked
+  // party the domain data is keyed by. Undefined only when an OAuth subject has no linked
   // party (caller should return an empty result, never a cross-user leak).
   ownerPartyRef?: string;
   // The authenticated subject: OAuth token.sub, or the session partyRef.

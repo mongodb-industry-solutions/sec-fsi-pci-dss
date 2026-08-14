@@ -78,7 +78,7 @@ export async function oauthController(fastify: FastifyInstance) {
 
       // If consent action submitted (from PSP frontend consent form).
       // Always redirect to the registered redirect_uri returned by initiateAuthorization
-      // (validated.redirectUri), never the raw query value — prevents open redirect.
+      // (validated.redirectUri), never the raw query value: prevents open redirect.
       if (q._psp_action === 'deny') {
         auditOAuth(db(), 'oauth.authorize.denied', {
           clientId: q.client_id, sub: q._psp_sub, state: q.state, outcome: 'rejected', reason: 'access_denied',
@@ -103,7 +103,7 @@ export async function oauthController(fastify: FastifyInstance) {
         return reply.redirect(redirectUrl.toString());
       }
 
-      // No action yet — return validated params so frontend can render consent page.
+      // No action yet: return validated params so frontend can render consent page.
       // v18 E-03/E-10: include scope metadata, merchant branding, and (post-login) the scopes
       // already granted to this client so the UI can highlight newly-requested permissions.
       const previouslyGranted = q._psp_sub
@@ -127,7 +127,7 @@ export async function oauthController(fastify: FastifyInstance) {
       if (err.oauthError === 'invalid_request' && err.message?.includes('redirect_uri')) {
         return oauthErrorReply(reply, err);
       }
-      // All other errors: redirect to redirect_uri?error=... — but ONLY after confirming the
+      // All other errors: redirect to redirect_uri?error=..., but ONLY after confirming the
       // redirect_uri is registered for this client. Some errors (e.g. unsupported response_type,
       // unknown client) are thrown before initiateAuthorization validates the redirect_uri, so we
       // must re-check the client allowlist here to avoid an open redirect (RFC 6749 §4.1.2.1).
@@ -142,7 +142,7 @@ export async function oauthController(fastify: FastifyInstance) {
             return reply.redirect(redirectUrl.toString());
           }
         } catch {
-          // Client not resolvable or redirect_uri malformed — fall through to direct error.
+          // Client not resolvable or redirect_uri malformed: fall through to direct error.
         }
       }
       return oauthErrorReply(reply, err);
@@ -215,7 +215,7 @@ export async function oauthController(fastify: FastifyInstance) {
     } catch (err: any) {
       // Audit the failed token exchange with the classified CAUSE (bad secret / PKCE / redirect_uri /
       // expired code, …) and the merchant behind the clientId, so an auditor/manager can pinpoint the
-      // failure — the merchant only sees a generic token_exchange_failed. No secret is emitted.
+      // failure: the merchant only sees a generic token_exchange_failed. No secret is emitted.
       const { cause, explanation } = classifyOAuthFailure(err.oauthError, err.message);
       // Recover the flow's `state` from the code (for authorization_code grants) so the failure shares
       // the SAME flowId as the rest of the flow and is filterable by it. Fully fire-and-forget.
@@ -260,7 +260,7 @@ export async function oauthController(fastify: FastifyInstance) {
     schema: {
       tags: ['auth:oidc'],
       summary: 'OAuth 2.0 Token Revocation (RFC 7009)',
-      description: 'Revokes an access or refresh token. Always returns 200 (RFC 7009 §2.2 — no information leakage).',
+      description: 'Revokes an access or refresh token. Always returns 200 (RFC 7009 §2.2, no information leakage).',
       consumes: ['application/x-www-form-urlencoded'],
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {

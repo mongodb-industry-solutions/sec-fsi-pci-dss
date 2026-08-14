@@ -12,10 +12,11 @@ import { RawMongoPanel } from '../../../../components/RawMongoPanel';
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { useResource } from '../../../../lib/useResource';
 import { useEffectivePermissions } from '../../../../lib/permissions';
+import { AuditTrailLink } from '../../../../components/AuditTrailLink';
 import { AccessDenied } from '../../../../components/AccessDenied';
 import { useCaseEscalation } from '../../../../lib/useCaseEscalation';
 import { Tooltip } from '../../../../components/Tooltip';
-import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle } from 'lucide-react';
+import { Eye, EyeOff, UserCheck, Store, ChevronRight, CreditCard, Landmark, Lock, AlertTriangle, ArrowLeft } from 'lucide-react';
 
 type TxnDetail = Awaited<ReturnType<typeof api.transactions.getById>>;
 
@@ -242,9 +243,115 @@ export default function TransactionDetailPage() {
   if (notFound || !txn) return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 text-gray-500 space-y-3">
       <p>Transaction not found.</p>
-      <Link href="/system/transactions" className="text-blue-600 hover:underline text-sm">← Back to transactions</Link>
+      <Link href="/system/transactions" className="inline-flex items-center gap-1.5 text-blue-600 hover:underline text-sm">
+        <ArrowLeft size={14} /> Back to transactions
+      </Link>
     </div>
   );
+
+  // v36 (ADR-063): the reference may resolve to a NON-card movement (transfer / RTP). It carries the
+  // movement-row shape, so it gets its own compact detail: the card-centric panels below (PAN, issuer,
+  // card-on-file, KYB) have no meaning for it.
+  const movement = txn as unknown as {
+    kind?: 'card' | 'transfer' | 'rtp';
+    paymentExecutionInstanceReference?: string;
+    direction?: string; grossAmount?: number; netAmount?: number; feeAmount?: number; currency?: string;
+    paymentExecutionRail?: string | null; paymentExecutionStatus?: string; concept?: string | null;
+    beneficiaryName?: string | null; destinationAccountMasked?: string | null;
+    linkedPaymentExecutionReference?: string | null;
+    initiatedAt?: string | null; completedAt?: string | null; heldForReview?: boolean;
+    fraudCase?: { created: boolean; status?: string | null; reference?: string | null };
+  };
+  if (movement.kind && movement.kind !== 'card') {
+    const KIND_LABEL: Record<string, string> = { transfer: 'Transfer', rtp: 'Request to Pay' };
+    const amount = movement.grossAmount != null && movement.currency
+      ? new Intl.NumberFormat('en-US', { style: 'currency', currency: movement.currency }).format(movement.grossAmount)
+      : '-';
+    const at = movement.completedAt ?? movement.initiatedAt;
+    return (
+      <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
+        <Breadcrumb items={fromCase
+          ? [
+              { label: 'Home', href: '/system' },
+              { label: 'Cases', href: '/system/investigation' },
+              { label: fromCase.caseRef ?? 'Case', href: `/system/investigation/${fromCase.caseId}` },
+              { label: 'Movement' },
+            ]
+          : [
+              { label: 'Home', href: '/system' },
+              { label: 'Transactions', href: '/system/transactions' },
+              { label: 'Movement' },
+            ]}
+        />
+
+        <div className="bg-white rounded-xl border p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900">{amount}</h1>
+              <p className="text-sm text-gray-500 mt-0.5">{at ? new Date(at).toLocaleString() : '-'}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[#001E2B] text-[#00ED64] font-medium">
+                {KIND_LABEL[movement.kind] ?? movement.kind}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 capitalize">
+                {movement.paymentExecutionStatus ?? '-'}
+              </span>
+              {movement.heldForReview && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-medium">
+                  Funds held, not delivered
+                </span>
+              )}
+            </div>
+          </div>
+
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+            <dt className="text-gray-500">Reference</dt>
+            <dd className="font-mono text-xs break-all">{movement.paymentExecutionInstanceReference ?? txnId}</dd>
+            <dt className="text-gray-500">Direction</dt>
+            <dd className="capitalize">{movement.direction ?? '-'}</dd>
+            <dt className="text-gray-500">Rail</dt>
+            <dd className="uppercase text-xs">{movement.paymentExecutionRail ?? 'n/a'}</dd>
+            <dt className="text-gray-500">Destination</dt>
+            <dd className="truncate">{movement.beneficiaryName ?? movement.destinationAccountMasked ?? 'n/a'}</dd>
+            <dt className="text-gray-500">Reference note</dt>
+            <dd className="truncate">{movement.concept ?? 'n/a'}</dd>
+            {movement.netAmount != null && (
+              <>
+                <dt className="text-gray-500">Net / fee</dt>
+                <dd className="font-mono text-xs">{movement.netAmount} / {movement.feeAmount ?? 0} {movement.currency}</dd>
+              </>
+            )}
+            {movement.linkedPaymentExecutionReference && (
+              <>
+                <dt className="text-gray-500">Settled by</dt>
+                <dd>
+                  <Link href={`/system/transactions/${movement.linkedPaymentExecutionReference}`}
+                    className="font-mono text-xs text-blue-600 hover:underline break-all">
+                    {movement.linkedPaymentExecutionReference}
+                  </Link>
+                </dd>
+              </>
+            )}
+          </dl>
+        </div>
+
+        {movement.fraudCase?.created && (
+          <div className="bg-white rounded-xl border p-5 text-sm">
+            <p className="font-semibold text-gray-800 mb-1">Under investigation</p>
+            <p className="text-gray-600">
+              Case {movement.fraudCase.reference ?? ''} · <span className="capitalize">{(movement.fraudCase.status ?? '').replace(/_/g, ' ')}</span>
+            </p>
+          </div>
+        )}
+
+        <Link href={fromCase ? `/system/investigation/${fromCase.caseId}` : '/system/transactions'}
+          className="inline-block text-blue-600 hover:underline text-sm">
+          <ArrowLeft size={14} /> Back
+        </Link>
+      </div>
+    );
+  }
 
   const formattedAmount = txn.cardTransactionAmount
     ? new Intl.NumberFormat('en-US', { style: 'currency', currency: txn.cardTransactionAmount.currency }).format(txn.cardTransactionAmount.amount)
@@ -306,23 +413,27 @@ export default function TransactionDetailPage() {
             <span className={`text-xs px-2 py-0.5 rounded font-medium ${STATUS_COLORS[txn.cardTransactionStatus ?? ''] ?? 'bg-gray-100 text-gray-700'}`}>
               {txn.cardTransactionStatus}
             </span>
+            {/* Oversight roles jump straight to every event that references this transaction. */}
+            <div className="mt-2 flex justify-end">
+              <AuditTrailLink reference={txn.cardTransactionInstanceReference ?? txnId} label="View audit trail" />
+            </div>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 text-sm border-t pt-4">
-          <InfoLabel label="Transaction ID" tip="BIAN SD-254 CardTransactionLog instance reference. The immutable primary key for this transaction record." />
+          <InfoLabel label="Transaction ID" tip="CardTransactionLog instance reference. The immutable primary key for this transaction record." />
           <span className="font-mono text-xs break-all">{txn.cardTransactionInstanceReference ?? txnId}</span>
           <InfoLabel label="Amount" tip="Authorized amount and settlement currency (ISO 4217). This card transaction is single-currency; no FX conversion applies." />
           <span className="font-medium">{formattedAmount}{currency ? <span className="text-gray-400 font-normal ml-1">({currency})</span> : null}</span>
           {txn.cardTransactionType && (
             <>
-              <InfoLabel label="Type" tip="BIAN SD-254 transaction type: purchase, cash advance, balance transfer, refund, fee or adjustment." />
+              <InfoLabel label="Type" tip="transaction type: purchase, cash advance, balance transfer, refund, fee or adjustment." />
               <span className="capitalize">{txn.cardTransactionType.replace(/_/g, ' ')}</span>
             </>
           )}
           {feeAmount != null && (
             <>
-              <InfoLabel label="Merchant commission" tip="BIAN SD-89 acquiring commission captured on this payment (fee attributed to the merchant), in the settlement currency." />
+              <InfoLabel label="Merchant commission" tip="acquiring commission captured on this payment (fee attributed to the merchant), in the settlement currency." />
               <span className="font-mono text-xs">{currency ? new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(feeAmount) : feeAmount}</span>
             </>
           )}
@@ -454,7 +565,7 @@ export default function TransactionDetailPage() {
                     <SensitiveReveal
                       label="Raw Gateway Payload"
                       masked="•••• (masked)"
-                      info="Full acquirer/gateway payload for this authorization (SD-254). QE:none: encrypted at rest and not searchable."
+                      info="Full acquirer/gateway payload for this authorization. QE:none: encrypted at rest and not searchable."
                       fetchValue={async () => JSON.stringify(txn.sensitive?.rawGatewayPayload, null, 2)}
                     />
                   ) : null}
@@ -462,7 +573,7 @@ export default function TransactionDetailPage() {
                     <SensitiveReveal
                       label="Processor Metadata"
                       masked="•••• (masked)"
-                      info="Processor-side metadata for this transaction (SD-254). QE:none: encrypted at rest and not searchable."
+                      info="Processor-side metadata for this transaction. QE:none: encrypted at rest and not searchable."
                       fetchValue={async () => JSON.stringify(txn.sensitive?.processorTransactionMetadata, null, 2)}
                     />
                   ) : null}
@@ -508,10 +619,10 @@ export default function TransactionDetailPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-sm">
-                <InfoLabel label="Name" tip="Registered account holder (BIAN SD-13 Party). PII, minimized to the name here." /><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
+                <InfoLabel label="Name" tip="Registered account holder. PII, minimized to the name here." /><span className="font-medium truncate">{String(partyCustomer.customerName ?? '-')}</span>
                 <InfoLabel label="Segment" tip="Customer segment (e.g. retail, SME, corporate), used for risk and servicing." /><span className="capitalize">{String(partyCustomer.customerSegment ?? '-')}</span>
                 <InfoLabel label="Status" tip="Lifecycle status of the customer agreement (active, suspended, closed)." /><span className="capitalize">{String(partyCustomer.customerAgreementStatus ?? '-')}</span>
-                <InfoLabel label="KYC check" tip="Know Your Customer verification outcome (BIAN SD-13). Cleared / pending / failed drives onboarding and monitoring." /><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
+                <InfoLabel label="KYC check" tip="Know Your Customer verification outcome. Cleared / pending / failed drives onboarding and monitoring." /><span className="capitalize">{String((partyCustomer.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string } | null)?.customerAgreementKycCheckStatus ?? 'n/a')}</span>
               </div>
               {custSensitive ? (
                 <div className="mt-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
@@ -546,7 +657,7 @@ export default function TransactionDetailPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Landmark size={13} className="text-[#001E2B]" />
                     <span className="text-xs font-semibold text-gray-700">Funding account</span>
-                    <Tooltip text="The bank account that funds this card (BIAN SD-66). IBAN is GDPR/PSD2-protected (not PCI DSS scope) and revealed on demand." />
+                    <Tooltip text="The bank account that funds this card. IBAN is GDPR/PSD2-protected (not PCI DSS scope) and revealed on demand." />
                     {accountHref && (
                       <Link href={accountHref} className="ml-auto inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline">
                         Open account <ChevronRight size={12} />
@@ -700,7 +811,7 @@ export default function TransactionDetailPage() {
               id: txnId,
               label: 'cardTransactionLog',
               labelColor: 'text-amber-400',
-              description: 'SD-27 - QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
+              description: 'QE:equality (accountRef) + QE:none (raw gateway payload, processor metadata)',
             },
             ...(txn.paymentCardReference ? [{
               kind: 'mongo' as const,
@@ -708,7 +819,7 @@ export default function TransactionDetailPage() {
               id: txn.paymentCardReference,
               label: 'paymentCardManagement',
               labelColor: 'text-blue-400',
-              description: 'SD-170 - card token (QE:equality), PAN mask, network, expiry',
+              description: 'card token (QE:equality), PAN mask, network, expiry',
             }] : []),
             ...(linkedCase ? [{
               kind: 'mongo' as const,
@@ -716,7 +827,7 @@ export default function TransactionDetailPage() {
               id: linkedCase.id,
               label: 'fraudDiagnosisCase',
               labelColor: 'text-red-400',
-              description: 'SD-92 - investigation case, risk indicators, resolution record',
+              description: 'investigation case, risk indicators, resolution record',
             }] : []),
           ]}
         />

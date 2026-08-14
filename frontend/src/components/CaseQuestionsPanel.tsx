@@ -4,7 +4,7 @@ import { HelpCircle, Plus, X, Send, CheckCircle2, Clock } from 'lucide-react';
 import { api, type CustomerQuestion } from '../lib/api';
 import { useNotify } from './ui/ConfirmProvider';
 
-// ADR-031: L1/L2 panel to pose structured questions to the customer on a fraud case (SD-83) and
+// ADR-031: L1/L2 panel to pose structured questions to the customer on a fraud case and
 // see their (immutable) responses. The customer answers on their transaction page.
 export function CaseQuestionsPanel({ caseId, token, role, onActivity, refreshSignal }: { caseId: string; token: string; role: string; onActivity?: () => void; refreshSignal?: number }) {
   const notify = useNotify();
@@ -50,7 +50,7 @@ export function CaseQuestionsPanel({ caseId, token, role, onActivity, refreshSig
       <div className="flex items-center gap-2">
         <HelpCircle size={16} className="text-[#001E2B]" />
         <h2 className="font-semibold text-sm text-gray-800">Customer questions</h2>
-        <span className="text-[10px] text-gray-400 ml-auto">SD-83 · answers are immutable (PCI Req 10)</span>
+        <span className="text-[10px] text-gray-400 ml-auto">answers are immutable (PCI DSS)</span>
       </div>
 
       {canWrite && (

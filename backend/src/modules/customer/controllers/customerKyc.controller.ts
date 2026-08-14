@@ -1,5 +1,5 @@
-// BIAN SD-53 KYC Administration controller (v31). Mounted under /customer (same prefix as the
-// customer-agreement search controller — one customer surface, no forked API). The Operations Officer
+// KYC Administration controller (v31). Mounted under /customer (same prefix as the
+// customer-agreement search controller: one customer surface, no forked API). The Operations Officer
 // reviews/corrects KYC data here; sensitive identity fields stay behind the L1/L2 QE tiers + escalation
 // token (never decrypted without viewSensitive). Verdict/status is not editable here (decision 2).
 
@@ -32,7 +32,7 @@ export async function customerKycController(fastify: FastifyInstance) {
   };
   const canSensitive = requirePermission('customers', 'viewSensitive');
 
-  // GET /customer/kyc — paged list of KYC-completed parties (L1 masked). requirePermission customers:view.
+  // GET /customer/kyc: paged list of KYC-completed parties (L1 masked). requirePermission customers:view.
   fastify.get('/kyc', {
     schema: {
       tags: ['customer'],
@@ -65,7 +65,7 @@ export async function customerKycController(fastify: FastifyInstance) {
     },
   });
 
-  // GET /customer/:partyInstanceReference/kyc — full KYC detail. L2 decrypt only with viewSensitive.
+  // GET /customer/:partyInstanceReference/kyc, full KYC detail. L2 decrypt only with viewSensitive.
   fastify.get('/:partyInstanceReference/kyc', {
     schema: {
       tags: ['customer'],
@@ -86,12 +86,12 @@ export async function customerKycController(fastify: FastifyInstance) {
     },
   });
 
-  // PATCH /customer/:partyInstanceReference/kyc — correct KYC data. amendmentReason required.
+  // PATCH /customer/:partyInstanceReference/kyc, correct KYC data. amendmentReason required.
   fastify.patch('/:partyInstanceReference/kyc', {
     schema: {
       tags: ['customer'],
-      summary: 'Correct KYC data (SD-53, v31) — data administration, not a decision',
-      description: 'Edits permitted KYC data fields (occupation, source of funds, government ID, address, purpose of relationship). **Rejects (400) any write to `customerAgreementKycCheckStatus`** — the verdict is not editable here. Requires `customers:manage` and an `amendmentReason`. Emits `kyc.record.amended`.',
+      summary: 'Correct KYC data (SD-53, v31), data administration, not a decision',
+      description: 'Edits permitted KYC data fields (occupation, source of funds, government ID, address, purpose of relationship). **Rejects (400) any write to `customerAgreementKycCheckStatus`**, the verdict is not editable here. Requires `customers:manage` and an `amendmentReason`. Emits `kyc.record.amended`.',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['partyInstanceReference'], properties: { partyInstanceReference: { type: 'string' } } },
       body: {
@@ -123,9 +123,9 @@ export async function customerKycController(fastify: FastifyInstance) {
     },
   });
 
-  // GET /customer/:partyInstanceReference/kyc/reveal — audited on-demand reveal of the QE:none KYC fields
+  // GET /customer/:partyInstanceReference/kyc/reveal, audited on-demand reveal of the QE:none KYC fields
   // (residential address, source of funds, purpose, risk notes, postal address). Ephemeral, need-to-know,
-  // audited (PCI Req 3.2/3.3 CHD-adjacent, GDPR, Req 10). Gated by customers:manage (the KYC admin).
+  // audited (PCI DSS CHD-adjacent, GDPR). Gated by customers:manage (the KYC admin).
   fastify.get('/:partyInstanceReference/kyc/reveal', {
     schema: {
       tags: ['customer'],
@@ -154,7 +154,7 @@ export async function customerKycController(fastify: FastifyInstance) {
     },
   });
 
-  // POST /customer/:partyInstanceReference/kyc/re-screen — re-trigger KYC screening via the port (events).
+  // POST /customer/:partyInstanceReference/kyc/re-screen, re-trigger KYC screening via the port (events).
   fastify.post('/:partyInstanceReference/kyc/re-screen', {
     schema: {
       tags: ['customer'],
@@ -178,7 +178,7 @@ export async function customerKycController(fastify: FastifyInstance) {
     },
   });
 
-  // GET /customer/:partyInstanceReference/kyc/process — correlated KYC process timeline (§5bis.5).
+  // GET /customer/:partyInstanceReference/kyc/process, correlated KYC process timeline (§5bis.5).
   fastify.get('/:partyInstanceReference/kyc/process', {
     schema: {
       tags: ['customer'],

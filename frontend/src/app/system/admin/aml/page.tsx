@@ -6,7 +6,6 @@ export default function AmlMonitoringPage() {
       type: 'aml_monitoring',
       label: 'AML Monitoring',
       description: 'Anti-money laundering pattern analysis',
-      bianSd: 'SD-99',
     }} />
   );
 }

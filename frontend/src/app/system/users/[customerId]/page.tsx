@@ -47,7 +47,7 @@ function statusPill(status: string): string {
 
 // --- Staff-only sections (VIEW: L2 + auditor · ACTIONS: level2_investigator only) ------------
 
-// Transactions (SD-65 + SD-254), display-safe + paginated. Read-only for both staff roles.
+// Transactions (+), display-safe + paginated. Read-only for both staff roles.
 function StaffTransactionsSection({ customerId, partyRef, token }: { customerId: string; partyRef: string; token: string }) {
   const router = useRouter();
   const [rows, setRows] = useState<CustomerTransactionRow[]>([]);
@@ -92,7 +92,7 @@ function StaffTransactionsSection({ customerId, partyRef, token }: { customerId:
               <tbody>
                 {rows.map((r) => {
                   const when = r.completedAt ?? r.initiatedAt;
-                  // Card-kind → existing staff transaction detail; transfer-kind → SD-65 staff execution detail.
+                  // Card-kind → existing staff transaction detail; transfer-kind → staff execution detail.
                   const href = r.kind === 'card'
                     ? `/system/transactions/${encodeURIComponent(r.paymentExecutionInstanceReference)}${staffQuery(customerId, partyRef)}`
                     : `/system/users/${encodeURIComponent(customerId)}/transactions/${encodeURIComponent(r.paymentExecutionInstanceReference)}`;
@@ -253,7 +253,7 @@ function StaffAccountsSection({ customerId, partyRef, token }: { customerId: str
   );
 }
 
-// Saved cards (SD-88), masked PAN only. Deactivate / remove are level2_investigator only.
+// Saved cards , masked PAN only. Deactivate / remove are level2_investigator only.
 function StaffCardsSection({ customerId, partyRef, token, canAct }: { customerId: string; partyRef: string; token: string; canAct: boolean }) {
   const confirm = useConfirm();
   const notify = useNotify();
@@ -338,7 +338,7 @@ function StaffCardsSection({ customerId, partyRef, token, canAct }: { customerId
   );
 }
 
-// Fraud/investigation cases opened against this customer (SD-77). Read-only list; each row links to
+// Fraud/investigation cases opened against this customer . Read-only list; each row links to
 // the existing case detail. Reuses CaseTable + Pagination. VIEW = L2 + auditor (server re-enforces).
 function StaffCasesSection({ customerId, token }: { customerId: string; token: string }) {
   const [cases, setCases] = useState<FraudCase[]>([]);
@@ -441,7 +441,7 @@ export default function CustomerDetailPage() {
   const kyc = c.customerAgreementKycCheck as { customerAgreementKycCheckStatus?: string; customerAgreementKycCheckReference?: string; customerAgreementKycCheckCompletedDate?: string; customerAgreementKycCheckNotes?: string } | null;
   // v32 C2: QE:none values travel in the payload only on the audited escalation path (a case
   // reference). Otherwise the server sends `sensitiveAvailable` and the value is fetched from the
-  // reveal endpoint, which emits one compliance event per disclosure (PCI DSS Req 10.2.2).
+  // reveal endpoint, which emits one compliance event per disclosure (PCI DSS).
   const sensitive = c.sensitive as { customerAgreementResidentialAddress?: Record<string, unknown>; customerAgreementRiskNotes?: string } | undefined;
   const sensitiveAvailable = sensitive != null || c.sensitiveAvailable === true;
   // v32 B7 (P5): no orphan information. The auditor and the L2 investigator already hold both
@@ -491,22 +491,22 @@ export default function CustomerDetailPage() {
       </div>
 
       <RecordGroupGrid>
-        {/* Profile: SD-13/SD-53 lookup tier (QE equality/range), decrypted in-process for staff. */}
+        {/* Profile: lookup tier (QE equality/range), decrypted in-process for staff. */}
         <RecordGroup
           icon={UserCheck}
           title="Profile"
           info="Party and agreement attributes at LOOKUP tier: encrypted at rest in Atlas with Queryable Encryption and searchable while encrypted. Decrypted in-process for a role with need-to-know."
           accessNote={c.contactPiiRestricted === true
-            ? `Contact PII (email, phone) is restricted at the L1 access level${debugMode ? ' (PCI DSS Req 7, need-to-know)' : ''}. Available to L2 investigators and the security auditor.`
+            ? `Contact PII (email, phone) is restricted at the L1 access level${debugMode ? ' (PCI DSS, need-to-know)' : ''}. Available to L2 investigators and the security auditor.`
             : undefined}
         >
-          <RecordField label="Email" tier="lookup" value={c.customerEmailAddress ? String(c.customerEmailAddress) : ''} info="Contact email (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-          <RecordField label="Phone" tier="lookup" value={c.customerMobilePhoneNumber ? String(c.customerMobilePhoneNumber) : ''} info="Contact mobile phone (SD-13). QE:equality encrypted at rest (exact-match searchable)." />
-          <RecordField label="Account reference" tier="lookup" mono value={c.customerAgreementReference ? String(c.customerAgreementReference) : ''} info="Internal reference for the customer agreement (SD-53), used for lookups. QE:equality encrypted at rest." />
+          <RecordField label="Email" tier="lookup" value={c.customerEmailAddress ? String(c.customerEmailAddress) : ''} info="Contact email. QE:equality encrypted at rest (exact-match searchable)." />
+          <RecordField label="Phone" tier="lookup" value={c.customerMobilePhoneNumber ? String(c.customerMobilePhoneNumber) : ''} info="Contact mobile phone. QE:equality encrypted at rest (exact-match searchable)." />
+          <RecordField label="Account reference" tier="lookup" mono value={c.customerAgreementReference ? String(c.customerAgreementReference) : ''} info="Internal reference for the customer agreement, used for lookups. QE:equality encrypted at rest." />
           <RecordField label="Segment" value={SEGMENT_LABELS[String(c.customerSegment)] ?? humanize(c.customerSegment)} info="Commercial segment (retail / premium / corporate / SME). Business metadata, plaintext." />
-          <RecordField label="Status" value={humanize(c.customerAgreementStatus)} info="BIAN SD-53 agreement lifecycle status. Plaintext." />
+          <RecordField label="Status" value={humanize(c.customerAgreementStatus)} info="Agreement lifecycle status. Plaintext." />
           <RecordField label="Enrolled" value={fmtDate(c.customerAgreementEnrollmentDate)} info="Date the customer agreement was enrolled. Plaintext business metadata." />
-          <RecordField label="Language" value={humanize(c.customerAgreementPreferredLanguage)} info="Preferred communication language (SD-53). Plaintext business metadata." />
+          <RecordField label="Language" value={humanize(c.customerAgreementPreferredLanguage)} info="Preferred communication language. Plaintext business metadata." />
         </RecordGroup>
 
         {/* v32 B4: the same identity document the KYC administration page shows, from the same
@@ -516,11 +516,11 @@ export default function CustomerDetailPage() {
           taxIdNumber={c.customerAgreementTaxIDNumber}
         />
 
-        {/* KYC check (BIAN SD-53 BQ:Step), with the v32 B7 link onward to the full KYC record. */}
+        {/* KYC check (BQ:Step), with the v32 B7 link onward to the full KYC record. */}
         <RecordGroup
           icon={ShieldCheck}
-          title={`KYC check${debugMode ? ' (SD-53)' : ''}`}
-          info="Outcome of the Know Your Customer verification step (SD-53 BQ:Step): lifecycle status, provider reference and completion date."
+          title="KYC check"
+          info="Outcome of the Know Your Customer verification step: lifecycle status, provider reference and completion date."
           badge={canOpenKycRecord ? (
             <Link
               href={`/system/admin/modules/kyc/${encodeURIComponent(partyRef)}`}
@@ -533,7 +533,7 @@ export default function CustomerDetailPage() {
           {kyc ? (
             <>
               <RecordField label="Status" value={humanize(kyc.customerAgreementKycCheckStatus)} info="KYC lifecycle status derived from the screening verdict (initiated / verified / rejected / expired)." />
-              <RecordField label="Reference" tier="lookup" mono value={kyc.customerAgreementKycCheckReference ? String(kyc.customerAgreementKycCheckReference) : ''} info="Provider-side reference for the KYC check (SD-53)." />
+              <RecordField label="Reference" tier="lookup" mono value={kyc.customerAgreementKycCheckReference ? String(kyc.customerAgreementKycCheckReference) : ''} info="Provider-side reference for the KYC check." />
               <RecordField label="Completed" value={fmtDate(kyc.customerAgreementKycCheckCompletedDate)} info="Date the KYC check completed. Plaintext business metadata." />
               {kyc.customerAgreementKycCheckNotes ? (
                 <RecordField label="Notes" value={String(kyc.customerAgreementKycCheckNotes)} info="Free-text notes recorded with the KYC outcome." />
@@ -548,7 +548,7 @@ export default function CustomerDetailPage() {
         <RecordGroup
           icon={Lock}
           title={`Protected details${debugMode ? ' (QE:none)' : ''}`}
-          info="QE:none fields (encrypted at rest, NOT searchable): residential address and risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI DSS Req 3.2/3.3 and Req 10, GDPR need-to-know). The value is never persisted; only the fact of the reveal is audited, by field name."
+          info="QE:none fields (encrypted at rest, NOT searchable): residential address and risk notes. Hidden by default; the eye performs an on-demand, ephemeral, audited reveal (PCI DSS, GDPR need-to-know). The value is never persisted; only the fact of the reveal is audited, by field name."
           badge={
             <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
               sensitiveAvailable ? 'bg-purple-100 text-purple-700'
@@ -567,7 +567,7 @@ export default function CustomerDetailPage() {
           <RecordField
             label="Residential address"
             tier="sensitive"
-            info="Full residential address (SD-53). QE:none: encrypted at rest and not searchable."
+            info="Full residential address. QE:none: encrypted at rest and not searchable."
             {...(sensitiveAvailable ? { fetchValue: async () => fmtAddress(sensitive?.customerAgreementResidentialAddress ?? (await revealKyc()).customerAgreementResidentialAddress) || 'n/a' } : {})}
           />
           <RecordField

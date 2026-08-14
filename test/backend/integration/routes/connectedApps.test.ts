@@ -1,9 +1,9 @@
 /**
- * Integration tests: v18 Fase D — Authorized Applications (connected apps, self-scoped).
+ * Integration tests: v18 Fase D, Authorized Applications (connected apps, self-scoped).
  * Source: backend/src/modules/identity/controllers/consentGrants.controller.ts
  *         (GET /auth/grants/:consentId, GET /auth/grants/:consentId/operations)
  *
- * Requires TEST_MONGODB_URI — skips gracefully when not set (matches the other route tests).
+ * Requires TEST_MONGODB_URI: skips gracefully when not set (matches the other route tests).
  *
  * Covers:
  *  - D-01 self-scoped access: the OWNER gets 200 with the grant detail (scopes expanded).

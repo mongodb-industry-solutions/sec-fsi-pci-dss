@@ -84,6 +84,14 @@ function statusTone(s?: string): 'ok' | 'warn' | 'err' | 'neutral' {
   return 'neutral';
 }
 
+// Date AND time: several movements a day are normal in the demo, and a date alone made them
+// indistinguishable. Rendered from the ISO string so the server-rendered value never drifts by locale.
+function stamp(iso?: string | null): string {
+  if (!iso) return 'n/a';
+  const s = String(iso);
+  return s.length >= 16 ? `${s.slice(0, 10)} ${s.slice(11, 16)}` : s.slice(0, 10);
+}
+
 export default async function HistoryPage() {
   const session = await getSession();
   if (!session) redirect('/');
@@ -93,7 +101,7 @@ export default async function HistoryPage() {
   let results: any[] = [];
   let error: string | undefined;
   // The PSP /transactions merchant channel already returns a MERGED, merchant-isolated history
-  // (SD-65 executions + the party's card transactions made THROUGH this merchant). We only need to
+  // (executions + the party's card transactions made THROUGH this merchant). We only need to
   // request a high enough page size so nothing is truncated (default was 20).
   try {
     const data = await c!.listHistory(1, 100);
@@ -121,19 +129,19 @@ export default async function HistoryPage() {
   const rate = MERCHANT_COMMISSION_RATE;
   const toMs = (s?: string) => (s ? Date.parse(s) || 0 : 0);
 
-  // Operation rows (SD-65 executions + card transactions), from the merged PSP history.
+  // Operation rows (executions + card transactions), from the merged PSP history.
   const opRows = results.map((t, i) => {
     const gross = t.grossAmount ?? t.paymentExecutionAmount?.amount;
     const commission = typeof gross === 'number' ? gross * rate : undefined;
     return {
       key: (t.paymentExecutionInstanceReference ?? `op-${i}`) as string,
       txnId: (t.paymentExecutionInstanceReference ?? t.transferReference ?? '') as string,
-      date: (t.completedAt ?? t.initiatedAt ?? '').toString().slice(0, 10) || 'n/a',
+      date: stamp((t.completedAt ?? t.initiatedAt) as string | undefined),
       concept: (t.concept ?? '') as string,
       direction: (t.direction ?? 'n/a') as string,
       amount: money(gross, t.currency),
       // feeAmount is only persisted when a commission is charged (a zero fee is not written), so an
-      // absent value means no fee, i.e. 0 — show it as a real 0.00 amount rather than n/a.
+      // absent value means no fee, i.e. 0: show it as a real 0.00 amount rather than n/a.
       fee: money(t.feeAmount ?? 0, t.currency),
       commission: commission != null ? money(commission, t.currency) : 'n/a',
       rail: (t.paymentExecutionRail ?? 'n/a') as string,
@@ -143,7 +151,7 @@ export default async function HistoryPage() {
     };
   });
 
-  // Hide the SD-65 execution row when it is the settlement of an RTP shown here (BIAN keeps them as
+  // Hide the execution row when it is the settlement of an RTP shown here (BIAN keeps them as
   // separate records; we de-dup the presentation so the same movement is not listed twice).
   const linkedExecRefs = new Set(rtpDocs.map(({ x }) => x.linkedPaymentExecutionReference).filter(Boolean) as string[]);
   const opRowsDeduped = opRows.filter((r) => !linkedExecRefs.has(r.txnId));
@@ -157,7 +165,7 @@ export default async function HistoryPage() {
     return {
       key: x.paymentRequestInstanceReference as string,
       txnId: x.paymentRequestInstanceReference as string,
-      date: (x.recordCreatedDateTime ?? '').toString().slice(0, 10) || 'n/a',
+      date: stamp(x.recordCreatedDateTime as string | undefined),
       concept: (x.purpose ?? 'Payment request') as string,
       direction: role === 'to_approve' ? 'sent' : 'received',
       amount: money(gross, x.currency),
@@ -192,7 +200,7 @@ export default async function HistoryPage() {
             <table className="w-full text-sm">
               <thead className="bg-surface-alt text-left text-muted">
                 <tr>
-                  <th className="p-3 font-medium">Date</th>
+                  <th className="p-3 font-medium">Date / time</th>
                   <th className="p-3 font-medium">Transaction ID</th>
                   <th className="p-3 font-medium">Concept</th>
                   <th className="p-3 font-medium">Direction</th>
@@ -208,7 +216,7 @@ export default async function HistoryPage() {
                   const Icon = DirIcon(r.direction);
                   return (
                     <tr key={r.key} className="border-t border-line text-ink">
-                      <td className="p-3">{r.date}</td>
+                      <td className="p-3 whitespace-nowrap">{r.date}</td>
                       <td className="p-3">
                         <span className="inline-flex items-center gap-1">
                           <span className="font-mono text-xs text-muted" title={r.txnId || undefined}>{shortRef(r.txnId)}</span>

@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order - Checkout Session Service
+// Payment Order - Checkout Session Service
 // Implements the Redirect Checkout integration pattern.
 
 import { Db } from 'mongodb';
@@ -146,7 +146,7 @@ export interface ProcessCheckoutPaymentInput {
   saveCard?: boolean;
   cardAuthOutcome?: 'approved' | 'declined' | 'challenge';
   // The CVV the buyer entered on the checkout form. Forwarded to the issuer for verification ONLY
-  // (P13.1); never persisted/logged (PCI DSS Req 3.2). A wrong/missing CVV declines (D1).
+  // (P13.1); never persisted/logged (PCI DSS). A wrong/missing CVV declines (D1).
   cardCvv?: string;
 }
 
@@ -176,12 +176,12 @@ export async function processCheckoutPayment(
 
   // v18 on-behalf-of: if the merchant app created this session while acting for a logged-in user, stamp
   // the resulting card transaction with THAT payer's canonical account reference so the purchase lands
-  // in their payment history — even when no email is typed on the hosted page. Identity ref only, no PII.
+  // in their payment history, even when no email is typed on the hosted page. Identity ref only, no PII.
   const actingAccountReference = session.checkoutSessionActingPartyReference
     ? await resolveAccountReferenceForParty(db, session.checkoutSessionActingPartyReference)
     : undefined;
 
-  // SD-15: Card Authorization — run before creating the transaction
+  // Card Authorization, run before creating the transaction
   const mcc = input.merchantCategoryCode ?? '5999';
   const authResult = await authorizeCard(db, {
     checkoutSessionInstanceReference: input.sessionId,
@@ -221,7 +221,7 @@ export async function processCheckoutPayment(
 
   // Create the underlying card transaction. An issuer decline (e.g. a wrong CVV) is a normal business
   // outcome, not a server error: surface it as a declined payment (merchant callback + redirect back
-  // to the merchant), the same as the pre-auth decline above — never a 500.
+  // to the merchant), the same as the pre-auth decline above, never a 500.
   let txResult: Awaited<ReturnType<typeof createTransaction>>;
   try {
     txResult = await createTransaction(db, {
@@ -244,7 +244,7 @@ export async function processCheckoutPayment(
       cardTransactionNarrative: `Checkout session ${session.checkoutSessionMerchantReference}`,
       merchantAgreementInstanceReference: session.merchantAgreementInstanceReference,
       // Pass the expiry through so the card-on-file (auto-registered in createTransaction) carries
-      // it. The card is saved for the payer regardless of any "save card" choice (SD-88).
+      // it. The card is saved for the payer regardless of any "save card" choice .
       ...(input.cardExpiryMonth && input.cardExpiryYear
         ? { paymentCardExpirationDate: `${input.cardExpiryMonth}/${input.cardExpiryYear.slice(-2)}` }
         : {}),
@@ -311,7 +311,7 @@ export async function processCheckoutPayment(
   // v18 (B-02): attribute the completed purchase to the acting merchant app + user, so it appears in the
   // connected-apps operations view (`/system/applications/{consentId}/operations`, self-scoped by the
   // OAuth subject). Display-safe: no CHD (the bus strips it), masked PAN only. `actingPartyReference` is
-  // the OAuth SUBJECT (SD-91 login id) so it lines up with the operations query, which matches on `sub`.
+  // the OAuth SUBJECT (login id) so it lines up with the operations query, which matches on `sub`.
   if (session.checkoutSessionActingSubjectReference || session.checkoutSessionActingClientId) {
     emitProcessEvent(db, {
       entityType: 'transaction', entityId: txResult.cardTransactionInstanceReference,

@@ -40,7 +40,7 @@ let activeTimers: NodeJS.Timeout[] = [];
  * runtime (bus + projections + sagas + retention sweeps + schedulers) against that connection.
  *
  * Extracted so both first-time startup and the hot-reload path (/admin/reload) run identical
- * wiring — the reload rebuilds the QE client so a fresh key-vault/DEK set is picked up after a
+ * wiring: the reload rebuilds the QE client so a fresh key-vault/DEK set is picked up after a
  * drop + setup + seed, WITHOUT restarting the process.
  */
 async function connectAndWire(fastify: FastifyInstance): Promise<void> {
@@ -51,7 +51,7 @@ async function connectAndWire(fastify: FastifyInstance): Promise<void> {
   fastify.dbError = null;
 
   // dev.v8: EventBus vendor (in-process adapter + Mongo event store). initEventBus creates a fresh
-  // instance; getEventBus() returns the latest — so a reload swaps to a clean bus + subscribers.
+  // instance; getEventBus() returns the latest, so a reload swaps to a clean bus + subscribers.
   const { initEventBus, getEventBus } = await import('../vendors/eventbus');
   await initEventBus(db).start();
 
@@ -76,15 +76,15 @@ async function connectAndWire(fastify: FastifyInstance): Promise<void> {
   const { KybVerificationSaga } = await import('../modules/gateway/services/kybVerification.saga');
   new KybVerificationSaga(db, getEventBus()).register();
 
-  // v17: payout orchestration (merchant settlement, SD-65/SD-66/SD-36).
+  // v17: payout orchestration (merchant settlement).
   const { PayoutOrchestrationProcess } = await import('../modules/gateway/services/payoutOrchestration.process');
   new PayoutOrchestrationProcess(db, getEventBus()).register();
 
-  // P2P compliance: FDS + HRP + AML screening for peer-to-peer transfers (SD-83, PCI DSS Req 10).
+  // P2P compliance: FDS + HRP + AML screening for peer-to-peer transfers (PCI DSS).
   const { P2PComplianceProcess } = await import('../modules/gateway/services/p2pCompliance.process');
   new P2PComplianceProcess(db, getEventBus()).register();
 
-  // v28 RTP lifecycle: project execution settlement onto the linked request + expiry sweeper (SD-65).
+  // v28 RTP lifecycle: project execution settlement onto the linked request + expiry sweeper .
   if (config.rtp.enabled) {
     const { RtpLifecycleProcess } = await import('../modules/gateway/services/rtpLifecycle.process');
     new RtpLifecycleProcess(db, getEventBus()).register();
@@ -148,7 +148,7 @@ export async function reloadDbRuntime(fastify: FastifyInstance): Promise<{ steps
   const envPath = resolve(__dirname, '../../.env');
   const envResult = dotenv.config({ path: envPath, override: true });
   if (envResult.error) {
-    steps.push(`.env not found at ${envPath} — continuing with current process environment (non-blocking)`);
+    steps.push(`.env not found at ${envPath}: continuing with current process environment (non-blocking)`);
   } else {
     steps.push(`.env reloaded (${Object.keys(envResult.parsed ?? {}).length} vars) from ${envPath}`);
   }

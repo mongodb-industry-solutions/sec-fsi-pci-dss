@@ -1,10 +1,10 @@
-// BIAN SD-65/66: P2P (peer-to-peer) bank transfer to a saved beneficiary.
+///66: P2P (peer-to-peer) bank transfer to a saved beneficiary.
 // v17.1 (ADR-039/040): a beneficiary transfer is an EXTERNAL bank transfer, not an internal
 // ledger move. Execution is dispatched through the payment_initiation provider (never a direct
 // builtin import). Funds are held on the sender at submission (available -> pending) and the
 // recipient is credited only when the provider emits bank.transfer.settled (async, T+N),
 // handled by PayoutOrchestrationProcess. On failure the hold is released.
-// PCI DSS Req 10: every transfer creates an immutable paymentExecutionProcedure audit record.
+// PCI DSS: every transfer creates an immutable paymentExecutionProcedure audit record.
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,6 +16,7 @@ import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/p
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
+import { RISK_HOLD_STEP } from './transferReview.service';
 
 export interface P2PTransferInput {
   initiatorPartyRef: string;         // the customer initiating the transfer
@@ -23,15 +24,16 @@ export interface P2PTransferInput {
   fromAccountRef: string;            // sender's payout account
   amount: number;
   note?: string;
-  merchantAgreementReference?: string; // SD-89: set when initiated via a merchant portal (OAuth on-behalf-of)
+  merchantAgreementReference?: string; // set when initiated via a merchant portal (OAuth on-behalf-of)
 }
 
 export interface P2PTransferResult {
   transferReference: string;
   amount: number;
   currency: string;
-  status: 'submitted' | 'completed' | 'failed' | 'exception';
+  status: 'submitted' | 'completed' | 'failed' | 'exception' | 'pending';
   failureReason?: string;
+  holdReason?: string;               // set with status 'pending': held for investigation, not delivered
   recipientAccountRef?: string;
   recipientHint?: string;
 }
@@ -59,10 +61,10 @@ export async function executeP2PTransfer(
   if (!senderAccount || senderAccount.partyInstanceReference !== initiatorPartyRef || senderAccount.payoutAccountStatus !== 'active') {
     return fail(amount, '', 'Source account not found or not active.');
   }
-  // Currency is always the sender account's native currency (server-authoritative — client hint is ignored).
+  // Currency is always the sender account's native currency (server-authoritative: client hint is ignored).
   const transferCurrency = senderAccount.payoutAccountCurrency;
 
-  // 3. Resolve the recipient's payout account — currency-matched active default, then any active
+  // 3. Resolve the recipient's payout account: currency-matched active default, then any active
   const recipientPartyRef = arrangement.counterpartyPartyReference;
   let recipientAccount: PayoutAccountArrangement | null = await db
     .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
@@ -88,8 +90,12 @@ export async function executeP2PTransfer(
     initiatorPartyRef, sourceAccountRef: fromAccountRef,
     destinationCountry: recipientAccount.payoutAccountCountryCode,
   });
-  if (screen.blocked) {
-    const blockedExec: PaymentExecutionProcedure = {
+  // A risk signal holds the transfer instead of rejecting it: hold the sender funds FIRST so the money
+  // is immobilised, then park the execution in `pending` with no rail dispatch (ADR-060).
+  if (screen.hold) {
+    const heldFunds = await holdCardFunds(db, fromAccountRef, amount);
+    if (!heldFunds) return fail(amount, transferCurrency, 'Insufficient available balance.');
+    const heldExec: PaymentExecutionProcedure = {
       paymentExecutionInstanceReference: transferRef,
       paymentOrderInstanceReference: transferRef,
       beneficiaryType: 'user',
@@ -100,29 +106,39 @@ export async function executeP2PTransfer(
       sourcePayoutAccountReference: fromAccountRef,
       resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
       grossAmount: amount, netAmount: amount, feeAmount: 0, currency: transferCurrency,
-      routingNote: 'P2P transfer blocked by pre-initiation risk gate',
-      paymentExecutionStatus: 'exception',
-      failureReason: [screen.reason, ...screen.indicators].filter(Boolean).join('; '),
+      routingNote: 'P2P transfer held for investigation by the pre-initiation risk gate',
+      paymentExecutionStatus: 'pending',
       initiatedAt: now,
-      resolutionLog: [{ stepName: 'risk.gate', stepOutcome: 'failed', stepNote: screen.indicators.join(', ') || 'blocked', stepDateTime: now }],
+      resolutionLog: [{ stepName: RISK_HOLD_STEP, stepOutcome: 'fallback', stepNote: screen.indicators.join(', ') || 'risk hold', stepDateTime: now }],
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
       recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
     };
-    await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(blockedExec);
+    // Compensation: past the reservation, a failure must never leave the sender's funds held with no
+    // execution to release them (the same invariant the payout process states for its own reservation).
+    try {
+      await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(heldExec);
+    } catch (err) {
+      await releaseCardHold(db, fromAccountRef, amount).catch(() => { /* best effort */ });
+      console.error('[p2p] could not persist the held execution; hold released:', err);
+      return fail(amount, transferCurrency, 'Could not hold this transfer for review. No funds were moved.');
+    }
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
-    await openTransferFraudCase(db, { transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount, currency: transferCurrency, destinationRef: recipientAccount.payoutAccountInstanceReference });
+    await openTransferFraudCase(db, {
+      transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount,
+      currency: transferCurrency, destinationRef: recipientAccount.payoutAccountInstanceReference,
+      kind: 'p2p', beneficiaryLabel: arrangement.counterpartyLabel,
+    });
     emitComplianceEvent(db, {
       entityType: 'execution', entityId: transferRef,
-      processType: 'payment_processing', processAction: 'bank.transfer.blocked', processOutcome: 'rejected',
+      processType: 'payment_processing', processAction: 'transfer.held.for.review', processOutcome: 'pending',
       performedByPartyReference: initiatorPartyRef, performedByRole: 'customer',
-      eventSummary: { amount, currency: transferCurrency, indicators: screen.indicators, score: screen.score },
+      eventSummary: { amount, currency: transferCurrency, indicators: screen.indicators, score: screen.score, heldAccount: fromAccountRef },
       bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     });
-    // Created as an exception (execution + L1 case exist). Return the ref so the UI can show a
-    // details screen and link to the created transfer instead of a bare error.
+    // Accepted and held: the funds are reserved on the sender account and nothing reached the rail.
     return {
       transferReference: transferRef, amount, currency: transferCurrency,
-      status: 'exception', failureReason: screen.reason ?? 'Transfer blocked by risk screening.',
+      status: 'pending', holdReason: screen.reason ?? 'Held for security review.',
       recipientAccountRef: recipientAccount.payoutAccountInstanceReference, recipientHint: arrangement.counterpartyLabel,
     };
   }
@@ -131,7 +147,7 @@ export async function executeP2PTransfer(
   const held = await holdCardFunds(db, fromAccountRef, amount);
   if (!held) return fail(amount, transferCurrency, 'Insufficient available balance.');
 
-  // 5. Create the immutable SD-65 execution in routing state. sourcePayoutAccountReference marks this
+  // 5. Create the immutable execution in routing state. sourcePayoutAccountReference marks this
   //    as a P2P transfer so the settlement handler clears the sender hold and credits the recipient.
   const rail = recipientAccount.payoutAccountPreferredRail ?? senderAccount.payoutAccountPreferredRail;
   const execution: PaymentExecutionProcedure = {

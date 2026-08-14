@@ -13,7 +13,7 @@ import { Tooltip } from '../../../../../components/Tooltip';
 // Dedicated config UI for the internal VoP (Verification of Payee) engine (overrides the generic module
 // editor for this capability). VoP is ADDITIONAL to FDS/AML/HRP; it confirms the payee name matches the
 // destination account holder. DATA-DRIVEN: thresholds/strategy/policy/markets live in the capability
-// moduleConfig; the backend /modules/vop/verify endpoint evaluates them on every check. PCI DSS Req 12.8 / Req 10.
+// moduleConfig; the backend /modules/vop/verify endpoint evaluates them on every check. PCI DSS.
 const CAP = 'vop';
 
 const DEFAULTS = {
@@ -89,7 +89,7 @@ export default function VopModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'Verification of Payee (VoP)' }]} />
-      <SectionHeader icon={ShieldCheck} title="Verification of Payee (VoP)" description="Payee name-vs-account confirmation. Additional to FDS/AML/HRP; market-gated." debugInfo="capability=vop · SD-13 Party Data Management · PCI DSS Req 12.8 / Req 10" />
+      <SectionHeader icon={ShieldCheck} title="Verification of Payee (VoP)" description="Payee name-vs-account confirmation. Additional to FDS/AML/HRP; market-gated." debugInfo="capability=vop Party Data Management · PCI DSS" />
 
       {!canEdit && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">

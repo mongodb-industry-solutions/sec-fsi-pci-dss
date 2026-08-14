@@ -169,7 +169,7 @@ export default function MerchantEventsPage() {
           icon={Activity}
           title="Webhook Events"
           description="Delivery log for all outbound webhook attempts, live and test."
-          debugInfo="BIAN SD-89 BQ:Notification, ADR-038, PCI DSS Req 10.7"
+          debugInfo="BQ:Notification, ADR-038, PCI DSS"
         />
         <button
           type="button"

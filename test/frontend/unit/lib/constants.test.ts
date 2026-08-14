@@ -2,13 +2,14 @@
  * Unit tests: frontend/src/lib/constants.ts
  * Validates all five demo users, role labels, color maps, and formatRiskIndicator.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   DEMO_PASSWORD,
   ROLE_LABELS,
   SEVERITY_COLORS,
   STATUS_COLORS,
   formatRiskIndicator,
+  demoPublicUrl,
 } from '../../../../frontend/src/lib/constants';
 
 // All seeded demo accounts now share one bcrypt-hashed credential exposed via the
@@ -77,5 +78,81 @@ describe('formatRiskIndicator', () => {
 
   it('handles empty string without throwing', () => {
     expect(() => formatRiskIndicator('')).not.toThrow();
+  });
+});
+
+// Share QR: the URL must resolve per environment (configured public URL first, browser origin next).
+describe('demoPublicUrl', () => {
+  const withOrigin = (origin: string, fn: () => void) => {
+    vi.stubGlobal('window', { location: { origin } });
+    try { fn(); } finally { vi.unstubAllGlobals(); }
+  };
+
+  it('appends the path to the browser origin', () => {
+    withOrigin('https://demo.example.com', () => {
+      expect(demoPublicUrl('/simulator')).toBe('https://demo.example.com/simulator');
+    });
+  });
+
+  it('returns the bare base when no path is given', () => {
+    withOrigin('https://demo.example.com', () => {
+      expect(demoPublicUrl()).toBe('https://demo.example.com');
+    });
+  });
+
+  it('never doubles the slash when the origin carries a trailing one', () => {
+    withOrigin('https://demo.example.com/', () => {
+      expect(demoPublicUrl('/simulator')).toBe('https://demo.example.com/simulator');
+    });
+  });
+
+  // Pin the SSR case explicitly instead of relying on the ambient environment: this file currently
+  // runs under node (vitest 4 ignores `environmentMatchGlobs`), but the assertion must hold under
+  // jsdom too, where `window` would otherwise be defined.
+  it('yields a relative path when rendered server-side (no window)', () => {
+    vi.stubGlobal('window', undefined);
+    try {
+      expect(demoPublicUrl('/simulator')).toBe('/simulator');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+// No raw identifier ever reaches a user: every gate indicator resolves to plain language.
+describe('formatRiskIndicator: gate indicators', () => {
+  it('translates the FDS gate indicator, with and without a qualifier', () => {
+    expect(formatRiskIndicator('fds.high.risk')).toBe('Fraud risk detected');
+    expect(formatRiskIndicator('fds.high.risk: velocity')).toBe('Fraud risk detected (velocity)');
+  });
+
+  it('translates a sanctions match however it is spelled', () => {
+    expect(formatRiskIndicator('hrp.sanctions.match')).toBe('Sanctions screening match');
+    expect(formatRiskIndicator('sanctions_match')).toBe('Sanctions screening match');
+  });
+
+  it('translates an AML alert and keeps its severity readable', () => {
+    expect(formatRiskIndicator('aml.alert')).toBe('Money-laundering alert');
+    expect(formatRiskIndicator('aml.alert: high')).toBe('Money-laundering alert (high severity)');
+  });
+
+  it('translates a payee-verification mismatch', () => {
+    expect(formatRiskIndicator('vop.no_match')).toBe('Payee name did not match the account holder');
+  });
+
+  it('translates the fraud-engine rule ids', () => {
+    expect(formatRiskIndicator('HIGH_VALUE_TXN')).toMatch(/High-value transaction/);
+    expect(formatRiskIndicator('RISKY_MCC')).toBe('High-risk merchant category');
+    expect(formatRiskIndicator('VELOCITY_24H')).toMatch(/24 hours/);
+    expect(formatRiskIndicator('transfer.risk.block')).toBe('Transfer flagged by risk screening');
+  });
+
+  it('keeps the existing amount and MCC labels working', () => {
+    expect(formatRiskIndicator('amount_threshold')).toMatch(/High-value transaction/);
+    expect(formatRiskIndicator('high_risk_mcc_7995')).toBe('High-risk merchant category: MCC 7995 (Gambling / Betting)');
+  });
+
+  it('never leaves dots or underscores in an unknown indicator', () => {
+    expect(formatRiskIndicator('some.new_signal')).toBe('some new signal');
   });
 });

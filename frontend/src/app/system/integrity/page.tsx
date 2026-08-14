@@ -6,7 +6,7 @@ import { IntegrityPanel } from '../../../components/dashboard/IntegrityPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { ShieldCheck } from 'lucide-react';
 
-// Security Auditor only: control-record data-integrity oversight (PCI DSS Req 10).
+// Security Auditor only: control-record data-integrity oversight (PCI DSS).
 export default function IntegrityPage() {
   const router = useRouter();
   const [token, setToken] = useState('');
@@ -29,7 +29,7 @@ export default function IntegrityPage() {
         title="Data Integrity"
         description="Read-only oversight of fraud case and payment-card records."
         info="This view checks that every case reference is unique, that cases still link to an existing transaction and customer, that the counts reconcile, and that payment cards are not duplicated by error (same card under multiple tokens, or registry drift). It reports aggregates and masked PANs only; never cardholder data."
-        debugInfo="BIAN SD-83 / SD-88 control-record integrity · PCI DSS Req 10 (logging & monitoring) · read-only"
+        debugInfo="control-record integrity · PCI DSS (logging & monitoring) · read-only"
       />
       <IntegrityPanel token={token} />
     </div>

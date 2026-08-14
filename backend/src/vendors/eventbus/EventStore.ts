@@ -1,6 +1,6 @@
 // Persistent, correlated record of every DomainEvent (dev.v8 D3). This is the unified audit/
 // investigation backbone: query by correlationId to replay a whole business-process journey in
-// order (PCI DSS Req 10). The interface is injectable so the bus can be unit-tested with a fake.
+// order (PCI DSS). The interface is injectable so the bus can be unit-tested with a fake.
 import { Db } from 'mongodb';
 import { DomainEvent, BusinessProcess } from './types';
 
@@ -9,7 +9,7 @@ export const DOMAIN_EVENT_COLLECTION = 'domainEvent';
 export interface EventStore {
   /** Append one event. Idempotent: a duplicate eventId is ignored, not an error. */
   append(event: DomainEvent): Promise<void>;
-  /** All events of a journey, oldest first — the full correlated trail. */
+  /** All events of a journey, oldest first: the full correlated trail. */
   trail(correlationId: string): Promise<DomainEvent[]>;
   /** Events of a given business-process class (optionally a time window), newest first. */
   byProcess(businessProcess: BusinessProcess, opts?: { from?: string; to?: string; limit?: number }): Promise<DomainEvent[]>;

@@ -1,5 +1,5 @@
 /**
- * RFC 7662 — OAuth 2.0 Token Introspection
+ * RFC 7662: OAuth 2.0 Token Introspection
  * Allows registered OAuth clients to verify any token without managing public keys.
  */
 import { Db } from 'mongodb';
@@ -46,7 +46,7 @@ export async function introspectToken(
     };
   }
 
-  // Access token — verify JWT RS256 signature + expiry
+  // Access token: verify JWT RS256 signature + expiry
   let payload;
   try {
     payload = await verifyAccessToken(token);

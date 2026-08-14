@@ -1,4 +1,4 @@
-// BIAN SD-65: Payment Execution Procedure — REST controller (v17)
+// Payment Execution Procedure, REST controller (v17)
 // Routes mounted at /executions → /api/v1/executions
 
 import { FastifyInstance } from 'fastify';

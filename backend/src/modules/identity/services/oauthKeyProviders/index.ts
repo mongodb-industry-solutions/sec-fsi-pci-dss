@@ -13,7 +13,7 @@ export interface OAuthPublicKeyEntry {
 /**
  * ADR-036: the keypair material is owned by the provider (local filesystem or AWS KMS),
  * which is the single source of truth. The partyAuthenticationKey collection is audit
- * metadata only — it is NOT read to verify tokens or build the JWKS.
+ * metadata only: it is NOT read to verify tokens or build the JWKS.
  */
 export interface OAuthKeyProvider {
   /** Sign with the active private key. */

@@ -1,4 +1,4 @@
-// POST /api/auth/ciba/start — begin passwordless login (session-less by design: the user is logged out).
+// POST /api/auth/ciba/start: begin passwordless login (session-less by design: the user is logged out).
 // The merchant (confidential client) calls the PSP bc-authorize endpoint with the browser-supplied
 // login_hint_token (opaque sub, no raw PII). Returns { auth_req_id, interval, expires_in, binding_message }.
 import { NextRequest, NextResponse } from 'next/server';

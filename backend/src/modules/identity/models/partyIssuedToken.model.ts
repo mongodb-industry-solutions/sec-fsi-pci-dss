@@ -1,4 +1,4 @@
-// SD-16: Party Authentication — OAuth 2.0 Issued Tokens (BQ:Grant)
+// Party Authentication, OAuth 2.0 Issued Tokens (BQ:Grant)
 // TTL index on expiresAt ensures automatic cleanup after expiry.
 // Access tokens are JWTs (not stored in full); refresh tokens are opaque UUIDs stored here.
 

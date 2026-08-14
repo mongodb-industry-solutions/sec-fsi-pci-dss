@@ -119,7 +119,7 @@ export const config = {
   },
 
   payout: {
-    // Builtin payment-initiation module — simulated settlement delays (T+N)
+    // Builtin payment-initiation module: simulated settlement delays (T+N)
     settlementDelayT1Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T1_MS', '3000')!, 10),
     settlementDelayT2Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T2_MS', '6000')!, 10),
     settlementDelayT3Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T3_MS', '9000')!, 10),
@@ -127,10 +127,10 @@ export const config = {
     paymentInitiationAlwaysSucceed: pspEnv('PAYMENT_INITIATION_ALWAYS_SUCCEED', 'true') === 'true',
     // Builtin account-information module
     aisAlwaysVerify: pspEnv('AIS_ALWAYS_VERIFY', 'true') === 'true',
-    // SD-54 Counterparty Administration — beneficiary registry limits
+    // Counterparty Administration: beneficiary registry limits
     beneficiaryMaxPerUser: parseInt(pspEnv('BENEFICIARY_MAX_PER_USER', '100')!, 10),
     beneficiaryRateLimitRpm: parseInt(pspEnv('BENEFICIARY_RATE_LIMIT_RPM', '20')!, 10),
-    // v17.1 Bank transfers — sandbox mode (transfers are simulated end to end; no real rail effect)
+    // v17.1 Bank transfers: sandbox mode (transfers are simulated end to end; no real rail effect)
     sandbox: pspEnv('PAYOUT_SANDBOX', 'true') === 'true',
     // v17.1 Recurring mandate scheduler poll interval (ms); 0 disables the background runner.
     mandateSchedulerMs: parseInt(pspEnv('PAYOUT_MANDATE_SCHEDULER_MS', '60000')!, 10),

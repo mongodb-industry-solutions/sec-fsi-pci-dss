@@ -1,4 +1,4 @@
-// GET /api/auth/login — start authorization_code + PKCE flow, redirect to PSP consent page.
+// GET /api/auth/login: start authorization_code + PKCE flow, redirect to PSP consent page.
 import { NextRequest, NextResponse } from 'next/server';
 import { buildAuthorizeUrl, generatePkce, randomToken } from '@/lib/oauth';
 import { attachLoginState } from '@/lib/session';
@@ -7,7 +7,7 @@ import { oauthLog, shortHash } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
   // Host consistency: only relevant for LOCAL dev, where the user might start on 127.0.0.1 while the
-  // seeded redirect_uri uses localhost:8082 (or vice-versa) — the ew_login cookie would then be set on
+  // seeded redirect_uri uses localhost:8082 (or vice-versa), the ew_login cookie would then be set on
   // one host and never sent back to the callback host → spurious invalid_state. Bounce to the canonical
   // host ONLY when that canonical host is a localhost variant. Behind a real proxy/ingress (staging/
   // prod) `req.nextUrl.host` reflects the internal hop, not the public host, so comparing it to the

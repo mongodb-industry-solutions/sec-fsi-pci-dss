@@ -8,7 +8,7 @@ import { SectionHeader } from '../../../components/SectionHeader';
 import { SavedCardsPanel } from '../../../components/SavedCardsPanel';
 import { Breadcrumb } from '../../../components/Breadcrumb';
 
-// Dedicated customer card-on-file management (BIAN SD-88). View, add and remove saved cards.
+// Dedicated customer card-on-file management . View, add and remove saved cards.
 // Customer-only: staff manage no cards here. Ownership + audit are enforced server-side.
 export default function CardsPage() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function CardsPage() {
         title="Payment Methods"
         description="View, add and remove your saved cards."
         info="Only the masked card number is shown. Your full card number and CVV are never stored. Removing a card cancels any recurring use of it."
-        debugInfo="BIAN SD-88 Payment Card · PCI DSS Req 3 (no PAN/CVV) · Req 7 (own cards only) · Req 10 (audited)"
+        debugInfo="Payment Card · PCI DSS (no PAN/CVV) (own cards only) (audited)"
       />
       {!ready ? (
         <div className="text-sm text-gray-400">Loading…</div>

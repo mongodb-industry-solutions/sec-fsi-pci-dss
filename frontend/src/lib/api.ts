@@ -164,10 +164,10 @@ export interface WebhookDeliveryLog {
   deliveredAt: string;
 }
 
-// v16: Merchant OAuth 2.0 client registration (SD-89 BQ:Grant)
+// v16: Merchant OAuth 2.0 client registration (BQ:Grant)
 export interface MerchantOAuthClient {
   oauthClientId: string;
-  oauthClientSecretPrefix: string;          // First 8 chars — plaintext never returned
+  oauthClientSecretPrefix: string;          // First 8 chars, plaintext never returned
   oauthRedirectUris: string[];
   oauthGrantTypes: ('authorization_code' | 'client_credentials' | 'refresh_token')[];
   oauthScopes: string[];
@@ -178,8 +178,8 @@ export interface MerchantOAuthClient {
   oauthRequirePkce: boolean;
   oauthPostLogoutRedirectUris?: string[];
   oauthClaimMapping?: Record<string, string>;
-  oauthLogoUri?: string;   // v18: OIDC logo_uri (https) — branding on the consent page + app listings
-  oauthClientUri?: string; // v18: OIDC client_uri (https) — merchant home page link
+  oauthLogoUri?: string;   // v18: OIDC logo_uri (https), branding on the consent page + app listings
+  oauthClientUri?: string; // v18: OIDC client_uri (https), merchant home page link
 }
 
 // v16: OAuth consent grants (user-authorized apps)
@@ -207,7 +207,7 @@ export interface EnrolledCredential {
   lastUsedAt?: string | null;
 }
 
-// v18 D-01: detail of one authorized app — scopes expanded with human-readable descriptions + branding.
+// v18 D-01: detail of one authorized app, scopes expanded with human-readable descriptions + branding.
 export interface ConsentGrantScope {
   scope: string;
   description: string;
@@ -300,6 +300,10 @@ export interface FraudCase {
   caseStatus: string;
   riskSeverity: string;
   cardTransactionInstanceReference: string;
+  // ADR-062: movement kind of the case (absent on pre-ADR-062 cases → treat as card).
+  transactionKind?: CaseMovementKind;
+  paymentExecutionInstanceReference?: string | null;
+  paymentRequestInstanceReference?: string | null;
   customerAgreementInstanceReference: string;
   transactionSnapshot?: TransactionSnapshot;
   fraudDiagnosisAssessment?: {
@@ -332,21 +336,67 @@ export interface RawDocumentResponse {
   document: Record<string, unknown>;
 }
 
+export type CaseMovementKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+
+export interface CasePartySummary {
+  reference: string;
+  name: string | null;
+  type: string | null;
+  customerAgreementInstanceReference: string | null;
+}
+
+export interface CaseAccountSummary {
+  reference: string;
+  alias: string | null;
+  bankName: string | null;
+  holderName: string | null;
+  currency: string | null;
+  countryCode: string | null;
+  type: string | null;
+  status: string | null;
+  partyReference: string | null;
+  balance: { available: number | null; pending: number | null };
+}
+
 export interface CaseEnrichment {
   caseId: string;
   asOf: string;
+  // Movement kind: decides whether the counterparty is a merchant, a beneficiary or a payee.
+  transactionKind?: CaseMovementKind;
   operation: {
     transactionId: string;
+    kind?: CaseMovementKind;
     type: string;
     status: string;
     channel: string | null;
-    merchantCategoryCode: string | null;
-    merchantName: string;
-    maskedPan: string;
+    merchantCategoryCode?: string | null;
+    merchantName?: string;
+    maskedPan?: string;
+    rail?: string | null;
+    heldForReview?: boolean;
     amount: { amount: number; currency: string };
     dateTime: string;
     description: string | null;
   } | null;
+  // Non-card movements only: the destination of the money (PSP-owned data, visible to L1).
+  counterparty?: {
+    kind: 'beneficiary' | 'external_account' | 'payee';
+    label: string | null;
+    accountMasked: string | null;
+    countryCode: string | null;
+    partyReference: string | null;
+    arrangementReference: string | null;
+    accountReference: string | null;
+    labelRestricted?: boolean;
+    lookupHint?: string | null;
+    lookupType?: string | null;
+    status?: string | null;
+    registeredAt?: string | null;
+    ownerParty?: CasePartySummary | null;
+    account?: CaseAccountSummary | null;
+  } | null;
+  // Payer side of a non-card movement: the account the funds are held on.
+  sourceAccount?: CaseAccountSummary | null;
   sdf: {
     score: number | null;
     scorePending: boolean;
@@ -390,6 +440,8 @@ export interface CaseEnrichment {
     customerId: string | null;
     merchantId: string | null;
     accountRef: string | null;
+    executionRef?: string | null;
+    paymentRequestRef?: string | null;
   };
 }
 
@@ -459,7 +511,7 @@ export interface TransactionNotesResponse {
   notes: NoteEntry[];
 }
 
-// ADR-031: customer questions raised by L1/L2 investigators (SD-83), answered by the customer.
+// ADR-031: customer questions raised by L1/L2 investigators , answered by the customer.
 export interface CustomerQuestion {
   questionId: string;
   caseReference: string;
@@ -557,7 +609,7 @@ export interface CustomerTransactionRow {
   completedAt: string | null;
 }
 
-// v27: one resolution step of an SD-65 payment execution (routing/settlement log). Display-safe.
+// v27: one resolution step of an payment execution (routing/settlement log). Display-safe.
 export interface PaymentExecutionResolutionStep {
   stepName: string;
   stepOutcome: 'found' | 'not_found' | 'fallback' | 'failed';
@@ -565,7 +617,7 @@ export interface PaymentExecutionResolutionStep {
   stepDateTime: string;
 }
 
-// v27: display-safe SD-65 execution detail for the staff drill-down (no CHD, no raw IBAN).
+// v27: display-safe execution detail for the staff drill-down (no CHD, no raw IBAN).
 // Mirrors the backend ExecutionDetail returned by GET /customer/:customerId/transactions/:executionId.
 export interface ExecutionDetail {
   kind: 'transfer';
@@ -668,9 +720,9 @@ export interface RtpRequestDTO {
   paymentRequestInstanceReference: string;
   requesterPartyReference: string;
   payerPartyReference?: string;
-  payerCounterpartyReference?: string; // the requester's beneficiary (SD-54) representing the payer
+  payerCounterpartyReference?: string; // the requester's beneficiary representing the payer
   payeeName?: string;         // requester's own name (authorized to the payer on request)
-  payerName?: string;         // payer's real name — only returned once the payer consented (accepted+)
+  payerName?: string;         // payer's real name, only returned once the payer consented (accepted+)
   payerAlias?: string;        // payer display the requester provided (beneficiary label); for the payee's view
   payeeReceivingAccountReference: string;
   payerFundingAccountReference?: string;
@@ -717,7 +769,7 @@ export interface PartyOwnerResult {
   ownerName: string | null;
 }
 
-// v29 SD-88 global card administration row (display-safe; no full PAN / CVV / expiry).
+// v29 global card administration row (display-safe; no full PAN / CVV / expiry).
 export interface AdminCard {
   paymentCardInstanceReference: string;
   customerAgreementInstanceReference: string;
@@ -733,7 +785,7 @@ export interface AdminCard {
   recordCreatedDateTime?: string | null;
 }
 
-// v29 SD-66 global payout-account administration row (QE-stripped; presence hints only).
+// v29 global payout-account administration row (QE-stripped; presence hints only).
 export interface AdminPayoutAccount {
   payoutAccountInstanceReference: string;
   partyInstanceReference: string;
@@ -799,7 +851,7 @@ export const api = {
     logout: (token: string) =>
       apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
     // Note: the demo-user roster utility lives at GET /api/v1/system/users (api.system.users).
-    // The duplicate /api/v1/auth/users was removed — a demo access convenience belongs under /system,
+    // The duplicate /api/v1/auth/users was removed: a demo access convenience belongs under /system,
     // not under /auth (real authentication). See api.system.users.
     domains: () =>
       apiFetch<{ domains: AuthDomain[] }>('/api/v1/auth/domains'),
@@ -889,9 +941,15 @@ export const api = {
         escalationToken ? { headers: { 'X-Escalation-Token': escalationToken } } : {},
         token
       ),
+    // v36: card-token / masked-PAN lookups are explicit filters on the canonical collection, which
+    // returns the paginated envelope like every other query.
     getByCardToken: (cardToken: string, token: string) =>
-      apiFetch<{ results: Record<string, unknown>[]; count: number }>(
-        `/api/v1/transactions?cardToken=${encodeURIComponent(cardToken)}`, {}, token
+      apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/transactions?kind=card&cardToken=${encodeURIComponent(cardToken)}&limit=100`, {}, token
+      ),
+    getByMaskedPan: (maskedPan: string, token: string) =>
+      apiFetch<{ results: Record<string, unknown>[]; total: number; page: number; limit: number }>(
+        `/api/v1/transactions?kind=card&maskedPan=${encodeURIComponent(maskedPan)}&limit=100`, {}, token
       ),
     getNotes: (txnId: string, token: string) =>
       apiFetch<TransactionNotesResponse>(`/api/v1/transactions/${txnId}/notes`, {}, token),
@@ -904,8 +962,14 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),
-    listAll: (
-      params: { status?: string; merchant?: string; cardToken?: string; email?: string; transactionId?: string; page?: number; limit?: number },
+    // v36 (ADR-063): ONE collection endpoint. Every movement kind by default (server-merged and
+    // RTP-de-duped); `kind` narrows to one. Card-only callers pass `kind: 'card'` and keep the card
+    // document shape.
+    list: (
+      params: {
+        status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string;
+        transactionId?: string; kind?: 'card' | 'transfer' | 'rtp'; page?: number; limit?: number;
+      },
       token: string
     ) => {
       const qs = new URLSearchParams(
@@ -918,14 +982,14 @@ export const api = {
         total: number;
         page: number;
         limit: number;
-      }>(`/api/v1/transactions/all${qs ? `?${qs}` : ''}`, {}, token);
+      }>(`/api/v1/transactions${qs ? `?${qs}` : ''}`, {}, token);
     },
   },
 
   customer: {
     // v27: encrypted-KYC search. The field registry drives which controls the UI renders;
     // the search runs QE over ciphertext server-side. Sensitive result fields are returned
-    // only to L2 (with a valid escalation token) / auditor — the server is the boundary.
+    // only to L2 (with a valid escalation token) / auditor: the server is the boundary.
     searchFields: (token: string) =>
       apiFetch<KycSearchFieldsResponse>('/api/v1/customer/search/fields', {}, token),
     // `signal` lets the caller abort a superseded query.
@@ -940,7 +1004,7 @@ export const api = {
         },
         token,
       ),
-    // v31 KYC administration (SD-53). Backend enforces customers:view / customers:manage; sensitive
+    // v31 KYC administration . Backend enforces customers:view / customers:manage; sensitive
     // fields decrypt only with a valid escalation token (viewSensitive).
     kycList: (filters: { status?: string; segment?: string; riskRating?: string; partyType?: string; name?: string; email?: string; phone?: string; nationality?: string; page?: number; limit?: number }, token: string) => {
       const qs = new URLSearchParams(Object.entries(filters).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
@@ -982,7 +1046,7 @@ export const api = {
       apiFetch<{ results: Record<string, unknown>[] }>(
         `/api/v1/customer/${encodeURIComponent(customerId)}/cards`, {}, token
       ),
-    // v27: staff investigation view of a customer's aggregated transactions (SD-65 + SD-254),
+    // v27: staff investigation view of a customer's aggregated transactions (+),
     // display-safe and paginated. Restricted server-side to level2_investigator / security_auditor.
     transactions: (customerId: string, params: { page?: number; limit?: number }, token: string) => {
       const qs = new URLSearchParams(
@@ -993,7 +1057,7 @@ export const api = {
       );
     },
     // The AUTHENTICATED caller's OWN saved cards (display-safe). The agreement is resolved server-side
-    // from the token (partyRef) — never a client-supplied id — so a caller only ever sees their own
+    // from the token (partyRef), never a client-supplied id, so a caller only ever sees their own
     // cards. Used by the hosted payment pages to offer a saved-card pick to the signed-in viewer.
     // Display-safe only: surrogate token + masked PAN + network + alias + preferred. No PAN/CVV/expiry.
     getMyCards: (token: string) =>
@@ -1074,7 +1138,7 @@ export const api = {
         { method: 'POST', body: JSON.stringify({}) },
         token
       ),
-    // v27 staff drill-down: display-safe SD-65 execution detail of ONE transfer belonging to a
+    // v27 staff drill-down: display-safe execution detail of ONE transfer belonging to a
     // customer. Restricted server-side to level2_investigator / security_auditor (else 403); a
     // transfer not belonging to the customer's party returns 404. Never returns the raw IBAN.
     transactionDetail: (customerId: string, executionId: string, token: string) =>
@@ -1117,7 +1181,7 @@ export const api = {
         bySeverity: Array<{ severity: string; count: number }>;
         byMonth: Array<{ year: number; month: number; count: number }>;
       }>('/api/v1/fraud/stats', {}, token),
-    // Auditor data-integrity oversight (PCI DSS Req 10); no PII.
+    // Auditor data-integrity oversight (PCI DSS); no PII.
     integrity: (token: string) =>
       apiFetch<{
         totalCases: number;
@@ -1205,7 +1269,7 @@ export const api = {
         { method: 'DELETE', body: JSON.stringify(body) },
         token
       ),
-    // Open a case from EXACTLY ONE of a card transaction (transactionId) or an SD-65 transfer (executionId).
+    // Open a case from EXACTLY ONE of a card transaction (transactionId) or an transfer (executionId).
     open: (body: { transactionId?: string; executionId?: string; reason?: string }, token: string) =>
       apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseReference: string; alreadyExisted: boolean }>(
         '/api/v1/fraud',
@@ -1290,7 +1354,7 @@ export const api = {
     },
     getById: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}`, {}, token),
-    // v31 KYB administration (SD-89). Backend enforces merchants:view / merchants:manage.
+    // v31 KYB administration . Backend enforces merchants:view / merchants:manage.
     kybDetail: (id: string, token: string) =>
       apiFetch<Record<string, unknown>>(`/api/v1/merchants/${id}/kyb`, {}, token),
     kybPatch: (id: string, patch: Record<string, unknown>, token: string) =>
@@ -1316,7 +1380,7 @@ export const api = {
         merchantTransactionLimitAmount: number;
         merchantAgreementStatus: string;
         merchantDefaultPayoutAccountReference: string;
-        merchantCommissionRate: number; // v18 B-08: SD-89 commission rate 0..1
+        merchantCommissionRate: number; // v18 B-08: commission rate 0..1
       }>,
       token: string,
     ) =>
@@ -1382,14 +1446,14 @@ export const api = {
         byStatus: Array<{ status: string; count: number; amount: number }>;
         byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
         byCurrency: Array<{ currency: string; count: number; amount: number }>;
-        // v18 B-06: commission revenue (SD-89) aggregated from paymentExecution fee (SD-65).
+        // v18 B-06: commission revenue aggregated from paymentExecution fee .
         commissionRevenue?: {
           total: number;
           count: number;
           byMonth: Array<{ year: number; month: number; count: number; amount: number }>;
         };
       }>(`/api/v1/merchants/${merchantId}/stats`, {}, token),
-    // v18 B-03: merchant activity view — who did what through this merchant (SD-16 audit). Display-safe.
+    // v18 B-03: merchant activity view, who did what through this merchant (audit). Display-safe.
     activity: (
       merchantId: string,
       filters: { user?: string; q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number },
@@ -1418,7 +1482,7 @@ export const api = {
         limit: number;
       }>(`/api/v1/merchants/${merchantId}/activity${qs ? `?${qs}` : ''}`, {}, token);
     },
-    // v18 B-08: users who authorized this merchant (OAuth consent grants, SD-16). Display-safe.
+    // v18 B-08: users who authorized this merchant (OAuth consent grants). Display-safe.
     authorizations: (
       merchantId: string,
       filters: { q?: string; page?: number; limit?: number },
@@ -1443,7 +1507,7 @@ export const api = {
         limit: number;
       }>(`/api/v1/merchants/${merchantId}/authorizations${qs ? `?${qs}` : ''}`, {}, token);
     },
-    // Merchant lifecycle audit trail (SD-89, PCI DSS Req 10).
+    // Merchant lifecycle audit trail (PCI DSS).
     events: (merchantId: string, token: string) =>
       apiFetch<{
         events: Array<{
@@ -1490,7 +1554,7 @@ export const api = {
       apiFetch<{ revoked: boolean; keyId: string }>(
         `/api/v1/merchants/${merchantId}/keys/${keyId}`, { method: 'DELETE' }, token
       ),
-    // v16: OAuth 2.0 client management (SD-89 BQ:Grant)
+    // v16: OAuth 2.0 client management (BQ:Grant)
     getOAuthClient: (merchantId: string, token: string) =>
       apiFetch<MerchantOAuthClient>(`/api/v1/merchants/${merchantId}/oauth-client`, {}, token),
     createOAuthClient: (merchantId: string, token: string, body: {
@@ -1560,7 +1624,7 @@ export const api = {
         error?: string;
       }>(`/api/v1/merchants/${merchantId}/webhooks/test`, { method: 'POST', body: JSON.stringify(body ?? {}) }, token),
 
-    // v16: Typed webhook registry (ADR-038) — per-event-type webhooks
+    // v16: Typed webhook registry (ADR-038), per-event-type webhooks
     listTypedWebhooks: (merchantId: string, token: string) =>
       apiFetch<{ webhooks: TypedWebhookConfig[] }>(`/api/v1/merchants/${merchantId}/webhooks/registry`, {}, token),
     registerTypedWebhook: (merchantId: string, token: string, body: {
@@ -1725,7 +1789,7 @@ export const api = {
       ),
   },
 
-  // passwordless credential management (SD-91/SD-16). Owner-scoped by the session token.
+  // passwordless credential management . Owner-scoped by the session token.
   credentials: {
     list: (token: string) =>
       apiFetch<{ credentials: EnrolledCredential[] }>(`/api/v1/auth/enroll`, {}, token),
@@ -1936,7 +2000,7 @@ export const api = {
         apiFetch<{ deleted: boolean }>(`/api/v1/modules/domains/${id}`, { method: 'DELETE' }, token),
     },
 
-    // v29 SD-88: global card administration via the built-in card-issuer module. Display-safe only:
+    // v29 global card administration via the built-in card-issuer module. Display-safe only:
     // surrogate token, masked PAN, network, status; expiry only in the per-card detail (need-to-know).
     // Never accepts or returns CVV/PIN/full PAN. 409 managed_externally when a vendor owns the capability.
     cardAdmin: {
@@ -2008,7 +2072,7 @@ export const api = {
         ),
     },
 
-    // v29 SD-66: global payout-account administration via the built-in account-information module.
+    // v29 global payout-account administration via the built-in account-information module.
     // QE/GDPR: IBAN/routing never returned (presence hints only). 409 managed_externally when a vendor owns it.
     accountAdmin: {
       list: (
@@ -2116,7 +2180,7 @@ export const api = {
     },
   },
 
-  // SD-66 Payout Account Arrangement + SD-65 Payment Execution (v17)
+  // Payout Account Arrangement + Payment Execution (v17)
   accounts: {
     list: (partyRef: string, token: string, params?: { status?: string; page?: number; limit?: number }) => {
       const qs = params ? '?' + new URLSearchParams(
@@ -2278,11 +2342,11 @@ export const api = {
     },
   },
 
-  // SD-54 Counterparty Administration — staff-facing beneficiary registry (v18)
+  // Counterparty Administration: staff-facing beneficiary registry (v18)
   beneficiaries: {
     list: (
       token: string,
-      params?: { ownerRef?: string; q?: string; status?: 'active' | 'removed'; page?: number; limit?: number },
+      params?: { ownerRef?: string; q?: string; caseRef?: string; status?: 'active' | 'removed'; page?: number; limit?: number },
     ) => {
       const qs = params
         ? '?' + new URLSearchParams(
@@ -2349,14 +2413,14 @@ export const api = {
       body: { fromAccountRef: string; amount: number; note?: string },
       token: string,
     ) =>
-      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; recipientHint?: string }>(
+      apiFetch<{ transferReference: string; amount: number; currency: string; status: string; failureReason?: string; holdReason?: string; recipientHint?: string }>(
         `/api/v1/beneficiaries/${encodeURIComponent(ownerRef)}/${encodeURIComponent(beneficiaryRef)}/transfer`,
         { method: 'POST', body: JSON.stringify(body) },
         token,
       ),
   },
 
-  // v17.1: bank transfers (ACH / SEPA / SWIFT) — rail engine preview + execute.
+  // v17.1: bank transfers (ACH / SEPA / SWIFT), rail engine preview + execute.
   transfers: {
     preview: (
       body: { destination: BankDestination; amountCurrency?: string; rail?: string },
@@ -2394,7 +2458,7 @@ export const api = {
       ),
   },
 
-  // v28: Request to Pay (RTP) — a transfer that requires the payer's in-app approval + shared QR.
+  // v28: Request to Pay (RTP), a transfer that requires the payer's in-app approval + shared QR.
   rtp: {
     create: (
       body: {
@@ -2464,7 +2528,7 @@ export const api = {
         total: number; page: number; limit: number; capped: boolean;
       }>(`/api/v1/events/audit${qs}`, {}, token);
     },
-    // dev.v8: correlated journey — every DomainEvent for one business-process instance, in order.
+    // dev.v8: correlated journey, every DomainEvent for one business-process instance, in order.
     trail: (correlationId: string, token: string) =>
       apiFetch<{ correlationId: string; count: number; events: Array<{ eventId: string; eventType: string; occurredAt: string; correlationId: string; causationId?: string; businessProcess: string; source: string; payload: Record<string, unknown>; bian?: { serviceDomain: string; controlRecord: string } }> }>(
         `/api/v1/events/trail/${encodeURIComponent(correlationId)}`, {}, token,

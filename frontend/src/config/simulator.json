@@ -11,12 +11,12 @@
 
   "testCards": [
     { "label": "Visa Standard (4242-4242-4242-4242)", "number": "4242424242424242" },
-    { "label": "Visa Business (2223-0000-4840-0010)", "number": "2223000048400010" },
-    { "label": "Mastercard Standard (5555-5555-5555-1212)", "number": "5555555555551212" },
+    { "label": "Visa Business (4012-8888-8888-1881)", "number": "4012888888881881" },
+    { "label": "Mastercard Standard (5555-5555-5555-4444)", "number": "5555555555554444" },
     { "label": "Mastercard Prepaid (5200-8282-8282-8210)", "number": "5200828282828210" },
-    { "label": "Amex Gold (3782-8224-6301-0005)", "number": "378282246310005" },
-    { "label": "Amex Platinum (3714-4963-5309-8431)", "number": "371449635398431" },
-    { "label": "Demo Card (Pre-filled Example)", "number": "4111111111111234" }
+    { "label": "Amex Gold (3782-822463-10005)", "number": "378282246310005" },
+    { "label": "Amex Platinum (3714-496353-98431)", "number": "371449635398431" },
+    { "label": "Demo Card (4111-1111-1111-1111)", "number": "4111111111111111" }
   ],
 
   "fallbackMerchants": [
@@ -69,7 +69,7 @@
       "outcomeLabel": "🚨 Fraud case auto-created",
       "savedCards": [
         { "alias": "Personal Visa", "number": "4242424242424242" },
-        { "alias": "Business Visa", "number": "2223000048400010" }
+        { "alias": "Business Visa", "number": "4012888888881881" }
       ],
       "prefill": {
         "cardholderName": "Luis Fernandez",
@@ -93,7 +93,7 @@
       "expectedOutcome": "legit",
       "outcomeLabel": "✅ Payment approved",
       "savedCards": [
-        { "alias": "Personal Mastercard", "number": "5555555555551212" },
+        { "alias": "Personal Mastercard", "number": "5555555555554444" },
         { "alias": "Prepaid Mastercard", "number": "5200828282828210" }
       ],
       "prefill": {
@@ -105,8 +105,8 @@
         "merchantName": "Espresso Works Ltd.",
         "merchantCategoryCode": "5812",
         "description": "Coffee and workspace, Espresso Works",
-        "cardExpiry": "06/26",
-        "cardHint": "5555555555551212",
+        "cardExpiry": "06/30",
+        "cardHint": "5555555555554444",
         "cardAuthOutcome": "approved"
       }
     },
@@ -118,7 +118,7 @@
       "expectedOutcome": "borderline",
       "outcomeLabel": "⚠️ Manual review triggered",
       "savedCards": [
-        { "alias": "Personal Visa", "number": "4111111111111234" },
+        { "alias": "Personal Visa", "number": "4111111111111111" },
         { "alias": "Amex Gold", "number": "378282246310005" }
       ],
       "prefill": {
@@ -131,7 +131,7 @@
         "merchantCategoryCode": "7372",
         "description": "Software subscription, Okafor Digital",
         "cardExpiry": "09/27",
-        "cardHint": "4111111111111234",
+        "cardHint": "4111111111111111",
         "cardAuthOutcome": "approved"
       }
     }

@@ -11,11 +11,11 @@ const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_aud
 
 // Mounted at /customer  -  routes are /:customerId/cards
 //
-// Authorization model (PCI DSS Req 7 least privilege, BIAN SD-88 customer-centric):
+// Authorization model (PCI DSS least privilege, customer-centric):
 //  - A customer may VIEW / ADD / REMOVE only THEIR OWN cards (the path :customerId must match
-//    the agreement linked to their JWT partyRef — ownership enforced server-side).
+//    the agreement linked to their JWT partyRef: ownership enforced server-side).
 //  - Staff (L1/L2/auditor) may READ a customer's card list for investigation, but NOT add/remove.
-//  - Every add/remove emits a compliance audit event (Req 10). CVV/PIN are never accepted/stored.
+//  - Every add/remove emits a compliance audit event . CVV/PIN are never accepted/stored.
 //  Note: production step-up MFA for add/remove plugs in at these handlers (re-auth/TOTP); the demo
 //  gates the destructive action with an explicit client confirmation.
 export async function paymentCardController(fastify: FastifyInstance) {
@@ -61,7 +61,10 @@ and must NOT be repeated in the request body.
           },
           paymentCardExpirationDate: {
             type: 'string',
-            description: 'Card expiry date in `MM/YY` format. Stored as QE:none (encrypted, not searchable).',
+            // Month must be 01-12: the issuer module derives the per-card CVV from this value and
+            // its expired-card check fails open on an unparseable month.
+            pattern: '^(0[1-9]|1[0-2])/[0-9]{2}$',
+            description: 'Card expiry date in `MM/YY` format (month 01-12). Stored as QE:none (encrypted, not searchable).',
           },
           paymentCardMaskedPanDisplay: {
             type: 'string',
@@ -99,7 +102,7 @@ and must NOT be repeated in the request body.
             },
             reused: {
               type: 'boolean',
-              description: 'True when the customer already had this card on file — no duplicate was created.',
+              description: 'True when the customer already had this card on file, no duplicate was created.',
             },
           },
         },
@@ -146,7 +149,7 @@ and must NOT be repeated in the request body.
       ...(body.paymentCardAlias ? { paymentCardAlias: body.paymentCardAlias } : {}),
     });
 
-    // Audit (PCI DSS Req 10): record the card registration. No CHD in the summary.
+    // Audit (PCI DSS): record the card registration. No CHD in the summary.
     if (!result.reused) emitComplianceEvent(fastify.db, {
       entityType: 'card',
       entityId: result.paymentCardInstanceReference,
@@ -163,15 +166,15 @@ and must NOT be repeated in the request body.
     return reply.status(201).send(result);
   });
 
-  // GET /api/v1/customer/me/cards  — the AUTHENTICATED caller's own saved cards (display-safe).
+  // GET /api/v1/customer/me/cards: the AUTHENTICATED caller's own saved cards (display-safe).
   //
   // Caller-scoped by design: the customer agreement is resolved from the caller's JWT (partyRef)
-  // via getOwnAgreementId — never from a client-supplied id, never from a session/link's stored
+  // via getOwnAgreementId, never from a client-supplied id, never from a session/link's stored
   // acting party. Used by the hosted payment pages (checkout + payment link) to offer the viewer a
   // one-tap saved-card pick. A shared link opened in another browser (no/other token) resolves to a
   // different caller (or 401), so it can never surface someone else's cards.
   //
-  // PCI DSS: returns display-safe rows only — surrogate token (not CHD) + masked PAN (last 4) +
+  // PCI DSS: returns display-safe rows only, surrogate token (not CHD) + masked PAN (last 4) +
   // network + alias + preferred flag. Never the full PAN, never the CVV/PIN (SAD, prohibited), and
   // NOT the expiry (QE:none; owner-only via the per-card detail endpoint). Only `active` cards are
   // returned (a suspended/expired card would only decline at authorization).
@@ -180,7 +183,7 @@ and must NOT be repeated in the request body.
       tags: ['cards'],
       summary: 'List the authenticated caller\'s own saved cards (display-safe)',
       description: `Returns the caller's own saved cards (BIAN SD-88). The customer agreement is
-resolved server-side from the caller's session token (partyRef) — no id is accepted from the client,
+resolved server-side from the caller's session token (partyRef), no id is accepted from the client,
 so a caller can only ever see their OWN cards (PCI DSS Req 7 least privilege). Display-safe fields
 only: surrogate token, masked PAN, network, alias, preferred flag. No full PAN, no CVV, no expiry.`,
       security: [{ bearerAuth: [] }],
@@ -314,7 +317,7 @@ in this list response; it requires Level 2 access and a separate request.`,
     return reply.send(result);
   });
 
-  // GET /api/v1/customer/card-registry/:token  — FDS/AML shared-card lookup (investigation).
+  // GET /api/v1/customer/card-registry/:token, FDS/AML shared-card lookup (investigation).
   // Returns the physical card and HOW MANY customers hold it (a money-mule / shared-card signal),
   // plus the holder agreement references. Restricted to L1/L2/auditor. Token is non-CHD.
   fastify.get('/card-registry/:token', {
@@ -353,7 +356,7 @@ shared-card / money-mule indicator. Restricted to fraud analyst / investigator /
     return reply.send(reg);
   });
 
-  // GET /api/v1/customer/card-by-token/:token  — investigation pivot from a transaction.
+  // GET /api/v1/customer/card-by-token/:token, investigation pivot from a transaction.
   // A transaction only carries the surrogate token (paymentCardReference); this resolves the
   // UUIDs an investigator needs to pivot to the card detail, the owning customer (KYC) and the
   // funding bank account. Restricted to investigation roles. Token is non-CHD; no expiry/CVV.
@@ -400,10 +403,10 @@ its funding/payout account. No CHD, no card expiry. Restricted to fraud analyst 
     });
   });
 
-  // GET /api/v1/customer/:customerId/cards/:cardId  — card detail.
+  // GET /api/v1/customer/:customerId/cards/:cardId, card detail.
   // Returns the card-on-file (surrogate token, lifecycle dates, alias/note). The owner also sees the
   // QE:none expiry; staff (investigator/auditor) get a READ without the expiry (owner-only reveal,
-  // PCI DSS Req 3.3). CVV/PIN are never stored, never returned.
+  // PCI DSS). CVV/PIN are never stored, never returned.
   fastify.get('/:customerId/cards/:cardId', {
     schema: {
       tags: ['cards'],
@@ -464,15 +467,15 @@ audited (Req 10).`,
     const card = await getCardById(fastify.db, customerId, cardId);
     if (!card) return reply.status(404).send({ error: 'Card not found' });
 
-    // The QE:none expiry is disclosed to the cardholder only (PCI DSS Req 3.3). A staff investigation
+    // The QE:none expiry is disclosed to the cardholder only (PCI DSS). A staff investigation
     // READ never reveals it; strip it so the drill-down stays display-safe.
     if (!isOwner) delete (card as Record<string, unknown>).paymentCardExpirationDate;
 
     // FDS/AML shared-card signal: how many customers hold this same physical card (the number only,
-    // never the other holders' identities — PCI/PII minimization for the cardholder's own view).
+    // never the other holders' identities: PCI/PII minimization for the cardholder's own view).
     const cardHolderCount = await getCardHolderCount(fastify.db, card.paymentCardReference as string);
 
-    // Audit (PCI DSS Req 10): record self-service access to a card-on-file. No CHD in the summary.
+    // Audit (PCI DSS): record self-service access to a card-on-file. No CHD in the summary.
     emitComplianceEvent(fastify.db, {
       entityType: 'card',
       entityId: cardId,
@@ -491,7 +494,7 @@ audited (Req 10).`,
 
   // POST /api/v1/customer/:customerId/cards/:cardId/cvv  (OWNER reveal of the per-card CVV), routed
   // THROUGH the provider dispatch (never a direct call to the built-in module). Owner-only + step-up.
-  // The CVV is derived (never stored) and returned ephemerally; the reveal is audited (Req 10) with
+  // The CVV is derived (never stored) and returned ephemerally; the reveal is audited with
   // NO CVV in the log. If an external issuer governs the capability, the dispatch routes to it.
   const ownerReveal = (kind: 'cvv' | 'pan') => async (request: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply) => {
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
@@ -531,18 +534,18 @@ audited (Req 10).`,
   fastify.post('/:customerId/cards/:cardId/cvv', { schema: ownerRevealSchema('cvv') }, ownerReveal('cvv'));
   fastify.post('/:customerId/cards/:cardId/pan', { schema: ownerRevealSchema('pan') }, ownerReveal('pan'));
 
-  // PATCH /api/v1/customer/:customerId/cards/:cardId  — edit the alias/note (the ONLY editable
+  // PATCH /api/v1/customer/:customerId/cards/:cardId, edit the alias/note (the ONLY editable
   // attributes of a saved card). Owner-only. Both fields are non-CHD display metadata.
   fastify.patch('/:customerId/cards/:cardId', {
     schema: {
       tags: ['cards'],
       summary: 'Update a saved card alias / note (owner-only)',
       description: `Updates the customer-defined \`paymentCardAlias\` (nickname) and/or
-\`paymentCardCustomerNote\`. These are the **only** mutable attributes of a stored card — the PAN,
+\`paymentCardCustomerNote\`. These are the **only** mutable attributes of a stored card: the PAN,
 token, expiry, network and status are immutable from the customer's side. Owner-only. Emits a
 \`card.updated\` compliance audit event (Req 10).
 
-**PCI DSS:** the alias/note are free-text display labels — they MUST NOT contain a PAN/CVV and are
+**PCI DSS:** the alias/note are free-text display labels, they MUST NOT contain a PAN/CVV and are
 treated purely as a recognizable nickname/memo.`,
       security: [{ bearerAuth: [] }],
       params: {
@@ -614,7 +617,7 @@ treated purely as a recognizable nickname/memo.`,
     return reply.send(updated);
   });
 
-  // PATCH /api/v1/customer/:customerId/cards/:cardId/status  — deactivate / reactivate a card.
+  // PATCH /api/v1/customer/:customerId/cards/:cardId/status, deactivate / reactivate a card.
   // A deactivated (suspended) card stays on file but the PSP rejects every operation with it,
   // even if the issuer would approve. Owner-only. Emits `card.deactivated` / `card.reactivated`.
   fastify.patch('/:customerId/cards/:cardId/status', {
@@ -662,8 +665,8 @@ audit event (Req 10).`,
     const { customerId, cardId } = request.params as { customerId: string; cardId: string };
     const { active } = request.body as { active: boolean };
 
-    // Owner (self-service) OR an L2 investigator acting as staff (BIAN SD-15 control). The auditor is
-    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS Req 7).
+    // Owner (self-service) OR an L2 investigator acting as staff (control). The auditor is
+    // read-only and L1 has no card-mutation reach, so both are blocked here (PCI DSS).
     const user = (request as { user?: JwtUserPayload }).user;
     const ownId = await getOwnAgreementId(fastify.db, user?.partyRef);
     const isOwner = !!ownId && ownId === customerId;
@@ -690,7 +693,7 @@ audit event (Req 10).`,
     return reply.send(updated);
   });
 
-  // DELETE /api/v1/customer/:customerId/cards/:cardId  — customer removes a saved card.
+  // DELETE /api/v1/customer/:customerId/cards/:cardId, customer removes a saved card.
   fastify.delete('/:customerId/cards/:cardId', {
     schema: {
       tags: ['cards'],

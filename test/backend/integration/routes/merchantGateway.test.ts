@@ -1,5 +1,5 @@
 /**
- * Integration tests: v23 — merchant OAuth on-behalf-of channel on the SHARED capability modules.
+ * Integration tests: v23, merchant OAuth on-behalf-of channel on the SHARED capability modules.
  * The merchant is just another API client: it hits the same endpoints as first-party callers
  * (/beneficiaries, /accounts, /transactions, /gateway/transfers). The only difference is the auth
  * channel (RS256 Bearer + scope + subject binding), resolved by vendors/middleware/dualAuth.ts.
@@ -7,7 +7,7 @@
  * Sources: beneficiary.controller.ts, payoutAccount.controller.ts, cardTransaction.controller.ts,
  *          transfer.controller.ts, vendors/middleware/{auth,dualAuth,validateMerchantToken}.ts
  *
- * Requires TEST_MONGODB_URI env var — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI env var: skips gracefully when not set.
  *
  * Covers:
  *  (a) an RS256 OAuth token is accepted on the module endpoints (dualAuth flag, not the old HS256 401);
@@ -75,7 +75,7 @@ describe('v23 merchant OAuth channel on the shared modules', () => {
     expect(res.status).toBe(200);
   });
 
-  // (b) Accounts — masked IBAN only, scope + subject binding + 401.
+  // (b) Accounts: masked IBAN only, scope + subject binding + 401.
   skip('accounts: 200 + masked IBAN only (no raw payoutAccountIban)', async () => {
     const token = await mintToken(SUB, ['read:accounts']);
     const res = await supertest(app.server)
@@ -88,7 +88,7 @@ describe('v23 merchant OAuth channel on the shared modules', () => {
     expect(raw).not.toMatch(/"payoutAccountRoutingNumber"/);
   });
 
-  skip('accounts: subject binding — path owner != token.sub → 403', async () => {
+  skip('accounts: subject binding, path owner != token.sub → 403', async () => {
     const token = await mintToken(SUB, ['read:accounts']);
     const res = await supertest(app.server)
       .get(`/api/v1/accounts/${OTHER_SUB}`)
@@ -140,7 +140,7 @@ describe('v23 merchant OAuth channel on the shared modules', () => {
     expect(typeof res.body.ok).toBe('boolean');
   });
 
-  // Send-to-beneficiary (P2P) — now POST /beneficiaries/:beneficiaryRef/transfer (owner from token).
+  // Send-to-beneficiary (P2P): now POST /beneficiaries/:beneficiaryRef/transfer (owner from token).
   skip('beneficiaries/transfer: requires write:transfers (403 without it)', async () => {
     const token = await mintToken(SUB, ['read:beneficiaries']);
     const res = await supertest(app.server)

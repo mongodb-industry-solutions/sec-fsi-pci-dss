@@ -1,4 +1,4 @@
-// AML capability module controller — STATIC routes (ADR-029).
+// AML capability module controller: STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { screenAml } from '../services/aml.service';

@@ -12,10 +12,10 @@ import { Breadcrumb } from '../../../../../../../components/Breadcrumb';
 import { RequirePermission } from '../../../../../../../components/RequirePermission';
 import { useEffectivePermissions } from '../../../../../../../lib/permissions';
 
-// v29.2 global card-administration DETAIL page (SD-88, built-in card-issuer module). Dedicated page
+// v29.2 global card-administration DETAIL page (built-in card-issuer module). Dedicated page
 // (not a modal) so the operations officer sees every display-safe field with room to act.
-// PCI DSS Req 3.2/3.3: full PAN and CVV/PIN are NEVER stored or shown; expiry (QE:none) is included
-// here on a need-to-know basis. Req 7 (least privilege) + Req 10 (every mutation audited server-side).
+// PCI DSS: full PAN and CVV/PIN are NEVER stored or shown; expiry (QE:none) is included
+// here on a need-to-know basis. (least privilege) + (every mutation audited server-side).
 
 const LIST_HREF = '/system/admin/modules/card-issuer?tab=cards';
 // 'active' is the only status the backend treats as "on". The activation toggle only supports
@@ -299,10 +299,10 @@ function CardAdminDetail() {
                 paymentCardInstanceReference: {card.paymentCardInstanceReference}
               </p>
             )}
-            <p className="text-xs text-gray-400 pt-1">Cardholder is derived from the linked party (need-to-know, audited). Full PAN and CVV are never stored. Any reveal is ephemeral (on demand, re-hideable), routed via the card provider and audited server-side (PCI DSS Req 3.2/3.3, Req 10).</p>
+            <p className="text-xs text-gray-400 pt-1">Cardholder is derived from the linked party (need-to-know, audited). Full PAN and CVV are never stored. Any reveal is ephemeral (on demand, re-hideable), routed via the card provider and audited server-side (PCI DSS).</p>
           </div>
 
-          {/* Funding account (SD-88 cardAccountReference). IBAN is hidden by default; reveal on demand. */}
+          {/* Funding account (cardAccountReference). IBAN is hidden by default; reveal on demand. */}
           {card.fundingAccount && (
             <div className="bg-white rounded-xl border p-5 space-y-3">
               <div className="flex items-center justify-between gap-3">

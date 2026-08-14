@@ -1,5 +1,5 @@
 /**
- * E2E: Customer payment (FR-v1-01/03) — new-payment wizard + history.
+ * E2E: Customer payment (FR-v1-01/03), new-payment wizard + history.
  * Routes: /system/payment, /system/payment/history.
  *
  * The payment wizard was redesigned: step 1 no longer offers preset saved-card
@@ -92,17 +92,99 @@ test.describe('FR-v1-01/03: new payment wizard', () => {
     await advanceToConfirmation(page);
     await expect(page.getByText(/Payment Confirmed/i)).toBeVisible({ timeout: 8000 });
     await expect(page.getByText(/fraud|review|investigation/i).first()).toBeVisible({ timeout: 8000 });
+    // Accepted, not completed: the amount is reserved until the review closes.
+    await expect(page.getByText(/reserved on your account, not charged/i)).toBeVisible();
+  });
+
+  // A decline is a completed operation: it lands on the receipt with a link to the detail, never on
+  // an inline error on the review step.
+  test('a declined payment lands on the receipt with the operation detail link', async ({ page }) => {
+    await page.route('**/api/v1/transactions/*/stream', (route) =>
+      route.fulfill(sseOutcome({ status: 'declined', declineReason: 'insufficient_funds', fraudCaseCreated: false })));
+    await page.route('**/api/v1/transactions', (route) => route.request().method() === 'POST'
+      ? route.fulfill(json({ cardTransactionInstanceReference: 'txn-dec-1', cardTransactionStatus: 'pending' }, 201))
+      : route.continue());
+    await advanceToConfirmation(page);
+    await expect(page.getByText(/Payment Not Completed/i)).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Declined', { exact: true })).toBeVisible();
+    await expect(page.getByText(/insufficient funds/i)).toBeVisible();
+    await expect(page.getByRole('link', { name: /your transactions/i })).toHaveAttribute('href', '/system/payment/history/txn-dec-1');
+    await expect(page.getByRole('button', { name: /View Operation Detail/i })).toBeVisible();
   });
 });
 
 test.describe('FR-v1-01: payment history', () => {
+  // v36 (ADR-063): the history reads the canonical collection, which returns normalized movement rows
+  // for every kind. `/transactions/all` is gone.
   test('customer sees their transaction history', async ({ page, context }) => {
-    await page.route('**/api/v1/transactions/all**', (r) => r.fulfill(json({ page: 1, limit: 100, total: 1, results: [
-      { cardTransactionInstanceReference: 'txn-h1', cardTransactionAmount: { amount: 42.5, currency: 'USD' }, cardTransactionDateTime: '2026-06-01T10:00:00Z', cardTransactionStatus: 'authorized', cardTransactionMerchantName: 'TechGadgets Ltd.', cardTransactionMaskedPanDisplay: '****-****-****-4242', cardTransactionChannel: 'online' },
+    await page.route('**/api/v1/transactions?**', (r) => r.fulfill(json({ page: 1, limit: 200, total: 2, results: [
+      {
+        kind: 'card', paymentExecutionInstanceReference: 'txn-h1', direction: 'sent',
+        grossAmount: 42.5, currency: 'USD', paymentExecutionStatus: 'authorized', paymentExecutionRail: 'card',
+        concept: 'TECHGADGETS', beneficiaryName: 'TechGadgets Ltd.', destinationAccountMasked: '****-****-****-4242',
+        merchantCategoryCode: '5732', channel: 'online', initiatedAt: '2026-06-01T10:00:00Z', completedAt: '2026-06-01T10:00:00Z',
+        fraudCase: { created: false },
+      },
+      {
+        kind: 'transfer', paymentExecutionInstanceReference: 'exec-h1', direction: 'sent',
+        grossAmount: 90, currency: 'EUR', paymentExecutionStatus: 'completed', paymentExecutionRail: 'sepa',
+        concept: 'Rent share', beneficiaryName: 'Carlos', destinationAccountMasked: 'ES12••••5477',
+        initiatedAt: '2026-06-02T10:00:00Z', completedAt: '2026-06-02T11:00:00Z', fraudCase: { created: false },
+      },
     ] })));
     await loginAs(context, 'customer');
     await page.goto('/system/payment/history');
     await expect(page.getByRole('heading', { name: 'Payment History', exact: true })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('TechGadgets Ltd.').first()).toBeVisible({ timeout: 8000 });
+    // One list, every movement kind: the transfer row comes from the same response.
+    await expect(page.getByText('Rent share').first()).toBeVisible({ timeout: 8000 });
+    // Icons are lucide components, not text glyphs: no arrow / tick characters reach the markup.
+    const body = await page.locator('main').innerText();
+    for (const glyph of ['↑', '↓', '↕', '✓', '✗', '💳', '›']) expect(body, glyph).not.toContain(glyph);
+    // The direction and status chips render as inline SVG icons.
+    await expect(page.locator('main svg').first()).toBeVisible();
+    await expect(page.getByText('Transfer sent').first()).toBeVisible();
+  });
+});
+
+/**
+ * Regression (v36): the customer detail page used the 404 of GET /transactions/:id as the signal
+ * "this reference is not a card payment, try the transfer / RTP endpoints". Once that route started
+ * resolving EVERY movement kind, a transfer answered 200 with a movement row, the page took the card
+ * branch and crashed on an undefined status. It must fall through to the transfer view instead.
+ */
+test.describe('customer detail page: a transfer reference', () => {
+  const MOVEMENT_ROW = {
+    kind: 'transfer', paymentExecutionInstanceReference: 'exec-c1', direction: 'sent',
+    grossAmount: 800, currency: 'EUR', paymentExecutionStatus: 'pending', paymentExecutionRail: 'sepa',
+    concept: 'Car deposit', beneficiaryName: 'Carlos', destinationAccountMasked: 'ES12••••5477',
+    initiatedAt: '2026-07-08T09:20:00Z', completedAt: null, heldForReview: true,
+  };
+  const TRANSFER = {
+    paymentExecutionInstanceReference: 'exec-c1',
+    initiatorPartyReference: 'p-1', initiatorName: 'Luis Fernandez',
+    beneficiaryPartyReference: 'p-2', beneficiaryName: 'Carlos',
+    grossAmount: 800, netAmount: 800, feeAmount: 0, currency: 'EUR',
+    paymentExecutionStatus: 'pending', paymentExecutionRail: 'sepa',
+    routingNote: 'Car deposit',
+    initiatedAt: '2026-07-08T09:20:00Z', direction: 'sent', fraudCase: null,
+  };
+
+  test('renders the transfer instead of crashing on a card-shaped read', async ({ page, context }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+
+    // The movement route answers 200 with the row (post-v36 behaviour), not 404.
+    await page.route('**/api/v1/transactions/exec-c1', (r) => r.fulfill(json(MOVEMENT_ROW)));
+    await page.route('**/api/v1/transactions/exec-c1/notes', (r) => r.fulfill(json({ caseFound: false, notes: [] })));
+    await page.route('**/api/v1/accounts/transfer/exec-c1', (r) => r.fulfill(json(TRANSFER)));
+    await page.route('**/api/v1/notifications**', (r) => r.fulfill(json({ count: 0, items: [] })));
+
+    await loginAs(context, 'customer', { partyRef: 'p-1' });
+    await page.goto('/system/payment/history/exec-c1');
+
+    // The transfer view rendered, and nothing blew up.
+    await expect(page.getByText(/Car deposit/i).first()).toBeVisible({ timeout: 15000 });
+    expect(errors.filter((e) => /replace|undefined/i.test(e))).toEqual([]);
   });
 });

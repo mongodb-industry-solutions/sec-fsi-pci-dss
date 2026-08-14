@@ -35,7 +35,7 @@ async function ensureIndex(
     const e = err as MongoServerError;
 
     if (e.code === 85 || e.code === 86) {
-      // Index exists with wrong options — drop by auto-name and recreate.
+      // Index exists with wrong options: drop by auto-name and recreate.
       const autoName = Object.entries(keySpec as Record<string, unknown>)
         .map(([k, v]) => `${k}_${v}`)
         .join('_');
@@ -78,9 +78,9 @@ async function ensureIndex(
         }
       }
       console.log(
-        `  repaired: ${collection}.{${fields.join(', ')}} — removed ${removed} duplicate(s), retrying unique index`,
+        `  repaired: ${collection}.{${fields.join(', ')}}, removed ${removed} duplicate(s), retrying unique index`,
       );
-      // Final attempt — let it throw if it still fails.
+      // Final attempt: let it throw if it still fails.
       await db.collection(collection).createIndex(keySpec, options);
       return;
     }
@@ -102,7 +102,7 @@ async function ensureIndexes(
   try {
     await db.collection(collection).createIndexes(indexes);
   } catch {
-    // Batch failed — run each index individually so ensureIndex can self-heal.
+    // Batch failed: run each index individually so ensureIndex can self-heal.
     for (const idx of indexes) {
       const { key, ...opts } = idx;
       await ensureIndex(db, collection, key as IndexSpecification, opts as CreateIndexesOptions);
@@ -115,9 +115,9 @@ async function ensureIndexes(
 export async function createIndexes(client: MongoClient) {
   const db = client.db(config.mongodb.dbName);
 
-  // SD-13: Party Data Management
+  // Party Data Management
   // partyMobilePhoneNumber is QE-encrypted (no unique index possible), so uniqueness is
-  // enforced on its blind-index digest — a keyed HMAC stored in plaintext. See digest.ts.
+  // enforced on its blind-index digest: a keyed HMAC stored in plaintext. See digest.ts.
   await ensureIndexes(db, 'party', [
     { key: { partyInstanceReference: 1 }, unique: true },
     // Partial: phone is optional (self-registered parties may omit it). Only documents that
@@ -125,19 +125,19 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
   ]);
 
-  // SD-254: Card Transaction Log
+  // Card Transaction Log
   await ensureIndexes(db, 'cardTransactionLog', [
     { key: { cardTransactionInstanceReference: 1 }, unique: true },
     { key: { paymentCardReference: 1 } },
     { key: { cardTransactionDateTime: -1 } },
     { key: { cardTransactionStatus: 1 } },
     { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
-    // v18 (A-06): runtime merchant commission revenue aggregation (SD-89 dashboard). Sparse — only
+    // v18 (A-06): runtime merchant commission revenue aggregation (dashboard). Sparse, only
     // fee-bearing acquiring payments carry the attribution sub-doc.
     { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
   ]);
 
-  // SD-53: Customer Agreement Procedure
+  // Customer Agreement Procedure
   // v27: helper index on the plaintext KYC status (NOT a QE field). QE-encrypted KYC leaves
   // (riskScore, riskRating, etc.) are searched via QE and must NOT carry btree/unique indexes.
   await ensureIndexes(db, 'customerAgreementProcedure', [
@@ -153,7 +153,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1, recordUpdatedDateTime: -1 } },
   ]);
 
-  // SD-88: Payment Card Management (the per-customer card-on-file arrangement).
+  // Payment Card Management (the per-customer card-on-file arrangement).
   // A customer may hold a given card (token) only once → unique compound index dedups per customer.
   await ensureIndexes(db, 'paymentCardManagement', [
     { key: { paymentCardInstanceReference: 1 }, unique: true },
@@ -173,7 +173,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentCardReference: 1 } },
   ]);
 
-  // SD-88: Payment Card Registry (the physical card, one per token). Token is the unique identity;
+  // Payment Card Registry (the physical card, one per token). Token is the unique identity;
   // the holder array is indexed so "which cards does this customer hold" and FDS shared-card lookups
   // are fast.
   await ensureIndexes(db, 'paymentCardRegistry', [
@@ -182,7 +182,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { cardHolderCount: -1 } },
   ]);
 
-  // SD-83: Fraud Diagnosis — instance reference (natural primary key)
+  // Fraud Diagnosis, instance reference (natural primary key)
   await ensureIndexes(db, 'fraudDiagnosisCase', [
     { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
     { key: { cardTransactionInstanceReference: 1 } },
@@ -190,7 +190,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
   ]);
 
-  // SD-83: Fraud Diagnosis — human-readable business key (unique constraint).
+  // Fraud Diagnosis, human-readable business key (unique constraint).
   // ensureIndex deduplicates the collection automatically when E11000 occurs
   // (runtime-generated cases can share a reference if the counter is ever reset).
   await ensureIndex(
@@ -204,7 +204,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
   ]);
 
-  // SD-83: Customer Questions (ADR-031)
+  // Customer Questions (ADR-031)
   await ensureIndexes(db, 'fraudDiagnosisCustomerQuestion', [
     { key: { customerQuestionInstanceReference: 1 }, unique: true },
     { key: { cardTransactionInstanceReference: 1 } },
@@ -230,14 +230,14 @@ export async function createIndexes(client: MongoClient) {
     { key: { partitionKey: 1, occurredAt: 1 } },
   ]);
 
-  // SD-91: Customer Authentication Assessment
+  // Customer Authentication Assessment
   await ensureIndexes(db, 'customerAuthenticationAssessment', [
     { key: { customerAuthenticationInstanceReference: 1 }, unique: true },
     { key: { partyInstanceReference: 1 } },
     { key: { customerAuthenticationUserRole: 1 } },
   ]);
 
-  // SD-16: Party Authentication Assessment
+  // Party Authentication Assessment
   await ensureIndexes(db, 'partyAuthenticationAssessment', [
     { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
     { key: { partyInstanceReference: 1 } },
@@ -256,7 +256,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { roleIsBuiltin: 1 } },
   ]);
 
-  // SD-60: Customer Credit Rating State
+  // Customer Credit Rating State
   await ensureIndexes(db, 'customerCreditRatingState', [
     { key: { customerCreditRatingInstanceReference: 1 }, unique: true },
     { key: { customerAgreementReference: 1 } },
@@ -277,7 +277,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { accessDateTime: -1 } },
   ]);
 
-  // SD-89: Merchant Agreement Procedure
+  // Merchant Agreement Procedure
   await ensureIndexes(db, 'merchantAgreementProcedure', [
     { key: { merchantAgreementInstanceReference: 1 }, unique: true },
     { key: { merchantAgreementStatus: 1 } },
@@ -291,12 +291,12 @@ export async function createIndexes(client: MongoClient) {
     { key: { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': 1 } },
   ]);
 
-  // SD-89: Merchant lifecycle audit trail (append-only, PCI DSS Req 10)
+  // Merchant lifecycle audit trail (append-only, PCI DSS)
   await ensureIndexes(db, 'merchantAgreementEvents', [
     { key: { merchantAgreementInstanceReference: 1, eventDateTime: 1 } },
   ]);
 
-  // SD-64: Checkout Session Log (TTL on expiry field)
+  // Checkout Session Log (TTL on expiry field)
   await ensureIndexes(db, 'checkoutSessionLog', [
     { key: { checkoutSessionInstanceReference: 1 }, unique: true },
     { key: { merchantAgreementInstanceReference: 1 } },
@@ -310,7 +310,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { active: 1, displayOrder: 1 } },
   ]);
 
-  // SD-64: Payment Link Record
+  // Payment Link Record
   await ensureIndexes(db, 'paymentLinkRecord', [
     { key: { paymentLinkInstanceReference: 1 }, unique: true },
     { key: { paymentLinkCode: 1 }, unique: true },
@@ -319,13 +319,13 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentLinkExpiresAt: 1 }, expireAfterSeconds: 0, sparse: true },
   ]);
 
-  // SD-193: External Provider Arrangement (Ch-07) — registry of providers/vendors
+  // External Provider Arrangement (Ch-07), registry of providers/vendors
   // (dev.v7 Fase 2: renamed from legacy 'integrationRegistry').
-  // Drop the old unique (type+endpoint) index if it still exists — replaced with non-unique
+  // Drop the old unique (type+endpoint) index if it still exists: replaced with non-unique
   // to support multi-provider configurations (ADR-010).
   await db.collection('externalProviderArrangement')
     .dropIndex('externalProviderArrangementType_1_externalProviderApiEndpoint_1')
-    .catch(() => { /* index may not exist — safe to ignore */ });
+    .catch(() => { /* index may not exist: safe to ignore */ });
 
   await ensureIndexes(db, 'externalProviderArrangement', [
     { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
@@ -336,7 +336,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
   ]);
 
-  // SD-193: External Provider Arrangement Portfolio (Ch-07) — routing groups
+  // External Provider Arrangement Portfolio (Ch-07), routing groups
   // (dev.v7 Fase 2: renamed from legacy 'integrationRoutingGroups').
   await ensureIndexes(db, 'externalProviderArrangementPortfolio', [
     { key: { routingGroupInstanceReference: 1 }, unique: true },
@@ -344,7 +344,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { isDefaultGroup: 1 }, sparse: true },
   ]);
 
-  // SD-193: External Provider Arrangement Action Log — timeseries (ADR-025)
+  // External Provider Arrangement Action Log, timeseries (ADR-025)
   // (dev.v7 Fase 2: renamed from legacy 'integrationEvents').
   // TTL is managed by the timeseries collection definition; no manual TTL index needed.
   await ensureIndexes(db, 'externalProviderArrangementActionLog', [
@@ -353,7 +353,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { 'businessContext.entityType': 1, 'businessContext.entityId': 1, recordCreatedDateTime: -1 }, sparse: true },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
-  // dev.v7 Fase 2: capabilityModuleConfiguration — internal Module engine config (ADR-029).
+  // dev.v7 Fase 2: capabilityModuleConfiguration, internal Module engine config (ADR-029).
   // Implicitly created here via createIndex; documents seeded in Fase 4.
   await ensureIndexes(db, 'capabilityModuleConfiguration', [
     { key: { capabilityModuleInstanceReference: 1 }, unique: true },
@@ -361,36 +361,36 @@ export async function createIndexes(client: MongoClient) {
     { key: { moduleDomain: 1 } },
   ]);
 
-  // ADR-025: Business Process Events — timeseries
+  // ADR-025: Business Process Events, timeseries
   await ensureIndexes(db, 'businessProcessEvent', [
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
     { key: { processAction: 1, processOutcome: 1 } },
-    // v18: "user x merchant x action" activity view (SD-16 audit).
+    // v18: "user x merchant x action" activity view (audit).
     // Not sparse: timeseries collections reject the sparse option.
     { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
-  // ADR-025: Compliance Process Events — timeseries
+  // ADR-025: Compliance Process Events, timeseries
   await ensureIndexes(db, 'complianceProcessEvent', [
     { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
     { key: { processType: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
-  // v16 (ADR-036): SD-16 RSA public key registry — unique kid, status filter for JWKS
+  // v16 (ADR-036): RSA public key registry, unique kid, status filter for JWKS
   await ensureIndexes(db, 'partyAuthenticationKey', [
     { key: { keyId: 1 }, unique: true },
     { key: { keyStatus: 1 } },
   ]);
 
-  // v16 (ADR-033): SD-16 OAuth authorization codes — unique code, TTL 5min on expiresAt
+  // v16 (ADR-033): OAuth authorization codes, unique code, TTL 5min on expiresAt
   await ensureIndexes(db, 'partyAuthorizationCode', [
     { key: { code: 1 }, unique: true },
     { key: { clientId: 1 } },
     { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
   ]);
 
-  // v16 (ADR-033): SD-16 Issued OAuth tokens — unique tokenId, TTL on expiresAt, accessTokenJti lookup
+  // v16 (ADR-033): Issued OAuth tokens, unique tokenId, TTL on expiresAt, accessTokenJti lookup
   await ensureIndexes(db, 'partyIssuedToken', [
     { key: { tokenId: 1 }, unique: true },
     { key: { accessTokenJti: 1 }, sparse: true },
@@ -406,7 +406,7 @@ export async function createIndexes(client: MongoClient) {
     { sparse: true },
   );
 
-  // v16 (ADR-038): SD-16 PartyAuthentication, ConsentGrant — unique per-user+client pair, sub lookup, revocation
+  // v16 (ADR-038): PartyAuthentication, ConsentGrant, unique per-user+client pair, sub lookup, revocation
   await ensureIndexes(db, PARTY_AUTH_CONSENT_COLLECTION, [
     { key: { consentId: 1 }, unique: true },
     { key: { partyAuthenticationInstanceReference: 1, oauthClientId: 1 }, unique: true },
@@ -414,14 +414,14 @@ export async function createIndexes(client: MongoClient) {
     { key: { oauthClientId: 1, consentStatus: 1 } },
   ]);
 
-  // SD-91/SD-16: PartyEnrolledCredential — unique credentialId, owner+status lookup
+  // PartyEnrolledCredential, unique credentialId, owner+status lookup
   await ensureIndexes(db, PARTY_ENROLLED_CREDENTIAL_COLLECTION, [
     { key: { partyEnrolledCredentialInstanceReference: 1 }, unique: true },
     { key: { credentialId: 1 }, unique: true },
     { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
   ]);
 
-  // SD-91: PartyBackchannelAuthentication — unique authReqId, TTL on expiresAt, client+status lookup
+  // PartyBackchannelAuthentication, unique authReqId, TTL on expiresAt, client+status lookup
   await ensureIndexes(db, PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION, [
     { key: { authReqId: 1 }, unique: true },
     { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
@@ -436,7 +436,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantAgreementInstanceReference: 1, webhookEventType: 1, deliveredAt: -1 } },
   ]);
 
-  // SD-66: Payout Account Arrangement (v17)
+  // Payout Account Arrangement (v17)
   // Partial unique index: at most one default account per party (sparse on the true flag).
   await ensureIndexes(db, PAYOUT_ACCOUNT_COLLECTION, [
     { key: { payoutAccountInstanceReference: 1 }, unique: true },
@@ -444,39 +444,39 @@ export async function createIndexes(client: MongoClient) {
     { key: { partyInstanceReference: 1, payoutAccountIsDefault: 1 }, sparse: true },
   ]);
 
-  // SD-65: Payment Execution Procedure (v17)
+  // Payment Execution Procedure (v17)
   await ensureIndexes(db, PAYMENT_EXECUTION_COLLECTION, [
     { key: { paymentExecutionInstanceReference: 1 }, unique: true },
     { key: { paymentOrderInstanceReference: 1 } },
     { key: { cardTransactionInstanceReference: 1 }, sparse: true },
     { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
-    // v18: merchant commission revenue aggregation (SD-89 dashboard). Sparse — only fee-bearing execs.
+    // v18: merchant commission revenue aggregation (dashboard). Sparse, only fee-bearing execs.
     { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
-    // v18: merchant-scoped transaction history (SD-89 data isolation). Sparse — only merchant-initiated execs.
+    // v18: merchant-scoped transaction history (data isolation). Sparse, only merchant-initiated execs.
     { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
   ]);
 
-  // SD-54: Counterparty Arrangement / Beneficiary Registry (v17)
-  // Unique on (owner, counterparty) pair — prevents duplicate entries for same beneficiary.
+  // Counterparty Arrangement / Beneficiary Registry (v17)
+  // Unique on (owner, counterparty) pair: prevents duplicate entries for same beneficiary.
   await ensureIndexes(db, COUNTERPARTY_COLLECTION, [
     { key: { counterpartyArrangementReference: 1 }, unique: true },
     { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
     { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
   ]);
 
-  // v17.1: Recurring mandates (SD-66) — due-run scan by status + nextRunAt.
+  // v17.1: Recurring mandates , due-run scan by status + nextRunAt.
   await ensureIndexes(db, RECURRING_MANDATE_COLLECTION, [
     { key: { recurringMandateInstanceReference: 1 }, unique: true },
     { key: { ownerPartyReference: 1, recordCreatedDateTime: -1 } },
     { key: { mandateStatus: 1, nextRunAt: 1 } },
   ]);
 
-  // v17.1: Idempotency store — unique composite key (first writer wins under a race).
+  // v17.1: Idempotency store, unique composite key (first writer wins under a race).
   await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [
     { key: { idempotencyKey: 1 }, unique: true },
   ]);
 
-  // SD-65 (v28): Request to Pay canonical record. Inbox/outbox + expiry-sweeper + linkage queries.
+  // (v28): Request to Pay canonical record. Inbox/outbox + expiry-sweeper + linkage queries.
   await ensureIndexes(db, PAYMENT_REQUEST_COLLECTION, [
     { key: { paymentRequestInstanceReference: 1 }, unique: true },
     { key: { requesterPartyReference: 1, recordCreatedDateTime: -1 } },
@@ -487,13 +487,13 @@ export async function createIndexes(client: MongoClient) {
     { key: { idempotencyKey: 1 }, unique: true, partialFilterExpression: { idempotencyKey: { $exists: true } } },
   ]);
 
-  // Directory Entry (v28): RTP alias resolution cache — hashed alias PK + TTL.
+  // Directory Entry (v28): RTP alias resolution cache, hashed alias PK + TTL.
   await ensureIndexes(db, RTP_ALIAS_DIRECTORY_CACHE_COLLECTION, [
     { key: { aliasHash: 1 }, unique: true },
     { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
   ]);
 
-  // SD-65 (v28): shared QR representation — PK, subject lookup, TTL.
+  // (v28): shared QR representation, PK, subject lookup, TTL.
   await ensureIndexes(db, QR_REPRESENTATION_COLLECTION, [
     { key: { qrRepresentationInstanceReference: 1 }, unique: true },
     { key: { subjectType: 1, subjectReference: 1 } },

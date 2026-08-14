@@ -48,7 +48,7 @@ export function SectionHeader({ icon: Icon, title, description, info, debugInfo,
           <ShieldCheck size={13} className="text-[#001E2B] mt-0.5 shrink-0" />
           <div className="min-w-0">
             <p className="text-[10px] font-semibold text-[#001E2B] uppercase tracking-wider">Security &amp; standards</p>
-            <p className="text-xs font-mono text-gray-600 mt-0.5">{debugInfo}</p>
+            <p className="text-[10px] sm:text-xs font-mono text-gray-600 mt-0.5 leading-snug [overflow-wrap:anywhere]">{debugInfo}</p>
           </div>
         </div>
       )}

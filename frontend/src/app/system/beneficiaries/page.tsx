@@ -2,11 +2,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  UserCheck, Search, Plus, Mail, Phone, Trash2, ChevronLeft, ChevronRight, X, SendHorizonal, Check, Landmark, HandCoins,
+  UserCheck, Search, Plus, Mail, Phone, Trash2, ChevronLeft, ChevronRight, X, SendHorizonal, Check, Landmark, HandCoins, Download,
 } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { RequestMoneyModal } from '../../../components/RequestMoneyModal';
 import { useDebugMode } from '../../../lib/debugMode';
+import { Combobox } from '../../../components/ui/Combobox';
+import { AuditTrailLink } from '../../../components/AuditTrailLink';
+import { downloadJsonFile, appliedFilters } from '../../../lib/downloadJson';
 import { api } from '../../../lib/api';
 import { getToken, decodeToken } from '../../../lib/auth';
 
@@ -344,6 +347,8 @@ export default function BeneficiariesPage() {
 
   const [search, setSearch] = useState('');
   const [ownerFilter, setOwnerFilter] = useState('');
+  const [caseFilter, setCaseFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'removed'>('active');
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -351,20 +356,22 @@ export default function BeneficiariesPage() {
   const [requestTarget, setRequestTarget] = useState<Beneficiary | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<Beneficiary | null>(null);
   const [removing, setRemoving] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const LIMIT = 10;
 
   // A staff caller needs a predicate (owner party reference, or MIN_QUERY chars) before any
   // request is issued. The server enforces the same rule and returns 400 without one.
   const MIN_QUERY = 3;
-  const hasPredicate = isCustomer || !!ownerFilter.trim() || search.trim().length >= MIN_QUERY;
+  const hasPredicate = isCustomer || !!ownerFilter.trim() || !!caseFilter.trim() || search.trim().length >= MIN_QUERY;
 
-  const load = useCallback(async (pg: number, q: string, owner: string) => {
+  const load = useCallback(async (pg: number, q: string, owner: string, caseRef = '', status: 'active' | 'removed' = 'active') => {
     if (!token) return;
     // Customers: always scoped to own; the backend forces it regardless of what is sent.
     const effectiveOwner = isCustomer ? ownPartyRef : owner.trim();
     const term = q.trim();
-    if (!isCustomer && !effectiveOwner && term.length < MIN_QUERY) {
+    const kase = caseRef.trim();
+    if (!isCustomer && !effectiveOwner && !kase && term.length < MIN_QUERY) {
       setBeneficiaries([]); setTotal(0); setError(''); setLoading(false);
       return;
     }
@@ -374,6 +381,8 @@ export default function BeneficiariesPage() {
         page: pg, limit: LIMIT,
         ...(term ? { q: term } : {}),
         ...(effectiveOwner ? { ownerRef: effectiveOwner } : {}),
+        ...(kase ? { caseRef: kase } : {}),
+        ...(isCustomer ? {} : { status }),
       });
       setBeneficiaries(res.results);
       setTotal(res.total);
@@ -387,15 +396,50 @@ export default function BeneficiariesPage() {
     // Customers load their own list; staff wait for a predicate (no query on mount).
     if (!token) return;
     if (isCustomer) { if (ownPartyRef) load(page, search, ownerFilter); return; }
-    if (hasPredicate) load(page, search, ownerFilter);
+    if (hasPredicate) load(page, search, ownerFilter, caseFilter, statusFilter);
     else { setBeneficiaries([]); setTotal(0); }
-  }, [token, page, load, search, ownerFilter, isCustomer, ownPartyRef, hasPredicate]);
+  }, [token, page, load, search, ownerFilter, caseFilter, statusFilter, isCustomer, ownPartyRef, hasPredicate]);
+
+  // Evidence extract of the scoped result set: the whole predicate, the totals and every record
+  // an oversight role just read, so a finding can be filed without a screenshot.
+  const exportEvidence = useCallback(async () => {
+    if (!token || !hasPredicate) return;
+    setExporting(true);
+    try {
+      const filters = {
+        ownerRef: ownerFilter.trim(), caseRef: caseFilter.trim(),
+        q: search.trim(), status: statusFilter,
+      };
+      const PER = 100;
+      const collected: Beneficiary[] = [];
+      let pageN = 1;
+      let grandTotal = 0;
+      for (;;) {
+        const res = await api.beneficiaries.list(token, { ...appliedFilters(filters), page: pageN, limit: PER });
+        grandTotal = res.total;
+        collected.push(...res.results);
+        if (collected.length >= res.total || res.results.length < PER) break;
+        pageN += 1;
+      }
+      downloadJsonFile('beneficiaries', {
+        generatedAt: new Date().toISOString(),
+        generatedByRole: role,
+        bianServiceDomain: 'Counterparty Administration',
+        note: 'Contact details are stored masked (PCI DSS). Each read is recorded in the compliance ledger.',
+        filtersApplied: appliedFilters(filters),
+        totalMatching: grandTotal,
+        exported: collected.length,
+        records: collected,
+      });
+    } catch { /* non-blocking: the empty download signals the failure */ }
+    setExporting(false);
+  }, [token, hasPredicate, ownerFilter, caseFilter, search, statusFilter, role]);
 
   function handleSearchChange(val: string) {
     setSearch(val);
     setPage(1);
     if (searchTimer.current) clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => load(1, val, ownerFilter), 350);
+    searchTimer.current = setTimeout(() => load(1, val, ownerFilter, caseFilter, statusFilter), 350);
   }
 
   async function handleRemove(b: Beneficiary) {
@@ -403,7 +447,7 @@ export default function BeneficiariesPage() {
     try {
       await api.beneficiaries.remove(b.ownerPartyReference, b.counterpartyArrangementReference, token);
       setConfirmRemove(null);
-      load(page, search, ownerFilter);
+      load(page, search, ownerFilter, caseFilter, statusFilter);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove.');
     }
@@ -426,43 +470,127 @@ export default function BeneficiariesPage() {
           ? 'Your saved contacts for quick transfers. Add someone by phone or email, we never store their raw contact details, only a secure reference.'
           : 'Saved contacts registered by customers for transfers and payments. Contact details are masked at registration time.'
         }
-        debugInfo="BIAN SD-54 Counterparty Administration · PCI DSS Req 3.4 · Req 7 (scope: own for customers)"
+        debugInfo="Counterparty Administration · PCI DSS (scope: own for customers)"
       />
 
-      {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-48">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-          <input value={search} onChange={e => handleSearchChange(e.target.value)}
-            placeholder={isCustomer ? 'Search by name or contact…' : `Search by name or contact (min ${MIN_QUERY} characters)…`}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+      {/* Toolbar. Staff read one owner, one case, or a search term: the three alternative
+          predicates the server accepts, labelled so it is clear any single one is enough. */}
+      {isCustomer ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-48">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input value={search} onChange={e => handleSearchChange(e.target.value)}
+              placeholder="Search by name or contact…"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+          </div>
+          {canWrite && (
+            <button type="button" onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus size={14} /> Add contact
+            </button>
+          )}
         </div>
-        {/* Staff-only: owner filter */}
-        {isStaff && (
-          <input value={ownerFilter} onChange={e => { setOwnerFilter(e.target.value); setPage(1); load(1, search, e.target.value); }}
-            placeholder="Owner party reference…"
-            title="A staff read is scoped to one owner party, or to a search term of at least 3 characters (v32, ADR-048)"
-            className="w-60 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
-        )}
-        {canWrite && (
-          <button type="button" onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-1.5 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <Plus size={14} /> Add contact
-          </button>
-        )}
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="lg:col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">Alias or masked contact</label>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input value={search} onChange={e => handleSearchChange(e.target.value)}
+                  placeholder={`e.g. Mom, Flatmate, ***@ (min ${MIN_QUERY} characters)`}
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+              </div>
+              <p className="mt-1 text-[11px] text-gray-400">
+                Matches the alias and the masked hint only. A full email or phone number is never stored, so it will not match.
+              </p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Owner party reference</label>
+              <input value={ownerFilter}
+                onChange={e => { setOwnerFilter(e.target.value); setPage(1); load(1, search, e.target.value, caseFilter, statusFilter); }}
+                placeholder="Party UUID of the customer"
+                className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+              <p className="mt-1 text-[11px] text-gray-400">Copy it from the customer record (Users).</p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Investigation case</label>
+              <input value={caseFilter}
+                onChange={e => { setCaseFilter(e.target.value); setPage(1); load(1, search, ownerFilter, e.target.value, statusFilter); }}
+                placeholder="FD-2026-000123"
+                className="w-full px-3 py-2 text-sm font-mono border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40" />
+              <p className="mt-1 text-[11px] text-gray-400">Resolves to the case customer.</p>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Status</label>
+              <Combobox
+                editable={false}
+                value={statusFilter}
+                onChange={(v) => { setStatusFilter(v as 'active' | 'removed'); setPage(1); load(1, search, ownerFilter, caseFilter, v as 'active' | 'removed'); }}
+                options={[
+                  { value: 'active', label: 'Active' },
+                  { value: 'removed', label: 'Removed (deregistered)' },
+                ]}
+              />
+            </div>
+            <div className="flex items-end gap-2 lg:col-span-2">
+              {hasPredicate && (
+                <button type="button"
+                  onClick={() => { setSearch(''); setOwnerFilter(''); setCaseFilter(''); setStatusFilter('active'); setPage(1); }}
+                  className="text-xs px-3 py-2 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50">
+                  Clear
+                </button>
+              )}
+              {hasPredicate && (
+                <button type="button" onClick={exportEvidence} disabled={exporting || loading}
+                  title="Download the records matching these filters as a JSON extract"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors disabled:opacity-50">
+                  <Download size={13} /> {exporting ? 'Preparing…' : 'Export evidence'}
+                </button>
+              )}
+              {(ownerFilter.trim() || caseFilter.trim()) && (
+                <AuditTrailLink
+                  reference={(ownerFilter || caseFilter).trim()}
+                  label="Audit trail for this predicate"
+                  className="py-2"
+                />
+              )}
+              {canWrite && (
+                <button type="button" onClick={() => setShowAddModal(true)}
+                  className="ml-auto flex items-center gap-1.5 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                  <Plus size={14} /> Add contact
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Empty search state for staff until a predicate is supplied. */}
       {!isCustomer && !hasPredicate && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 text-sm text-gray-600 space-y-1">
           <p className="font-medium text-gray-800">Search for a beneficiary to begin</p>
           <p>
-            Enter an owner party reference, or at least {MIN_QUERY} characters of a name or contact.
+            Any single predicate is enough: an owner party reference, an investigation case, or at
+            least {MIN_QUERY} characters of an alias or masked contact. Listing the whole registry is
+            not offered to any role (ADR-048).
             {canSearchAcrossParties
               ? ' A cross-party search is available to your role and every record it returns is recorded in the compliance ledger.'
               : ' Your role can look up beneficiaries for a known owner party; cross-party search requires the investigate capability.'}
           </p>
         </div>
+      )}
+
+      {/* What this view is scoped to, for the record an auditor is building. */}
+      {!isCustomer && hasPredicate && !loading && !error && (
+        <p className="text-xs text-gray-500">
+          {total} {total === 1 ? 'record' : 'records'} · status {statusFilter}
+          {ownerFilter.trim() && <> · owner <span className="font-mono">{shortRef(ownerFilter.trim())}</span></>}
+          {caseFilter.trim() && <> · case <span className="font-mono">{caseFilter.trim()}</span></>}
+          {search.trim() && <> · matching &ldquo;{search.trim()}&rdquo;</>}
+          . Contact details are masked at registration (PCI DSS) and this read is recorded in
+          the compliance ledger.
+        </p>
       )}
 
       {/* Table */}
@@ -487,6 +615,7 @@ export default function BeneficiariesPage() {
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Contact</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Identifier</th>
                   {isStaff && <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Owner</th>}
+                  {isStaff && <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Status</th>}
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Added</th>
                   <th className="px-4 py-3" />
                 </tr>
@@ -508,13 +637,36 @@ export default function BeneficiariesPage() {
                       </span>
                     </td>
                     {isStaff && (
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <button type="button"
+                          onClick={() => { setOwnerFilter(b.ownerPartyReference); setSearch(''); setCaseFilter(''); setPage(1); }}
+                          title={`Scope to owner ${b.ownerPartyReference}`}
+                          className="font-mono text-xs text-gray-500 underline decoration-dotted hover:text-[#001E2B]">
+                          {shortRef(b.ownerPartyReference)}
+                        </button>
+                      </td>
+                    )}
+                    {isStaff && (
                       <td className="px-4 py-3">
-                        <span className="font-mono text-xs text-gray-400" title={b.ownerPartyReference}>{shortRef(b.ownerPartyReference)}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded border ${
+                          b.counterpartyArrangementStatus === 'active'
+                            ? 'bg-green-50 text-green-700 border-green-200'
+                            : 'bg-gray-100 text-gray-600 border-gray-200'
+                        }`}>
+                          {b.counterpartyArrangementStatus}
+                        </span>
                       </td>
                     )}
                     <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(b.recordCreatedDateTime)}</td>
                     <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
+                        {isStaff && (
+                          <AuditTrailLink
+                            reference={b.counterpartyArrangementReference}
+                            label="Audit"
+                            className="px-2.5 py-1"
+                          />
+                        )}
                         {isCustomer && b.counterpartyArrangementStatus === 'active' && (
                           <button type="button"
                             onClick={() => setSendTarget(b)}
@@ -567,7 +719,7 @@ export default function BeneficiariesPage() {
 
       {debugMode && (
         <p className="text-[10px] font-mono text-gray-400">
-          GET /api/v1/beneficiaries · SD-54 · scope: {isCustomer ? 'own (forced server-side)' : 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}` : ownerFilter.trim() ? `ownerRef=${ownerFilter.trim()}` : search.trim().length >= MIN_QUERY ? `q=${search.trim()}` : 'none (no request issued)'}
+          GET /api/v1/beneficiaries · scope: {isCustomer ? 'own (forced server-side)': 'search'} · predicate: {isCustomer ? `ownerRef=${ownPartyRef}`: ownerFilter.trim ? `ownerRef=${ownerFilter.trim}`: search.trim.length >= MIN_QUERY ? `q=${search.trim}`: 'none (no request issued)'}
         </p>
       )}
 

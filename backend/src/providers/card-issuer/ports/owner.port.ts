@@ -1,7 +1,7 @@
 // Owner-resolution ports (v30.1). The built-in modules (card-issuer, account-information) must not
-// gain broad `customers` access (SoD, PCI Req 7). Instead they resolve ONLY the derived owner name
+// gain broad `customers` access (SoD, PCI DSS). Instead they resolve ONLY the derived owner name
 // server-side, gated by their own cards/accounts permission and audited (need-to-know, GDPR Art. 5).
-// The party master data (SD-13) stays owned by the customer/party domain; these ports only READ a
+// The party master data stays owned by the customer/party domain; these ports only READ a
 // single display field and never mutate the party.
 import { Db } from 'mongodb';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../../modules/identity/models/party.model';

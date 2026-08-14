@@ -29,11 +29,11 @@ function pspEnvVar(name: string): string | undefined {
 
 /**
  * Resolve the HMAC key material for the blind index, in priority order:
- *   1. PSP_BLIND_INDEX_KEY            — explicit dedicated key (recommended for prod)
- *   2. KMS_LOCAL_MASTER_KEY (QE key)  — derive a dedicated subkey via HKDF-SHA256 so the
+ *   1. PSP_BLIND_INDEX_KEY: explicit dedicated key (recommended for prod)
+ *   2. KMS_LOCAL_MASTER_KEY (QE key): derive a dedicated subkey via HKDF-SHA256 so the
  *                                       QE master key is never reused verbatim for HMAC
  *                                       (domain separation; it is also the CHD CMK).
- *   3. demo default                   — dev only; predictable, never use in production.
+ *   3. demo default: dev only; predictable, never use in production.
  * Changing whichever source is active invalidates all existing digests (requires a re-seed
  * or backfill), so the resolution must stay stable across every process.
  */

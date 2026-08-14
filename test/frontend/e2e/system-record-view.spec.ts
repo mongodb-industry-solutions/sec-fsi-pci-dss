@@ -229,7 +229,7 @@ test.describe('v32 test 35: access level decides how much, never how it looks', 
 
   test('L1 gets an explicit restriction, not an empty field', async ({ page, context }) => {
     await loginAs(context, 'level1_analyst');
-    await stubPermissions(page, { customers: ['view'], transactions: ['view'], cards: ['view'], fraudCases: ['view', 'investigate'], auditEvents: ['view'], beneficiaries: ['view'] }, 'level1_analyst');
+    await stubPermissions(page, { customers: ['view'], transactions: ['view'], cards: ['view'], fraudCases: ['view', 'investigate'], beneficiaries: ['view'] }, 'level1_analyst');
     await stubApi(page, {
       byId: {
         customerEmailAddress: undefined,

@@ -1,4 +1,4 @@
-// BIAN SD-66 / SD-65 / SD-254: unified account movement aggregation service
+// unified account movement aggregation service
 // Merges paymentExecutionProcedure (disbursements) and cardTransactionLog (card activity)
 // into a single AccountMovement ledger view for a given payout account.
 
@@ -33,19 +33,19 @@ export async function listAccountMovements(
   const toIso = (d: Date | string): string =>
     d instanceof Date ? d.toISOString() : new Date(d).toISOString();
 
-  // 1a. Merchant/non-P2P disbursements — this account receives the payout (credit)
+  // 1a. Merchant/non-P2P disbursements: this account receives the payout (credit)
   const merchantExecs = await executionCol.find({
     resolvedPayoutAccountReference: accountRef,
     beneficiaryType: { $ne: 'user' },
   }).toArray();
 
-  // 1b. P2P received — this account is the recipient of a user-to-user transfer (credit)
+  // 1b. P2P received: this account is the recipient of a user-to-user transfer (credit)
   const p2pReceivedExecs = await executionCol.find({
     resolvedPayoutAccountReference: accountRef,
     beneficiaryType: 'user',
   }).toArray();
 
-  // 1c. P2P sent — this account is the source of a user-to-user transfer (debit)
+  // 1c. P2P sent: this account is the source of a user-to-user transfer (debit)
   const p2pSentExecs = await executionCol.find({
     sourcePayoutAccountReference: accountRef,
     beneficiaryType: 'user',
@@ -99,14 +99,17 @@ export async function listAccountMovements(
     fundingPayoutAccountInstanceReference: accountRef,
   }).toArray();
 
-  const cardIds = cards.map((c) => c.paymentCardInstanceReference);
+  // A card transaction references its card by TOKEN (`paymentCardReference`, the PAN surrogate), not by
+  // the card's instance UUID. Matching the UUIDs against that field silently returned nothing, so a card
+  // payment was recorded and moved the balance yet never appeared among the account's movements.
+  const cardTokens = cards.map((c) => c.paymentCardReference).filter((t): t is string => !!t);
 
   // 3. Fetch card transactions for those cards
   let cardMovements: AccountMovement[] = [];
-  if (cardIds.length > 0) {
+  if (cardTokens.length > 0) {
     const txCol = db.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION);
     const transactions = await txCol.find({
-      paymentCardReference: { $in: cardIds },
+      paymentCardReference: { $in: cardTokens },
     }).toArray();
 
     cardMovements = transactions.map((tx) => {
@@ -149,7 +152,7 @@ export async function listAccountMovements(
   // 4. Merge all movements
   let all: AccountMovement[] = [...disbursements, ...cardMovements, ...creditMovements];
 
-  // 4b. Running available balance — per settled movement, "balance after this movement".
+  // 4b. Running available balance: per settled movement, "balance after this movement".
   //
   //     Only movements that actually SETTLED (funds moved) affect the available balance.
   //     A failed/exception/reversed transfer or a still-pending card authorisation never
@@ -161,7 +164,7 @@ export async function listAccountMovements(
   //     newest settled movement's balanceAfter equals the current balance; each older row is
   //     the balance before the newer one settled. This keeps the ledger consistent with the
   //     authoritative stored balance even if historical execution records are incomplete or
-  //     were reseeded independently — rather than reconstructing forward from zero.
+  //     were reseeded independently: rather than reconstructing forward from zero.
   const SETTLED_STATUSES = new Set(['completed', 'settled']);
   const isSettled = (m: AccountMovement): boolean =>
     m.movementType === 'balance_credit' || SETTLED_STATUSES.has(m.status);

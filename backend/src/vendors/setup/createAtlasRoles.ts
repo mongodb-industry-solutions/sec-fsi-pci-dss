@@ -11,7 +11,7 @@
  *
  * Both roles cover the same collections - the QE encryptedFieldsMap tier (not RBAC) controls
  * what each user can actually read. The separate DB credentials produce distinct Atlas audit
- * log entries, satisfying PCI DSS Req 10 (non-repudiation per data-sensitivity tier).
+ * log entries, satisfying PCI DSS (non-repudiation per data-sensitivity tier).
  *
  * Required env vars (setup skipped gracefully when absent):
  *   ATLAS_PUBLIC_KEY              Atlas API public key

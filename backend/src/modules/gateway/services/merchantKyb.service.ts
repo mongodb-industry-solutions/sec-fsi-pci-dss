@@ -1,6 +1,6 @@
-// BIAN SD-89 KYB administration service (v31). Owns the KYB *data* surface: review/correct KYB
+// KYB administration service (v31). Owns the KYB *data* surface: review/correct KYB
 // fields, administer beneficial owners (bounded embed), compose owner-layer risk from each UBO's
-// SD-53 KYC verdict, and persist the structured entity-layer verdict from the screening chain.
+// KYC verdict, and persist the structured entity-layer verdict from the screening chain.
 //
 // The KYB *decision* (approve/reject/suspend) stays in merchant.service.reviewMerchantApplication
 // (merchant_officer). This service never writes lifecycle status from the data-correction path
@@ -261,7 +261,7 @@ export async function addBeneficialOwner(db: Db, id: string, input: AddOwnerInpu
   const merchant = await getMerchantRaw(db, id);
   if (!merchant) return { status: 'not_found' };
 
-  // Referenced party must exist (SD-13): owners reference existing parties only, never invented here.
+  // Referenced party must exist : owners reference existing parties only, never invented here.
   const party = await db.collection<PartyControlRecord>(PARTY_COLLECTION).findOne({ partyInstanceReference: input.merchantBeneficialOwnerPartyReference } as never, { projection: { partyInstanceReference: 1 } });
   if (!party) return { status: 'invalid', error: 'Referenced party does not exist.' };
 

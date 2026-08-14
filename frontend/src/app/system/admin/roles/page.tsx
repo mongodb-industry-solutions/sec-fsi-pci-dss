@@ -132,7 +132,7 @@ function RolesAdmin() {
         title="Roles & Access"
         description="Define what each role can do. Permissions are data, not code (default-deny)."
         info="Builtin roles can have their permissions edited but cannot be deleted. Custom roles support any subset of the catalog, including full management. Roles are global across authentication domains."
-        debugInfo="ADR-030 · BIAN SD-16 Party Authentication · PCI DSS Req 7 (RBAC, least privilege, documented matrix)"
+        debugInfo="ADR-030 Party Authentication · PCI DSS (RBAC, least privilege, documented matrix)"
         actions={
           <button onClick={() => setDraft(emptyDraft())}
             className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium">

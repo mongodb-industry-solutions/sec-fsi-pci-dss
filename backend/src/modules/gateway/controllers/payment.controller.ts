@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order + SD-65: Payment Execution  -  REST controller
+// Payment Order + Payment Execution  -  REST controller
 // Routes mounted at /gateway/payments → /api/v1/gateway/payments
 
 import { FastifyInstance } from 'fastify';
@@ -16,6 +16,7 @@ import { validateMerchantToken } from '../../../vendors/middleware/validateMerch
 import { createTransaction, CardIssuerDeclinedError, resolveAccountReferenceForParty } from '../../transaction/services/cardTransaction.service';
 import { attributionFromMerchantContext, emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+import { getChargeableCardToken } from '../../customer/services/paymentCard.service';
 
 const PAYMENT_STATUS_ENUM = [
   'initiated', 'confirmed', 'authorized', 'captured',
@@ -26,7 +27,7 @@ export async function paymentController(fastify: FastifyInstance) {
 
   // POST /api/v1/gateway/payments
   // Item 2 (v18): SERVER-TO-SERVER merchant charge. Authenticated with the merchant's OAuth
-  // client_credentials token (RS256, scope write:payments) — NOT a user session (HS256) and NOT the
+  // client_credentials token (RS256, scope write:payments), NOT a user session (HS256) and NOT the
   // user authorization_code token. `skipAuth` bypasses the global HS256 preHandler; validateMerchantToken
   // verifies the machine token in-handler and resolves the acquiring merchant, so the charge is always
   // attributed to that merchant and the commission fee (Item 1) is applied to it. No CHD ever reaches the
@@ -35,12 +36,12 @@ export async function paymentController(fastify: FastifyInstance) {
     config: { skipAuth: true },
     schema: {
       tags: ['gateway'],
-      summary: 'Create a payment order (SD-64) — server-to-server merchant charge',
+      summary: 'Create a payment order (SD-64), server-to-server merchant charge',
       description: `Creates a \`paymentOrder\` (BIAN SD-64) with initial status \`initiated\`.
 
 **Idempotency:** The \`X-Idempotency-Key\` header is **required**. _(v5: duplicate-key detection and 409 enforcement are not yet implemented in this prototype.)_
 
-**Payment lifecycle (SD-64 state machine):**
+**Payment lifecycle (state machine):**
 \`\`\`
 initiated → confirmed → authorized → captured → settled
                                  → voided
@@ -48,7 +49,7 @@ initiated → confirmed → authorized → captured → settled
                                               → refunded
 \`\`\`
 
-**SD-65 routing:** On \`/authorize\`, the Payment Execution service selects a processor and records the routing decision.
+**routing:** On \`/authorize\`, the Payment Execution service selects a processor and records the routing decision.
 
 **Fraud evaluation:** Authorization triggers \`shared/services/fraudTrigger\`  -  a \`fraudDiagnosisCase\` is opened automatically if the amount or MCC meets the risk criteria.
 
@@ -75,7 +76,7 @@ initiated → confirmed → authorized → captured → settled
           amount: { type: 'number', description: 'Payment amount in the specified currency.' },
           currency: { type: 'string', description: 'ISO 4217 three-letter currency code.' },
           paymentOrderDescription: { type: 'string', description: 'Optional human-readable description.' },
-          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only — the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
+          actingSubjectReference: { type: 'string', description: 'v18: OAuth subject (SD-91 login id) of the user the merchant app is acting for. Attribution only, the charge stays merchant-authenticated. Enables buyer-side traceability (payment history + operations view).' },
         },
       },
       response: {
@@ -91,7 +92,20 @@ initiated → confirmed → authorized → captured → settled
         },
         400: { $ref: 'Error#' },
         401: { $ref: 'Error#' },
-        402: { description: 'Card issuer declined the tokenised charge.', $ref: 'Error#' },
+        402: {
+          description: 'Card issuer declined the tokenised charge.',
+          type: 'object',
+          properties: {
+            error: { type: 'string' },
+            // The reason is what makes a decline actionable for the merchant; the shared Error schema
+            // would strip these, leaving the client with a bare status code.
+            error_description: { type: 'string', description: 'Human-readable decline reason from the issuer.' },
+            responseCode: { type: 'string', description: 'Issuer response code (ISO 8583 style).' },
+            paymentOrderInstanceReference: { type: 'string' },
+            paymentOrderReference: { type: 'string' },
+            paymentOrderStatus: { type: 'string' },
+          },
+        },
         403: { description: 'Merchant token missing write:payments scope or merchant mismatch.', $ref: 'Error#' },
         409: { description: '(v5-only) Duplicate idempotency key  -  not yet enforced in this prototype.', $ref: 'Error#' },
       },
@@ -124,7 +138,7 @@ initiated → confirmed → authorized → captured → settled
       return reply.status(403).send({ error: 'access_denied', error_description: 'merchantAgreementInstanceReference does not match the authenticated client' });
     }
 
-    // SD-64: persist the payment order (idempotent on X-Idempotency-Key).
+    // persist the payment order (idempotent on X-Idempotency-Key).
     const order = await createPaymentOrder(fastify.db, {
       merchantAgreementInstanceReference: merchantId,
       paymentOrderMerchantReference: body.paymentOrderMerchantReference,
@@ -134,10 +148,13 @@ initiated → confirmed → authorized → captured → settled
       idempotencyKey,
     });
 
-    // Charge a TOKENISED card server-side (PCI DSS Req 3: no PAN/CVV in the merchant; the PSP holds the
-    // token). The card transaction (SD-254) carries the acquiring merchant reference, so completeAuthorized
+    // Charge a TOKENISED card server-side (PCI DSS: no PAN/CVV in the merchant; the PSP holds the
+    // token). The card transaction carries the acquiring merchant reference, so completeAuthorized
     // applies the commission fee (Item 1) and the merchant dashboard revenue reflects this API payment.
-    const apiChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
+    // Charge the ACTING BUYER's card-on-file when the merchant forwarded their subject: a demo charge
+    // against a fixed token only worked if that token happened to be seeded, so the API-payment method
+    // failed with a bare 402. `PSP_API_PAYMENT_TEST_TOKEN` stays as the unattributed fallback.
+    const fallbackChargeToken = process.env.PSP_API_PAYMENT_TEST_TOKEN ?? 'pm_test_espresso_api';
     // v18 attribution: if the merchant forwarded the acting user's subject, resolve it to the payer's
     // party + canonical account so the charge lands in THEIR payment history. Falls back to the merchant
     // account key when no acting user is supplied (pure machine charge).
@@ -147,6 +164,9 @@ initiated → confirmed → authorized → captured → settled
     const actingAccountReference = actingPartyReference
       ? await resolveAccountReferenceForParty(fastify.db, actingPartyReference)
       : undefined;
+    const apiChargeToken = actingPartyReference
+      ? (await getChargeableCardToken(fastify.db, actingPartyReference).catch(() => null)) ?? fallbackChargeToken
+      : fallbackChargeToken;
     try {
       const tx = await createTransaction(fastify.db, {
         cardToken: apiChargeToken,
@@ -163,7 +183,7 @@ initiated → confirmed → authorized → captured → settled
         merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'api_payment', merchantReference: body.paymentOrderMerchantReference, paymentOrderInstanceReference: order.paymentOrderInstanceReference },
       });
-      // Attribute the merchant-originated charge (SD-16 audit, PCI DSS Req 10).
+      // Attribute the merchant-originated charge (audit, PCI DSS).
       // Base attribution from the machine token (clientId + merchant). When the merchant forwarded an
       // acting user, override actingPartyReference with the user's OAuth subject so the charge lines up
       // with the self-scoped operations view (which matches on the subject).
@@ -178,7 +198,7 @@ initiated → confirmed → authorized → captured → settled
           ? { ...baseAttribution, ...(body.actingSubjectReference && { actingPartyReference: body.actingSubjectReference }) }
           : undefined,
       });
-      // Persist the SD-64 status transition so GET /gateway/payments/:id agrees with this response
+      // Persist the status transition so GET /gateway/payments/:id agrees with this response
       // (the order was created as 'initiated'). Fall back to the returned status if already advanced.
       const authorized = await authorizePaymentOrder(fastify.db, order.paymentOrderInstanceReference);
       return reply.status(201).send({ ...order, paymentOrderStatus: authorized?.paymentOrderStatus ?? 'authorized', cardTransactionInstanceReference: tx.cardTransactionInstanceReference });

@@ -9,8 +9,9 @@ import { FraudAlert } from '../../../components/FraudAlert';
 import { Tooltip } from '../../../components/Tooltip';
 import { detectNetwork, tokenizeCard } from '../../../lib/cardTokenize';
 import Link from 'next/link';
+import { Check, AlertTriangle } from 'lucide-react';
 
-// A saved card-on-file (BIAN SD-88) the customer can pay with. The surrogate token is reused so
+// A saved card-on-file the customer can pay with. The surrogate token is reused so
 // the transaction references the real stored card; the full PAN/CVV are never present here.
 interface SavedCard {
   id: string;
@@ -43,10 +44,10 @@ const genToken = () => `pm_${Math.random().toString(36).slice(2, 10)}${Math.rand
 
 // Static fallback; shown only if the API call fails (network error, not yet seeded)
 const MERCHANT_FALLBACK: MerchantOption[] = [
-  { id: '', label: 'TechGadgets Ltd.',  mcc: '5734', risk: 'low' },
-  { id: '', label: 'Casino Royale',     mcc: '7995', risk: 'high' },
-  { id: '', label: 'Metro Supermarket', mcc: '5411', risk: 'low' },
-  { id: '', label: 'Night Club XL',     mcc: '5813', risk: 'high' },
+  { id : '', label: 'TechGadgets Ltd.',  mcc: '5734', risk: 'low' },
+  { id : '', label: 'Casino Royale',     mcc: '7995', risk: 'high' },
+  { id : '', label: 'Metro Supermarket', mcc: '5411', risk: 'low' },
+  { id : '', label: 'Night Club XL',     mcc: '5813', risk: 'high' },
 ];
 
 const AMOUNT_PRESETS = ['120.00', '499.00', '850.00', '1250.00'];
@@ -134,7 +135,7 @@ export default function DemoPaymentPage() {
     return () => clearTimeout(t);
   }, [merchantSearch]);
 
-  // Saved cards the customer can pay with (their own card-on-file, SD-88).
+  // Saved cards the customer can pay with (their own card-on-file).
   const [savedCards, setSavedCards]         = useState<SavedCard[]>([]);
   const [cardsLoading, setCardsLoading]     = useState(true);
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -162,7 +163,8 @@ export default function DemoPaymentPage() {
   const [error, setError]                   = useState<string | null>(null);
   const { debugMode }                       = useDebugMode();
   const [result, setResult] = useState<{
-    txnId: string; fraudCaseCreated: boolean; caseId?: string; maskedPan: string
+    txnId: string; status: 'authorized' | 'declined'; declineReason?: string;
+    fraudCaseCreated: boolean; caseId?: string; maskedPan: string
   } | null>(null);
 
   // Once merchant presets load, auto-select the first one (replaces old hard-coded default)
@@ -207,7 +209,7 @@ export default function DemoPaymentPage() {
     setNewExpiry(digits.length >= 3 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits);
   }
 
-  // Load the customer's saved cards (SD-88) to offer as payment methods.
+  // Load the customer's saved cards to offer as payment methods.
   useEffect(() => {
     const t = getToken() ?? '';
     if (!t) { setCardsLoading(false); return; }
@@ -285,7 +287,7 @@ export default function DemoPaymentPage() {
         cardTransactionDescription: (txDescription.trim() || merchant.toUpperCase()).slice(0, 22),
         cardTransactionNarrative: txNarrative.trim() || undefined,
         ...(selectedMerchantId ? { merchantAgreementInstanceReference: selectedMerchantId } : {}),
-        // New card → send expiry + network so the PSP auto-registers it as a card-on-file (SD-88).
+        // New card → send expiry + network so the PSP auto-registers it as a card-on-file .
         ...(cardMode === 'new' && selectedNetwork ? { paymentCardExpirationDate: newCardExpiry, paymentCardNetwork: selectedNetwork } : {}),
         gatewayPayload: { source: 'app-mode', paymentReference: paymentReference || undefined },
       }, token);
@@ -293,12 +295,16 @@ export default function DemoPaymentPage() {
       // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
       const txnId = res.cardTransactionInstanceReference;
       const outcome = await awaitPaymentOutcome(txnId);
-      if (outcome.status === 'declined') {
-        setError(`The card issuer declined this payment${outcome.declineReason ? ` (${outcome.declineReason.replace(/_/g, ' ')})` : ''}. No charge was made.`);
-        return;
-      }
-      // Persisted server-side; history reads from the real API (no local mirror).
-      setResult({ txnId, fraudCaseCreated: !!outcome.fraudCaseCreated, caseId: outcome.caseId ?? undefined, maskedPan: maskedCard });
+      // Both outcomes are a recorded operation: always land on the receipt step, which links
+      // to the transaction detail for the full decision trail.
+      setResult({
+        txnId,
+        status: outcome.status,
+        declineReason: outcome.declineReason ?? undefined,
+        fraudCaseCreated: !!outcome.fraudCaseCreated,
+        caseId: outcome.caseId ?? undefined,
+        maskedPan: maskedCard,
+      });
       setStep(3);
     } catch (err) {
       setError((err as Error).message);
@@ -327,7 +333,7 @@ export default function DemoPaymentPage() {
                 step > s  ? 'bg-green-500 text-white' :
                             'bg-gray-200 text-gray-400'
               }`}>
-                {step > s ? '✓' : s}
+                {step > s ? <Check size={14} /> : s}
               </div>
               <span className={`text-sm hidden sm:inline ${step === s ? 'font-semibold text-gray-800' : 'text-gray-400'}`}>
                 {STEPS[s - 1]}
@@ -352,7 +358,7 @@ export default function DemoPaymentPage() {
                   <Link href="/system/cards" className="text-xs text-[#001E2B] hover:underline">Manage cards</Link>
                 </div>
 
-                {/* Saved-card picker (SD-88): up to 4 presets + search/autocomplete for the rest,
+                {/* Saved-card picker : up to 4 presets + search/autocomplete for the rest,
                     mirroring the Merchant picker. Selecting one reuses its surrogate token. */}
                 {cardsLoading ? (
                   <div className="grid grid-cols-2 gap-2">
@@ -443,7 +449,7 @@ export default function DemoPaymentPage() {
                     </div>
                     <p className="text-xs text-gray-400">
                       {selectedNetwork ? `${selectedNetwork} · ` : ''}Validated in your browser. The security code is never stored
-                      {debugMode ? ' (PCI DSS Req 3.2; SAD prohibited).' : '.'}
+                      {debugMode ? ' (PCI DSS; SAD prohibited).' : '.'}
                     </p>
                   </div>
                 ) : (
@@ -484,10 +490,10 @@ export default function DemoPaymentPage() {
               <div className="bg-white rounded-xl border p-5 space-y-4">
                 <h2 className="flex items-center gap-1.5 font-semibold text-gray-800">
                   Merchant
-                  <Tooltip text="The business you are paying (BIAN SD-89). Pick one of the first four, search for another, or type a name and MCC manually. Some categories (e.g. gambling) are higher risk and influence fraud scoring." />
+                  <Tooltip text="The business you are paying. Pick one of the first four, search for another, or type a name and MCC manually. Some categories (e.g. gambling) are higher risk and influence fraud scoring." />
                 </h2>
 
-                {/* Preset grid; first 4 active merchants from SD-89 */}
+                {/* Preset grid; first 4 active merchants from */}
                 {merchantsLoading ? (
                   <div className="grid grid-cols-2 gap-2">
                     {[0, 1, 2, 3].map(i => (
@@ -509,7 +515,7 @@ export default function DemoPaymentPage() {
                             ? 'text-gray-300'
                             : m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'
                         }`}>
-                          {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                          {m.risk === 'high' && <AlertTriangle size={11} className="inline mr-0.5 -mt-0.5" />}{mccNote(m.mcc)}
                         </div>
                       </button>
                     ))}
@@ -540,7 +546,7 @@ export default function DemoPaymentPage() {
                             className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors">
                             <span className="font-medium">{m.label}</span>
                             <span className={`ml-2 text-xs ${m.risk === 'high' ? 'text-amber-500' : 'text-gray-400'}`}>
-                              {m.risk === 'high' && '⚠ '}{mccNote(m.mcc)}
+                              {m.risk === 'high' && <AlertTriangle size={11} className="inline mr-0.5 -mt-0.5" />}{mccNote(m.mcc)}
                             </span>
                           </button>
                         </li>
@@ -629,7 +635,7 @@ export default function DemoPaymentPage() {
                   </div>
                   {isFraudRisk && debugMode && (
                     <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-                      <span className="shrink-0 mt-0.5">⚠</span>
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" />
                       <span>This transaction will trigger an automatic fraud review case.</span>
                     </div>
                   )}
@@ -701,14 +707,13 @@ export default function DemoPaymentPage() {
               <div className="bg-white rounded-xl border p-5 space-y-5">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transaction Description</h2>
-                  {debugMode && <span className="text-xs font-mono text-gray-300">SD-254</span>}
                 </div>
 
                 {/* Transaction type: read-only */}
                 <div className="flex items-center justify-between py-2 border-b">
                   <span className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
                     Type
-                    <Tooltip text="Transaction classification per BIAN SD-254. Purchase is fixed for card checkout. Other values such as refund, cash_advance, balance_transfer, fee, and adjustment are set by backend workflows." />
+                    <Tooltip text="Transaction classification. Purchase is fixed for card checkout. Other values such as refund, cash_advance, balance_transfer, fee, and adjustment are set by backend workflows." />
                     {debugMode && <code className="text-gray-300 text-xs font-mono">cardTransactionType</code>}
                   </span>
                   <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-2.5 py-1 rounded-full">
@@ -790,7 +795,7 @@ export default function DemoPaymentPage() {
                     <p className="text-gray-500">Token is a PAN surrogate, not CHD under PCI DSS v4.0</p>
                     <p className={isFraudRisk ? 'text-amber-700' : 'text-gray-500'}>
                       {isFraudRisk
-                        ? 'Fraud trigger active: will auto-create fraudDiagnosisCase (SD-83)'
+                        ? 'Fraud trigger active: will auto-create fraudDiagnosisCase'
                         : 'No fraud trigger expected for this transaction'}
                     </p>
                   </div>
@@ -814,14 +819,26 @@ export default function DemoPaymentPage() {
         )}
 
         {/* -- STEP 3 --------------------------------------------------------─ */}
-        {step === 3 && result && (
+        {step === 3 && result && (() => {
+          const declined = result.status === 'declined';
+          const detailPath = `/system/payment/history/${result.txnId}`;
+          return (
           <div className="space-y-4">
             <div className="bg-white rounded-xl border p-6 space-y-4">
+              {/* A decline is a completed operation too: same receipt layout, different tone. */}
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-lg shrink-0">✓</div>
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center font-bold text-lg shrink-0 ${
+                  declined ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                }`}>{declined ? <AlertTriangle size={18} /> : <Check size={18} />}</div>
                 <div>
-                  <h2 className="font-bold text-green-700 text-lg">Payment Confirmed</h2>
-                  <p className="text-xs text-gray-400">Transaction recorded securely in MongoDB Atlas</p>
+                  <h2 className={`font-bold text-lg ${declined ? 'text-amber-700' : 'text-green-700'}`}>
+                    {declined ? 'Payment Not Completed' : 'Payment Confirmed'}
+                  </h2>
+                  <p className="text-xs text-gray-400">
+                    {declined
+                      ? 'The operation was recorded and no amount was charged'
+                      : 'Transaction recorded securely in MongoDB Atlas'}
+                  </p>
                 </div>
               </div>
 
@@ -840,11 +857,31 @@ export default function DemoPaymentPage() {
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-gray-500">Status</span>
-                  <span className={result.fraudCaseCreated ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>
-                    {result.fraudCaseCreated ? 'Under review' : 'Authorized'}
+                  <span className={declined || result.fraudCaseCreated ? 'text-amber-700 font-medium' : 'text-green-700 font-medium'}>
+                    {declined ? 'Declined' : result.fraudCaseCreated ? 'Under review' : 'Authorized'}
                   </span>
                 </div>
+                {declined && result.declineReason && (
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-gray-500">Reason</span>
+                    <span className="capitalize">{result.declineReason.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
               </div>
+
+              {!declined && result.fraudCaseCreated && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  The amount is reserved on your account, not charged: this payment only completes once the
+                  security review closes.
+                </p>
+              )}
+
+              <p className="text-sm text-gray-600">
+                For the full detail of this operation, open it in{' '}
+                <Link href={detailPath} className="text-[#001E2B] font-medium underline hover:no-underline">
+                  your transactions
+                </Link>.
+              </p>
 
               {result.fraudCaseCreated && result.caseId && (
                 <FraudAlert
@@ -859,17 +896,24 @@ export default function DemoPaymentPage() {
                 <div className="bg-[#001E2B]/5 border border-[#001E2B]/20 rounded-lg p-3 text-xs space-y-1">
                   <p className="font-semibold text-[#001E2B]">Debug: Transaction reference</p>
                   <p className="font-mono text-gray-600">Txn ID: {result.txnId}</p>
-                  {result.fraudCaseCreated && <p className="text-amber-700">fraudDiagnosisCase created (SD-83)</p>}
+                  {result.fraudCaseCreated && <p className="text-amber-700">fraudDiagnosisCase created</p>}
                 </div>
               )}
             </div>
 
-            <button onClick={() => router.push('/system/payment/history')}
-              className="w-full border rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50 bg-white">
-              View My Transactions
-            </button>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button onClick={() => router.push(detailPath)}
+                className="w-full rounded-lg py-2.5 text-sm font-semibold bg-[#001E2B] text-[#00ED64] hover:opacity-90">
+                View Operation Detail
+              </button>
+              <button onClick={() => router.push('/system/payment/history')}
+                className="w-full border rounded-lg py-2.5 text-sm text-gray-700 hover:bg-gray-50 bg-white">
+                View My Transactions
+              </button>
+            </div>
           </div>
-        )}
+          );
+        })()}
 
       </main>
     </div>

@@ -5,8 +5,8 @@
  * net). Nothing here touches a database or a filesystem, so it is directly unit-testable.
  *
  * The invariants encoded here:
- *  - F1: every `customer` party owns exactly one SD-91 authentication record.
- *  - F3: every SD-254 transaction points at an SD-88 card held by the same party, and the masked
+ *  - F1: every `customer` party owns exactly one authentication record.
+ *  - F3: every transaction points at an card held by the same party, and the masked
  *    PAN on the transaction equals the one derived from that card.
  *  - F2/D-3: every `customer` party is complete (agreement with a completed KYC status, a card,
  *    a payout account, a transaction).
@@ -111,14 +111,14 @@ const pick = <T>(list: readonly T[], seed: number, shift = 0): T => list[(seed >
 const LOGIN_NAMESPACE = 'v33:customerAuthentication';
 
 /**
- * Derives an SD-91 authentication record for every `customer` party that lacks one, so no customer
+ * Derives an authentication record for every `customer` party that lacks one, so no customer
  * with an agreement, cards and transactions is unable to sign in.
  *
- * BIAN note: SD-16/SD-91 authentication stays a control record separate from the SD-53 agreement, so
+ * BIAN note: authentication stays a control record separate from the agreement, so
  * a credential-less customer remains representable. A non-active customer is expressed through
  * `customerAuthenticationAccountStatus`, never by omitting the record.
  *
- * Identity comes from the party (SD-13 is the source of truth), so the login and the KYC record can
+ * Identity comes from the party (is the source of truth), so the login and the KYC record can
  * never disagree. Derived logins are NOT `customerAuthenticationDemoFeatured`: the curated login
  * picker stays short while every customer remains reachable through search.
  *
@@ -141,7 +141,7 @@ export function deriveCustomerLogins(
 
     const email = (party.partyEmailAddress ?? '').toLowerCase();
     // A party with no email or no name cannot be given a coherent credential; skip rather than
-    // invent identity that would then disagree with SD-13.
+    // invent identity that would then disagree with.
     if (!email || !party.partyName) continue;
     if (takenEmails.has(email)) continue;
 
@@ -327,11 +327,11 @@ export interface CompletionOptions {
 
 /**
  * Fills every structural gap in the customer population (D-3: no customer left partial). For each
- * `customer` party it creates only what is missing: an SD-53 agreement with a completed KYC status,
- * an SD-88 card funded by an account the party already owns, and a few SD-254 transactions.
+ * `customer` party it creates only what is missing: an agreement with a completed KYC status,
+ * an card funded by an account the party already owns, and a few transactions.
  *
  * Deliberately modest volumes: the aim is a complete customer, not a busy one. Existing records are
- * never modified. Payout accounts are NOT created here, they are curated demo data (SD-66); a party
+ * never modified. Payout accounts are NOT created here, they are curated demo data ; a party
  * without one gets no card, and the integrity test reports it rather than this inventing an account.
  *
  * @returns the new records only; the caller appends them to the population.
@@ -368,7 +368,7 @@ export function completeCustomerPopulation(
     let heldCards = cards.filter((c) => c.customerAgreementInstanceReference === agreement.customerAgreementInstanceReference);
     if (!agreementsWithCard.has(agreement.customerAgreementInstanceReference)) {
       const funding = defaultAccountFor(party.partyInstanceReference, payoutAccounts);
-      // No payout account means no funding source; a card without one would break the SD-88
+      // No payout account means no funding source; a card without one would break the
       // cardAccountReference invariant, so leave the gap visible instead.
       if (funding) {
         const card = buildCard(agreement, seed, funding, now);
@@ -429,7 +429,7 @@ function buildAgreement(party: PartySeed, seed: number, taken: Set<string>, now:
 }
 
 /**
- * The SD-53 ResidentialAddress, derived from the party's SD-13 postal address so the two agree.
+ * The ResidentialAddress, derived from the party's postal address so the two agree.
  * The two sub-documents use different field names (`line1` vs `streetAddress`), so they are mapped
  * explicitly rather than copied.
  */
@@ -450,7 +450,7 @@ function buildCard(agreement: AgreementSeed, seed: number, fundingAccountRef: st
   return {
     paymentCardInstanceReference: deterministicReference(CARD_NAMESPACE, agreement.customerAgreementInstanceReference),
     customerAgreementInstanceReference: agreement.customerAgreementInstanceReference,
-    // Same `pm_<hex>` surrogate shape the tokenization service issues (SD-57), derived rather than
+    // Same `pm_<hex>` surrogate shape the tokenization service issues , derived rather than
     // random so a regeneration is idempotent.
     paymentCardReference: `pm_${deterministicReference(CARD_NAMESPACE, `token:${agreement.customerAgreementInstanceReference}`)
       .replace(/-/g, '')

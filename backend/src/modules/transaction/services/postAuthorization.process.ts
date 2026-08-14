@@ -4,6 +4,9 @@ import { dispatchProvider } from '../../provider/services/integrationDispatch.se
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import { CARD_TRANSACTION_COLLECTION } from '../models/cardTransaction.model';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
+import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
+import type { RiskSeverity } from '../../../shared/models/risk.model';
+import type { TransactionSnapshot } from '../../../shared/models/transaction.model';
 
 // Phase 2 (dev.v8 F5): post-authorization, async. AML monitoring runs after the payment is authorized
 // (it never blocks the payment), and the investigation case is ENRICHED from the correlated subsystem
@@ -53,8 +56,8 @@ export class PostAuthorizationProcess {
     if (p.fraudCaseCreated && p.fraudDiagnosisInstanceReference) {
       await this.enrichCase(txnId, p.fraudDiagnosisInstanceReference);
     }
-    // A5: Debit card funding account balance (BIAN SD-88 cardAccountReference, PCI Req 3.2)
-    // Uses only the UUID reference — IBAN is never read here.
+    // A5: Debit card funding account balance (cardAccountReference, PCI DSS)
+    // Uses only the UUID reference: IBAN is never read here.
     void this.decrementCardFundingBalance(txnId).catch(() => {});
   }
 
@@ -103,19 +106,60 @@ export class PostAuthorizationProcess {
     });
   }
 
-  // A late AML alert enriches the case too (if one exists for the transaction).
+  // A late AML alert enriches the existing case, and opens one when the alert is the ONLY signal:
+  // otherwise an AML-only alert would leave a suspicious payment with nobody assigned to review it.
+  // The payout hold is applied by PayoutOrchestrationProcess, which consumes the same event.
   private async onAmlCompleted(e: DomainEvent): Promise<void> {
-    if (!(e.payload as { alert?: boolean }).alert) return;
+    const p = e.payload as { alert?: boolean; severity?: string };
+    if (!p.alert) return;
+    const txnId = e.correlationId;
     const caseDoc = await this.db.collection<{ fraudDiagnosisInstanceReference: string }>(FRAUD_DIAGNOSIS_COLLECTION)
-      .findOne({ cardTransactionInstanceReference: e.correlationId }, { projection: { _id: 0, fraudDiagnosisInstanceReference: 1 } });
-    if (caseDoc) await this.enrichCase(e.correlationId, caseDoc.fraudDiagnosisInstanceReference);
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { _id: 0, fraudDiagnosisInstanceReference: 1 } });
+    const caseRef = caseDoc?.fraudDiagnosisInstanceReference ?? await this.openAmlCase(txnId, p.severity);
+    if (caseRef) await this.enrichCase(txnId, caseRef);
+  }
+
+  // Open an investigation from an AML alert alone. Reuses the fraud module's case factory (the owning
+  // module keeps the case semantics); returns undefined if the transaction is gone.
+  private async openAmlCase(txnId: string, severity?: string): Promise<string | undefined> {
+    const txn = await this.db.collection<{
+      cardTransactionAmount?: { amount: number; currency: string };
+      cardTransactionMerchantName?: string; cardTransactionMaskedPanDisplay?: string;
+      cardTransactionAccountReference?: string; cardTransactionStatus?: string;
+      customerAgreementInstanceReference?: string;
+    }>(CARD_TRANSACTION_COLLECTION).findOne({ cardTransactionInstanceReference: txnId });
+    if (!txn) return undefined;
+    // The case severity mirrors the alert: an explicit low/medium is kept, and only an unknown or
+    // absent severity falls back to medium (an AML alert is never negligible).
+    const SEVERITIES: readonly RiskSeverity[] = ['low', 'medium', 'high', 'critical'];
+    const mapped: RiskSeverity = SEVERITIES.includes(severity as RiskSeverity)
+      ? (severity as RiskSeverity)
+      : 'medium';
+    try {
+      const created = await createFraudCase(
+        this.db, txnId,
+        txn.customerAgreementInstanceReference ?? txn.cardTransactionAccountReference ?? txnId,
+        [`aml.alert${severity ? ': ' + severity : ''}`], mapped,
+        {
+          cardTransactionAmount: txn.cardTransactionAmount ?? { amount: 0, currency: 'USD' },
+          cardTransactionMerchantName: txn.cardTransactionMerchantName ?? '',
+          cardTransactionDateTime: new Date(),
+          cardTransactionStatus: (txn.cardTransactionStatus ?? 'authorized') as 'authorized',
+          cardTransactionMaskedPanDisplay: txn.cardTransactionMaskedPanDisplay ?? '',
+        } as TransactionSnapshot,
+      );
+      return created.fraudDiagnosisInstanceReference;
+    } catch (err) {
+      console.error('[post-auth] could not open an AML case:', err);
+      return undefined;
+    }
   }
 
   // A5: After a card event, update the PSP internal ledger balance for the funding payout account.
   // v17: DEBIT holds now happen atomically in the funds-check GATE (providerGroups.onFunds) BEFORE the
-  // payment is authorized — so this post-auth step no longer holds for purchases (that would double-debit).
+  // payment is authorized, so this post-auth step no longer holds for purchases (that would double-debit).
   // It only handles the REFUND credit path (return funds to the cardholder's available balance).
-  // Uses only UUID references — IBAN is never accessed (PCI DSS Req 3.2).
+  // Uses only UUID references: IBAN is never accessed (PCI DSS).
   private async decrementCardFundingBalance(txnId: string): Promise<void> {
     const txn = await this.db.collection<{
       cardTransactionAmount?: { amount: number; currency: string };
@@ -135,7 +179,7 @@ export class PostAuthorizationProcess {
       .findOne({ paymentCardInstanceReference: txn.paymentCardInstanceReference }, { projection: { fundingPayoutAccountInstanceReference: 1 } });
     if (!card?.fundingPayoutAccountInstanceReference) return;
     const accountRef = card.fundingPayoutAccountInstanceReference;
-    // Refund: return funds to cardholder available balance (BIAN SD-88 credit), in account currency (FX).
+    // Refund: return funds to cardholder available balance (credit), in account currency (FX).
     const { PAYOUT_ACCOUNT_COLLECTION } = await import('../../gateway/models/payoutAccount.model');
     const account = await this.db.collection<{ payoutAccountCurrency?: string }>(PAYOUT_ACCOUNT_COLLECTION)
       .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountCurrency: 1 } });

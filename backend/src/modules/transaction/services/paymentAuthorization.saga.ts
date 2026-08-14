@@ -18,9 +18,11 @@ const GATE_EVENT: Record<string, string> = {
 };
 const DEFAULT_GATES = ['card.issuer', 'fds', 'hrp', 'funds'];
 
-interface GateVerdict { approved: boolean; responseCode?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[] }
+interface GateVerdict { approved: boolean; responseCode?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[]; sanctionsMatch?: boolean }
+// A sanctions match is scored as a high-risk indicator so the case severity reflects it.
+const SANCTIONS_RISK_SCORE = 90;
 // fundsHold: the atomic hold the funds gate made (available -> pending). Released as a compensation if
-// the journey is later declined by any gate (or if the hold lands after an earlier decline — race).
+// the journey is later declined by any gate (or if the hold lands after an earlier decline: race).
 interface JourneyState {
   expected: Set<string>;
   verdicts: Map<string, GateVerdict>;
@@ -54,7 +56,7 @@ export class PaymentAuthorizationSaga {
     // Only the authoritative gate verdict drives the saga. Audit-ledger projections (emit*/compliance
     // events) can share a gate's eventType (e.g. the card-issuer module's own compliance event is also
     // `card.issuer.validation.completed`) but carry a `ledgerKind` and use a ledger outcome ('rejected')
-    // — ignore them so they never masquerade as a gate approval.
+    //: ignore them so they never masquerade as a gate approval.
     if ((e.payload as { ledgerKind?: string }).ledgerKind) return;
     // Fallback if the gate result beats the `requested` event (in-process race): assume the default set.
     let st = this.journeys.get(txnId);
@@ -62,10 +64,10 @@ export class PaymentAuthorizationSaga {
 
     // Gate verdict travels in the *.completed payload. Accept the §7 `outcome` enum
     // ('approved'|'declined') and the legacy `approved` boolean for forward/back compatibility.
-    const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[]; held?: number; fundingPayoutAccountReference?: string };
+    const p = e.payload as { outcome?: 'approved' | 'declined'; approved?: boolean; responseCode?: string; decisionReason?: string; reason?: string; riskScore?: number; recommendation?: 'approve' | 'review' | 'decline'; fraudFlag?: boolean; rulesFired?: string[]; sanctionsMatch?: boolean; held?: number; fundingPayoutAccountReference?: string };
     const approved = p.outcome ? p.outcome !== 'declined' : p.approved !== false;
 
-    // Record any hold the funds gate made — even after the journey is decided (ordering race): a gate
+    // Record any hold the funds gate made, even after the journey is decided (ordering race): a gate
     // may decline BEFORE the funds gate runs, so the hold can land on an already-declined journey.
     if (gate === 'funds' && p.held && p.fundingPayoutAccountReference) {
       st.fundsHold = { accountRef: p.fundingPayoutAccountReference, amount: p.held };
@@ -73,7 +75,7 @@ export class PaymentAuthorizationSaga {
     }
 
     if (st.decided) return;
-    st.verdicts.set(gate, { approved, responseCode: p.responseCode, reason: p.decisionReason ?? p.reason, riskScore: p.riskScore, recommendation: p.recommendation, fraudFlag: p.fraudFlag, rulesFired: p.rulesFired });
+    st.verdicts.set(gate, { approved, responseCode: p.responseCode, reason: p.decisionReason ?? p.reason, riskScore: p.riskScore, recommendation: p.recommendation, fraudFlag: p.fraudFlag, rulesFired: p.rulesFired, sanctionsMatch: p.sanctionsMatch });
 
     const declinedEntry = [...st.verdicts.entries()].find(([, v]) => !v.approved);
     const allIn = [...st.expected].every((g) => st!.verdicts.has(g));
@@ -98,11 +100,21 @@ export class PaymentAuthorizationSaga {
         payload: { outcome: 'declined', decisionReason: verdict.reason, responseCode: verdict.responseCode, declinedBy, fraudCaseCreated: false }, bian,
       }));
     } else {
-      // Hand the FDS gate verdict to completion so the fraud case is congruent with the gate result.
+      // Hand the risk verdict to completion so the fraud case is congruent with the gate results. A
+      // sanctions match is merged in as a risk indicator: it holds the payment and opens the case
+      // instead of declining, so it is never accepted without an explicit L1/L2 resolution.
       const fdsV = st.verdicts.get('fds');
-      const fdsVerdict = fdsV?.recommendation
+      let fdsVerdict = fdsV?.recommendation
         ? { riskScore: fdsV.riskScore ?? 0, recommendation: fdsV.recommendation, fraudFlag: !!fdsV.fraudFlag, rulesFired: fdsV.rulesFired ?? [] }
         : undefined;
+      if (st.verdicts.get('hrp')?.sanctionsMatch) {
+        fdsVerdict = {
+          riskScore: Math.max(fdsVerdict?.riskScore ?? 0, SANCTIONS_RISK_SCORE),
+          recommendation: 'review',
+          fraudFlag: true,
+          rulesFired: [...(fdsVerdict?.rulesFired ?? []), 'sanctions_match'],
+        };
+      }
       st.decisionOutcome = 'authorized';
       const outcome = await completeAuthorized(this.db, txnId, fdsVerdict);
       void this.bus.publish(makeEvent({

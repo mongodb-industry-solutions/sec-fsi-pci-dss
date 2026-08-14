@@ -10,7 +10,7 @@ import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider
 import { Breadcrumb, type Crumb } from '../../../../components/Breadcrumb';
 import { SensitiveReveal } from '../../../../components/SensitiveReveal';
 
-// Owner self-service detail for one saved card (BIAN SD-88). Shows the surrogate token, expiry
+// Owner self-service detail for one saved card . Shows the surrogate token, expiry
 // (QE:none, owner-visible), lifecycle dates and status. The alias/note are the ONLY editable
 // attributes; the card itself can be removed (soft-delete). Ownership is enforced server-side.
 interface CardDetail {
@@ -140,14 +140,16 @@ export default function CardDetailPage() {
   ) => {
     setTxnsLoading(true);
     try {
-      const params: Parameters<typeof api.transactions.listAll>[0] = {
+      const params: Parameters<typeof api.transactions.list>[0] = {
+        // This panel renders card transactions: ask for the card document shape.
+        kind: 'card',
         cardToken,
         page,
         limit: 10,
       };
       if (status) params.status = status;
-      const res = await api.transactions.listAll(params, t);
-      // Filter by date client-side when dateFrom/dateTo are set, since listAll doesn't support them
+      const res = await api.transactions.list(params, t);
+      // Filter by date client-side when dateFrom/dateTo are set: the collection has no date filter
       let results = res.results as unknown as CardTransaction[];
       if (dateFrom) {
         const from = new Date(dateFrom).getTime();
@@ -364,7 +366,7 @@ export default function CardDetailPage() {
               </div>
             </div>
 
-            {/* Funding account chip — in header */}
+            {/* Funding account chip: in header */}
             {card.fundingPayoutAccountInstanceReference && (
               <div className="flex items-center gap-1.5 text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-full px-2.5 py-1 w-fit">
                 <Landmark size={11} />
@@ -387,7 +389,7 @@ export default function CardDetailPage() {
             )}
           </div>
 
-          {/* Funding Account — BIAN SD-88 cardAccountReference (standalone panel) */}
+          {/* Funding Account: cardAccountReference (standalone panel) */}
           {card.fundingPayoutAccountInstanceReference && (
             <div className="bg-white rounded-xl border p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -395,7 +397,7 @@ export default function CardDetailPage() {
                   <Landmark size={14} className="text-blue-600" />
                 </div>
                 <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Funding Bank Account</h2>
-                <span className="text-xs text-gray-400 font-mono hidden sm:inline">BIAN SD-88 cardAccountReference</span>
+                <span className="text-xs text-gray-400 font-mono hidden sm:inline">cardAccountReference</span>
               </div>
               {fundingAccount ? (
                 <Link
@@ -581,7 +583,7 @@ export default function CardDetailPage() {
           </div>
           )}
 
-          {/* Transaction list — only rendered when this card has a card token to filter by */}
+          {/* Transaction list, only rendered when this card has a card token to filter by */}
           {card.paymentCardReference && (
             <div className="bg-white rounded-xl border p-5 space-y-4">
               <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Transactions on this card</h2>

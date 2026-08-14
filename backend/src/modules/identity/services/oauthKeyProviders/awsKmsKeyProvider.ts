@@ -2,7 +2,7 @@ import * as crypto from 'crypto';
 import { OAuthKeyProvider, OAuthPublicKeyEntry } from './index';
 
 // Lazy-import AWS SDK so the server starts without AWS credentials when OAUTH_KEY_PROVIDER=local
-// @ts-ignore — @aws-sdk/client-kms is an optional peer dependency (only required when OAUTH_KEY_PROVIDER=aws)
+// @ts-ignore: @aws-sdk/client-kms is an optional peer dependency (only required when OAUTH_KEY_PROVIDER=aws)
 let KMSClient: any;
 // @ts-ignore
 let SignCommand: any;
@@ -63,7 +63,7 @@ export class AwsKmsKeyProvider implements OAuthKeyProvider {
 
   private async getPublicKeyPemInternal(): Promise<string> {
     await this.getPublicKeyJwk(); // ensures kid + jwk cached
-    const pubKey = crypto.createPublicKey({ key: this.cachedJwk as crypto.JsonWebKey, format: 'jwk' });
+    const pubKey = crypto.createPublicKey({ key: this.cachedJwk as JsonWebKey, format: 'jwk' });
     return pubKey.export({ type: 'spki', format: 'pem' }) as string;
   }
 
@@ -83,21 +83,21 @@ export class AwsKmsKeyProvider implements OAuthKeyProvider {
 
   async rotate(): Promise<{ kid: string; publicKeyPem: string }> {
     throw Object.assign(
-      new Error('Rotation is managed inside AWS KMS — create a new CMK / KMS key rotation, not via this API'),
+      new Error('Rotation is managed inside AWS KMS: create a new CMK / KMS key rotation, not via this API'),
       { statusCode: 400 },
     );
   }
 
   async importKeypair(): Promise<{ kid: string; publicKeyPem: string }> {
     throw Object.assign(
-      new Error('Key import is not supported with the AWS KMS provider — the private key never leaves KMS'),
+      new Error('Key import is not supported with the AWS KMS provider: the private key never leaves KMS'),
       { statusCode: 400 },
     );
   }
 
   async revoke(): Promise<void> {
     throw Object.assign(
-      new Error('Key revocation is managed inside AWS KMS — disable/schedule deletion of the CMK there'),
+      new Error('Key revocation is managed inside AWS KMS: disable/schedule deletion of the CMK there'),
       { statusCode: 400 },
     );
   }

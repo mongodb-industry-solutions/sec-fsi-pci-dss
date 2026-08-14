@@ -106,7 +106,7 @@ export default function ApiKeysSectionPage() {
         icon={Key}
         title="API Keys"
         description="Server-to-server credentials for the gateway API."
-        debugInfo="BIAN SD-89 credential management · PCI DSS Req 3 (hash only) · Req 8 (unique, revocable credentials)"
+        debugInfo="credential management · PCI DSS (hash only) (unique, revocable credentials)"
       />
 
       <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-start gap-2">

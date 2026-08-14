@@ -1,5 +1,5 @@
 /**
- * Unit tests: beneficiary registry — re-add after soft-delete (SD-54)
+ * Unit tests: beneficiary registry, re-add after soft-delete 
  * Source: backend/src/modules/identity/services/counterpartyArrangement.service.ts (registerBeneficiary)
  *
  * Requirement: DELETE soft-deletes an arrangement (status='removed') but the unique index on
@@ -41,7 +41,7 @@ function makeDb(col: ReturnType<typeof makeCol>) {
   return { collection: vi.fn(() => col) } as never;
 }
 
-describe('registerBeneficiary — re-add after soft-delete (SD-54)', () => {
+describe('registerBeneficiary: re-add after soft-delete (SD-54)', () => {
   beforeEach(() => {
     h.partyFindOne.mockReset();
     h.partyFindOne.mockResolvedValue({ partyInstanceReference: COUNTERPARTY });

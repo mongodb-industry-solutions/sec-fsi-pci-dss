@@ -1,15 +1,15 @@
 /**
- * Passwordless credential enrollment API (SD-91/SD-16, tag auth:enrollment).
+ * Passwordless credential enrollment API (tag auth:enrollment).
  * WebAuthn-style registration ceremony. All routes are SESSION-GATED (the global authMiddleware
  * protects everything not in PUBLIC_EXACT; enrollment is intentionally NOT public). Owner-scoped:
  * every operation is bound to the caller's own sub.
  *
  * Routes:
- *   POST   /api/v1/auth/enroll/challenge          — issue a registration challenge to sign
- *   POST   /api/v1/auth/enroll                     — register a public key (signed challenge proves possession)
- *   GET    /api/v1/auth/enroll                     — list the caller's enrolled credentials
- *   POST   /api/v1/auth/enroll/:credentialId/rotate — rotate (register replacement, revoke old)
- *   DELETE /api/v1/auth/enroll/:credentialId       — revoke a credential
+ *   POST   /api/v1/auth/enroll/challenge: issue a registration challenge to sign
+ *   POST   /api/v1/auth/enroll: register a public key (signed challenge proves possession)
+ *   GET    /api/v1/auth/enroll: list the caller's enrolled credentials
+ *   POST   /api/v1/auth/enroll/:credentialId/rotate, rotate (register replacement, revoke old)
+ *   DELETE /api/v1/auth/enroll/:credentialId, revoke a credential
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import {

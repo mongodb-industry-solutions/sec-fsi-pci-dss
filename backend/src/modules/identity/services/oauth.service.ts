@@ -1,5 +1,5 @@
 /**
- * OAuth 2.0 Authorization Server — core business logic (ADR-033, ADR-035)
+ * OAuth 2.0 Authorization Server: core business logic (ADR-033, ADR-035)
  * Supports: authorization_code + PKCE (S256), client_credentials, refresh_token
  * Token format: RS256 JWT (access + id_token), opaque UUID (refresh)
  */
@@ -40,8 +40,8 @@ export interface OAuthClientInfo {
   requirePkce: boolean;
   tokenLifetimeSeconds: number;
   refreshTokenLifetimeDays: number;
-  oauthLogoUri?: string;    // v18: OIDC logo_uri — branding on the consent page (A-22)
-  oauthClientUri?: string;  // v18: OIDC client_uri — merchant home page link
+  oauthLogoUri?: string;    // v18: OIDC logo_uri, branding on the consent page (A-22)
+  oauthClientUri?: string;  // v18: OIDC client_uri, merchant home page link
 }
 
 export async function resolveOAuthClient(
@@ -68,7 +68,7 @@ export async function resolveOAuthClient(
 
   // A CONFIDENTIAL client (one provisioned with a secret) MUST authenticate at the token endpoint
   // for every grant (RFC 6749 §3.2.1). Enforced only when the caller is authenticating the client
-  // (token/introspection endpoints, requireClientAuthentication=true) — not for internal metadata
+  // (token/introspection endpoints, requireClientAuthentication=true), not for internal metadata
   // lookups (authorize page, post-auth token issuance). Previously the secret was validated only
   // when it happened to be present, so omitting it bypassed authentication entirely on the
   // authorization_code and refresh_token flows. Public clients (no secret hash) rely on PKCE.
@@ -136,7 +136,7 @@ export async function initiateAuthorization(
   }
 
   const requestedScopes = params.scope.split(' ').filter(Boolean);
-  // v18 E-04: RFC 6749 §4.1.2.1 — reject any requested scope outside the client allowlist
+  // v18 E-04: RFC 6749 §4.1.2.1, reject any requested scope outside the client allowlist
   // instead of silently dropping it (previous behaviour narrowed via intersection).
   const invalid = requestedScopes.filter((s) => !client.scopes.includes(s));
   if (invalid.length > 0) {
@@ -273,7 +273,7 @@ export async function exchangeAuthorizationCode(
     outcome: 'verified',
   });
 
-  // Upsert consent grant record (SD-16). Created on first exchange; lastUsedAt updated on refresh.
+  // Upsert consent grant record . Created on first exchange; lastUsedAt updated on refresh.
   const consentCol = db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION);
   const existing = await consentCol.findOne({ partyAuthenticationInstanceReference: record.partyAuthenticationInstanceReference, oauthClientId: clientId });
   const now = new Date();
@@ -291,7 +291,7 @@ export async function exchangeAuthorizationCode(
       { consentId: existing.consentId },
       { $set: { grantedScopes: granted, consentStatus: 'active', lastUsedAt: now, recordUpdatedDateTime: now } },
     );
-    // Audit the (re)consent on the business ledger (SD-16). Attribution ties it to the merchant client.
+    // Audit the (re)consent on the business ledger . Attribution ties it to the merchant client.
     emitProcessEvent(db, {
       entityType: 'customer',
       entityId: sub,
@@ -331,7 +331,7 @@ export async function exchangeAuthorizationCode(
       scopes: record.scopes,
       grantedAt: now.toISOString(),
     }).catch(() => {});
-    // v18 E-07: audit the first-time consent grant on the business ledger (SD-16).
+    // v18 E-07: audit the first-time consent grant on the business ledger .
     emitProcessEvent(db, {
       entityType: 'customer',
       entityId: sub,
@@ -425,11 +425,11 @@ export async function refreshAccessToken(
   return tokens;
 }
 
-// ── Subject → Party resolution (SD-91 → SD-13) ─────────────────────────────────
-// An OAuth/session token `sub` is the SD-91 login-record id (customerAuthenticationInstanceReference).
-// Domain data (payout accounts, counterparties, executions) is keyed by the SD-13 partyInstanceReference.
+// ── Subject → Party resolution (→) ─────────────────────────────────
+// An OAuth/session token `sub` is the login-record id (customerAuthenticationInstanceReference).
+// Domain data (payout accounts, counterparties, executions) is keyed by the partyInstanceReference.
 // This bridges the two so merchant on-behalf-of endpoints (which bind on `sub`) can query domain data.
-// Returns null when the sub is unknown (handled gracefully by callers — empty results, no throw).
+// Returns null when the sub is unknown (handled gracefully by callers: empty results, no throw).
 export async function resolvePartyInstanceReference(db: Db, sub: string): Promise<string | null> {
   if (!sub) return null;
   const rec = await db
@@ -569,7 +569,7 @@ export async function issueTokens(
     scope: scopes.join(' '),
   };
 
-  // ID token — only for user-bearing flows (not client_credentials) with openid scope
+  // ID token, only for user-bearing flows (not client_credentials) with openid scope
   if (!opts.isClientCredentials && scopes.includes('openid')) {
     const idPayload: Record<string, unknown> = {
       iss: issuer,
@@ -599,7 +599,7 @@ export async function issueTokens(
     response.id_token = `${idHeaderAndPayload}.${idSig.toString('base64url')}`;
   }
 
-  // Refresh token — not for client_credentials
+  // Refresh token, not for client_credentials
   if (!opts.isClientCredentials && grantType !== 'client_credentials') {
     const refreshId = uuidv4();
     const refreshExpiry = new Date();
@@ -633,7 +633,7 @@ export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> 
   const kid = header.kid as string;
 
   const provider = getOAuthKeyProvider();
-  // Resolve the public key for this token's kid — active OR a deprecated key still in
+  // Resolve the public key for this token's kid: active OR a deprecated key still in
   // its grace period (ADR-036). Revoked/unknown kids return null and are rejected.
   const pubPem = await provider.getPublicPemByKid(kid);
   if (!pubPem) {
@@ -647,7 +647,7 @@ export async function verifyAccessToken(token: string): Promise<jwt.JwtPayload> 
   }
 }
 
-// ── Consent Grant Management (SD-16) ─────────────────────────────────────────
+// ── Consent Grant Management ─────────────────────────────────────────
 
 // v18: consent grant enriched with the merchant's OIDC logo (branding on the "Authorized Apps" list).
 export type ConsentGrantWithBranding = PartyAuthConsentRecord & { oauthLogoUri?: string };
@@ -706,7 +706,7 @@ export async function getUserConsentGrantDetail(
     .findOne({ consentId, partyAuthenticationInstanceReference: sub });
   if (!grant) return null;
 
-  // Attach the merchant's OIDC branding (logo_uri/client_uri) — same source as the list view.
+  // Attach the merchant's OIDC branding (logo_uri/client_uri): same source as the list view.
   const merchant = await db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne(
@@ -733,7 +733,7 @@ export async function getUserConsentGrantDetail(
 
 // v18 B-10: users who authorized a given merchant (cross-merchant audit for L1/L2/auditor).
 // Reads partyAuthConsent filtered by merchantAgreementInstanceReference, joins the user's display
-// name/email (SD-13) for a display-safe row. Search matches the user name/email/party ref. Paginated.
+// name/email for a display-safe row. Search matches the user name/email/party ref. Paginated.
 export interface MerchantAuthorizationRow {
   consentId: string;
   partyAuthenticationInstanceReference: string;
@@ -760,7 +760,7 @@ export async function listMerchantAuthorizations(
     .sort({ consentGrantedAt: -1 })
     .toArray();
 
-  // Resolve display-safe user identity (SD-13) in one batch — no CHD, no IBAN.
+  // Resolve display-safe user identity in one batch, no CHD, no IBAN.
   const subs = [...new Set(grants.map((g) => g.partyAuthenticationInstanceReference))];
   const users = subs.length
     ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
@@ -797,7 +797,7 @@ export async function listMerchantAuthorizations(
 }
 
 // v27: resolve a party's OAuth subject (customerAuthenticationInstanceReference == PartyAuthConsent
-// partyAuthenticationInstanceReference) from its SD-13 partyInstanceReference. Lets staff query/revoke
+// partyAuthenticationInstanceReference) from its partyInstanceReference. Lets staff query/revoke
 // a found customer's authorized apps by party ref without the client sending the auth subject. Returns
 // null when the party has no authentication identity (e.g. a party that never enrolled to log in).
 export async function resolveSubForParty(db: Db, partyRef: string): Promise<string | null> {
@@ -854,7 +854,7 @@ export async function revokeConsentGrant(
 
 // Re-approve a previously revoked consent grant, reverting the user's earlier revocation from the
 // Authorized Applications view. Self-scoped (must belong to `sub`). Idempotent when already active.
-// This restores the CONSENT record + its prior scopes only; it mints NO tokens — the merchant still
+// This restores the CONSENT record + its prior scopes only; it mints NO tokens: the merchant still
 // runs the OAuth authorization_code flow to obtain fresh tokens (the prior scopes now count as granted,
 // so re-consent is smooth). Fires oauth.authorization_granted so the merchant learns access is back.
 export async function reactivateConsentGrant(
@@ -867,7 +867,7 @@ export async function reactivateConsentGrant(
     .findOne({ consentId, partyAuthenticationInstanceReference: sub });
 
   if (!consent) throw Object.assign(new Error('Consent grant not found'), { statusCode: 404 });
-  if (consent.consentStatus === 'active') return; // already active — no-op
+  if (consent.consentStatus === 'active') return; // already active, no-op
 
   const now = new Date();
   await db.collection<PartyAuthConsentRecord>(PARTY_AUTH_CONSENT_COLLECTION).updateOne(

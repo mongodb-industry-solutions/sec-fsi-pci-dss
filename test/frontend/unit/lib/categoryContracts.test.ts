@@ -1,5 +1,5 @@
 /**
- * Unit test (dev.v8 P9): the admin trigger-event catalogue uses the new canonical event taxonomy —
+ * Unit test (dev.v8 P9): the admin trigger-event catalogue uses the new canonical event taxonomy,
  * the collapsed closing event card.payment.authorization.completed, never the legacy transaction.*.
  */
 import { describe, it, expect } from 'vitest';

@@ -5,8 +5,9 @@ import { CreditCard, Plus, Search, Star } from 'lucide-react';
 import { api } from '../lib/api';
 import { useDebugMode } from '../lib/debugMode';
 import { Pagination } from './Pagination';
+import { DebugChip } from './DebugChip';
 
-// Customer-managed stored cards (BIAN SD-88): searchable / filterable / paginated list. Only the
+// Customer-managed stored cards : searchable / filterable / paginated list. Only the
 // masked PAN, network, status, alias and registration date are shown here; the full PAN and CVV
 // are never stored. Ownership is enforced by the backend. Clicking a row opens the card detail.
 interface CardRow {
@@ -93,11 +94,9 @@ export function SavedCardsPanel({ agreementId, token }: { agreementId: string | 
           <h2 className="font-semibold text-gray-800 text-sm">Saved Payment Methods</h2>
           {!loading && <span className="text-xs text-gray-400">({filtered.length})</span>}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
           {debugMode && (
-            <span className="text-xs px-1.5 py-0.5 rounded border font-mono bg-teal-50 text-teal-700 border-teal-200 shrink-0">
-              SD-88 · paymentCardManagement · PCI Req 3.4
-            </span>
+            <DebugChip label="paymentCardManagement · PCI DSS" />
           )}
           <button
             onClick={() => router.push('/system/cards/new')}
@@ -190,7 +189,7 @@ export function SavedCardsPanel({ agreementId, token }: { agreementId: string | 
 
       <p className="text-xs text-gray-400">
         Only the masked card number is shown. The full card number and CVV are never stored
-        {debugMode ? ' (PCI DSS Req 3.2 / 3.4; token is a surrogate, expiry is QE:none).' : '.'}
+        {debugMode ? ' (PCI DSS; token is a surrogate, expiry is QE:none).' : '.'}
       </p>
     </div>
   );

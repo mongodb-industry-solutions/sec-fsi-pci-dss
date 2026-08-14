@@ -28,7 +28,7 @@ async function forward(req: NextRequest, ctx: { params: Promise<{ path: string[]
   const { path } = await ctx.params;
 
   // Reject dot-segments / embedded separators BEFORE the allowlist check. `[^/]+` in the patterns
-  // would otherwise match `..`, and `new URL()` normalizes dot-segments — so a path like
+  // would otherwise match `..`, and `new URL()` normalizes dot-segments, so a path like
   // `.../accounts/..` could pass the allowlist yet be forwarded to a different (non-allowlisted)
   // endpoint after normalization. Decode each segment and forbid `.`, `..`, and any `/`\ inside it.
   for (const seg of path) {

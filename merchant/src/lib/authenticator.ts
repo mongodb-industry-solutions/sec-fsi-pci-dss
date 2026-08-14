@@ -142,7 +142,7 @@ export async function sign(challenge: string): Promise<{ credentialId: string; s
   return { credentialId: meta.credentialId, signature };
 }
 
-/** Build a compact login_hint_token (base64url JSON of the opaque sub) — no raw PII in the hint. */
+/** Build a compact login_hint_token (base64url JSON of the opaque sub), no raw PII in the hint. */
 export function loginHintToken(sub: string): string {
   const json = JSON.stringify({ sub });
   return btoa(json).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

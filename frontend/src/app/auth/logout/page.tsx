@@ -7,7 +7,7 @@ import { MERCHANT_PUBLIC_URL } from '../../../lib/constants';
 // Resolve the post-logout redirect safely. Allowing any absolute http(s) URL is an open redirect
 // (?redirect=https://evil.example). Permit only: (1) a same-origin relative path (single leading '/',
 // not '//' or '/\' protocol-relative/backslash tricks), or (2) an absolute URL whose origin is on the
-// allowlist — the PSP itself plus known relying parties (the merchant demo app). Anything else → home.
+// allowlist: the PSP itself plus known relying parties (the merchant demo app). Anything else → home.
 function safeRedirect(raw: string | null): string {
   if (!raw) return '/';
   if (/^\/(?![/\\])/.test(raw)) return raw; // same-origin relative path

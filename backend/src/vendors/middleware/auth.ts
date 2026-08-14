@@ -26,7 +26,7 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/auth/register',
   '/api/v1/auth/domains',
   // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
-  // or their own RS256 access token — NOT the PSP session JWT. Exact paths only, so the
+  // or their own RS256 access token, NOT the PSP session JWT. Exact paths only, so the
   // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
   '/.well-known/openid-configuration',
   '/api/v1/auth/jwks',
@@ -36,7 +36,8 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/api/v1/auth/introspect',
   '/api/v1/auth/revoke',
   '/api/v1/transactions/merchants',
-  // Simulator mode: transaction creation without a user session
+  // Simulator mode: transaction CREATION without a user session. Method-scoped below: the collection
+  // GET on the same path must never be public, or it would list every movement in the platform.
   '/api/v1/transactions',
   // Admin login does its own credential check
   '/api/v1/admin/login',
@@ -46,7 +47,7 @@ const PUBLIC_EXACT: Set<string> = new Set([
 // Admin run/logs endpoints handle their own admin token verification internally
 // Checkout and payment-link CREATION now require a valid JWT (no longer open). Only the buyer-facing
 // routes (resolve/pay a link or session) opt out per-route via `config: { skipAuth: true }`, since the
-// buyer is not logged in (hosted payment page, SAQ A). The simulator authenticates as the selected demo
+// buyer is not logged in (hosted payment page). The simulator authenticates as the selected demo
 // user and calls these real authenticated endpoints (no open /system/simulator surface).
 // Internal stub endpoints use X-Integration-Source header validation instead of JWT (ADR-025)
 const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/internal'];
@@ -57,6 +58,18 @@ const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/
 // is checked  -  customers are denied even on public-GET routes.
 const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
 
+// Some public paths are only public for SOME methods. `/api/v1/transactions` is public so the
+// simulator can create a payment with no session; its GET is the movement collection and must stay
+// authenticated (v36: it would otherwise return every movement to an anonymous caller).
+const PUBLIC_EXACT_METHODS: Record<string, ReadonlySet<string>> = {
+  '/api/v1/transactions': new Set(['POST']),
+};
+
+function methodIsPublic(path: string, method: string): boolean {
+  const allowed = PUBLIC_EXACT_METHODS[path];
+  return !allowed || allowed.has(method);
+}
+
 // URL prefixes and exact paths that the `customer` role is never allowed to access.
 // Customers use /api/v1/auth/me for their own profile; they must not query other
 // customers' data through the general customer search or investigation endpoints.
@@ -65,7 +78,7 @@ const CUSTOMER_BLOCKED_PREFIXES: string[] = [
   '/api/v1/customer',   // QE equality searches  -  customer must use /auth/me instead
   '/api/v1/modules',    // v29: built-in module admin surfaces (global card/account admin) are staff-only.
                         // The customer role has cards:[view,manage] for OWN cards (scope own), so the
-                        // ACL permission alone would let it reach the global list; block by prefix (PCI Req 7).
+                        // ACL permission alone would let it reach the global list; block by prefix (PCI DSS).
 ];
 
 // Exact paths blocked for customers even when the prefix is otherwise public
@@ -73,7 +86,7 @@ const CUSTOMER_BLOCKED_EXACT: Set<string> = new Set([
   '/api/v1/audit-events',
 ]);
 
-// Carve-out: a customer MAY manage their own stored cards (SD-88) even though the general
+// Carve-out: a customer MAY manage their own stored cards even though the general
 // /api/v1/customer search prefix is blocked. The card sub-routes enforce ownership in-handler
 // (the path :customerId must match the caller's own agreement), so allowing the customer here
 // does not expose other customers' data. Pattern: /api/v1/customer/{id}/cards[/{cardId}].
@@ -85,9 +98,9 @@ function isCustomerBlocked(role: string | undefined, url: string): boolean {
   return CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) || CUSTOMER_BLOCKED_EXACT.has(path);
 }
 
-// Investigation (BIAN SD-83 Fraud Diagnosis) is restricted to fraud analyst and auditor
+// Investigation (Fraud Diagnosis) is restricted to fraud analyst and auditor
 // roles. The platform/integration `manager`, `merchant_officer` and `customer` roles must
-// not read or act on fraud cases (PCI DSS Req 7 least privilege). The unauthenticated
+// not read or act on fraud cases (PCI DSS least privilege). The unauthenticated
 // simulator (no token) keeps read-only access; the role check only applies when a token is
 // present, so an authenticated non-analyst role is denied on BOTH read and mutation routes.
 const INVESTIGATION_PREFIX = '/api/v1/fraud';
@@ -125,14 +138,14 @@ async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload):
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
   const { url, method } = request;
-  // Match against the pathname only — query strings (e.g. ?featured=true) must
+  // Match against the pathname only: query strings (e.g. ?featured=true) must
   // not break public-route matching.
   const path = url.split('?')[0];
 
   // Routes that opt out of JWT via `config: { skipAuth: true }` validate their own
   // caller identity in-handler. The internal capability-module engines (ADR-029:
   // /api/v1/modules/<cap>/score|screen) use the X-Integration-Source header instead
-  // of a Bearer token — the EDA dispatcher calls them server-to-server, not as a user.
+  // of a Bearer token: the EDA dispatcher calls them server-to-server, not as a user.
   const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean; dualAuth?: boolean };
   if (routeConfig.skipAuth) {
     attachRbacContext(request);
@@ -162,7 +175,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(401).send({ error: 'invalid_token', error_description: 'A valid session or OAuth token is required.' });
   }
 
-  if (PUBLIC_EXACT.has(path)) {
+  if (PUBLIC_EXACT.has(path) && methodIsPublic(path, method)) {
     attachRbacContext(request);
     return;
   }
@@ -213,13 +226,13 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   }
 
   // Customers are blocked from investigation, customer-search, and audit endpoints (but may
-  // manage their own stored cards — see isCustomerBlocked). They use /api/v1/auth/me otherwise.
+  // manage their own stored cards: see isCustomerBlocked). They use /api/v1/auth/me otherwise.
   const role = (payload as { role?: string }).role;
   if (isCustomerBlocked(role, url)) {
     return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
   }
 
-  // Investigation (SD-83) is for fraud analyst/auditor roles only; deny manager/officer/etc.
+  // Investigation is for fraud analyst/auditor roles only; deny manager/officer/etc.
   if (blockedFromInvestigation(role, path)) {
     return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
   }

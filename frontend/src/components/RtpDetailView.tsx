@@ -5,7 +5,7 @@
 // approval, the payer can approve/reject here (NOT from the transfer hub). Real authenticated endpoints.
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Check, X, Info, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Check, X, Info, ArrowDownLeft, ArrowUpRight, ArrowLeft, ExternalLink } from 'lucide-react';
 import { api, RtpRequestDTO } from '../lib/api';
 
 const PENDING = ['created', 'validated', 'presented', 'delivered', 'viewed'];
@@ -77,7 +77,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
     setBusy(true); setMsg(null);
     try {
       const res = await api.rtp.accept(req.paymentRequestInstanceReference, { fundingAccountRef: fundingRef || undefined }, token, `rtp-accept-${req.paymentRequestInstanceReference}`);
-      setMsg(res.status === 'accepted' ? 'Approved — payment on the way.' : (res.reason ?? 'Could not approve.'));
+      setMsg(res.status === 'accepted' ? 'Approved: payment on the way.': (res.reason ?? 'Could not approve.'));
       const fresh = await api.rtp.getById(req.paymentRequestInstanceReference, token).catch(() => null);
       if (fresh) setReq(fresh);
       onChanged?.();
@@ -101,7 +101,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
   return (
     <>
       <Link href="/system/payment/history" className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-4">
-        ← Back to transactions
+        <ArrowLeft size={14} /> Back to transactions
       </Link>
 
       {/* Header + Sender/Recipient (mirrors the P2P detail card) */}
@@ -118,7 +118,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                 {statusChip}
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">{req.recordCreatedDateTime ? new Date(req.recordCreatedDateTime).toLocaleString() : '—'}</p>
+            <p className="text-sm text-gray-500 mt-1">{req.recordCreatedDateTime ? new Date(req.recordCreatedDateTime).toLocaleString(): '—'}</p>
             {req.purpose && <p className="text-sm text-gray-600 mt-1">{req.purpose}</p>}
           </div>
           <div className="text-right shrink-0">
@@ -128,7 +128,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
           </div>
         </div>
 
-        {/* Sender / Recipient — perspective-aware privacy:
+        {/* Sender / Recipient: perspective-aware privacy:
             - Payer view: sees the requester's NAME (authorized on request) + their own funding account.
             - Payee view: sees only the payer label THEY provided (beneficiary/alias) + their own receiving account.
             - Staff (L1/L2/auditor): full refs + accounts for investigation. */}
@@ -143,7 +143,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                   <dt className="text-gray-500">Funding account</dt>
                   <dd className="font-mono text-xs text-gray-800 break-all">
                     {req.payerFundingAccountReference
-                      ? <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} ↗</Link>
+                      ? <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} <ExternalLink size={11} className="inline" /></Link>
                       : '—'}
                   </dd>
                 </>
@@ -175,7 +175,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                   ) : req.payerFundingAccountReference && (<>
                     <dt className="text-gray-500">Funding account</dt>
                     <dd className="font-mono text-xs text-gray-800 break-all">
-                      <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} ↗</Link>
+                      <Link href={`/system/accounts/${req.payerFundingAccountReference}`} className="text-blue-600 hover:underline">{req.payerFundingAccountReference} <ExternalLink size={11} className="inline" /></Link>
                     </dd>
                   </>)}
                 </>
@@ -189,7 +189,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
                     <dt className="text-gray-500">Beneficiary</dt>
                     <dd>
                       <Link href={`/system/beneficiaries/${req.payerCounterpartyReference}`} className="text-blue-600 hover:underline break-all">
-                        View beneficiary ↗
+                        View beneficiary <ExternalLink size={11} className="inline" />
                       </Link>
                     </dd>
                   </>)}
@@ -206,7 +206,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1">
               {/* Requester name: authorized to the payer (requesting is the consent). */}
               <dt className="text-gray-500">Name</dt>
-              <dd className="text-gray-800">{req.payeeName ?? (isPayee ? 'You' : '—')}</dd>
+              <dd className="text-gray-800">{req.payeeName ?? (isPayee ? 'You': '—')}</dd>
               {/* Destination account: bank + masked IBAN so the PAYER sees where the money goes. */}
               {req.payeeAccountDisplay?.bankName && (<>
                 <dt className="text-gray-500">Destination bank</dt>
@@ -220,7 +220,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
               {(staffRole || isPayee) && (<>
                 <dt className="text-gray-500">Receiving account</dt>
                 <dd className="font-mono text-xs text-gray-800 break-all">
-                  <Link href={`/system/accounts/${req.payeeReceivingAccountReference}`} className="text-blue-600 hover:underline">{req.payeeReceivingAccountReference} ↗</Link>
+                  <Link href={`/system/accounts/${req.payeeReceivingAccountReference}`} className="text-blue-600 hover:underline">{req.payeeReceivingAccountReference} <ExternalLink size={11} className="inline" /></Link>
                 </dd>
               </>)}
               {staffRole && (<>
@@ -231,9 +231,9 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
           </div>
         </div>
 
-        {/* Identifiers — visible to BOTH parties (and staff) for support / investigations.
+        {/* Identifiers: visible to BOTH parties (and staff) for support / investigations.
             Request ID = the Request-to-Pay intent (what you approve). Transfer ID = the actual money
-            movement (SD-65 execution) created after approval. They are deliberately distinct records. */}
+            movement created after approval. They are deliberately distinct records. */}
         <div className="border-t pt-4 mt-4 text-sm space-y-2">
           <div>
             <div className="flex items-center justify-between gap-2">
@@ -246,7 +246,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
             <div className="flex items-center justify-between gap-2">
               <span className="text-gray-500 flex items-center gap-1"><Info size={12} className="text-gray-400" /> Transfer / execution ID</span>
               {req.linkedPaymentExecutionReference
-                ? <Link href={`/system/payment/history/${req.linkedPaymentExecutionReference}`} className="font-mono text-xs text-blue-600 hover:underline break-all">{req.linkedPaymentExecutionReference} ↗</Link>
+                ? <Link href={`/system/payment/history/${req.linkedPaymentExecutionReference}`} className="font-mono text-xs text-blue-600 hover:underline break-all">{req.linkedPaymentExecutionReference} <ExternalLink size={11} className="inline" /></Link>
                 : <span className="font-mono text-xs text-gray-400">Not created yet</span>}
             </div>
             <p className="text-[11px] text-gray-400">The actual money movement created after approval. Use it for support about the funds/settlement.</p>
@@ -254,7 +254,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
         </div>
       </div>
 
-      {/* Timeline — created / approved by payer / completed (both parties). */}
+      {/* Timeline: created / approved by payer / completed (both parties). */}
       {events.length > 0 && (
         <div className="bg-white rounded-xl border p-5 mb-4">
           <h2 className="text-sm font-semibold text-gray-900 mb-2">Timeline</h2>
@@ -272,7 +272,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
         </div>
       )}
 
-      {/* Security Review — BOTH parties see the PSP/L1/L2 outcome + notes on their funds (transparency).
+      {/* Security Review: BOTH parties see the PSP/L1/L2 outcome + notes on their funds (transparency).
           Staff additionally get a link into the full investigation case. */}
       <div className="bg-white rounded-xl border p-5 mb-4">
         <h2 className="text-sm font-semibold text-gray-900 mb-2">Security Review</h2>
@@ -291,7 +291,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
               </div>
             ))}
             {staffRole && sc.caseInstanceReference && (
-              <Link href={`/system/investigation/${sc.caseInstanceReference}`} className="text-blue-600 hover:underline">Open investigation case ↗</Link>
+              <Link href={`/system/investigation/${sc.caseInstanceReference}`} className="text-blue-600 hover:underline">Open investigation case <ExternalLink size={11} className="inline" /></Link>
             )}
           </div>
         ) : (
@@ -299,7 +299,7 @@ export function RtpDetailView({ request, token, partyRef, role, onChanged }: {
         )}
       </div>
 
-      {/* Approve / reject — payer only, while pending */}
+      {/* Approve / reject: payer only, while pending */}
       {pending && isPayer && (
         <div className="bg-white rounded-xl border p-5 mb-4">
           {msg && <div className="mb-3 rounded bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-700">{msg}</div>}

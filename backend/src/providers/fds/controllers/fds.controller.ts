@@ -1,6 +1,6 @@
-// FDS capability module controller — STATIC routes (ADR-029): no dynamic catch-all.
-//   POST /api/v1/modules/fds/score   — internal engine invocation (endpoint-first loopback)
-//   GET/PUT /api/v1/modules/fds/config — admin config of the internal engine
+// FDS capability module controller: STATIC routes (ADR-029): no dynamic catch-all.
+//   POST /api/v1/modules/fds/score: internal engine invocation (endpoint-first loopback)
+//   GET/PUT /api/v1/modules/fds/config: admin config of the internal engine
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { scoreFds, resolveFdsRules, FdsModuleConfig } from '../services/fds.service';
@@ -12,7 +12,7 @@ import {
 export async function fdsController(fastify: FastifyInstance) {
   const CAP = 'fds';
 
-  // Internal engine — not JWT-authenticated; validated by X-Integration-Source (like the old stub).
+  // Internal engine, not JWT-authenticated; validated by X-Integration-Source (like the old stub).
   fastify.post('/score', {
     schema: {
       tags: ['modules:fds'],

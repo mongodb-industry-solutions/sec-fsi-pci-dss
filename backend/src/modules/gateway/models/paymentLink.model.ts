@@ -1,4 +1,4 @@
-// BIAN SD-64: Payment Order - Payment Link Control Record
+// Payment Order - Payment Link Control Record
 // Represents a shareable payment URL: merchant creates once, buyer pays anytime.
 
 export const PAYMENT_LINK_COLLECTION = 'paymentLinkRecord';

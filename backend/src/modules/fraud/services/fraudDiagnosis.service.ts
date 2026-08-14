@@ -16,7 +16,7 @@ import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgr
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../../gateway/models/paymentExecution.model';
 import { createNotification } from '../../notification/notifications.service';
 
-// -- BIAN SD-83: Note entry - resolved view of a note_added event enriched with retraction info
+// -- Note entry - resolved view of a note_added event enriched with retraction info
 export interface NoteEntry {
   noteId: string;
   noteText: string;
@@ -205,7 +205,7 @@ export async function createFraudCase(
 // decide whether a manual open should dedup to an existing case or start a new one.
 const RESOLVED_STATUSES: FraudDiagnosisControlRecord['fraudDiagnosisCaseStatus'][] = ['resolved_cleared', 'resolved_fraud', 'closed'];
 
-// Map an SD-65 payment-execution status onto the display-only cardTransactionStatus enum
+// Map an payment-execution status onto the display-only cardTransactionStatus enum
 // carried by the shared TransactionSnapshot. This is presentation only (no CHD), so a coarse
 // mapping is fine: completed -> settled, terminal failures -> declined, everything else pending.
 function execStatusToSnapshotStatus(status: string): TransactionSnapshot['cardTransactionStatus'] {
@@ -215,7 +215,7 @@ function execStatusToSnapshotStatus(status: string): TransactionSnapshot['cardTr
   return 'pending';
 }
 
-// BIAN SD-83 / SD-65: manually open a fraud case from a payment execution (transfer), mirroring the
+// manually open a fraud case from a payment execution (transfer), mirroring the
 // automated P2P compliance path (modules/gateway/services/p2pCompliance.process.ts). Builds a
 // DISPLAY-SAFE snapshot (no CHD, no raw IBAN), creates the case, then stamps it with the
 // paymentExecutionInstanceReference + transactionKind discriminator. Dedups to an existing
@@ -287,7 +287,7 @@ export async function openCaseFromExecution(
     snapshot,
   );
 
-  // Discriminate as a P2P/transfer case and link the SD-65 execution, exactly like the P2P process.
+  // Discriminate as a P2P/transfer case and link the execution, exactly like the P2P process.
   await db.collection(FRAUD_DIAGNOSIS_COLLECTION).updateOne(
     { fraudDiagnosisInstanceReference: created.fraudDiagnosisInstanceReference },
     { $set: { paymentExecutionInstanceReference: executionId, transactionKind: 'p2p', recordUpdatedDateTime: new Date() } },
@@ -337,7 +337,7 @@ export async function getCaseById(db: Db, id: string) {
 /**
  * Fraud investigation analytics for L1 / L2 / auditor dashboards.
  * Aggregation over operational case metadata only; fraudDiagnosisCase carries no
- * cardholder PII (PCI DSS Req 3/7). `$toDate` tolerates Date or ISO-string dates.
+ * cardholder PII (PCI DSS). `$toDate` tolerates Date or ISO-string dates.
  */
 export async function getFraudStats(db: Db) {
   const coll = db.collection(FRAUD_DIAGNOSIS_COLLECTION);
@@ -373,7 +373,7 @@ export async function getFraudStats(db: Db) {
 }
 
 /**
- * Data-integrity oversight for the Security Auditor (PCI DSS Req 10): verifies the
+ * Data-integrity oversight for the Security Auditor (PCI DSS): verifies the
  * Fraud Diagnosis control records are well-formed. Aggregates only; no PII.
  *  - duplicateReferences: case references appearing on more than one case (must be 0;
  *    enforced by the unique index after a clean re-seed; see ADR-024).
@@ -462,7 +462,57 @@ export async function updateCase(
     { $set: update },
     { returnDocument: 'after' }
   );
+  if (result) await publishCaseResolved(db, result as unknown as FraudDiagnosisControlRecord, patch.fraudDiagnosisCaseStatus);
   return result ?? null;
+}
+
+// A resolved case closes the payment decision it opened: the payout process listens and either
+// releases the withheld payout (cleared) or returns the hold and declines it (confirmed fraud).
+async function publishCaseResolved(
+  db: Db,
+  fraudCase: FraudDiagnosisControlRecord,
+  newStatus?: FraudDiagnosisControlRecord['fraudDiagnosisCaseStatus'],
+): Promise<void> {
+  if (newStatus !== 'resolved_cleared' && newStatus !== 'resolved_fraud') return;
+  const txnId = fraudCase.cardTransactionInstanceReference;
+  if (!txnId) return;
+  try {
+    const { getEventBus, makeEvent } = await import('../../../vendors/eventbus');
+    await getEventBus().publish(makeEvent({
+      eventType: 'fraud.case.resolved', correlationId: txnId, businessProcess: 'fraud_investigation',
+      source: 'fraud.diagnosis',
+      payload: {
+        fraudDiagnosisInstanceReference: fraudCase.fraudDiagnosisInstanceReference,
+        cardTransactionInstanceReference: txnId,
+        outcome: newStatus === 'resolved_cleared' ? 'cleared' : 'confirmed_fraud',
+      },
+      bian: { serviceDomain: 'SD-83 Fraud Diagnosis', controlRecord: 'FraudDiagnosisCase' },
+    }));
+  } catch (err) {
+    // The case resolution itself must never fail because the payment follow-up could not be published.
+    console.error('[fraud] publish fraud.case.resolved failed:', err);
+  }
+}
+
+/**
+ * Stamp the execution a case's movement ended up using. An RTP case is opened at screening time, when
+ * the approval has not created its execution yet, so the case only knows the request reference. Called
+ * by the approval once the execution exists, which keeps the case resolvable by either reference.
+ */
+export async function linkCaseExecution(
+  db: Db,
+  movementReference: string,
+  paymentExecutionInstanceReference: string,
+): Promise<void> {
+  try {
+    await db.collection(FRAUD_DIAGNOSIS_COLLECTION).updateOne(
+      { cardTransactionInstanceReference: movementReference, fraudDiagnosisCaseStatus: { $nin: RESOLVED_STATUSES } },
+      { $set: { paymentExecutionInstanceReference, recordUpdatedDateTime: new Date() } },
+    );
+  } catch (err) {
+    // Never block the movement on bookkeeping: the read path also resolves through the request link.
+    console.error('[fraud] linkCaseExecution failed:', err);
+  }
 }
 
 export async function getCaseEvents(db: Db, caseId: string) {
@@ -508,7 +558,7 @@ export async function getAllAuditEvents(
   return { events, total, page, limit };
 }
 
-// PCI DSS Req 10.2.1 / 10.3.1: each audit entry must identify the INDIVIDUAL user who acted,
+// PCI DSS: each audit entry must identify the INDIVIDUAL user who acted,
 // not just the role (multiple L1/L2 share a role). `actor` carries the acting user's unique id
 // (partyRef/sub) and display name from their JWT; BIAN records this as performedByPartyReference.
 export async function appendAuditEvent(
@@ -532,7 +582,7 @@ export async function appendAuditEvent(
   await db.collection(FRAUD_DIAGNOSIS_EVENTS_COLLECTION).insertOne(event as object);
 }
 
-// -- BIAN SD-83 append-only notes --------------------------------------------
+// -- append-only notes --------------------------------------------
 
 export async function addCaseNote(
   db: Db,

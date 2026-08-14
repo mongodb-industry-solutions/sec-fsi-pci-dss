@@ -4,7 +4,7 @@ import { RESOURCES, ACTIONS } from '../../../shared/models/acl.model';
 import type { AuthenticatedRequest } from '../../../shared/models/identity.model';
 
 // ADR-030: expose the current user's EFFECTIVE permissions so the frontend can gate UI without
-// embedding permissions in the JWT (changes take effect without re-login). PCI DSS Req 7.
+// embedding permissions in the JWT (changes take effect without re-login). PCI DSS.
 export async function aclController(fastify: FastifyInstance) {
   fastify.get('/effective', {
     schema: {

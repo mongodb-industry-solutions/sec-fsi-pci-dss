@@ -15,7 +15,7 @@ import { ModuleTabsBar, useActiveTab, type ModuleTab } from '../_components/Modu
 
 // Unified Account Information (AIS) module admin (v29.1): one page with "Configuration/Policies" and
 // "Accounts" tabs. Config is a typed form over the AIS engine settings (with a read-only raw view);
-// Accounts is the SD-66 data plane.
+// Accounts is the data plane.
 
 const CAP = 'account-information';
 
@@ -89,7 +89,7 @@ function AccountInfoConfigPanel() {
         </div>
       )}
       <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
-        {/* Verification policies (SD-36 AIS engine) */}
+        {/* Verification policies (AIS engine) */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-1">
           <h2 className="font-semibold text-gray-800 text-sm">Verification policies</h2>
           <p className="text-xs text-gray-500 pb-2">How the built-in AIS engine verifies a PSP-registered payout account. Overrides the built-in defaults.</p>
@@ -171,8 +171,8 @@ function AccountInfoModule() {
       <SectionHeader
         icon={Landmark}
         title={`${descriptor.label}; Internal Module`}
-        description="AIS validation policies plus global payout-account administration (SD-66), unified in one module surface."
-        debugInfo="capability=account-information · SD-66 Payout Account Arrangement · GDPR/PSD2 · PCI Req 7 · Req 10"
+        description="AIS validation policies plus global payout-account administration, unified in one module surface."
+        debugInfo="capability=account-information Payout Account Arrangement · GDPR/PSD2 · PCI DSS"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />
       {tab === 'config' ? <AccountInfoConfigPanel /> : (

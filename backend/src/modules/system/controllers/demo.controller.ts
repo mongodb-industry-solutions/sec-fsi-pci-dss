@@ -138,7 +138,7 @@ export async function demoController(fastify: FastifyInstance) {
       tags: ['system'],
       summary: 'Health check (IETF draft format)',
       description: `Returns system health following the IETF Health Check Response Format (draft-inadarei-api-health-check).
-**Public — no JWT required.** Use \`?detail=server|db|all\` for extended component checks (heavier; use on-demand only).`,
+**Public, no JWT required.** Use \`?detail=server|db|all\` for extended component checks (heavier; use on-demand only).`,
       querystring: {
         type: 'object',
         properties: {
@@ -157,7 +157,7 @@ export async function demoController(fastify: FastifyInstance) {
     const checks: Record<string, CheckEntry[]> = {};
     let overallStatus: CheckStatus = 'pass';
 
-    // Core connectivity check (always runs — lightweight ping)
+    // Core connectivity check (always runs: lightweight ping)
     if (fastify.dbError) {
       overallStatus = 'fail';
       checks['mongodb:connectivity'] = [{
@@ -193,7 +193,7 @@ export async function demoController(fastify: FastifyInstance) {
       Object.assign(checks, serverChecks());
     }
 
-    // Extended: database details (moderate cost — buildInfo + listCollections)
+    // Extended: database details (moderate cost, buildInfo + listCollections)
     if ((detail === 'db' || detail === 'all') && !fastify.dbError) {
       Object.assign(checks, await dbChecks(fastify.db));
     }

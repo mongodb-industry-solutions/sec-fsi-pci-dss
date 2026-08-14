@@ -33,7 +33,7 @@ describe('PaymentAuthorizationSaga (Phase-1 gate aggregation)', () => {
     new PaymentAuthorizationSaga({} as Db, bus).register();
   });
 
-  // Watch the single closing event and record its outcome (§6.1 — no separate authorized/declined names).
+  // Watch the single closing event and record its outcome (§6.1, no separate authorized/declined names).
   function watch(txnId: string): string[] {
     const seen: string[] = [];
     bus.subscribe('card.payment.authorization.completed', (e) => seen.push((e.payload as { outcome: string }).outcome), { correlationId: txnId });
@@ -72,7 +72,7 @@ describe('PaymentAuthorizationSaga (Phase-1 gate aggregation)', () => {
     await bus.publish(makeEvent({ eventType: 'card.issuer.validation.completed', correlationId: 't4', businessProcess: 'card_payment', payload: { outcome: 'rejected', ledgerKind: 'compliance', response: { approved: false, responseCode: '82' } } }));
     await bus.publish(gate('fds.scoring.completed', 't4', true));
     await bus.publish(gate('hrp.screening.completed', 't4', true));
-    // The authoritative (business) issuer verdict declines — the journey must decline, not authorize.
+    // The authoritative (business) issuer verdict declines: the journey must decline, not authorize.
     await bus.publish(gate('card.issuer.validation.completed', 't4', false, 'invalid_cvv'));
     await flush();
     expect(seen).toEqual(['declined']);

@@ -30,21 +30,21 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
     { label: 'Cases',          path: '/system/investigation',  icon: BriefcaseMedical },
     { label: 'Transactions',   path: '/system/transactions',   icon: CreditCard },
     { label: 'Users',          path: '/system/users',          icon: Users },
-    { label: 'Beneficiaries',  path: '/system/beneficiaries',  icon: UserCheck, tooltip: 'SD-54 Counterparty Administration, saved beneficiary contacts' },
+    { label: 'Beneficiaries',  path: '/system/beneficiaries',  icon: UserCheck, tooltip: 'Counterparty Administration, saved beneficiary contacts' },
     { label: 'Merchants',      path: '/system/merchant',       icon: Store },
   ],
   level2_investigator: [
     { label: 'Cases',          path: '/system/investigation',  icon: BriefcaseMedical },
     { label: 'Transactions',   path: '/system/transactions',   icon: CreditCard },
     { label: 'Users',          path: '/system/users',          icon: Users },
-    { label: 'Beneficiaries',  path: '/system/beneficiaries',  icon: UserCheck, tooltip: 'SD-54 Counterparty Administration, saved beneficiary contacts' },
+    { label: 'Beneficiaries',  path: '/system/beneficiaries',  icon: UserCheck, tooltip: 'Counterparty Administration, saved beneficiary contacts' },
     { label: 'Merchants',      path: '/system/merchant',       icon: Store },
   ],
   security_auditor: [
     { label: 'Cases',          path: '/system/investigation',  icon: BriefcaseMedical },
     { label: 'Transactions',   path: '/system/transactions',   icon: CreditCard },
     { label: 'Users',          path: '/system/users',          icon: Users },
-    { label: 'Beneficiaries',  path: '/system/beneficiaries',  icon: UserCheck, tooltip: 'SD-54 Counterparty Administration, saved beneficiary contacts' },
+    { label: 'Beneficiaries',  path: '/system/beneficiaries',  icon: UserCheck, tooltip: 'Counterparty Administration, saved beneficiary contacts' },
     { label: 'Audit Log',      path: '/system/audit',          icon: BarChart3 },
     { label: 'Audit Events',   path: '/system/audit-events',   icon: Activity },
     { label: 'Data Integrity', path: '/system/integrity',      icon: ShieldCheck },
@@ -66,7 +66,7 @@ const NAV_BY_ROLE: Record<string, NavItem[]> = {
   ],
   operations_officer: [
     { label: 'Hub',          path: '/system',               icon: Settings2, exact: true },
-    { label: 'Modules',      path: '/system/admin/modules', icon: LayoutGrid, tooltip: 'Internal module policies plus card (SD-88) and payout-account (SD-66) administration' },
+    { label: 'Modules',      path: '/system/admin/modules', icon: LayoutGrid, tooltip: 'Internal module policies plus card and payout-account administration' },
     { label: 'Audit Events', path: '/system/audit-events',  icon: Activity },
   ],
   manager: [

@@ -1,5 +1,5 @@
-// §2.6: /system/admin/modules lists ALL configurable modules — PSP core modules AND built-in provider
-// modules — in one list, so every entry must carry a module-type label ('Core' | 'Built-in Provider')
+// §2.6: /system/admin/modules lists ALL configurable modules, PSP core modules AND built-in provider
+// modules: in one list, so every entry must carry a module-type label ('Core' | 'Built-in Provider')
 // to tell at a glance whether an operator is configuring core system behavior or a replaceable adapter.
 import { CAPABILITY_LIST } from './capabilities';
 
@@ -25,7 +25,7 @@ export const CORE_ADMIN_MODULES: AdminModuleEntry[] = [
   {
     key: 'domain',
     label: 'Auth Domains',
-    description: 'Authentication-domain registry; full CRUD (BIAN SD-16)',
+    description: 'Authentication-domain registry; full CRUD',
     href: '/system/admin/modules/domains',
     moduleType: 'core',
     group: 'Core',

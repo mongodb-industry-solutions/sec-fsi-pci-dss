@@ -12,7 +12,7 @@ import { useEffectivePermissions } from '../../../../../lib/permissions';
 
 // Dedicated config UI for the internal AML (Anti-Money-Laundering) monitoring engine (overrides the
 // generic module editor). DATA-DRIVEN: watchlist sources + continuous-monitoring flag live in the
-// capability moduleConfig; the backend /modules/aml/score endpoint evaluates them. PCI DSS Req 12.8 / Req 10.
+// capability moduleConfig; the backend /modules/aml/score endpoint evaluates them. PCI DSS.
 const CAP = 'aml';
 const DEFAULT_SOURCES = ['OFAC_SDN', 'FATF', 'EU_Consolidated'];
 
@@ -57,7 +57,7 @@ export default function AmlModulePage() {
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
       <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'AML Monitoring' }]} />
-      <SectionHeader icon={ScanSearch} title="AML Monitoring" description="Anti-money-laundering screening and suspicious-activity analysis." debugInfo="capability=aml · SD-99 Suspicious Activity Analysis · PCI DSS Req 12.8 / Req 10" />
+      <SectionHeader icon={ScanSearch} title="AML Monitoring" description="Anti-money-laundering screening and suspicious-activity analysis." debugInfo="capability=aml Suspicious Activity Analysis · PCI DSS" />
 
       {!canEdit && (
         <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">

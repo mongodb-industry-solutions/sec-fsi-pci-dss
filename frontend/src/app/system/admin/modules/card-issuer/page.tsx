@@ -13,7 +13,7 @@ import { CardsAdminPanel } from '../_components/CardsAdminPanel';
 import { ModuleTabsBar, useActiveTab, type ModuleTab } from '../_components/ModuleTabs';
 
 // Unified Card Issuer module admin (v29.1): one page with "Configuration/Policies" and "Cards" tabs.
-// PCI DSS Req 3.2: the valid CVV is a fixed demo value, never a real card secret, and no PAN/CVV is stored.
+// PCI DSS: the valid CVV is a fixed demo value, never a real card secret, and no PAN/CVV is stored.
 
 interface NetworkForm {
   name: string;
@@ -89,7 +89,7 @@ function CardIssuerConfigPanel() {
     setNetworks((prev) => prev.map((n, idx) => (idx === i ? { ...n, ...patch } : n)));
   }
   function addNetwork() {
-    setNetworks((prev) => [...prev, { name: '', prefixes: '', lengths: '16', cvvLength: 3, enabled: true }]);
+    setNetworks((prev) => [...prev, { name : '', prefixes : '', lengths: '16', cvvLength: 3, enabled: true }]);
   }
   function removeNetwork(i: number) {
     setNetworks((prev) => prev.filter((_, idx) => idx !== i));
@@ -146,7 +146,7 @@ function CardIssuerConfigPanel() {
               className={`w-32 border rounded-lg px-3 py-2 text-sm font-mono ${cvvInvalid ? 'border-red-400' : ''}`}
               placeholder="123"
             />
-            <p className="text-xs text-gray-500 mt-1">The single CVV the simulator accepts. Fixed demo value; never a real card secret and never stored.</p>
+            <p className="text-xs text-gray-500 mt-1">The global CVV this module accepts. Set here (not hardcoded): the value you save applies to every card until changed. A demo value, never a real card secret and never stored.</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">CVV acceptance mode (demo)</label>
@@ -160,7 +160,7 @@ function CardIssuerConfigPanel() {
               <option value="per_card">per_card (real per-card CVV only)</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              both: accepts the global {validCvv || '123'} or the real per-card CVV. global: only the fixed demo CVV. per_card: only the card&apos;s own CVV.
+              both: accepts the global CVV configured above ({validCvv || '123'}) or the card&apos;s own derived CVV. global: only the configured value. per_card: only the card&apos;s own CVV.
             </p>
           </div>
           <div>
@@ -244,7 +244,7 @@ function CardIssuerConfigPanel() {
       </fieldset>
 
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 mt-5">
-        <strong>Logging:</strong> every validation request records a compliance event with the request and response payloads and the linked transaction id / case reference. The event never contains the PAN or CVV (only a masked PAN and whether a CVV was supplied), per PCI DSS Req 3.2 and Req 10.
+        <strong>Logging:</strong> every validation request records a compliance event with the request and response payloads and the linked transaction id / case reference. The event never contains the PAN or CVV (only a masked PAN and whether a CVV was supplied), per PCI DSS.
       </div>
     </>
   );
@@ -263,8 +263,8 @@ function CardIssuerModule() {
       <SectionHeader
         icon={CreditCard}
         title="Card Issuer; Internal Module"
-        description="Card validation policies plus global card administration (SD-88), unified in one module surface."
-        debugInfo="capability=card-issuer · SD-88 Payment Card · PCI DSS Req 3.2/3.3 (no SAD stored) · Req 7 · Req 10"
+        description="Card validation policies plus global card administration, unified in one module surface."
+        debugInfo="capability=card-issuer Payment Card · PCI DSS (no SAD stored)"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />
       {tab === 'config' ? <CardIssuerConfigPanel /> : (

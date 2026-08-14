@@ -75,8 +75,8 @@ backend/      ← Fastify 4 (controllers / services / models / encryption)
   bin/        ← setup.ts + seed.ts (owned by backend; invoked via npm --prefix backend)
   data/       ← JSON seed files (one per collection; consumed only by backend/bin/seed.ts)
 test/         ← All automated tests (Vitest unit + integration, Playwright E2E)
-  backend/    ←   mirrors backend/src/ — unit/services/ + integration/routes/
-  frontend/   ←   mirrors frontend/src/ — unit/lib/ + unit/components/ + e2e/
+  backend/    ←   mirrors backend/src/: unit/services/ + integration/routes/
+  frontend/   ←   mirrors frontend/src/: unit/lib/ + unit/components/ + e2e/
 docs/         ← PRD, roadmap, technical-spec, this EP
 ```
 
@@ -110,7 +110,7 @@ fraudDiagnosisCase ◄── also links ─────────────�
    (linkedCustomerAgreementReference + linkedCardTransactionReference)
 ```
 
-**Payment token (paymentCardReference):** Stored as plaintext with a standard MongoDB index — not in QE. A payment token is a card surrogate under PCI DSS v4.0: it is not Cardholder Data (CHD) and does not require QE protection. QE equality applies only to genuine PII/CHD fields (`customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`, `customerAgreementReference`).
+**Payment token (paymentCardReference):** Stored as plaintext with a standard MongoDB index, not in QE. A payment token is a card surrogate under PCI DSS v4.0: it is not Cardholder Data (CHD) and does not require QE protection. QE equality applies only to genuine PII/CHD fields (`customerEmailAddress`, `customerMobilePhoneNumber`, `cardTransactionAccountReference`, `customerAgreementReference`).
 
 **Join strategy:** Application-side sequential queries. The backend service layer queries each collection independently and assembles the response. No `$lookup` across QE collections: it is not supported for encrypted fields in the current QE implementation.
 
@@ -128,7 +128,7 @@ Two DEKs:
 Complete `encryptedFieldsMap` definitions are in [technical-spec.md §2](technical-spec.md#2-qe-encryptedfieldsmaps).
 
 **v1 query types:** equality only: `cardTransactionAccountReference`, `customerEmailAddress`, `customerMobilePhoneNumber`, `customerAgreementReference`, `authenticationUserEmailAddress`.  
-`paymentCardReference` (card token) is **not** a QE field — it is stored plaintext and searched via a standard MongoDB index. See ADR-003.
+`paymentCardReference` (card token) is **not** a QE field: it is stored plaintext and searched via a standard MongoDB index. See ADR-003.
 
 **v2 addition:** range query on `transactionAmount.amount` (`min: 0`, `max: 999999`, `precision: 2`).
 
@@ -184,7 +184,7 @@ GET    /api/v1/system/health
 - Five pre-seeded demo roles: `customer`, `level1Analyst`, `level2Investigator`, `auditor`, `admin`.
 - The frontend's Application Mode shows a user-selector dropdown at the login screen (no password required for demo flow).
 - The auth domain is configurable: `AUTH_DOMAIN=local` (default) uses the seeded users; `AUTH_DOMAIN=msentra` delegates to MS Entra ID (future).
-- `authenticationUserEmailAddress` in `partyAuthentication` is QE:equality for demo completeness — the same QE search story applies to auth lookup.
+- `authenticationUserEmailAddress` in `partyAuthentication` is QE:equality for demo completeness, the same QE search story applies to auth lookup.
 
 **v2 RBAC:**
 - JWT `role` claim drives field projection in API responses (replaces the earlier `X-Demo-Role` header pattern).
@@ -244,12 +244,12 @@ Each module maps to one or more BIAN Service Domains. No module exists without a
 
 | Module | BIAN SD | SD Name | Collections | QE Classification | API Prefix | PCI CDE Scope |
 |---|---|---|---|---|---|---|
-| `identity` | SD-16 | Party Authentication | `partyAuthentication` | `equality` on email | `/api/v1/auth` | Adjacent — auth only |
-| `customer` | SD-53 · SD-88 | Customer Agreement · Payment Card | `customerAgreementProcedure` · `paymentCardManagement` | `equality` on accountRef; `none` (inline) on address / govId / riskNotes / expirationDate | `/api/v1/customer` · `/api/v1/customer/:id/cards` | **In scope** — PII/CHD |
-| `transactions` | SD-254 | Card Transaction | `cardTransactionLog` | `equality` on accountRef; `none` (inline) on rawGatewayPayload / processorMetadata | `/api/v1/transactions` | **In scope** — CHD |
-| `fraud` | SD-83 | Fraud Diagnosis | `fraudDiagnosisCase` · `fraudDiagnosisCaseEvents` | None — operational metadata, FK refs only | `/api/v1/fraud` · `/api/v1/fraud/:id/events` | Adjacent — references CDE keys |
-| `gateway` *(v4)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope** — merchant secrets + payment refs |
-| `system` | — | Demo infrastructure | None | None | `/api/v1/system/health` · `/api/v1/system/raw/:collection/:id` | Non-CDE — raw endpoint blocked in production |
+| `identity` | SD-16 | Party Authentication | `partyAuthentication` | `equality` on email | `/api/v1/auth` | Adjacent: auth only |
+| `customer` | SD-53 · SD-88 | Customer Agreement · Payment Card | `customerAgreementProcedure` · `paymentCardManagement` | `equality` on accountRef; `none` (inline) on address / govId / riskNotes / expirationDate | `/api/v1/customer` · `/api/v1/customer/:id/cards` | **In scope**, PII/CHD |
+| `transactions` | SD-254 | Card Transaction | `cardTransactionLog` | `equality` on accountRef; `none` (inline) on rawGatewayPayload / processorMetadata | `/api/v1/transactions` | **In scope**: CHD |
+| `fraud` | SD-83 | Fraud Diagnosis | `fraudDiagnosisCase` · `fraudDiagnosisCaseEvents` | None: operational metadata, FK refs only | `/api/v1/fraud` · `/api/v1/fraud/:id/events` | Adjacent, references CDE keys |
+| `gateway` *(v4)* | SD-64 · SD-65 · SD-89 · SD-57 | Payment Order · Payment Execution · Merchant Relations · Card Etoken | `merchantAgreement` · `paymentOrder` · `tokenVault` | `none` on merchantApiKeyHash · `equality` on merchant/customer refs | `/api/v1/gateway` | **In scope**: merchant secrets + payment refs |
+| `system` |: | Demo infrastructure | None | None | `/api/v1/system/health` · `/api/v1/system/raw/:collection/:id` | Non-CDE, raw endpoint blocked in production |
 
 #### 3.8.2 Shared resources
 
@@ -258,7 +258,7 @@ Each module maps to one or more BIAN Service Domains. No module exists without a
 | `shared/models/risk.model.ts` | `RiskSeverity` · `FraudTriggerInput` | `transactions` · `fraud` · `gateway` (v5) |
 | `shared/models/identity.model.ts` | `UserRole` · `AnalystRole` · `JwtDemoPayload` | `identity` · `fraud` · `gateway` (v5) |
 | `shared/models/transaction.model.ts` | `TransactionSnapshot` | `fraud` (defines embedded field) · `transactions` (builds the value at write time) |
-| `shared/services/fraudTrigger.service.ts` *(v4)* | `triggerFraudEvaluation()` | `transactions` · `gateway` — activated when gateway also triggers fraud cases |
+| `shared/services/fraudTrigger.service.ts` *(v4)* | `triggerFraudEvaluation()` | `transactions` · `gateway`: activated when gateway also triggers fraud cases |
 
 Until v5, `transactions` calls `createFraudCase()` from `modules/fraud/` directly. The shared service is introduced only when a second caller (gateway) makes the duplication worth extracting.
 
@@ -411,7 +411,7 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 | **P3a** | Backend: JWT auth middleware + `POST /api/v1/auth/login` endpoint | P3 | v1 |
 | **P4** | Backend: payment API (`POST /transactions`, `POST /cards`) | P3 | v1 |
 | **P5** | Backend: investigation API (QE equality searches, fraud cases, raw document endpoint) | P3, P4 | v1 |
-| **P6** | Frontend: Simulator Mode — payment simulation flow (checkout, token gen, encryption toggle) | P4 | v1 |
+| **P6** | Frontend: Simulator Mode, payment simulation flow (checkout, token gen, encryption toggle) | P4 | v1 |
 | **P6a** | Frontend: dual-mode landing page + Application Mode shell (login, role selector, JWT flow) | P3a | v1 |
 | **P7** | Frontend: investigation dashboard in Application Mode (search, case detail) | P5, P6a | v1 |
 | **P8** | Docker Compose + `docker compose up` smoke test | P4, P5, P6, P6a, P7 | v1 |
@@ -423,10 +423,10 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 | **P14** | Frontend: save card flow, returning-customer payment | P13 | v3 |
 | **P15** | Backend: `/diagnostics/query-timing` | P5 | v3 |
 | **P16** | Frontend: performance comparison panel | P15 | v3 |
-| **P17** | Backend: structural refactor — create `src/modules/` + `src/shared/` layout; move all existing files; no functional change | P16 | v4 |
+| **P17** | Backend: structural refactor, create `src/modules/` + `src/shared/` layout; move all existing files; no functional change | P16 | v4 |
 | **P18** | Backend: extract shared types to `shared/models/` (`risk`, `identity`, `transaction`) | P17 | v4 |
 | **P19** | Backend: create module `index.ts` Fastify plugins; update `server.ts` registration | P18 | v4 |
-| **P20** | Backend: gateway module — BIAN models (`merchantAgreement`, `paymentOrder`, `tokenVault`) | P19 | v4 |
+| **P20** | Backend: gateway module, BIAN models (`merchantAgreement`, `paymentOrder`, `tokenVault`) | P19 | v4 |
 | **P21** | Backend: gateway services (merchant, paymentOrder, routing, tokenization, webhook) | P20 | v4 |
 | **P22** | Backend: gateway controllers + `index.ts` plugin; update `encryptedFieldsMaps` + `createCollections` + `createIndexes` | P21 | v4 |
 | **P23** | Backend: merchant + gateway seed data; update `bin/seed.ts` | P22 | v4 |
@@ -434,11 +434,11 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 | **P25** | Backend + Frontend: AI agent integration (Magenta, `agentDraftDiagnosis` field) | P5 | v5 |
 | **P26** | Frontend: AI draft inline panel (Accept / Override / Dismiss) | P25 | v5 |
 | **P27** | Backend: bank-transfer rail engine (`shared/services/bankTransfer`: RailResolver, FeeCalculator, IBAN/BIC/ABA validators, return-code maps) | P19 | Add-on (dev v17) |
-| **P28** | Backend: provider-based transfer execution — `bankTransfer.service` + `dispatchProvider`; refactor `payoutOrchestration` + `p2pTransfer` off direct builtin imports; async settlement | P27 | Add-on (dev v17) |
+| **P28** | Backend: provider-based transfer execution, `bankTransfer.service` + `dispatchProvider`; refactor `payoutOrchestration` + `p2pTransfer` off direct builtin imports; async settlement | P27 | Add-on (dev v17) |
 | **P29** | Backend: pre-initiation risk gate (`transferRiskGate`: FDS/HRP/AML) with L1 fraud-case opening on block | P28 | Add-on (dev v17) |
-| **P30** | Backend: recurring mandates (ACH SDD / SEPA SDD) — model, service, API, background scheduler | P28 | Add-on (dev v17) |
+| **P30** | Backend: recurring mandates (ACH SDD / SEPA SDD), model, service, API, background scheduler | P28 | Add-on (dev v17) |
 | **P31** | Backend: transfer status endpoint + idempotency store + config-driven fees/sandbox | P28 | Add-on (dev v17) |
-| **P32** | Frontend: `/system/transfer/bank` — rail auto-detect, live validation, fee, status polling, recurring Direct Debit | P28, P31 | Add-on (dev v17) |
+| **P32** | Frontend: `/system/transfer/bank`, rail auto-detect, live validation, fee, status polling, recurring Direct Debit | P28, P31 | Add-on (dev v17) |
 
 See ADR-039 (§ADRs) and `tmp/dev.v17.plan.md` for the detailed v17.1 change plan and progress board.
 
@@ -622,8 +622,8 @@ Both modes connect to the same Fastify API and the same Atlas cluster. The mode 
 
 Notes were stored as two mutable string fields directly on the `fraudDiagnosisCase` document:
 
-- `fraudDiagnosisCaseNotes?: string` — internal analyst note, overwritable
-- `fraudDiagnosisCustomerSubjectNotes?: string` — customer-visible note, overwritable
+- `fraudDiagnosisCaseNotes?: string`, internal analyst note, overwritable
+- `fraudDiagnosisCustomerSubjectNotes?: string`, customer-visible note, overwritable
 
 This design had four compounding problems:
 
@@ -634,7 +634,7 @@ This design had four compounding problems:
 
 ### Decision
 
-Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collection — the same collection already used for all case audit events (status changes, escalations, assignments). Each note event is an immutable document with the following fields:
+Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collection: the same collection already used for all case audit events (status changes, escalations, assignments). Each note event is an immutable document with the following fields:
 
 | Field | Type | Description |
 |---|---|---|
@@ -655,14 +655,14 @@ Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collec
 |---|---|---|
 | `POST` | `/api/v1/fraud/:id/notes` | Add a `note_added` event; body: `{ noteText, visibility }` |
 | `DELETE` | `/api/v1/fraud/:id/notes/:noteId` | Append a `note_retracted` event; no physical delete |
-| `GET` | `/api/v1/transactions/:id/notes` | Return `notes: NoteEntry[]` — all non-retracted notes for the linked case, filtered by the caller's role |
+| `GET` | `/api/v1/transactions/:id/notes` | Return `notes: NoteEntry[]`, all non-retracted notes for the linked case, filtered by the caller's role |
 
 ### Consequences
 
-+ **Full audit trail** — every note creation and retraction is a permanent event; satisfies PCI DSS Req 10.3.  
-+ **Customer communication history** — `GET /transactions/:id/notes` returns a chronological list of `visibility: 'customer'` notes rather than a single overwritten string.  
-+ **Consistent event model** — notes reuse the existing `fraudDiagnosisCaseEvents` schema and indexes; no new collection required.  
-+ **Role-based retraction** — the constraint that only the authoring role can retract a note is enforced in the service layer, not by a database-level ACL, keeping the enforcement explicit and testable.  
++ **Full audit trail**: every note creation and retraction is a permanent event; satisfies PCI DSS Req 10.3.  
++ **Customer communication history**: `GET /transactions/:id/notes` returns a chronological list of `visibility: 'customer'` notes rather than a single overwritten string.  
++ **Consistent event model**: notes reuse the existing `fraudDiagnosisCaseEvents` schema and indexes; no new collection required.  
++ **Role-based retraction**: the constraint that only the authoring role can retract a note is enforced in the service layer, not by a database-level ACL, keeping the enforcement explicit and testable.  
 - The deprecated string fields must be preserved on the document interface (as optional) to avoid breaking seed-data reads until a future migration removes them.  
 - The `DELETE /fraud/:id/notes/:noteId` route performs a logical delete (append), which may surprise consumers expecting a 204 with no body; the response shape must be clearly documented in `technical-spec.md §6`.
 
@@ -677,7 +677,7 @@ Notes are stored as discrete events in the **`fraudDiagnosisCaseEvents`** collec
 
 The existing demo simulates payment transactions from the customer's perspective: the customer fills a form, the API creates a `cardTransactionLog` document, and a fraud case is optionally opened. This is a closed loop that only demonstrates the data and encryption model.
 
-The request was to extend the system to allow **external merchants** to integrate payment collection into their own systems — a fundamental capability of any real PSP. The goal: maximum ease of integration for external merchants, minimum PCI DSS scope for those merchants.
+The request was to extend the system to allow **external merchants** to integrate payment collection into their own systems: a fundamental capability of any real PSP. The goal: maximum ease of integration for external merchants, minimum PCI DSS scope for those merchants.
 
 This ADR documents the study of four integration patterns and the rationale for the selected approach.
 
@@ -687,7 +687,7 @@ This ADR documents the study of four integration patterns and the rationale for 
 
 The merchant's backend creates a checkout session via API, then redirects the buyer's browser to a hosted payment page (HPP) on the PSP domain. The buyer enters card details on the PSP's page. After payment the buyer is redirected back to the merchant's `returnUrl`.
 
-**PCI DSS scope for the merchant:** SAQ A — the simplest possible. The merchant's system never touches cardholder data at any point; only the PSP (this system) handles card entry.
+**PCI DSS scope for the merchant:** SAQ A, the simplest possible. The merchant's system never touches cardholder data at any point; only the PSP (this system) handles card entry.
 
 **External integration surface (3 steps):**
 ```javascript
@@ -714,7 +714,7 @@ const session = await fetch(`/api/v1/checkout/sessions/${sessionId}`).then(r => 
 
 The merchant creates a shareable URL ahead of time. The URL can be embedded in an email, printed as a QR code, shared on social media, or sent via SMS. No buyer session is required on the merchant side; any buyer who receives the URL can pay.
 
-**PCI DSS scope for the merchant:** SAQ A — same as Method A.
+**PCI DSS scope for the merchant:** SAQ A, same as Method A.
 
 **External integration surface (2 steps):**
 ```javascript
@@ -731,7 +731,7 @@ sendEmail(customerEmail, `Pay here: ${paymentUrl}`);
 
 **Key differences from Redirect Checkout:**
 - No buyer web session on the merchant side at creation time
-- No `returnUrl` — success is shown on the gateway page
+- No `returnUrl`: success is shown on the gateway page
 - Can be `single_use` (invoice-style) or `multi_use` (store payment button)
 - Optional expiry date
 
@@ -741,7 +741,7 @@ sendEmail(customerEmail, `Pay here: ${paymentUrl}`);
 
 A JavaScript SDK renders a payment form inside an iframe on the merchant's own page. The buyer never leaves the merchant's site; the iframe calls the PSP API directly.
 
-**PCI DSS scope for the merchant:** SAQ A-EP — slightly more complex than A. The merchant's domain loads a third-party script that handles card entry.
+**PCI DSS scope for the merchant:** SAQ A-EP, slightly more complex than A. The merchant's domain loads a third-party script that handles card entry.
 
 **Not implemented in this iteration** because: (1) requires building and hosting a JS SDK bundle; (2) requires CSP and X-Frame-Options configuration; (3) the incremental demo value over Method A is low for a first iteration. Documented here as the recommended v5 enhancement.
 
@@ -749,7 +749,7 @@ A JavaScript SDK renders a payment form inside an iframe on the merchant's own p
 
 The merchant builds their own card form, calls a tokenization endpoint to convert the card to a token, then calls the payment API with the token. Requires `libmongocrypt` or equivalent on the merchant's stack.
 
-**PCI DSS scope for the merchant:** SAQ D — the most complex category. The merchant's frontend must be fully PCI DSS compliant because it renders the card form.
+**PCI DSS scope for the merchant:** SAQ D, the most complex category. The merchant's frontend must be fully PCI DSS compliant because it renders the card form.
 
 **Not implemented and not recommended** for the "easy external integration" goal. SAQ D compliance requires extensive merchant-side controls that negate the integration simplicity goal.
 
@@ -758,10 +758,10 @@ The merchant builds their own card form, calls a tokenization endpoint to conver
 **Implement Method A (Redirect Checkout) and Method B (Payment Links) in Ch-04.** Propose Method C (Embedded SDK) for v5. Exclude Method D.
 
 **Rationale:**
-1. **SAQ A scope for all external merchants** — no cardholder data ever passes through merchant systems.
-2. **Minimal integration surface** — merchants need 1-3 API calls; no SDK, no JavaScript embed required.
-3. **Industry standard** — every major payment provider (Stripe, PayPal, Adyen) offers these two patterns as the default recommended integration.
-4. **BIAN alignment** — both patterns map naturally onto SD-64 (Payment Order) with distinct Control Record Types (`CheckoutSession` vs. `PaymentLink`).
+1. **SAQ A scope for all external merchants**, no cardholder data ever passes through merchant systems.
+2. **Minimal integration surface**: merchants need 1-3 API calls; no SDK, no JavaScript embed required.
+3. **Industry standard**: every major payment provider (Stripe, PayPal, Adyen) offers these two patterns as the default recommended integration.
+4. **BIAN alignment**: both patterns map naturally onto SD-64 (Payment Order) with distinct Control Record Types (`CheckoutSession` vs. `PaymentLink`).
 
 ### BIAN Alignment
 
@@ -775,13 +775,13 @@ The merchant builds their own card form, calls a tokenization endpoint to conver
 
 > **BIAN Audit 2026-06-10 (D-21–D-30):** All `bianControlRecordType` values now match the collection name suffix (e.g., `CheckoutSessionLog`, `PaymentLinkRecord`). `bianServiceDomain` values use BIAN standard spacing (`'Payment Order'`, `'Card eToken'`). `MerchantAgreementStatus` expanded to full BIAN Agreement lifecycle (`initiated | agreed | active | amended | suspended | closed`). Collection constants updated: `paymentOrder` → `paymentOrderProcedure`, `tokenVault` → `cardEtokenProcedure`.
 
-Both `checkoutSessionLog` and `paymentLinkRecord` use SD-64 because in BIAN terms a checkout session and a payment link are both forms of **payment order initiation** — the SD-64 Control Record captures the payment amount, currency, and status lifecycle regardless of how the buyer arrived at the payment form.
+Both `checkoutSessionLog` and `paymentLinkRecord` use SD-64 because in BIAN terms a checkout session and a payment link are both forms of **payment order initiation**: the SD-64 Control Record captures the payment amount, currency, and status lifecycle regardless of how the buyer arrived at the payment form.
 
 #### Dual-role: Natural Person as Customer AND Merchant (BIAN-validated)
 
 A `Party` (SD-13) can simultaneously be the subject of a `CustomerAgreement` (SD-53) and the owner of a `MerchantAgreement` (SD-89). This is fully aligned with the BIAN Business Object Model: `Party` is the identity anchor; `CustomerAgreement` and `MerchantAgreement` are role-scoped contracts linked back to the Party via `partyInstanceReference`.
 
-The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInstanceReference` (NOT a reference to `customerAgreementInstanceReference` — that would conflate identity with a role-scoped contract). A `Party` may own zero or more merchant agreements without having a customer agreement at all, and vice versa. KYC verification (performed once on the `Party`) is shared across all roles.
+The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInstanceReference` (NOT a reference to `customerAgreementInstanceReference`: that would conflate identity with a role-scoped contract). A `Party` may own zero or more merchant agreements without having a customer agreement at all, and vice versa. KYC verification (performed once on the `Party`) is shared across all roles.
 
 ### Security Model
 
@@ -792,7 +792,7 @@ The correct cross-domain FK is `merchantOwnerPartyReference → party.partyInsta
 | Payment link expiry | TTL index on `paymentLinkExpiresAt` (optional, sparse) |
 | Single-use link enforcement | `status = 'completed'` after first payment; subsequent `POST /pay` returns 410 |
 | Merchant API key storage | bcrypt hash in DB; plaintext returned only once on key generation |
-| Webhook authenticity (merchant receiving) | `X-Webhook-Signature: sha256=<hmac(payload, webhookSecret)>` — mirrors Stripe/GitHub pattern |
+| Webhook authenticity (merchant receiving) | `X-Webhook-Signature: sha256=<hmac(payload, webhookSecret)>`, mirrors Stripe/GitHub pattern |
 | Card data isolation | Raw card numbers never sent to or stored by the API; client-side tokenization (`pm_<random>`) |
 | PCI DSS SAQ A | The hosted payment pages (`/checkout/*`, `/pay/*`) are on the PSP domain; buyers enter card details only on those pages |
 
@@ -804,16 +804,16 @@ The prefix `lbpk` identifies LeafyBank Payment Key, `live` distinguishes product
 
 ### New Collections
 
-Two new MongoDB collections, both plaintext (no QE — neither contains CHD or PII at rest):
+Two new MongoDB collections, both plaintext (no QE: neither contains CHD or PII at rest):
 
-**`checkoutSessionLog`** — TTL-indexed on `checkoutSessionExpiresAt`. Each document represents one checkout session with its full lifecycle from `pending` to `completed | expired | cancelled`.
+**`checkoutSessionLog`**: TTL-indexed on `checkoutSessionExpiresAt`. Each document represents one checkout session with its full lifecycle from `pending` to `completed | expired | cancelled`.
 
-**`paymentLinkRecord`** — uniquely indexed on `paymentLinkCode`. Supports both `single_use` and `multi_use` links. TTL index on `paymentLinkExpiresAt` (sparse — only applies to links with explicit expiry).
+**`paymentLinkRecord`**: uniquely indexed on `paymentLinkCode`. Supports both `single_use` and `multi_use` links. TTL index on `paymentLinkExpiresAt` (sparse, only applies to links with explicit expiry).
 
 ### Consequences
 
 + External merchants can integrate in minutes with a 3-step API call (create session, redirect, verify).
-+ Payment links require no buyer session on the merchant side — suitable for invoices, QR codes, and social commerce.
++ Payment links require no buyer session on the merchant side: suitable for invoices, QR codes, and social commerce.
 + Both patterns deliver SAQ A scope, the lowest PCI DSS compliance burden, to integrated merchants.
 + Webhook delivery gives merchants real-time notification without polling.
 + The gateway's core QE story is preserved: checkout and payment link services ultimately call `cardTransaction.service.createTransaction()`, so all card transactions go through the existing QE-protected `cardTransactionLog` collection.
@@ -823,7 +823,7 @@ Two new MongoDB collections, both plaintext (no QE — neither contains CHD or P
 
 ---
 
-## ADR-007: Merchant Onboarding Lifecycle (SD-89 — Ch-05)
+## ADR-007: Merchant Onboarding Lifecycle (SD-89, Ch-05)
 
 **Date:** 2026-06-10  
 **Status:** Accepted
@@ -836,7 +836,7 @@ ADR-006 established `merchantAgreementProcedure` (SD-89) as a fully MongoDB-back
 
 2. **KYB (Know Your Business) is a regulated obligation.** Any payment institution accepting merchant funds must perform entity-level due diligence before activating payment capability. PCI DSS Req 12.8 requires documented agreements with all entities that handle or could affect card data security. Without a review step, the demo cannot illustrate the compliance lifecycle.
 
-3. **No internal review role exists.** Approving or rejecting a merchant application is the responsibility of a Merchant Acquiring department employee — a different BIAN actor from a fraud investigator (SD-83), security auditor (SD-116), or customer (SD-53). A new role `merchant_officer` is required.
+3. **No internal review role exists.** Approving or rejecting a merchant application is the responsibility of a Merchant Acquiring department employee: a different BIAN actor from a fraud investigator (SD-83), security auditor (SD-116), or customer (SD-53). A new role `merchant_officer` is required.
 
 ### Decision
 
@@ -849,18 +849,18 @@ ADR-006 established `merchantAgreementProcedure` (SD-89) as a fully MongoDB-back
 | Customer | `Initiate` | Creates `MerchantAgreementProcedure` at `under_review` | `POST /api/v1/merchants` |
 | Merchant Officer | `Control` (approve) | Transitions to `agreed`, populates review metadata | `PATCH /api/v1/merchants/:id/review` |
 | Merchant Officer | `Control` (reject) | Transitions to `rejected`, populates review metadata | `PATCH /api/v1/merchants/:id/review` |
-| Merchant | `Update` | Amends terms (future: `PATCH /api/v1/merchants/:id`) | — |
-| Bank System | `Terminate` | Transitions to `closed` | — |
+| Merchant | `Update` | Amends terms (future: `PATCH /api/v1/merchants/:id`) |, |
+| Bank System | `Terminate` | Transitions to `closed` |: |
 
-The `Control` Action Term is used because it represents a **state change of the Control Record** — the officer is controlling whether the agreement proceeds. This is the correct BIAN term for approval/rejection workflows, not `Update` (which modifies data fields) and not `Execute` (which runs a step in a process).
+The `Control` Action Term is used because it represents a **state change of the Control Record**: the officer is controlling whether the agreement proceeds. This is the correct BIAN term for approval/rejection workflows, not `Update` (which modifies data fields) and not `Execute` (which runs a step in a process).
 
 #### New Role: `merchant_officer`
 
 `merchant_officer` maps to a BIAN `Party` (SD-13) with `partyType: 'employee'` and a `CustomerAuthenticationAssessment` (SD-91) role claim of `merchant_officer`. The officer belongs to the "Merchant Acquiring" department of the bank.
 
 **Why not reuse `security_auditor`?**
-- `security_auditor` maps to SD-116 (IT Systems Management / Compliance) — responsible for audit logs and access events.
-- `merchant_officer` maps to SD-89 (Merchant Relations) — responsible for merchant commercial agreements.
+- `security_auditor` maps to SD-116 (IT Systems Management / Compliance): responsible for audit logs and access events.
+- `merchant_officer` maps to SD-89 (Merchant Relations): responsible for merchant commercial agreements.
 - Conflating these roles violates the BIAN principle of single-responsibility per Service Domain actor. Least-privilege (PCI DSS Req 7.1) also requires separation.
 
 #### KYB Process (Simplified for Demo)
@@ -895,7 +895,7 @@ merchantReviewNote?: string;                     // Officer's audit comment
 merchantReviewedByPartyReference?: string;       // FK → party.partyInstanceReference (SD-13)
 merchantReviewedDateTime?: Date;                 // ISO timestamp of review decision
 
-// Ch-06 — BQ:Step sub-document (authoritative KYB record):
+// Ch-06: BQ:Step sub-document (authoritative KYB record):
 merchantAgreementKybCheck?: {
   merchantAgreementKybCheckStatus: 'initiated' | 'verified' | 'rejected' | 'expired';
   merchantAgreementKybCheckCompletedDate?: Date;
@@ -929,7 +929,7 @@ merchantAgreementKybCheck?: {
 
 + Demo tells a realistic, end-to-end merchant onboarding story that FSI architects recognise.
 + `merchant_officer` introduces a new role that showcases RBAC on a BIAN-specific Action Term boundary.
-+ Seed data includes an `under_review` merchant — the officer can approve live during the demo for a "before/after" effect.
++ Seed data includes an `under_review` merchant: the officer can approve live during the demo for a "before/after" effect.
 + Webhook event `merchant.agreement.activated` demonstrates the event-driven integration pattern.
 - Adds a new frontend route (`/system/merchant/review`) and a new role to the auth model.
 - Seed complexity increases: `parties.json`, `customerAuthentications.json`, and `merchants.json` all require new entries.
@@ -943,7 +943,7 @@ merchantAgreementKybCheck?: {
 
 ### Context
 
-The demo currently operates in one mode: a clean business narrative suitable for a general audience. However, the primary target buyers — CISO / Security Architects and MongoDB SEs — need technical depth to evaluate Queryable Encryption, BIAN alignment, and PCI DSS compliance. Without a way to show the raw MongoDB documents (with ciphertext), BIAN Service Domain annotations, and PCI DSS requirement citations directly in the UI, presenters must switch to external tools (Atlas Data Explorer, terminal) and break the demo narrative.
+The demo currently operates in one mode: a clean business narrative suitable for a general audience. However, the primary target buyers, CISO / Security Architects and MongoDB SEs, need technical depth to evaluate Queryable Encryption, BIAN alignment, and PCI DSS compliance. Without a way to show the raw MongoDB documents (with ciphertext), BIAN Service Domain annotations, and PCI DSS requirement citations directly in the UI, presenters must switch to external tools (Atlas Data Explorer, terminal) and break the demo narrative.
 
 The existing Simulator Mode has a raw document toggle for the encryption visual, but it is limited to one step and one collection. Application Mode has no technical overlays at all.
 
@@ -958,12 +958,12 @@ Debug Mode is a **demo-only feature** and must not be enabled in any production 
 ```
 frontend/src/
   context/
-    DebugContext.tsx          — React context + useDebugMode() hook
+    DebugContext.tsx: React context + useDebugMode() hook
   components/debug/
-    DebugBadge.tsx            — BIAN SD chip + PCI DSS requirement badge
-    DebugInfo.tsx             — Expandable info panel (BIAN Action Term, HTTP, MongoDB op, PCI control)
-    DebugRawDoc.tsx           — Live MongoDB document viewer (calls /api/v1/system/raw/)
-    DebugFieldLabel.tsx       — Field wrapper: QE mode + PCI classification
+    DebugBadge.tsx: BIAN SD chip + PCI DSS requirement badge
+    DebugInfo.tsx: Expandable info panel (BIAN Action Term, HTTP, MongoDB op, PCI control)
+    DebugRawDoc.tsx: Live MongoDB document viewer (calls /api/v1/system/raw/)
+    DebugFieldLabel.tsx: Field wrapper: QE mode + PCI classification
 ```
 
 **`DebugContext`** wraps the entire `layout.tsx`. It reads `process.env.NEXT_PUBLIC_DEMO_DEBUG_ENABLED` at build time and `localStorage.demo_debug_mode` at runtime.
@@ -984,7 +984,7 @@ frontend/src/
 | `DebugBadge` | Any entity card | BIAN Service Domain chip (e.g., `SD-89 · Merchant Relations`) + collection name chip |
 | `DebugBadge` | Any encrypted field | `PCI DSS Req 3.5.1` badge |
 | `DebugFieldLabel` | Form/display fields | `QE:equality`, `QE:none`, or `unencrypted` tag; lock icon for encrypted |
-| Lock Tooltip | Encrypted fields | `"Stored as BSON Binary subtype 6 — MongoDB Atlas server never decrypts this field"` |
+| Lock Tooltip | Encrypted fields | `"Stored as BSON Binary subtype 6: MongoDB Atlas server never decrypts this field"` |
 | `DebugInfo` | Every action button | BIAN Action Term · HTTP method · MongoDB write op · PCI DSS control reference · Business logic description |
 | `DebugRawDoc` | Merchant, Transaction, Case pages | Live MongoDB document panel; `GET /api/v1/system/raw/:collection/:id`; formatted JSON with Binary notation |
 
@@ -999,7 +999,7 @@ Reuses the same `/api/v1/system/raw/:collection/:id` endpoint already in product
 
 #### Login Cards (Debug Mode)
 
-When debug mode is ON, the login screen replaces the credential form with a grid of user cards — one per demo user. Each card:
+When debug mode is ON, the login screen replaces the credential form with a grid of user cards: one per demo user. Each card:
 - Shows the user's **name**, **role badge** (color-coded), **department**, and a **"Log in"** button.
 - In debug mode: also shows `partyInstanceReference` (SD-13) and `customerAuthenticationInstanceReference` (SD-91).
 - One click authenticates via the existing `POST /api/v1/auth/login` endpoint with the user's pre-configured credentials (no manual entry required in debug mode).
@@ -1030,18 +1030,18 @@ Example presets for the Merchant Application Form:
 
 Debug Mode access to raw MongoDB documents requires careful scoping:
 - The `/api/v1/system/raw/` endpoint requires a valid JWT. No unauthenticated access.
-- Raw documents show **encrypted** field values (ciphertext) — not decrypted PAN or PII.
+- Raw documents show **encrypted** field values (ciphertext), not decrypted PAN or PII.
 - The `DEMO_DEBUG_ENABLED` environment variable ensures this feature can never accidentally be enabled in a production deployment (missing env var = feature absent at build time).
 
 ### Consequences
 
 + Presenters can demonstrate the full QE technical story (ciphertext visible, BIAN SD labels, PCI DSS citations) without leaving the UI.
-+ Debug Mode is self-contained — it can be turned off for a business audience without any code change.
++ Debug Mode is self-contained: it can be turned off for a business audience without any code change.
 + Form presets eliminate typing errors during live demos.
 + Login cards make role-switching instant for workshop scenarios.
 - Adds ~5 new React components and a context provider to the frontend.
 - `NEXT_PUBLIC_DEMO_DEBUG_ENABLED` must be added to the `.env.local` template and deployment docs.
-- The raw document viewer introduces a dependency on the Simulator Mode `/system/raw` endpoint — any changes to that endpoint must be backward compatible.
+- The raw document viewer introduces a dependency on the Simulator Mode `/system/raw` endpoint: any changes to that endpoint must be backward compatible.
 
 ---
 
@@ -1090,11 +1090,11 @@ BIAN mandates that every attribute in a BQ namespace carries the BQ name as a pr
 
 **Why not a separate collection?**
 
-KYC and KYB are integral steps of their respective procedures — they do not exist independently. A separate collection would introduce an unnecessary join, add seed complexity, and contradict the BIAN model where BQ:Step is an attribute of the CR, not a standalone entity.
+KYC and KYB are integral steps of their respective procedures: they do not exist independently. A separate collection would introduce an unnecessary join, add seed complexity, and contradict the BIAN model where BQ:Step is an attribute of the CR, not a standalone entity.
 
 **Why not store in SD-13 Party?**
 
-SD-13 (Party Data Management) is the identity anchor — it stores WHO the party is (name, address, contact). KYC status is a COMPLIANCE OUTCOME of the agreement procedure, not a property of the identity. Placing it in Party would conflate identity management with compliance lifecycle — a BIAN anti-pattern. The correct owner is the SD that runs the procedure that includes the check.
+SD-13 (Party Data Management) is the identity anchor: it stores WHO the party is (name, address, contact). KYC status is a COMPLIANCE OUTCOME of the agreement procedure, not a property of the identity. Placing it in Party would conflate identity management with compliance lifecycle, a BIAN anti-pattern. The correct owner is the SD that runs the procedure that includes the check.
 
 #### BIAN Status Vocabulary
 
@@ -1107,7 +1107,7 @@ Both checks use the same four-value lifecycle: `initiated | verified | rejected 
 | `rejected` | Check failed; application denied |
 | `expired` | Check passed but is no longer valid (time-based renewal required) |
 
-Note: `passed` and `failed` are **not** used — they are not BIAN vocabulary. The correct terms are `verified` and `rejected`.
+Note: `passed` and `failed` are **not** used, they are not BIAN vocabulary. The correct terms are `verified` and `rejected`.
 
 #### BIAN Naming Convention
 
@@ -1119,7 +1119,7 @@ This rule ensures BQ fields remain unambiguous when the Control Record is serial
 
 ### Implementation
 
-#### `createMerchant()` — KYB initiated at submission
+#### `createMerchant()`: KYB initiated at submission
 
 ```typescript
 merchantAgreementKybCheck: {
@@ -1127,7 +1127,7 @@ merchantAgreementKybCheck: {
 } satisfies MerchantAgreementKybCheck,
 ```
 
-#### `reviewMerchantApplication()` — Dual-write on review (backward compat + BQ:Step)
+#### `reviewMerchantApplication()`: Dual-write on review (backward compat + BQ:Step)
 
 ```typescript
 const kybStatus: KybCheckStatus = action === 'approve' ? 'verified' : 'rejected';
@@ -1149,8 +1149,8 @@ merchantReviewedDateTime: now,
 
 | Collection | schemaVersion | KYC/KYB field |
 |---|---|---|
-| `customerAgreementProcedure` | 3 | All 50 records — 48 `verified`, 1 `expired`, 1 `initiated` |
-| `merchantAgreementProcedure` | 2 | All 3 records — 2 `verified`, 1 `initiated` |
+| `customerAgreementProcedure` | 3 | All 50 records: 48 `verified`, 1 `expired`, 1 `initiated` |
+| `merchantAgreementProcedure` | 2 | All 3 records: 2 `verified`, 1 `initiated` |
 
 ### BIAN Alignment
 
@@ -1171,16 +1171,16 @@ merchantReviewedDateTime: now,
 
 ### Consequences
 
-+ Demo can now show KYC and KYB status to FSI architects with full BIAN citation — no more informal notes.
++ Demo can now show KYC and KYB status to FSI architects with full BIAN citation, no more informal notes.
 + Frontend can render color-coded compliance pills (verified=green, initiated=amber, rejected=red, expired=orange).
 + The BIAN audit trail is complete: who performed the check (`merchantAgreementKybCheckPerformedByPartyReference`), when (`merchantAgreementKybCheckCompletedDate`), and what reference (`merchantAgreementKybCheckReference`).
 + `expired` status enables future demo scenarios (KYC renewal workflows, risk-based re-verification).
-- `schemaVersion` bumped on both collections — seed re-seeding required to align existing data.
+- `schemaVersion` bumped on both collections: seed re-seeding required to align existing data.
 - Top-level review fields (`merchantReviewNote` etc.) are retained for backward compat but are now secondary to the BQ:Step sub-document.
 
 ---
 
-## ADR-010 — Internal-First Integration Pattern
+## ADR-010: Internal-First Integration Pattern
 
 **Date:** 2026-06-10  
 **Status:** Accepted  
@@ -1193,9 +1193,9 @@ The demo is a fully self-contained system. All compliance functions (fraud scori
 
 Two approaches were considered:
 
-**Option A — External-only**: Require external provider credentials to make compliance functions work. Realistic, but the demo breaks without configuration. Poor first-impression for offline or air-gapped demos.
+**Option A: External-only**: Require external provider credentials to make compliance functions work. Realistic, but the demo breaks without configuration. Poor first-impression for offline or air-gapped demos.
 
-**Option B — Internal-First (chosen)**: Ship working internal implementations for every compliance function. External providers are optional overrides registered in the integration registry. When an external provider is configured and active, it takes precedence. When not configured, the internal default runs. The system is never broken.
+**Option B: Internal-First (chosen)**: Ship working internal implementations for every compliance function. External providers are optional overrides registered in the integration registry. When an external provider is configured and active, it takes precedence. When not configured, the internal default runs. The system is never broken.
 
 ### Decision
 
@@ -1217,9 +1217,9 @@ Adopt the **Internal-First integration pattern** for all six compliance integrat
 ### Rationale
 
 - **Demo reliability**: works offline, in air-gapped environments, and without any external credentials.
-- **Proof of concept**: shows FSI architects that the plumbing exists — they can swap in their vendor by registering a provider.
-- **PCI DSS Req 12.8**: every integration (including internal ones) is documented in the registry with its BIAN SD and PCI DSS requirement mapping — satisfying the "documented relationships with third-party service providers" requirement for external providers.
-- **Preserves existing work**: HRPC endpoint (`GET /fraud/hrpc/check`), KYC/KYB BQ:Step sub-documents, and fraud scoring service are not replaced — they become the default implementations.
+- **Proof of concept**: shows FSI architects that the plumbing exists, they can swap in their vendor by registering a provider.
+- **PCI DSS Req 12.8**: every integration (including internal ones) is documented in the registry with its BIAN SD and PCI DSS requirement mapping, satisfying the "documented relationships with third-party service providers" requirement for external providers.
+- **Preserves existing work**: HRPC endpoint (`GET /fraud/hrpc/check`), KYC/KYB BQ:Step sub-documents, and fraud scoring service are not replaced, they become the default implementations.
 
 ### Alternatives Rejected
 
@@ -1241,7 +1241,7 @@ Adopt the **Internal-First integration pattern** for all six compliance integrat
 
 ---
 
-## ADR-011 — system_admin Role as Business Integration Administrator
+## ADR-011: system_admin Role as Business Integration Administrator
 
 **Date:** 2026-06-10  
 **Status:** Accepted  
@@ -1278,10 +1278,10 @@ Introduce a new application role `system_admin` with the following profile:
 **What system_admin CAN do:**
 - View all integration providers (GET /api/v1/integrations)
 - Register a new provider (POST /api/v1/integrations)
-- Update provider configuration — endpoint, events, timeout, retry (PATCH /api/v1/integrations/:id)
+- Update provider configuration: endpoint, events, timeout, retry (PATCH /api/v1/integrations/:id)
 - Rotate API keys (POST /api/v1/integrations/:id/rotate-key)
 - Test provider connectivity (POST /api/v1/integrations/:id/test)
-- Suspend external providers (POST /api/v1/integrations/:id/suspend) — internal providers are immutable
+- Suspend external providers (POST /api/v1/integrations/:id/suspend), internal providers are immutable
 - View integration event audit log (GET /api/v1/integrations/:id/events)
 - View all fraud cases in read-only mode (same as security_auditor)
 
@@ -1296,7 +1296,7 @@ Introduce a new application role `system_admin` with the following profile:
 ### Rationale
 
 - **Separation of Duties**: PCI DSS Req 7.1 requires distinct roles for infrastructure management and business configuration. The devops admin manages servers; the system_admin manages compliance integrations.
-- **Demo narrative**: the system_admin persona is the FSI prospect's "compliance technology owner" or "fintech integration manager" — a business role, not a sysadmin.
+- **Demo narrative**: the system_admin persona is the FSI prospect's "compliance technology owner" or "fintech integration manager", a business role, not a sysadmin.
 - **BIAN alignment**: SD-193 External Provider Arrangements defines an "External Provider Arrangements Administrator" role that maps directly to system_admin.
 - **Auditability**: every action taken by system_admin is logged in the integration event sub-document with the actor role, enabling PCI DSS Req 10.2 (audit log of all privileged access).
 
@@ -1310,7 +1310,7 @@ Introduce a new application role `system_admin` with the following profile:
 
 ---
 
-## ADR-012 — Integration Registry as BIAN SD-193 External Provider Arrangements
+## ADR-012: Integration Registry as BIAN SD-193 External Provider Arrangements
 
 **Date:** 2026-06-10  
 **Status:** Accepted  
@@ -1321,14 +1321,14 @@ Introduce a new application role `system_admin` with the following profile:
 
 The Integration Hub requires a persistent store for provider configuration (endpoint, API key hash, trigger events, timeout, retry policy), health state, and event audit log. Several models were considered:
 
-**Option A — Flat JSON config file**: Simple, no DB. No audit trail, no runtime updates, no UI management.
+**Option A: Flat JSON config file**: Simple, no DB. No audit trail, no runtime updates, no UI management.
 
-**Option B — Environment variables per provider**: Standard for simple integrations. Doesn't support multiple providers of the same type, has no audit trail, can't be managed by a non-developer.
+**Option B: Environment variables per provider**: Standard for simple integrations. Doesn't support multiple providers of the same type, has no audit trail, can't be managed by a non-developer.
 
-**Option C — Dedicated MongoDB collection (chosen)**: Full CRUD, runtime updates, API key hashing, health tracking, event audit log sub-document, UI management portal.
+**Option C: Dedicated MongoDB collection (chosen)**: Full CRUD, runtime updates, API key hashing, health tracking, event audit log sub-document, UI management portal.
 
 The chosen model maps precisely to BIAN SD-193 External Provider Arrangements, which defines:
-- **Control Record**: `ExternalProviderArrangement` — the provider registration
+- **Control Record**: `ExternalProviderArrangement`, the provider registration
 - **Behavior Qualifier: Assessment**: health check and connectivity test
 - **Behavior Qualifier: Update**: key rotation and configuration change
 - **Action Log**: integration event log (dispatch, callback, health check, test)
@@ -1339,7 +1339,7 @@ Create a new `integrationRegistry` MongoDB collection implementing BIAN SD-193. 
 
 **Key design decisions:**
 
-1. **API key security**: API keys are hashed with bcrypt (cost factor 12) before storage. The plaintext key is returned once at creation (and once after rotation) — never stored, never re-exposed. The `externalProviderApiKeyPrefix` field stores a visible prefix (e.g., `fds_live_...`) for UI identification.
+1. **API key security**: API keys are hashed with bcrypt (cost factor 12) before storage. The plaintext key is returned once at creation (and once after rotation), never stored, never re-exposed. The `externalProviderApiKeyPrefix` field stores a visible prefix (e.g., `fds_live_...`) for UI identification.
 
 2. **HMAC-based inbound callbacks**: External providers send results to `/webhooks/{type}/{id}/callback`. Every inbound request is validated with `X-Webhook-Signature: sha256=<hmac(body, callbackSecret)>`. The callback secret is stored hashed separately from the API key.
 
@@ -1364,13 +1364,13 @@ Create a new `integrationRegistry` MongoDB collection implementing BIAN SD-193. 
 
 | PCI DSS Requirement | How the registry satisfies it |
 |---|---|
-| Req 12.8.1 — Maintain list of all third-party service providers | `integrationRegistry` IS the maintained list; each provider record has name, type, endpoint, and status |
-| Req 12.8.2 — Written agreement acknowledging responsibility | `pciDssRequirements` field on each record; `externalProviderArrangementStatus` lifecycle tracks agreement state |
-| Req 12.8.3 — Due diligence before engagement | `externalProviderLastHealthCheckAt` + `externalProviderHealthStatus` as documented due diligence evidence |
-| Req 12.8.5 — Monitor providers' PCI DSS compliance status | Integration event log with health check events; `externalProviderHealthStatus` updated after each test |
-| Req 10.2.1 — Audit log of all system access | Every dispatch, callback, health check, and test fires an `IntegrationEvent` record with timestamp, actor, and outcome |
-| Req 10.7 — Retain audit logs for at least 90 days | TTL index on `integrationEvents` collection: `expireAfterSeconds: 7776000` |
-| Req 6.3.3 — Protect against known vulnerabilities | bcrypt key hashing prevents credential exposure if DB is compromised |
+| Req 12.8.1: Maintain list of all third-party service providers | `integrationRegistry` IS the maintained list; each provider record has name, type, endpoint, and status |
+| Req 12.8.2: Written agreement acknowledging responsibility | `pciDssRequirements` field on each record; `externalProviderArrangementStatus` lifecycle tracks agreement state |
+| Req 12.8.3: Due diligence before engagement | `externalProviderLastHealthCheckAt` + `externalProviderHealthStatus` as documented due diligence evidence |
+| Req 12.8.5: Monitor providers' PCI DSS compliance status | Integration event log with health check events; `externalProviderHealthStatus` updated after each test |
+| Req 10.2.1: Audit log of all system access | Every dispatch, callback, health check, and test fires an `IntegrationEvent` record with timestamp, actor, and outcome |
+| Req 10.7: Retain audit logs for at least 90 days | TTL index on `integrationEvents` collection: `expireAfterSeconds: 7776000` |
+| Req 6.3.3: Protect against known vulnerabilities | bcrypt key hashing prevents credential exposure if DB is compromised |
 
 ### Consequences
 
@@ -1380,11 +1380,11 @@ Create a new `integrationRegistry` MongoDB collection implementing BIAN SD-193. 
 + API key security matches industry standard (bcrypt hash, plaintext shown once).
 - New collection `integrationRegistry` and `integrationEvents` must be created, indexed, and seeded.
 - Dispatch layer adds latency to fraud scoring hot path (~2–5ms for internal dispatch, timeout budget for external).
-- HMAC validation requires the callback secret to be stored in hashed form, separate from the API key — adds complexity to the callback controller.
+- HMAC validation requires the callback secret to be stored in hashed form, separate from the API key: adds complexity to the callback controller.
 
 ---
 
-## ADR-013 — Multi-Provider Routing Groups
+## ADR-013: Multi-Provider Routing Groups
 
 **Date:** 2026-06-10  
 **Status:** Proposed  
@@ -1400,15 +1400,15 @@ ADR-012 established a unique compound index on `(externalProviderArrangementType
 - Running parallel KYC checks for higher confidence (two providers must both verify)
 - Gradually migrating from one provider to another with weighted traffic split
 
-**Option A — Keep single provider per type**: Simple but blocks real-world multi-provider setups. Organizations routinely use 2+ compliance providers for resilience and performance.
+**Option A: Keep single provider per type**: Simple but blocks real-world multi-provider setups. Organizations routinely use 2+ compliance providers for resilience and performance.
 
-**Option B — Priority field on each provider**: Allow multiple active providers; dispatch picks by priority. Simple but only supports primary/fallback, not round-robin or weighted.
+**Option B: Priority field on each provider**: Allow multiple active providers; dispatch picks by priority. Simple but only supports primary/fallback, not round-robin or weighted.
 
-**Option C — Dedicated routing group (chosen)**: A new `integrationRoutingGroups` collection defines the strategy. Individual providers reference a group. Dispatch resolves the group first, then applies strategy.
+**Option C: Dedicated routing group (chosen)**: A new `integrationRoutingGroups` collection defines the strategy. Individual providers reference a group. Dispatch resolves the group first, then applies strategy.
 
 ### Decision
 
-Create an `integrationRoutingGroups` collection. Each record defines a `RoutingStrategy` (`primary_fallback | round_robin | weighted | parallel`) and references member providers. Providers can exist without a group (single provider behavior, unchanged). Remove the unique constraint on `(type, endpoint)` — uniqueness is no longer enforced because organizations may use the same endpoint with different credentials.
+Create an `integrationRoutingGroups` collection. Each record defines a `RoutingStrategy` (`primary_fallback | round_robin | weighted | parallel`) and references member providers. Providers can exist without a group (single provider behavior, unchanged). Remove the unique constraint on `(type, endpoint)`: uniqueness is no longer enforced because organizations may use the same endpoint with different credentials.
 
 Supported strategies and their aggregation semantics are defined in `integration-hub-enhancement.md §3.3`.
 
@@ -1423,11 +1423,11 @@ Each member of a routing group is a separate `ExternalProviderArrangement` recor
 + Weighted routing supports zero-downtime provider migrations.
 - New collection `integrationRoutingGroups` adds a schema to manage.
 - Dispatch hot path now includes a group resolution step (adds ~1ms for group lookup, cacheable in application memory with 30s TTL).
-- Parallel strategy multiplies outbound request volume — timeout budgets must account for the slowest member.
+- Parallel strategy multiplies outbound request volume: timeout budgets must account for the slowest member.
 
 ---
 
-## ADR-014 — Configurable Field Mapping (No-Code Adapter Pattern)
+## ADR-014: Configurable Field Mapping (No-Code Adapter Pattern)
 
 **Date:** 2026-06-10  
 **Status:** Proposed  
@@ -1444,11 +1444,11 @@ External compliance systems (fraud detection, AML, KYC providers) use different 
 
 Three approaches were considered:
 
-**Option A — Hardcode adapters per provider**: Reliable but inflexible. Every new provider or field name change requires code deployment.
+**Option A: Hardcode adapters per provider**: Reliable but inflexible. Every new provider or field name change requires code deployment.
 
-**Option B — Custom scripting (JavaScript eval in admin panel)**: Maximum flexibility but creates a code injection surface and is excluded by PCI DSS (Req 6.2.4: prevent code injection).
+**Option B: Custom scripting (JavaScript eval in admin panel)**: Maximum flexibility but creates a code injection surface and is excluded by PCI DSS (Req 6.2.4: prevent code injection).
 
-**Option C — Declarative transformation rules stored in MongoDB (chosen)**: A finite set of safe transform operations (rename, value_map, scale, date_format, nested path, constant_inject, drop) stored as configuration. The dispatch and callback services apply them at runtime. No scripting, no eval.
+**Option C: Declarative transformation rules stored in MongoDB (chosen)**: A finite set of safe transform operations (rename, value_map, scale, date_format, nested path, constant_inject, drop) stored as configuration. The dispatch and callback services apply them at runtime. No scripting, no eval.
 
 ### Decision
 
@@ -1458,7 +1458,7 @@ Add a `fieldMappingConfig` sub-document to `ExternalProviderArrangement`. The `F
 
 ### BIAN Alignment
 
-`fieldMappingConfig` maps to BIAN SD-193 `ExternalProviderArrangementSpecification` — the technical specification of how the arrangement operates. Field mapping is an arrangement specification detail, not a compliance record.
+`fieldMappingConfig` maps to BIAN SD-193 `ExternalProviderArrangementSpecification`: the technical specification of how the arrangement operates. Field mapping is an arrangement specification detail, not a compliance record.
 
 ### Consequences
 
@@ -1471,7 +1471,7 @@ Add a `fieldMappingConfig` sub-document to `ExternalProviderArrangement`. The `F
 
 ---
 
-## ADR-015 — Structured Authentication Configuration per Integration
+## ADR-015: Structured Authentication Configuration per Integration
 
 **Date:** 2026-06-10  
 **Status:** Proposed  
@@ -1488,11 +1488,11 @@ ADR-012 stores API keys as bcrypt hashes and HMAC callback secrets as bcrypt has
 - **Outbound HMAC signatures**: Some providers require us to sign our outbound requests (not just validate their inbound ones). The current model only supports inbound HMAC validation.
 - **Bearer token prefix**: Most providers use `Bearer <token>` but some use `Token <token>` or no prefix. Currently hardcoded to `Bearer`.
 
-**Option A — Extend env vars per provider**: Simple but can't be managed by `system_admin` from the UI and can't change at runtime.
+**Option A: Extend env vars per provider**: Simple but can't be managed by `system_admin` from the UI and can't change at runtime.
 
-**Option B — Additional flat fields on ExternalProviderArrangement**: Low structure. 15+ new fields with overlapping semantics depending on auth type.
+**Option B: Additional flat fields on ExternalProviderArrangement**: Low structure. 15+ new fields with overlapping semantics depending on auth type.
 
-**Option C — Typed `authConfig` sub-document + QE-encrypted credential fields (chosen)**: A discriminated union of auth configurations per scheme type. Credential values (tokens, secrets, client secrets) are stored as MongoDB QE-encrypted fields with a dedicated `integrationCredentialsDEK`.
+**Option C: Typed `authConfig` sub-document + QE-encrypted credential fields (chosen)**: A discriminated union of auth configurations per scheme type. Credential values (tokens, secrets, client secrets) are stored as MongoDB QE-encrypted fields with a dedicated `integrationCredentialsDEK`.
 
 ### Decision
 
@@ -1504,23 +1504,23 @@ The existing `externalProviderApiKeyHash` and `externalProviderCallbackSecretHas
 
 | Requirement | How `authConfig` + QE satisfies it |
 |---|---|
-| Req 3.6 — Protect cryptographic keys | `integrationCredentialsDEK` is a dedicated DEK under the KMS CMK; credential key rotation does not require re-encrypting cardholder data |
-| Req 3.5 — Protect keys used to protect stored data | QE ensures credential values are never stored in plaintext in MongoDB |
-| Req 12.3.4 — Review all hardware/software annually | `bearer.tokenExpiresAt` field enables expiry tracking and UI warnings |
-| Req 6.3.3 — Protect against known vulnerabilities | QE encryption prevents credential exposure from a compromised database |
+| Req 3.6: Protect cryptographic keys | `integrationCredentialsDEK` is a dedicated DEK under the KMS CMK; credential key rotation does not require re-encrypting cardholder data |
+| Req 3.5: Protect keys used to protect stored data | QE ensures credential values are never stored in plaintext in MongoDB |
+| Req 12.3.4: Review all hardware/software annually | `bearer.tokenExpiresAt` field enables expiry tracking and UI warnings |
+| Req 6.3.3: Protect against known vulnerabilities | QE encryption prevents credential exposure from a compromised database |
 
 ### Consequences
 
 + OAuth2, outbound HMAC, and flexible API key location are configurable from the admin UI without code changes.
 + `integrationCredentialsDEK` limits the blast radius of a credential compromise to integration credentials only.
 + The dispatch service can now build correct auth headers for any supported scheme from configuration alone.
-- New QE encrypted fields on `integrationRegistry` require QE to be enabled for this collection (previously plaintext only — see ADR-012).
+- New QE encrypted fields on `integrationRegistry` require QE to be enabled for this collection (previously plaintext only: see ADR-012).
 - `integrationCredentialsDEK` adds a sixth DEK to manage (existing: lookupDEK, sensitiveDEK, plus future additions).
 - The `system_admin` UI must handle QE-encrypted fields differently from plaintext fields (write-only; no read-back of credential values).
 
 ---
 
-## ADR-016 — Category-Specific Extended Configuration
+## ADR-016: Category-Specific Extended Configuration
 
 **Date:** 2026-06-10  
 **Status:** Proposed  
@@ -1536,13 +1536,13 @@ The six compliance integration categories (fraud_detection, aml_monitoring, kyc_
 - A sanctions screening provider needs watchlist sources and fuzzy match thresholds.
 - A credit bureau needs pull type (soft/hard), scoring model, and jurisdiction.
 
-Today none of these parameters are configurable — they are either hardcoded or absent. This limits the demo's ability to show realistic integration management and prevents the admin from configuring provider behavior without code changes.
+Today none of these parameters are configurable: they are either hardcoded or absent. This limits the demo's ability to show realistic integration management and prevents the admin from configuring provider behavior without code changes.
 
-**Option A — Flat fields on ExternalProviderArrangement**: Adds 30+ optional fields to the model, most of which are irrelevant for any given category. Validation is complex.
+**Option A: Flat fields on ExternalProviderArrangement**: Adds 30+ optional fields to the model, most of which are irrelevant for any given category. Validation is complex.
 
-**Option B — Per-category collections**: Six new collections. Clean schema per type but massive overhead for a registry that will have at most ~20 records.
+**Option B: Per-category collections**: Six new collections. Clean schema per type but massive overhead for a registry that will have at most ~20 records.
 
-**Option C — Typed `categoryConfig` discriminated union (chosen)**: A polymorphic sub-document with one interface per category. MongoDB's document model handles this naturally. The backend validates the config shape against the declared type. The admin UI renders a different form per type.
+**Option C: Typed `categoryConfig` discriminated union (chosen)**: A polymorphic sub-document with one interface per category. MongoDB's document model handles this naturally. The backend validates the config shape against the declared type. The admin UI renders a different form per type.
 
 ### Decision
 
@@ -1550,7 +1550,7 @@ Add `categoryConfig` as a polymorphic sub-document to `ExternalProviderArrangeme
 
 ### BIAN Alignment
 
-`categoryConfig` maps to `ExternalProviderArrangement.ExternalProviderArrangementRecord` in BIAN SD-193 — the record of agreed terms and specifications for the arrangement. Each category config captures the domain-specific terms of the third-party arrangement.
+`categoryConfig` maps to `ExternalProviderArrangement.ExternalProviderArrangementRecord` in BIAN SD-193: the record of agreed terms and specifications for the arrangement. Each category config captures the domain-specific terms of the third-party arrangement.
 
 | Category | BIAN SD | Key config fields and their BIAN equivalent |
 |---|---|---|
@@ -1564,14 +1564,14 @@ Add `categoryConfig` as a polymorphic sub-document to `ExternalProviderArrangeme
 ### Consequences
 
 + Admin can configure provider-specific thresholds (score cutoffs, match sensitivity, re-verification periods) from the UI.
-+ BIAN compliance is strengthened — arrangement records now capture domain-specific terms as the standard prescribes.
++ BIAN compliance is strengthened: arrangement records now capture domain-specific terms as the standard prescribes.
 + Demo presentations can show realistic operational configuration that maps to real-world compliance workflows.
-- Backend must validate `categoryConfig` shape against `externalProviderArrangementType` — a Zod discriminated union adds ~50 lines of schema definition per category.
+- Backend must validate `categoryConfig` shape against `externalProviderArrangementType`: a Zod discriminated union adds ~50 lines of schema definition per category.
 - Changing a category config type after registration requires clearing and re-setting the sub-document.
 
 ---
 
-## ADR-017 — Generic Integration Category
+## ADR-017: Generic Integration Category
 
 **Date:** 2026-06-10  
 **Status:** Proposed  
@@ -1585,17 +1585,17 @@ The six compliance categories (fraud, AML, KYC, KYB, HRP/sanctions, credit burea
 
 Today these would either be hardcoded outside the integration registry (losing the audit trail, health monitoring, and API key management that the registry provides) or forced into an inappropriate compliance category (misrepresenting the BIAN alignment).
 
-**Option A — Refuse to register non-compliance integrations**: Simplest but forces operational integrations out of the registry and its PCI DSS audit trail.
+**Option A: Refuse to register non-compliance integrations**: Simplest but forces operational integrations out of the registry and its PCI DSS audit trail.
 
-**Option B — Extend each existing category**: Add catch-all fields to existing types. Breaks the clean category-specific config model.
+**Option B: Extend each existing category**: Add catch-all fields to existing types. Breaks the clean category-specific config model.
 
-**Option C — Add a `generic` category type (chosen)**: A seventh category with `GenericIntegrationConfig` that allows user-defined labels, event types, and an optional JSON Schema for payload validation. No BIAN compliance domain is claimed; BIAN reference is set to SD-193 itself.
+**Option C: Add a `generic` category type (chosen)**: A seventh category with `GenericIntegrationConfig` that allows user-defined labels, event types, and an optional JSON Schema for payload validation. No BIAN compliance domain is claimed; BIAN reference is set to SD-193 itself.
 
 ### Decision
 
 Add `'generic'` to `IntegrationProviderType`. The `bianServiceDomain` for generic integrations is set to `"External Provider Arrangements"` (SD-193) and `bianControlRecordType` to `"ExternalProviderArrangementPortfolio"`. All registry infrastructure (health monitoring, event audit log, API key management, field mapping) applies to generic integrations identically.
 
-**PCI DSS note**: Generic integrations are still listed in the registry (Req 12.8.1 — list of all TPSPs). The `GenericIntegrationConfig.description` field should be used to document the business purpose of the integration for Req 12.8.2 (written agreement acknowledging responsibility).
+**PCI DSS note**: Generic integrations are still listed in the registry (Req 12.8.1, list of all TPSPs). The `GenericIntegrationConfig.description` field should be used to document the business purpose of the integration for Req 12.8.2 (written agreement acknowledging responsibility).
 
 ### Consequences
 
@@ -1603,11 +1603,11 @@ Add `'generic'` to `IntegrationProviderType`. The `bianServiceDomain` for generi
 + The registry becomes a single source of truth for all external system dependencies, not just compliance providers.
 + Generic integrations are visible in PCI DSS TPSP lists (Req 12.8.1), improving audit completeness.
 - The `system_admin` UI must clearly distinguish generic integrations from compliance integrations to avoid confusion during audits.
-- `generic` integrations have no BIAN SD alignment beyond SD-193 itself — this must be documented clearly in audit reports.
+- `generic` integrations have no BIAN SD alignment beyond SD-193 itself: this must be documented clearly in audit reports.
 
 ---
 
-## ADR-018 — Simulator/Application Parity: real auth, account-reference normalization, curated roster
+## ADR-018: Simulator/Application Parity: real auth, account-reference normalization, curated roster
 
 **Status:** Accepted (2026-06-12)
 
@@ -1615,10 +1615,10 @@ Add `'generic'` to `IntegrationProviderType`. The `bianServiceDomain` for generi
 
 ADR-004 established the dual-mode frontend. In practice the Simulator had drifted from being a faithful demonstration of the real system:
 
-1. The investigation flow (`simulator/investigation/[caseId]`) was a static, hard-coded narrative. Escalation, L2 approval, and resolution were **not** persisted — they never called the real API. It also rendered **fictional data** (a Springfield address, a fake government ID, fabricated ciphertext), violating the principle that the Simulator runs on real system data.
+1. The investigation flow (`simulator/investigation/[caseId]`) was a static, hard-coded narrative. Escalation, L2 approval, and resolution were **not** persisted: they never called the real API. It also rendered **fictional data** (a Springfield address, a fake government ID, fabricated ciphertext), violating the principle that the Simulator runs on real system data.
 2. The Simulator performed no authentication; it relied on public-GET routes and could not exercise role-gated mutations, so a case "escalated" in the Simulator never appeared for an L2 user in Application mode.
 3. The demo user roster was duplicated and inconsistent across four sources (`users.json` [dead], `customerAuthentications.json`, a hard-coded frontend map, and the docs), with mixed email domains.
-4. `cardTransactionAccountReference` (QE:equality) held **heterogeneous** values — seeded transactions used the business key `ACC-xxx`, while the Simulator wrote the payer email — so no single query surfaced a customer's full history, and Application-mode history relied on a `localStorage` mirror (a second source of truth).
+4. `cardTransactionAccountReference` (QE:equality) held **heterogeneous** values, seeded transactions used the business key `ACC-xxx`, while the Simulator wrote the payer email, so no single query surfaced a customer's full history, and Application-mode history relied on a `localStorage` mirror (a second source of truth).
 
 **Decision**
 
@@ -1632,22 +1632,22 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) A Simulator action is now indistinguishable from an Application-mode action in the database; the demo proves the real security model (RBAC + QE) rather than narrating it.
 - (+) Single source of truth for the roster and for transaction history.
 - (+) Removed dead/duplicated resources: `users.json`, the hard-coded password map, fictional investigation constants, `simulatorHistory.ts`, and the legacy `*Sensitive.json` export files.
-- (−) The Simulator now depends on the auth and fraud endpoints behaving correctly; an RBAC bug surfaces in the Simulator (intended — it is now an honest test surface).
+- (−) The Simulator now depends on the auth and fraud endpoints behaving correctly; an RBAC bug surfaces in the Simulator (intended: it is now an honest test surface).
 - (−) Customer-facing case status in Application-mode transaction **history list** is not shown (customers are blocked from `/fraud`); customer-visible case notes remain available on the detail page via the dedicated customer-safe notes endpoint. A customer-safe case-status projection on `/transactions/all` is a possible follow-up.
 
 ---
 
-## ADR-030 — Data-Driven RBAC/ACL + Role & User Administration by Domain
+## ADR-030: Data-Driven RBAC/ACL + Role & User Administration by Domain
 
 **Status:** Accepted (2026-06-15). Implemented v8.1 (Phases A–C). Aligns **PCI DSS Req 7** (RBAC, least privilege, default-deny, documented matrix, separation of duties) and **BIAN SD-16** (Party Authentication).
 
 **Context.** Authorization was hard-coded across ~13 files (`auth.ts` prefix/role sets, per-controller role checks). This made the policy impossible to review as a whole (Req 7 wants a documented matrix) and impossible to change without code edits. The trigger: the `manager` (SD-193 integration admin) could reach business/cardholder data (`/system/transactions/:id`), violating separation of duties.
 
 **Decision.**
-1. **Static catalog, data assignment (E1).** The permission catalog (resource × action) lives in code (`acl.model.ts` back / `config/acl.ts` front) — it mirrors the real enforcement points, so no permission exists without a guard. Role→permission assignment is data in a new **`role`** collection (CRUD by the manager). The matrix in code doubles as the seed and the runtime fallback, so the DB can never diverge from what enforcement expects.
+1. **Static catalog, data assignment (E1).** The permission catalog (resource × action) lives in code (`acl.model.ts` back / `config/acl.ts` front): it mirrors the real enforcement points, so no permission exists without a guard. Role→permission assignment is data in a new **`role`** collection (CRUD by the manager). The matrix in code doubles as the seed and the runtime fallback, so the DB can never diverge from what enforcement expects.
 2. **Global roles & actions (E2).** Roles/actions are global across authentication domains. Per domain only the *binding* differs: **local** = user CRUD + role assignment; **remote (OIDC/SAML)** = claim/group → role mapping (`partyAuthenticationDomainRoleMappings`).
-3. **Builtin vs custom (E3).** Six builtin roles (matrix in `technical-spec §1.15`) — permissions editable, not deletable. Custom roles: full CRUD, any subset incl. full-manage.
-4. **Enforcement.** `requirePermission(resource, action)` — a Fastify preHandler, default-deny, with a cached role load (TTL + invalidation on edit) and builtin fallback so it never fails open. `viewSensitive` additionally requires the existing escalation flow (`canReadSensitive`). `GET /api/v1/acl/effective` exposes the caller's resolved permissions so the frontend `can()`/`<RequirePermission>` work without putting permissions in the JWT (changes apply without re-login). `extractDemoRole` trusts the signed token's role (so custom roles resolve through the ACL) while the untrusted `x-demo-role` header stays restricted to builtins.
+3. **Builtin vs custom (E3).** Six builtin roles (matrix in `technical-spec §1.15`): permissions editable, not deletable. Custom roles: full CRUD, any subset incl. full-manage.
+4. **Enforcement.** `requirePermission(resource, action)`: a Fastify preHandler, default-deny, with a cached role load (TTL + invalidation on edit) and builtin fallback so it never fails open. `viewSensitive` additionally requires the existing escalation flow (`canReadSensitive`). `GET /api/v1/acl/effective` exposes the caller's resolved permissions so the frontend `can()`/`<RequirePermission>` work without putting permissions in the JWT (changes apply without re-login). `extractDemoRole` trusts the signed token's role (so custom roles resolve through the ACL) while the untrusted `x-demo-role` header stays restricted to builtins.
 5. **UI.** `/system/admin/roles` (matrix editor, builtin-protected) + per-domain access panels under Auth Domains (users for local, role mapping for remote) + a reusable `<AccessDenied>` whose body lists the role's responsibilities **derived from the live ACL** (not hard-coded).
 
 **Consequences.**
@@ -1659,7 +1659,7 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 
 ---
 
-## ADR-031 — Customer Questions and Responses on Fraud Cases
+## ADR-031: Customer Questions and Responses on Fraud Cases
 
 **Status:** Accepted (2026-06-15). Implemented v8.2. Aligns **BIAN SD-83** (Fraud Diagnosis) and **PCI DSS Req 10** (immutable, traceable audit of investigation interactions).
 
@@ -1668,12 +1668,12 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 **Decision.**
 1. **New collection `fraudDiagnosisCustomerQuestion`** (plaintext, no CHD) linked to the case (`fraudDiagnosisInstanceReference`), the transaction (customer entry point) and the owning party (ownership checks). A question carries `questionText`, predefined `questionOptions[]`, an `allowOther` flag, `questionStatus` (`pending`/`closed`), and an immutable response (`responseOption`, optional `responseText`).
 2. **Investigator API** (L1/L2, fraud-case scope): `POST /api/v1/fraud/:id/questions`, `GET /api/v1/fraud/:id/questions`. The options list is fully customizable per question.
-3. **Customer API** (on the transaction, `transactions:view`): `GET /api/v1/transactions/:id/questions` (scoped to the caller's own party) and `POST /api/v1/transactions/:id/questions/:questionId/response`. The answer is written with an **atomic pending→closed transition** — it cannot be edited or resubmitted (immutability, Req 10). Ownership is enforced by the caller's party (Req 7).
+3. **Customer API** (on the transaction, `transactions:view`): `GET /api/v1/transactions/:id/questions` (scoped to the caller's own party) and `POST /api/v1/transactions/:id/questions/:questionId/response`. The answer is written with an **atomic pending→closed transition**, it cannot be edited or resubmitted (immutability, Req 10). Ownership is enforced by the caller's party (Req 7).
 4. **Notifications**: `GET /api/v1/notifications` returns the caller's pending questions; a "Notifications" entry + count badge appears in the customer menu and links to the relevant transaction.
 5. **Event tracking**: create and answer each emit a `businessProcessEvent` (`fraud.question.created` / `fraud.question.answered`) for the unified audit feed, and append a `fraudDiagnosisCaseEvents` entry (`question_created` / `question_answered`) so the case timeline shows the full interaction.
 
 **Live updates & notifications (v8.3).**
-6. **SSE**: `GET /api/v1/fraud/:id/stream` streams case events (`question.created`/`question.answered`) to the investigation view so L1/L2 see a customer's answer without a manual refresh. An in-process event bus (`caseEventBus`) publishes on create/answer; the client consumes via `fetch` + `ReadableStream` (Bearer header, no token in the URL — Req 4). Investigation roles only; a valid JWT is required (no anonymous stream). No CHD is streamed (Req 3).
+6. **SSE**: `GET /api/v1/fraud/:id/stream` streams case events (`question.created`/`question.answered`) to the investigation view so L1/L2 see a customer's answer without a manual refresh. An in-process event bus (`caseEventBus`) publishes on create/answer; the client consumes via `fetch` + `ReadableStream` (Bearer header, no token in the URL, Req 4). Investigation roles only; a valid JWT is required (no anonymous stream). No CHD is streamed (Req 3).
 7. **Notifications** are **derived** (no stored collection) from authoritative records per party: pending questions (actionable) + resolved cases (informational). Surfaced via a top-bar bell (latest 5 + count badge + "View all") and a full `/system/notifications` page with search/type-filter/pagination. `GET /api/v1/notifications` is scoped to the caller's own party (Req 7).
 
 **Consequences.**
@@ -1682,16 +1682,16 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 - (+) Live (SSE) L2 updates + a derived notification feed reuse the existing case/events/RBAC architecture; no parallel system, no extra collection for notifications.
 - (−) One new collection (`fraudDiagnosisCustomerQuestion`) to maintain. The SSE bus is single-process (demo); a multi-instance deployment would back it with Redis pub/sub or MongoDB change streams.
 
-## ADR-032 — Event-Driven Architecture: EventBus vendor, correlated event store, two-phase async payment authorization
+## ADR-032: Event-Driven Architecture: EventBus vendor, correlated event store, two-phase async payment authorization
 
 **Status:** Accepted (2026-06-16). Implemented dev.v8 (F1-F5). Aligns **PCI DSS Req 3.2** (no SAD), **Req 10** (traceable audit) and **BIAN SD-254 / SD-88 / SD-63 / SD-13 / SD-99**.
 
-**Context.** Event handling was scattered: a per-case in-process `EventEmitter` (`caseEventBus`) plus direct writes to three event collections (`businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog`). Following the real-PSP model, a card payment must wait for the issuer's decision (and other real-time risk checks) from providers with asynchronous flows, while the client waits for the outcome — and an investigation must be able to follow the whole journey across subsystems, not chase scattered logs.
+**Context.** Event handling was scattered: a per-case in-process `EventEmitter` (`caseEventBus`) plus direct writes to three event collections (`businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog`). Following the real-PSP model, a card payment must wait for the issuer's decision (and other real-time risk checks) from providers with asynchronous flows, while the client waits for the outcome, and an investigation must be able to follow the whole journey across subsystems, not chase scattered logs.
 
 **Decision.**
-1. **EventBus vendor (port/adapter), one instance for ALL events** (`backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus` — no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
+1. **EventBus vendor (port/adapter), one instance for ALL events** (`backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus`, no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
 2. **`DomainEvent` envelope + correlated event store** (`domainEvent` collection). Every event carries `eventId` (idempotency), `eventType` (dotted, module-prefixed), `correlationId` (= the journey, the `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey` (Kafka-ready). CHD is stripped on publish (`sanitizeDeep`, single CHD blocklist owned by the vendor). The legacy `emitProcessEvent`/`emitComplianceEvent`/`logEvent` also mirror to the store with correlation. `GET /api/v1/events/trail/:correlationId` returns the ordered journey.
-3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them — any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
+3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them, any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. Only eligibility gates hard-decline (`card-issuer`, `funds`, and `hrp` sanctions as a regulatory block); `fds` is a risk gate whose `review`/`decline` recommendation authorizes the payment and opens a fraud case for L1/L2 instead of declining it. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
 4. **Backward compatibility.** `createTransaction` is kept as a synchronous wrapper (initiate + await the terminal event) so the gateway (checkout / payment-link) is unchanged.
 
 **Consequences.**
@@ -1703,7 +1703,7 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 
 ---
 
-## ADR-033 — OIDC Authorization Server Implemented from Scratch (No oidc-provider Library)
+## ADR-033: OIDC Authorization Server Implemented from Scratch (No oidc-provider Library)
 
 **Status:** Accepted (2026-07-01). Implements **v16** (Issue #29). Aligns **BIAN SD-16** (Party Authentication) and **PCI DSS Req 8.6** (system account credential management).
 
@@ -1712,29 +1712,29 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 **Decision.** Implement the Authorization Server manually using primitives already in the project: `jsonwebtoken` (RS256 signing), `crypto` (PKCE SHA256, RSA keypair generation), `bcryptjs` (client secrets), `uuid` (code/token IDs). Support three grant types: `authorization_code` + PKCE (S256), `client_credentials`, and `refresh_token`. All flows are defined in RFC 6749, RFC 7636, and OIDC Core 1.0.
 
 **Consequences.**
-- (+) Fully auditable line-by-line; no hidden adapter layers — appropriate for a PCI DSS demonstration.
+- (+) Fully auditable line-by-line; no hidden adapter layers: appropriate for a PCI DSS demonstration.
 - (+) Zero new npm dependencies; no additional CVE surface.
 - (+) All grant types are well-specified; implementation is straightforward.
 - (−) More development time than a library; no automatic spec-compliance guarantees (covered by integration tests instead).
 
 ---
 
-## ADR-034 — OIDC Routes Under /api/v1/auth/ Prefix; Discovery at /.well-known/openid-configuration
+## ADR-034: OIDC Routes Under /api/v1/auth/ Prefix; Discovery at /.well-known/openid-configuration
 
 **Status:** Accepted (2026-07-01). Implements **v16**.
 
 **Context.** OIDC Discovery 1.0 §4 mandates that the discovery document is served at `{issuer}/.well-known/openid-configuration`. All other endpoint paths are advertised inside that document and have no mandated paths in the spec.
 
-**Decision.** Serve `/.well-known/openid-configuration` at root (no `/api/v1` prefix — spec-mandated). All other OIDC/OAuth2 endpoints use the `/api/v1/auth/` prefix for consistency with the existing internal auth controller (`/api/v1/auth/login`). Fastify's plugin system registers the discovery controller at root level separately from the `/api/v1` prefix.
+**Decision.** Serve `/.well-known/openid-configuration` at root (no `/api/v1` prefix: spec-mandated). All other OIDC/OAuth2 endpoints use the `/api/v1/auth/` prefix for consistency with the existing internal auth controller (`/api/v1/auth/login`). Fastify's plugin system registers the discovery controller at root level separately from the `/api/v1` prefix.
 
 OIDC endpoints:
-- `GET /.well-known/openid-configuration` — discovery document (root, spec-mandated)
-- `GET /api/v1/auth/jwks` — JSON Web Key Set (public keys)
-- `GET /api/v1/auth/authorize` — Authorization Code flow initiation
-- `POST /api/v1/auth/token` — token issuance (all grant types)
-- `GET /api/v1/auth/userinfo` — OIDC userinfo claims
-- `POST /api/v1/auth/revoke` — RFC 7009 token revocation
-- `POST /api/v1/auth/introspect` — RFC 7662 token introspection
+- `GET /.well-known/openid-configuration`: discovery document (root, spec-mandated)
+- `GET /api/v1/auth/jwks`: JSON Web Key Set (public keys)
+- `GET /api/v1/auth/authorize`: Authorization Code flow initiation
+- `POST /api/v1/auth/token`: token issuance (all grant types)
+- `GET /api/v1/auth/userinfo`: OIDC userinfo claims
+- `POST /api/v1/auth/revoke`: RFC 7009 token revocation
+- `POST /api/v1/auth/introspect`: RFC 7662 token introspection
 
 **Consequences.**
 - (+) Discovery document at spec-mandated path; all other paths consistent with existing codebase convention.
@@ -1743,30 +1743,30 @@ OIDC endpoints:
 
 ---
 
-## ADR-035 — RS256 JWT for OAuth Access Tokens; HS256 Retained for Internal PSP Sessions
+## ADR-035: RS256 JWT for OAuth Access Tokens; HS256 Retained for Internal PSP Sessions
 
 **Status:** Accepted (2026-07-01). Implements **v16**.
 
-**Context.** The existing internal authentication uses HS256 JWTs (`PSP_JWT_SECRET`). OAuth access tokens must be verifiable by merchants without sharing the PSP's secret — RS256 with a published JWKS endpoint enables this.
+**Context.** The existing internal authentication uses HS256 JWTs (`PSP_JWT_SECRET`). OAuth access tokens must be verifiable by merchants without sharing the PSP's secret: RS256 with a published JWKS endpoint enables this.
 
 **Decision.** Maintain two parallel signing mechanisms:
-1. **Internal PSP sessions** — HS256, `PSP_JWT_SECRET`. Used by `loginUser()` for employee/customer sessions. Unchanged.
-2. **OAuth access tokens + ID tokens** — RS256, RSA-2048 private key. Issued only by the OAuth token endpoint. Verifiable by anyone holding the public key from `/api/v1/auth/jwks`.
+1. **Internal PSP sessions**: HS256, `PSP_JWT_SECRET`. Used by `loginUser()` for employee/customer sessions. Unchanged.
+2. **OAuth access tokens + ID tokens**: RS256, RSA-2048 private key. Issued only by the OAuth token endpoint. Verifiable by anyone holding the public key from `/api/v1/auth/jwks`.
 
 The `sub` claim in OAuth tokens is the `customerAuthenticationInstanceReference` (for user-bearing flows) or `clientId` (for `client_credentials` flow). The `iss` claim is the PSP base URL (`PSP_BASE_URL` env var).
 
 **Consequences.**
-- (+) Merchant-verifiable tokens without sharing any PSP secret — standard OAuth architecture.
+- (+) Merchant-verifiable tokens without sharing any PSP secret: standard OAuth architecture.
 - (+) Existing internal authentication is completely unaffected.
 - (−) Two key types to manage; mitigated by the `OAuthKeyProvider` abstraction (ADR-036).
 
 ---
 
-## ADR-036 — RSA Private Key Is Never Persisted in MongoDB; Switchable OAuthKeyProvider (local|aws) Mirrors QE KMS_PROVIDER Pattern
+## ADR-036: RSA Private Key Is Never Persisted in MongoDB; Switchable OAuthKeyProvider (local|aws) Mirrors QE KMS_PROVIDER Pattern
 
 **Status:** Accepted (2026-07-01). Implements **v16**. Aligns **PCI DSS Req 3.6** (cryptographic key management).
 
-**Context.** JWT signing requires an RSA private key at runtime. Storing it in MongoDB would mean any client with a valid connection string could extract and forge any JWT — a complete authentication bypass, violating PCI DSS Req 3.6. The project already uses a `KMS_PROVIDER=local|aws` pattern for QE field encryption.
+**Context.** JWT signing requires an RSA private key at runtime. Storing it in MongoDB would mean any client with a valid connection string could extract and forge any JWT: a complete authentication bypass, violating PCI DSS Req 3.6. The project already uses a `KMS_PROVIDER=local|aws` pattern for QE field encryption.
 
 **Decision.** Mirror the existing pattern with `OAUTH_KEY_PROVIDER=local|aws`:
 
@@ -1779,7 +1779,7 @@ OAUTH_KEY_PROVIDER=local  →  LocalKeyProvider
 
 OAUTH_KEY_PROVIDER=aws  →  AwsKmsKeyProvider
   Private key: never exported from AWS KMS hardware
-  Signing:     kms.sign() call — key never in application memory
+  Signing:     kms.sign() call, key never in application memory
   Same AWS credentials as QE (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY)
 ```
 
@@ -1787,21 +1787,21 @@ Both providers expose a common `OAuthKeyProvider` interface. `npm run setup:key:
 
 **Consequences.**
 - (+) Private key never in the database; FIPS 140-2 hardware boundary available via `aws` provider.
-- (+) Same operational pattern as QE — existing runbooks and K8s Secret patterns apply.
+- (+) Same operational pattern as QE: existing runbooks and K8s Secret patterns apply.
 - (+) JWKS multi-key rotation with grace period, driven by the provider (see amendment).
 - (−) One new setup step (`npm run setup:key:rsa`); documented in README and installation guide.
 
-**Amendment (2026-07-03) — FS-first: provider is the single source of truth.**
-The original design used the Atlas `partyAuthenticationKey` collection as the source for the JWKS and stored the public key there on rotation. This created a dual source of truth that broke dashboard-initiated rotation: `generateAndActivateKey`/`uploadKey` wrote the new **public** key to the DB and marked it active, but **never persisted the new private key**, so the signing provider kept using the old key file — the advertised active `kid` could never sign. Corrected design:
+**Amendment (2026-07-03): FS-first: provider is the single source of truth.**
+The original design used the Atlas `partyAuthenticationKey` collection as the source for the JWKS and stored the public key there on rotation. This created a dual source of truth that broke dashboard-initiated rotation: `generateAndActivateKey`/`uploadKey` wrote the new **public** key to the DB and marked it active, but **never persisted the new private key**, so the signing provider kept using the old key file, the advertised active `kid` could never sign. Corrected design:
 - The `OAuthKeyProvider` (filesystem / KMS) owns all key material and is the only source for signing, verification, and the JWKS. Interface: `sign`, `getKid`, `getPublicKeyJwk`, `listPublicKeys`, `getPublicPemByKid`, `supportsRotation`, `rotate`, `importKeypair`, `revoke`.
-- `LocalKeyProvider` layout: active private at `private.pem`, active public at `public.pem`, and deprecated **public-only** keys under `retired/<kid>.pub.pem` for the grace period (deprecated private material is dropped — only the active key ever signs).
+- `LocalKeyProvider` layout: active private at `private.pem`, active public at `public.pem`, and deprecated **public-only** keys under `retired/<kid>.pub.pem` for the grace period (deprecated private material is dropped, only the active key ever signs).
 - Token verification resolves the public key by the token's `kid` (active **or** a deprecated key still in grace), enabling a real rotation grace period.
 - `partyAuthenticationKey` is now an **audit mirror** only (status + provenance for the admin dashboard), reconciled from the provider on startup and after every mutation. It is never read to verify tokens or build the JWKS.
 - KMS rotation/import/revoke are unsupported in-process (managed inside AWS KMS); `supportsRotation()` returns false.
 
 ---
 
-## ADR-037 — Merchant Portal API as OAuth-Authenticated Namespace (/api/v1/merchant/portal/)
+## ADR-037: Merchant Portal API as OAuth-Authenticated Namespace (/api/v1/merchant/portal/)
 
 **Status:** Superseded by **ADR-042 (v23)** (2026-07-09). Originally Accepted (2026-07-01), implemented **v16**. Aligns **BIAN SD-89** (Merchant Relations), **PCI DSS Req 7** (least privilege), **Req 8.6** (system account lifecycle).
 
@@ -1817,27 +1817,27 @@ The original design used the Atlas `partyAuthenticationKey` collection as the so
 **Decision.** Create a dedicated `/api/v1/merchant/portal/` namespace authenticated by OAuth merchant access tokens (not internal JWTs). A `validateMerchantToken` middleware: (1) verifies RS256 JWT signature, (2) extracts `client_id`, (3) resolves the merchant from `merchantAgreementProcedure`, (4) checks `oauthClientStatus === 'active'`, (5) enforces scope-based access control per endpoint.
 
 All responses are scoped to the authenticated merchant's own records only:
-- `GET /api/v1/merchant/portal/me` — own merchant profile (scope: `read:merchant_profile`)
-- `GET /api/v1/merchant/portal/transactions` — own transaction metadata, NO customer PII (scope: `read:transactions`)
-- `GET /api/v1/merchant/portal/checkout-sessions` — own sessions (scope: `read:orders`)
-- `GET /api/v1/merchant/portal/payment-links` — own links (scope: `read:orders`)
+- `GET /api/v1/merchant/portal/me`: own merchant profile (scope: `read:merchant_profile`)
+- `GET /api/v1/merchant/portal/transactions`: own transaction metadata, NO customer PII (scope: `read:transactions`)
+- `GET /api/v1/merchant/portal/checkout-sessions`: own sessions (scope: `read:orders`)
+- `GET /api/v1/merchant/portal/payment-links`: own links (scope: `read:orders`)
 - `GET /api/v1/merchant/portal/notifications` + SSE (scope: `read:notifications`)
 
 **Consequences.**
-- (+) Merchants access only their own data — Req 7 least privilege enforced at middleware level.
+- (+) Merchants access only their own data: Req 7 least privilege enforced at middleware level.
 - (+) OAuth client lifecycle (issue / rotate / revoke) satisfies Req 8.6 system account management.
-- (+) All merchant portal calls emit `businessProcessEvent` via existing EventBus — Req 10 audit.
+- (+) All merchant portal calls emit `businessProcessEvent` via existing EventBus: Req 10 audit.
 - (−) New middleware in the request path; tested independently with expired/revoked/wrong-scope tokens.
 
-## ADR-038 — Funds-Availability Gate + Currency Exchange (Bank-Movement Cycle Precision)
+## ADR-038: Funds-Availability Gate + Currency Exchange (Bank-Movement Cycle Precision)
 
 **Status:** Accepted (2026-07-03). Implements **v17**. Aligns **BIAN SD-36** (Account Information / AIS), **SD-15** (Card Authorization), **SD-66** (Payout Account / PISP), **PCI DSS Req 10.2.1** (audit of fund movements).
 
 **Context.** Card-payment authorization verified the issuer, fraud (FDS) and sanctions (HRP) gates but **never checked whether the funding account had sufficient balance**. The balance hold ran *post-authorization*, asynchronously and fire-and-forget, so an authorized payment could exceed available funds (the conditional hold failed silently). Balances could also be mutated in a mismatched currency (EUR card on a USD account). This broke the invariant that no balance goes negative in origin or destination.
 
 **Decision.**
-1. **Funds gate as a 4th parallel gate** of `PaymentAuthorizationSaga` (`card.issuer` + `fds` + `hrp` + **`funds`**). Events `funds.check.requested` / `funds.check.completed` (BIAN SD-36). The reactor (`providerGroups.onFunds`) resolves `cardToken → fundingPayoutAccount`, reads balance via the **`account_information` capability** (provider-indifferent: built-in module reads the internal ledger; an external PSD2 AIS substitutes it via `dispatchProvider` — **no internal/external branching**), and performs the **atomic hold** (`holdCardFunds`, `$gte`-conditional `$inc`). The hold is the authoritative decision: no read-modify-write race.
-2. **Scope of the gate.** It governs ONLY cards funded by a PSP-internal payout account (`fundingPayoutAccountInstanceReference`). New/unsaved tokens and external cards pass through (their funds are the issuer's responsibility — the `card.issuer` gate).
+1. **Funds gate as a 4th parallel gate** of `PaymentAuthorizationSaga` (`card.issuer` + `fds` + `hrp` + **`funds`**). Events `funds.check.requested` / `funds.check.completed` (BIAN SD-36). The reactor (`providerGroups.onFunds`) resolves `cardToken → fundingPayoutAccount`, reads balance via the **`account_information` capability** (provider-indifferent: built-in module reads the internal ledger; an external PSD2 AIS substitutes it via `dispatchProvider`, **no internal/external branching**), and performs the **atomic hold** (`holdCardFunds`, `$gte`-conditional `$inc`). The hold is the authoritative decision: no read-modify-write race.
+2. **Scope of the gate.** It governs ONLY cards funded by a PSP-internal payout account (`fundingPayoutAccountInstanceReference`). New/unsaved tokens and external cards pass through (their funds are the issuer's responsibility: the `card.issuer` gate).
 3. **Compensation.** On any-gate decline, the saga releases the hold (`releaseCardHold`, pending → available), idempotently, including the ordering race where the hold lands after an earlier decline. Settlement clears the hold via `settleCardDebit`. Insufficient funds → `declined` + ISO-8583 `'51'` + `decisionReason 'insufficient_funds'` (no new BIAN status; the reason code carries it).
 4. **Currency Exchange built-in module** (new capability `currency_exchange`): `convert(amount, from, to)` = mid cross-rate (via base currency) + configurable spread. Money-movement points (card hold/settle, merchant debit/credit, P2P credit, refund) convert into the account currency so **no balance is ever mutated in a mismatched currency**. Replaceable by an external FX provider.
 5. **Seed reconciliation.** All seeders default to **EUR**; `pending/reserved` start at 0 and `balanceCreditLog` `initial_deposit == total balance`, so seeds start fully reconciled (Σ credits − Σ debits == balance).
@@ -1888,7 +1888,7 @@ comment on `payoutAccountIban`) mislabelled IBAN handling as "PCI DSS Req 3.3".
    (→ `/system/beneficiaries/{cab…}`), `resolvedPayoutAccountReference` (→ `/system/accounts/{pau…}`), and
    for unregistered externals `destinationIban` (full IBAN, **QE:none `DEK-exec-dest-iban`, L2 only**) +
    `beneficiaryName` + `destinationAccountMasked` (plaintext, list views) + `destinationCountry`.
-   Registered destinations are not matched by IBAN (QE:none is non-searchable — that is the control); the
+   Registered destinations are not matched by IBAN (QE:none is non-searchable, that is the control); the
    linking reference is captured at initiation instead.
 3. **KYC demographics belong to Party (SD-13), uniformly for all party types** (customer + employee):
    `partyPostalAddress` added; `partyDateOfBirth`/`partyNationality` backfilled by the seeder. The KYC
@@ -1920,13 +1920,13 @@ activity is attributed without a new collection.
    exclusively via the PSP API + OAuth2/OIDC SSO (per ADR-033–037). Local port `8082` / container `8080`;
    env prefix `PSP_MERCHANT_`. This keeps the PSP the single system of record and puts the merchant app
    fully outside the CHD boundary (PCI SAQ A).
-2. **Commission model — no new collection.** The numeric commission reuses the existing
+2. **Commission model, no new collection.** The numeric commission reuses the existing
    `paymentExecutionProcedure.feeAmount` (SD-65); a new attribution sub-doc `fee { feeMerchantReference,
    feeRateApplied, feeCollectedDateTime }` records who was charged, at what rate, and when. The rate lives
    on SD-89 as `merchantCommissionRate` (editable in merchant settings, audited). Aggregate
-   `commissionRevenue` is **derived**, not stored. *(Runtime fee-wiring — A-06 — is deferred; revenue is
-   seed-driven for now.)*
-3. **Activity attribution — no new collection.** The existing `businessProcessEvent` gains `clientId`,
+   `commissionRevenue` is **derived**, not stored. *(Runtime fee-wiring, A-06, was deferred here and is
+   closed in ADR-056: the fee is withheld from the gross and credited to a PSP revenue ledger.)*
+3. **Activity attribution, no new collection.** The existing `businessProcessEvent` gains `clientId`,
    `merchantAgreementReference`, `actingPartyReference`, and `actingChannel`, so PSP events can be filtered
    per merchant / per connected app without a parallel event store.
 4. **OAuth: granular + incremental consent.** The user selects scopes; unknown scopes return
@@ -1935,10 +1935,9 @@ activity is attributed without a new collection.
 5. **Merchant branding** is driven by OIDC client metadata `logo_uri` / `client_uri`.
 
 **Consequences:** BIAN-pure (SD-65 fee, SD-89 agreement, SD-13 acting party) with no new collections. PCI
-SAQ A holds — no CHD ever reaches the merchant app; IBAN is masked-only in merchant views (GDPR Art. 32 /
-PSD2). Least-privilege scopes + separation of duties are enforced at the token boundary. Trade-off:
-commission revenue is not yet computed at authorization time (A-06 follow-up) and the API-driven payment
-OAuth path remains a follow-up.
+SAQ A holds, no CHD ever reaches the merchant app; IBAN is masked-only in merchant views (GDPR Art. 32 /
+PSD2). Least-privilege scopes + separation of duties are enforced at the token boundary. Trade-off: the
+API-driven payment OAuth path remains a follow-up.
 
 *Added 2026-07-06 (v18; doc + code together per repo rules).*
 
@@ -1978,7 +1977,7 @@ public-exact transactions route needs its bespoke OAuth detection.
 
 ---
 
-## ADR-043: Collection classification — Core PSP vs Integration/EDA infra vs Module-owned (v30)
+## ADR-043: Collection classification, Core PSP vs Integration/EDA infra vs Module-owned (v30)
 
 **Status:** Accepted (2026-07-22).
 
@@ -2120,7 +2119,7 @@ it, and resolves per `decisionMode`. Every provider is reached only via `dispatc
 the built-in engine with an external subsystem needs zero reactor changes (set
 `externalProviderApiEndpoint` on the arrangement; async vendor responses arrive via the existing callback
 handlers). The built-in KYC/KYB engines own no collections (stateless ports; only durable state is the
-`capabilityModuleConfiguration` row) — the zero-orphan property (see technical-spec section 10). This
+`capabilityModuleConfiguration` row): the zero-orphan property (see technical-spec section 10). This
 lineage extends ADR-011 (Internal-First) and ADR-025 (endpoint-first dispatch).
 
 ### ADR-047: One deterministic verdict-to-status mapper per process
@@ -2284,3 +2283,403 @@ holder (repointing a transaction to its card, v33 F3), it prefers a token unique
 transaction surfaces stay unambiguous while the shared-card demo keeps its population.
 
 *Added 2026-07-29 (v33; doc + code together per repo rules).*
+
+### ADR-056: the commission is withheld from the gross and credited to a PSP revenue ledger (v34)
+
+**Status.** Accepted.
+
+**Context.** ADR-041 modelled the commission (SD-65 `feeAmount` + `fee` attribution, SD-89
+`merchantCommissionRate`) and deferred the runtime wiring as A-06. Half of it later landed: the
+acquiring path persisted `feeAmount` at authorization and emitted `merchant.commission.collected`.
+The other half never did. The payout path created every execution with `feeAmount: 0`, so
+`netAmount == grossAmount`, and settlement credited the merchant the full gross. The only
+`gross − fee` formula in the repo had no caller. The result was a one-sided ledger: an event and an
+aggregation claimed revenue while no account was debited and none was credited, and the merchant UI
+displayed a commission figure that changed no amount.
+
+**Decision.**
+
+1. **Withheld, not added.** The buyer is charged the gross, which is what a PSP does: the fee is taken
+   out of the merchant's proceeds. `resolveMerchantFee` turns the merchant's current rate into the
+   gross/net/fee triple *before* the execution is inserted, so the record is correct at birth rather
+   than corrected by a second write. The replaced `applyMerchantFee` (post-hoc patch, never called) is
+   removed. The rail is asked to move `netAmount`; the commission never leaves the PSP.
+2. **Zero is the safe default.** No configured rate, or one outside 0..1, yields `feeAmount 0`, no
+   `fee` sub-document and `netAmount == grossAmount`, with no balance movement at all. Callers can
+   apply the result unconditionally, so an operation that states no fee can never unbalance a ledger.
+3. **The fee has a holder.** A PSP revenue ledger receives it: an SD-13 party of type
+   `service_account` holding an SD-66 `internal_ledger` account, seeded deterministically. No new
+   collection and no new model, because the PSP is a party like any other holder. `postCommission`
+   makes the posting double entry (merchant `pendingAmount −= fee`, PSP `availableAmount += fee`)
+   composing the existing balance primitives, and mirrors it into `balanceCreditLog` with a new
+   `commission` credit type plus a `merchant.commission.settled` event (PCI DSS Req 10). The credit id
+   is derived from the execution, so it is also the idempotency gate. `commission` is deliberately
+   absent from the admin credit endpoint's enum: it is system-posted only.
+4. **The hold clears exactly.** The authorization hold is taken on the gross, so the fee leg is
+   derived as `grossConverted − netConverted` in the merchant account currency instead of being
+   converted on its own. Otherwise FX rounding would strand a cent in `pendingAmount` forever.
+   For the same reason the buyer's funding hold is released against `grossAmount`, not the settled net.
+5. **Revenue counted once.** A card-originated execution now carries the same fee as its acquiring
+   record, so the execution source of `commissionRevenue` is restricted to fees with no acquiring
+   counterpart. Settlement amounts are read from our own execution record rather than from the rail
+   payload, so the ledger cannot drift from what we stored.
+
+**Consequences.** BIAN-pure (SD-65 execution, SD-66 balances, SD-89 pricing, SD-13 party) with no new
+collection. The demo can now show the full picture: the buyer pays the price, the merchant receives
+the net, the PSP holds the commission, and `balanceCreditLog` explains every cent of that balance.
+Accounting never blocks a payment and never strands an amount: `postCommission` returns a typed
+outcome, and on a missing revenue ledger the caller releases the fee to the merchant, since the hold
+was taken on the gross and would otherwise keep it in `pendingAmount` forever. The PSP forgoes the fee
+rather than holding money belonging to nobody; a replay needs no compensation. Trade-off: the two legs are
+separate single-document `$inc` operations rather than one transaction, consistent with the rest of
+the ledger in this demo, so a crash between them is repaired by the credit-log reconciliation rather
+than rolled back.
+
+*Added 2026-07-30 (v34; doc + code together per repo rules).*
+
+### ADR-057: a payout that will not settle must release its reservation, and release it as a reservation (v34)
+
+**Status.** Accepted.
+
+**Context.** At authorization the payout process reserves the merchant's incoming amount
+(`debitPending`, `pendingAmount += gross`), and settlement moves that reservation to available. Four
+terminal paths never gave it back: beneficiary validation refused (AIS not verified), rail submission
+refused (PISP not submitted), rail rejection after `in_flight` (`bank.transfer.failed` released only a
+P2P sender's hold), and any unexpected throw in the pipeline (swallowed by the subscriber's logger).
+The merchant was left showing an incoming credit that could never arrive, permanently. The last two
+paths are exactly the ones an external provider makes likely: a timeout or a 5xx from a real AIS or
+PISP service, rather than the builtin module's happy path.
+
+**Decision.**
+
+1. **Release it as a reservation, not as a refund.** A new SD-66 primitive `releasePendingCredit` is
+   the exact inverse of `debitPending`: `pendingAmount -= amount` and `availableAmount` deliberately
+   untouched. Reusing `releaseCardHold` here would have been wrong, not merely imprecise: it credits
+   available, which is correct for a P2P **sender** getting its own funds back, but for a payout
+   **beneficiary** it would credit money the rail never moved. The two reversals are different
+   operations because the reserved funds belong to different parties.
+2. **One compensating action for the saga.** `abortPayout` moves the SD-65 control record to its
+   terminal BIAN state (`exception` for an unusable beneficiary, `failed` for a rail refusal),
+   releases the reservation, and records both in the append-only `resolutionLog` and on the event
+   stream as `payout.hold.released` (PCI DSS Req 10). The BIAN state is carried in the event summary
+   rather than forced into `ProcessEventOutcome`, whose taxonomy stays as it was: an unusable
+   beneficiary is reported as `rejected`.
+3. **The state transition is the idempotency gate.** `transitionExecution` reports whether *this* call
+   performed the change, so a redelivered event or a retry cannot reverse (or credit) the same
+   execution twice. The same gate is now applied to the settled handler, where a redelivered
+   `bank.transfer.settled` could previously have credited a settlement twice.
+4. **Provider-indifferent by construction.** The compensation is driven by the *outcome* of a
+   `dispatchProvider` call, never by which provider produced it, and the whole post-reservation
+   pipeline is wrapped so a throwing or timing-out provider lands in the same place as a clean
+   refusal. That is what makes ADR-039's substitution property real for money movement: swapping the
+   builtin `account_information` or `payment_initiation` module for an external service cannot leave
+   the ledger inconsistent, whatever the external service does.
+
+**Consequences.** After any terminal payout path the merchant's `pendingAmount` returns to its
+pre-authorization value, so balances stay exact without a reconciliation job. The FX conversion used
+by every balance movement in the process is now a single entry point (`convert` + `accountCurrency`),
+removing three copies of the same conversion block. The payment itself is never rolled back by a
+payout failure: the compensation runs and the error is rethrown for the subscriber to log, leaving the
+authorized card transaction untouched. Trade-off: the compensation is a sequence of single-document
+`$inc` operations rather than one transaction, consistent with the rest of this ledger, so the
+idempotency gate rather than atomicity is what guarantees it happens exactly once.
+
+*Added 2026-07-31 (v34; doc + code together per repo rules).*
+
+**Addendum (audit correlation, v34).** Two gaps surfaced while verifying that every AIS/PISP action is
+auditable from the transaction id. The wire log itself was already complete: `dispatchProvider` records
+every call through `logEvent` with sanitized request/response (PCI DSS Req 10.7) on success, error and
+timeout, for builtin and external providers alike. What was missing was correlation. First, the payout
+gates pass `businessContext.entityId = executionRef`, and the execution was only linked to the
+acquiring record *after* the rail accepted, so a payout that died at AIS or PISP left no path from the
+transaction to its provider calls. The link now happens as soon as the execution is created, and each
+dispatch payload carries `cardTransactionInstanceReference` (the end-to-end reference a real rail would
+receive as ISO 20022 `EndToEndId`), which the audit trail's deep reference match reads out of the
+payload snapshot. Second, `payout.execution.completed` / `.failed` and the commission and hold-release
+events now carry `txnId` in their summaries, and the no-payout-account path emits
+`payout.execution.exception` instead of resolving silently.
+
+A third finding was in the compensation itself: once the PISP has accepted the submission the
+reservation belongs to the rail outcome, so an unexpected error after that point must NOT release it.
+It annotates the record and leaves `bank.transfer.settled` / `.failed` to resolve it; otherwise a later
+settlement would credit against a reservation already reversed and drive `pendingAmount` negative.
+
+### ADR-058: a QR payload is protected wherever it lands, and an unbuildable format is refused (v35)
+
+**Status.** Accepted.
+
+**Context.** v28 shipped the shared QR capability (`qrPaymentRepresentation`) as a deliberately
+plaintext collection, on the stated grounds that it holds "no sensitive plaintext, only a signed deep
+link / EMVCo / EPC string". The v34 analysis of the MongoDB QR payment architecture material tested
+that claim against the code and found it false for one branch: for `payloadFormat: 'sepa_epc'`,
+`buildPayload` writes an EPC069-12 payload embedding the creditor IBAN and the payee name into
+`encodedPayload`. The same payee name is QE-encrypted on `paymentRequestProcedure`, so the QR record
+was a cleartext side channel around the platform's own field protection, on the only payment
+collection with neither QE nor tests.
+
+Two adjacent defects surfaced with it. `payloadFormat: 'emvco'` was an accepted enum value with no
+implementation, so the service silently produced a `url` deep link and stored a record that misreported
+its own content; and `paymentRequestProcedure.originalPayload`, a free-shape unencrypted field added to
+hold a raw ingestion payload, was never written or read. The source article recommends storing the raw
+polymorphic payload beside the canonical one, which is precisely what that field would have enabled.
+
+**Decision.**
+
+1. **Do not store what must be protected.** QE on this collection was attempted and is **not
+   possible**: MongoDB forbids TTL indexes on encrypted collections (err 6346501), and the `expiresAt`
+   TTL is what expires the payment intent. Encrypting the field would have meant trading a working
+   expiry mechanism for a key, so the payload is kept out of the record instead. `encodedPayload` is
+   durable only for `'url'`; the EPC069-12 form is derived on read from `paymentRequestProcedure` +
+   `payoutAccountArrangement`, already QE:none. The encoding is unchanged, its lifetime is not.
+   Consequences: no schema change, no new DEK, no `--reset`, TTL intact, and the issue endpoint stops
+   accepting `iban`/`payeeName`/`amount` so creditor PII cannot be injected from the API. The cost is
+   that `'sepa_epc'` is limited to `subjectType: 'rtp_request'`, the only subject with a resolvable
+   creditor account, and that a QR whose account has since disappeared returns 409 rather than a
+   stale payload. Both are correct: a payment QR whose creditor cannot be resolved should not render.
+2. **Refuse what cannot be built.** An unsupported `payloadFormat`, and `sepa_epc` on a subject with
+   no derivable creditor account, raise `QrPayloadError` → 400. Silent degradation to `url` is a
+   data-integrity defect: the stored record and the API response both claimed a format never produced.
+3. **No card-proxy QR.** `emvco` is removed rather than implemented. An EMVCo card-proxy QR would pull
+   CHD into an account/alias-based record that PRD and spec both place outside PCI scope; extending
+   PCI scope into the request domain is a product decision, not a code change.
+4. **Do not retain the raw payload.** `originalPayload` is removed. This is a deliberate departure
+   from the source article's side-by-side pattern, on PCI DSS Req 3 and GDPR Art. 5(1)(c) grounds: the
+   canonical record plus the `paymentRequestEvent` timeseries already provide the audit history, and an
+   arbitrary-shape unencrypted field beside QE-protected PII is a minimization risk with no caller.
+   Reintroducing it requires a QE decision and a spec update first.
+5. **Issuing a QR is a write.** `POST /rtp/requests/:ref/qr` moves to `paymentRequests:manage` /
+   `write:rtp`, matching the rule `POST /gateway/qr/represent` already documented. Resolving stays
+   read-level. Read-only oversight roles are consequently refused on issue, consistent with the
+   ADR-048 line (v32 A8) that a read-only auditor holding a mutating permission is an SoD finding.
+
+**Consequences.** The demo keeps its one standards-compliance artifact on this surface (the EPC069-12
+encoder) and keeps its TTL, while the creditor data the payload embeds never lands in the record. No
+schema, DEK or seed change, so no `--reset` is needed. The QR surface gains its first tests. Sharding
+for the static-merchant-QR write hotspot is documented as a design, not implemented: a
+single-deployment demo cannot demonstrate a compound shard key, so it would be setup cost with no
+on-screen value.
+
+**Note on the rejected alternative.** QE was the first choice and was implemented before the TTL
+constraint surfaced during `setup:db`. It is recorded here because the reasoning is not obvious: on a
+collection whose expiry is enforced by a TTL index, "encrypt the sensitive field" is unavailable, and
+the correct move is to stop persisting the field rather than to weaken the lifecycle.
+
+### ADR-059: a risk signal holds a payment, it does not decline it (v36)
+
+**Status.** Accepted.
+
+**Context.** The Phase-1 authorization gate treated all four gates alike: any non-approved verdict was
+a hard decline. The FDS gate mapped a `block`/`decline` recommendation onto `outcome: 'declined'`, and
+the saga's decline branch publishes `fraudCaseCreated: false`, so a high-score payment was rejected
+automatically and no investigation case was ever opened. With the seeded rule set
+(`bands.declineAtOrAbove: 120`), a 1250 payment at a risky MCC scored 135 and was auto-declined: the
+L1 triage and L2 confirmation the platform is built around were unreachable for exactly the payments
+that most needed them.
+
+The second half of the defect was on the money side. `PayoutOrchestrationProcess.onAuthorized` paid out
+on any non-declined outcome, so once a flagged payment was authorized the merchant was settled at T+N
+regardless of an open case, and resolving the case had no effect on the payment at all.
+
+**Decision.**
+
+1. **Separate eligibility from risk.** Eligibility gates decline: the card issuer (invalid card, CVV or
+   owner), the funds check (insufficient funds) and sanctions screening (a regulatory block). The fraud
+   gate is a risk gate: it always completes as approved and carries its verdict, which opens the case.
+2. **Accepted is not completed.** An authorization with an open case is withheld: no execution is
+   created and no ledger movement happens, so the funds-gate hold placed at authorization is exactly
+   the money that stays put. The cardholder is not charged and the merchant is not credited.
+3. **The investigation closes the payment.** Resolving the case publishes `fraud.case.resolved`, which
+   the payout process consumes: `cleared` releases the withheld payout, `confirmed_fraud` returns the
+   hold to the cardholder (pending -> available) and declines the transaction. Only a still-authorized
+   transaction is actionable, so a settled or already declined payment is never re-processed.
+
+**Consequences.** A flagged payment is auditable end to end: authorized, withheld, investigated,
+resolved, then either settled or reversed, with the money immobilised (not moved) throughout. Merchant
+commission revenue no longer counts payments still under investigation, which is the correct reading.
+No API change: routes, request/response shapes and the SSE outcome fields are untouched; what changes
+is which value `outcome` takes for a fraud signal. No schema, DEK or seed change, so no `--reset`.
+
+**On the standards.** Withholding satisfies AML (monitoring alerts are not meant to block; suspicious
+activity is investigated and reported) and satisfies the sanctions freeze obligation *provided* nothing
+releases a withheld payment except an explicit resolution: no timeout, no scheduled settlement job. The
+sanctions gate itself is left as a hard decline, since a confirmed match should not be accepted at all.
+
+### ADR-060: the risk hold applies to every money movement, not only card payments (v36)
+
+**Status.** Accepted.
+
+**Context.** ADR-059 fixed card payments: a fraud signal holds the payment instead of declining it. The
+transfer rails still did the opposite, and worse. `transferRiskGate.screenTransfer` returned `blocked`,
+and because the FDS branch flagged on `fraudFlag` (true for any non-`approve` recommendation), a plain
+**review** verdict rejected the transfer outright: the execution was written as `exception`, a case was
+opened for L1, and nothing could ever move that transfer again. Clearing the case had no effect, so the
+customer's only option was to retry and be rejected by the same rule. Money was never at risk (the
+rejection happened before any ledger movement), but the operation was dead, and a false positive was
+indistinguishable from confirmed fraud.
+
+**Decision.** One policy for every movement type: a risk signal (fraud, sanctions, severe AML) HOLDS,
+it never rejects. Only eligibility failures reject (invalid card/CVV/owner, insufficient funds, no
+supported rail, Verification of Payee mismatch).
+
+1. **Held, in `pending`.** The screening result is `hold`, not `blocked`. The execution is created in
+   `pending` (an existing status: "created, not yet routed") with a `risk.hold` resolution step, and
+   nothing is dispatched to the payout rail. For P2P the sender funds are held FIRST
+   (available -> pending) so the money is immobilised, not merely undelivered.
+2. **Only a resolution can move it.** `getHeldExecution` gates every path on `pending` + the
+   `risk.hold` step, so a settled, failed or reversed execution is never re-processed.
+   `fraud.case.resolved` then either submits the transfer to the rail (`cleared`) or returns the held
+   funds and reverses the execution (`confirmed_fraud`). A transfer case carries the execution
+   reference in the same field a card case uses, so one event serves both.
+3. **`pending` is inert by construction.** Nothing consumes a `pending` execution: settlement is driven
+   by the rail's `bank.transfer.settled`, which cannot arrive because the transfer was never dispatched.
+   That is what makes the hold safe without a new lifecycle state.
+
+**Consequences.** A flagged transfer is now recoverable: cleared by L1/L2 it completes, confirmed fraud
+returns the funds. False positives cost a review, not a lost operation. The transfer response gains
+`status: 'pending'` with a `holdReason`, and a flagged transfer answers 202 (accepted) where it used to
+answer 422 (rejected). No route, field removal or schema change: `paymentExecutionStatus` already had
+`pending`, and the transfer routes carry no response schema, so nothing is stripped or invalidated. An
+integrator that polls `GET /gateway/transfers/:ref/status` sees `pending` and then the terminal state.
+
+**Not included.** RTP approval keeps its current shape: a risk hold (or a VoP mismatch) leaves the
+request `presented` with no funds moved and a case opened, and the payer re-approves once it clears. The
+money-safety invariant already holds there (nothing is reserved, nothing is delivered), so aligning it
+to the `pending` execution model is a follow-up, not a correctness fix.
+
+### ADR-061: one risk policy for every movement, with no unsupervised outcome (v36)
+
+**Status.** Accepted.
+
+**Context.** ADR-059/060 unified the happy path but left four asymmetries where a risk signal still had
+an unsupervised outcome: (a) a sanctions match on a card payment declined the payment and, because the
+saga's decline branch publishes `fraudCaseCreated: false`, opened NO case, so a sanctions hit was a
+silent rejection nobody reviewed; (b) an AML alert on a card payment only enriched a case that already
+existed, so an AML-only alert settled with nobody assigned to it; (c) a non-severe AML alert on a
+transfer let the movement reach the rail and opened the case afterwards, money already gone; (d) an RTP
+approval held for review kept the request `presented` with no linked execution, so the resolution had no
+effect and the payer had to re-approve into the same rule.
+
+**Decision.** Risk signals (fraud, sanctions, AML) hold and always open a case; eligibility failures
+reject. Applied per surface:
+
+1. **Sanctions on cards hold.** `hrp.screening.completed` carries `sanctionsMatch` and completes as
+   approved. The saga merges it into the risk verdict handed to `completeAuthorized`
+   (`recommendation: 'review'`, `rulesFired += 'sanctions_match'`, score floored at 90), so the payment
+   is authorized, the payout withheld and a high-severity case opened. The freeze obligation is met by
+   never completing the payment: only an L1/L2 resolution can release or reverse it.
+2. **An AML-only alert opens a case.** `PostAuthorizationProcess` opens one through the fraud module's
+   own factory when no case exists, then enriches it as before.
+3. **The AML alert recalls a recallable payout.** `PayoutOrchestrationProcess` consumes
+   `aml.monitoring.completed`: while the execution is still `routing`/`scheduled` it aborts the payout
+   (existing compensation releases the merchant reservation) and withholds it. Once the rail has the
+   transfer, it is NOT recallable: that is recorded as `payout.recall.not.possible` and the case reviews
+   it post-settlement, which is AML's designed post-hoc nature. No invented reversal.
+4. **Any AML alert holds a transfer.** The gate no longer distinguishes severity.
+5. **A held RTP approval joins the model.** The payer's funds are held and the execution is created in
+   `pending` with the `risk.hold` step and linked to the request, which stays `accepted` (accepted, not
+   initiated). `RtpLifecycleProcess` consumes the hold outcome: released -> `payment_initiated` (the
+   rail then settles it as usual), reversed -> `payment_failed`. VoP keeps rejecting: a payee-name
+   mismatch is a verification failure, not a risk score.
+
+**Architecture.** No deviation: every cross-module reaction is an event (`fraud.case.resolved`,
+`aml.monitoring.completed`, `transfer.hold.released/reversed`), every provider call still goes through
+`dispatchProvider`, and each decision stays in its owning module (case semantics in `fraud`, ledger and
+rail in `gateway`, authorization in `transaction`). No new collection, field, DEK or index, so nothing
+to add to `setup/` or `seed/` and no `--reset`.
+
+**API.** Unchanged. The only additive state-machine change is `accepted -> payment_failed` for an RTP
+request that was accepted, held and then confirmed fraudulent; a held approval still answers
+`status: 'accepted'`.
+
+**Consequences.** Every risk outcome on every movement type is now supervised: something is held, a case
+exists, and a human decides. The single remaining unrecallable window is an AML alert that lands after
+the rail has taken the transfer, which is documented rather than papered over.
+
+### ADR-062: an investigation case is about a money movement, not about a card payment (v36)
+
+**Status.** Accepted.
+
+**Context.** The investigation case detail was written for card payments and had no other shape. A
+transfer case (P2P, bank transfer, RTP) carries the execution reference in
+`cardTransactionInstanceReference`, so the read-model's card lookup missed, `operation` came back null,
+`merchantId` was undefined and the UI fell back to its "external merchant: not acquired by this PSP, so
+there is no KYB record" panel. For a transfer to a registered beneficiary that message is not just
+unhelpful, it is wrong: there is no merchant in the movement at all, and the PSP owns the destination
+record in full. L1 was left with a screen that named a merchant that did not exist and hid the
+beneficiary that did.
+
+**Decision.**
+
+1. **Stamp the movement kind at case creation.** `transactionKind` widens to
+   `'card' | 'p2p' | 'bank_transfer' | 'rtp'` and `openTransferFraudCase` writes it together with
+   `paymentExecutionInstanceReference` (or the new `paymentRequestInstanceReference` for RTP). The
+   snapshot descriptor becomes "Transfer to <beneficiary label>" instead of a truncated account ref.
+2. **The read-model resolves the movement it actually is.** For a non-card case the enrichment builds
+   `operation` from the payment execution or the payment request (status, rail, remittance info,
+   `heldForReview`) and adds a `counterparty` block: a registered beneficiary, an unregistered
+   destination account, or an RTP payee. `kyb` stays null and the client drops the merchant panel.
+3. **Minimisation holds (ADR-048).** The counterparty exposes the label, the MASKED account, the
+   country and the references. The full IBAN is never added to this surface: it stays behind the
+   existing escalation-gated endpoints. This is PSP-owned counterparty data, so L1 sees it without an
+   escalation, which is the point of the fix.
+4. **Seeded, not only runtime.** `seedPaymentExecutions` gains a held beneficiary transfer and
+   `fraudCases.json` a matching `p2p` case, so the non-card investigation path is demonstrable after a
+   reseed instead of requiring someone to trigger a hold live.
+
+**Consequences.** One case-detail layout serves every movement type: the operation panel adapts (card +
+MCC vs destination + rail) and the counterparty panel replaces the merchant panel when there is no
+merchant. The seed-integrity guard is now kind-aware: the `case → card transaction` rule applies to card
+cases only, and a new rule requires every non-card case to carry the link to its movement, so a case
+that the read-model could not resolve fails the suite instead of rendering an empty panel.
+
+**Model change.** Two optional plaintext fields on an existing plaintext collection
+(`transactionKind` widened, `paymentRequestInstanceReference` added). No QE field, DEK, index or
+collection change, so `setup/` needs nothing; the seed data ships with the change as required.
+
+### ADR-063: one movement collection, and the merge lives in one place (v36)
+
+**Status.** Accepted.
+
+**Context.** The v36 investigation work exposed three problems in the transaction read surface.
+(a) `GET /transactions/all` and `GET /transactions` were the same resource under two names, and the
+latter answered 400 without a `cardToken`, so a collection GET could not list. (b) The rule for "what
+is a row of movement history" (normalize card + execution + request, de-dup an RTP against the
+execution that settles it, sort by date) was implemented THREE times: in the merchant channel of the
+controller, in the customer history page and in the merchant app. (c) A transfer or RTP reference had
+no detail endpoint an analyst could reach, so the investigation UI had to render a dead reference.
+The `cardToken` filter also guessed by value shape whether it was a token or a masked PAN.
+
+**Decision.**
+
+1. **One collection.** `GET /api/v1/transactions` lists every movement kind by default as
+   `kind`-discriminated rows (`card`, `transfer`, `rtp`), with `kind` as a narrowing filter. Listing is
+   the collection's job; narrowing is what filters are for. `GET /transactions/all` is DELETED, not
+   deprecated: the only callers were internal.
+2. **One merge.** `gateway/services/paymentMovement.service.ts` owns normalization, the RTP de-dup and
+   the paging. The merchant channel and the staff/session channel both consume it, and the customer
+   history page dropped its client-side merge for a single request.
+3. **Explicit filters.** `cardToken` and `maskedPan` are separate parameters. The value-shape heuristic
+   is gone: a token that happened to look like a masked PAN queried the wrong field.
+4. **Every reference resolves.** `GET /transactions/:id` falls through to the movement read-model, so a
+   transfer or an RTP reference returns its movement document instead of 404. The investigation UI can
+   therefore always offer the link.
+5. **Merge in memory, not `$unionWith`.** `cardTransactionLog` is QE-enabled and aggregation stages are
+   restricted over encrypted collections.
+
+**Compatibility.** The one external consumer (leafy-wallet) calls `GET /transactions` with no params on
+the merchant OAuth channel, which is unchanged: same rows, same envelope, same field names, and no RTP
+rows added to a merchant-isolated view (RTP carries no merchant attribution, and those clients fetch it
+themselves). A unit test asserts the consumer's exact field reads. Internal callers were migrated in
+the same change. `movementScope`, an earlier compatibility flag, was dropped as unnecessary once the
+consumer inventory was confirmed: the parameter only affected the session/staff channel, which no
+external system uses.
+
+**Deliberately flow-agnostic.** A row is derived from the STORED record, never from the choreography
+that produced it, and each kind has its own normalizer. A future DB-driven payment-workflow
+orchestrator can add kinds or change the sequence of events for a process without touching this read
+surface: add a normalizer, not a branch in a caller.
+
+**Consequences.** One endpoint, one merge, one place to change a row. The staff card list, the card
+detail and the dashboard stat pin themselves to `kind=card` to keep the card document shape. Response
+schemas gained the movement fields as additive optional properties (they are strict, so an undeclared
+field would be stripped). No collection, index, DEK or seed change.

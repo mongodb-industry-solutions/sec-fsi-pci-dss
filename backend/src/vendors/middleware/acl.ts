@@ -10,7 +10,7 @@ import { canReadSensitive } from './rbac';
 // ── Role-permission cache ─────────────────────────────────────────────────────
 // Permissions are DATA (the `role` collection), editable at runtime. We cache per role with a
 // short TTL and explicit invalidation on edits, so a permission change takes effect without a
-// re-login (the JWT never carries permissions — see /acl/effective). Default-deny throughout.
+// re-login (the JWT never carries permissions: see /acl/effective). Default-deny throughout.
 const CACHE_TTL_MS = 30_000;
 const cache = new Map<string, { role: RoleRecord | null; expires: number }>();
 
@@ -28,11 +28,11 @@ export function invalidateRoleCache(roleName?: string): void {
 }
 
 // Resolve a role record from the DB; fall back to the builtin matrix if the collection is
-// unavailable or the role is a not-yet-seeded builtin. Never throws — enforcement must not fail open.
+// unavailable or the role is a not-yet-seeded builtin. Never throws: enforcement must not fail open.
 //
 // For builtin roles loaded from DB: any resource present in the in-code builtin but absent from the
 // DB record is merged in. This means new resources (e.g. 'beneficiaries' in v18) take effect without
-// requiring a manual re-seed — only additions are merged, so manager permission edits are preserved.
+// requiring a manual re-seed, only additions are merged, so manager permission edits are preserved.
 export async function loadRole(db: Db, roleName: string | undefined): Promise<RoleRecord | null> {
   if (!roleName) return null;
   const cached = cache.get(roleName);
@@ -85,12 +85,12 @@ function roleOf(request: FastifyRequest): string | undefined {
 }
 
 /**
- * Generic, data-driven authorization guard (PCI DSS Req 7, default-deny). Use as a route
+ * Generic, data-driven authorization guard (PCI DSS, default-deny). Use as a route
  * preHandler: `preHandler: requirePermission('transactions', 'view')`. Denies with 403 + a
  * machine-readable body the frontend maps to <AccessDenied>.
  *
  * `viewSensitive` additionally requires the escalation flow (canReadSensitive) on top of the
- * role granting the permission — so an L2 still needs a valid escalation token, while an auditor
+ * role granting the permission, so an L2 still needs a valid escalation token, while an auditor
  * (direct sensitive reader) passes. Plain `view`/`manage`/`investigate` are pure ACL checks.
  */
 export function requirePermission(resource: Resource, action: Action) {

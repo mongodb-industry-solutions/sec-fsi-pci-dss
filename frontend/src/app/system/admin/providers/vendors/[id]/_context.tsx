@@ -53,7 +53,7 @@ export interface EventFieldMapping {
   required?: boolean;
 }
 
-// §2.4: per-event wire config — each event a vendor handles has its OWN outbound + inbound config
+// §2.4: per-event wire config, each event a vendor handles has its OWN outbound + inbound config
 // (its own URL, mapping, auth, retries, timeout, callback). There is NO vendor base URL.
 export interface ProviderEventOutboundConfig {
   url?: string;

@@ -1,4 +1,4 @@
-// KYB capability module controller — STATIC routes (ADR-029).
+// KYB capability module controller: STATIC routes (ADR-029).
 import { FastifyInstance } from 'fastify';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { verifyKyb } from '../services/kyb.service';

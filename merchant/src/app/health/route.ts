@@ -4,7 +4,7 @@
 // CORS-open so the PSP admin monitoring page (a different origin) can read the status cross-origin.
 import { NextResponse } from 'next/server';
 
-// Never prerendered/cached — always reflect the live server state.
+// Never prerendered/cached, always reflect the live server state.
 export const dynamic = 'force-dynamic';
 
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'no-store' };

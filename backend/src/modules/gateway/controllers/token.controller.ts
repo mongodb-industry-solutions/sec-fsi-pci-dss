@@ -1,4 +1,4 @@
-// BIAN SD-57: Card Etoken  -  Token Vault  -  REST controller
+// Card Etoken  -  Token Vault  -  REST controller
 // Routes mounted at /gateway/tokens → /api/v1/gateway/tokens
 
 import { FastifyInstance } from 'fastify';

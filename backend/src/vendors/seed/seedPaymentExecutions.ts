@@ -1,24 +1,30 @@
 import { Db } from 'mongodb';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../../modules/gateway/models/paymentExecution.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
+import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../../modules/gateway/models/balanceCreditLog.model';
+import {
+  PSP_REVENUE_PARTY_REFERENCE,
+  PSP_REVENUE_ACCOUNT_REFERENCE,
+} from '../../modules/gateway/services/commissionSettlement.service';
 
-// Demo bank-transfer executions (SD-65) covering the three recipient-identity variants so the
+// Demo bank-transfer executions covering the three recipient-identity variants so the
 // payment-history detail page (/system/payment/history/{ref}) shows a navigable link or full
 // destination for each. All initiated by Luis (b0000001) from his default account.
-//   1. To a saved beneficiary (SD-54 arrangement)      → links /system/beneficiaries/{cab…}
-//   2. To a registered payout account (SD-66)          → links /system/accounts/{pau…}
+//   1. To a saved beneficiary (arrangement)      → links /system/beneficiaries/{cab…}
+//   2. To a registered payout account → links /system/accounts/{pau…}
 //   3. To an unregistered external IBAN                → shows full IBAN (QE-encrypted at rest)
-// destinationIban is QE:none — the seeder runs on the L2 encrypted client, so it is encrypted on insert.
+// destinationIban is QE:none, the seeder runs on the L2 encrypted client, so it is encrypted on insert.
 
 const INITIATOR = 'b0000001-0000-4000-8000-000000000001';       // Luis
 const SOURCE_ACCOUNT = 'pao00001-0000-4000-8000-000000000001';  // Luis' default (EUR)
 const NOW = new Date('2026-07-01T10:00:00.000Z');
+const HELD_AT = new Date('2026-07-08T09:20:00.000Z');
 
-// v18: Espresso Works Ltd (SD-89) — merchant the commission fee is attributed to.
+// v18: Espresso Works Ltd , merchant the commission fee is attributed to.
 const ESPRESSO = 'm0000001-0000-4000-8000-000000000001';
 const COMMISSION_RATE = 0.025;
 
-// Build a merchant-commission execution (SD-65) with fee attribution (SD-89) so the merchant dashboard
+// Build a merchant-commission execution with fee attribution so the merchant dashboard
 // shows commissionRevenue after reseed. Deterministic; no balance movement (no source/resolved account).
 function commissionExecution(ref: string, gross: number, collected: Date): PaymentExecutionProcedure {
   const feeAmount = Math.round(gross * COMMISSION_RATE * 100) / 100;
@@ -38,7 +44,7 @@ function commissionExecution(ref: string, gross: number, collected: Date): Payme
 }
 
 const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
-  // 1. Beneficiary transfer — Carlos (cab00002 → party b0000003 → account pau00007)
+  // 1. Beneficiary transfer: Carlos (cab00002 → party b0000003 → account pau00007)
   {
     paymentExecutionInstanceReference: 'e0000001-0000-4000-8000-000000000001',
     paymentOrderInstanceReference:     'e0000001-0000-4000-8000-000000000001',
@@ -57,7 +63,7 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
   },
-  // 2. Registered payout account destination (pau00001) — no beneficiary arrangement
+  // 2. Registered payout account destination (pau00001), no beneficiary arrangement
   {
     paymentExecutionInstanceReference: 'e0000002-0000-4000-8000-000000000002',
     paymentOrderInstanceReference:     'e0000002-0000-4000-8000-000000000002',
@@ -74,7 +80,7 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
   },
-  // 3. Unregistered external IBAN — full IBAN stored QE-encrypted, shown to the owner
+  // 3. Unregistered external IBAN: full IBAN stored QE-encrypted, shown to the owner
   {
     paymentExecutionInstanceReference: 'e0000003-0000-4000-8000-000000000003',
     paymentOrderInstanceReference:     'e0000003-0000-4000-8000-000000000003',
@@ -97,6 +103,30 @@ const DEMO_EXECUTIONS: PaymentExecutionProcedure[] = [
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
     recordCreatedDateTime: NOW, recordUpdatedDateTime: NOW, schemaVersion: 1,
   },
+  // 4. Beneficiary transfer HELD for investigation (ADR-060/061): funds reserved on the sender, nothing
+  //    dispatched to the rail. Backs the seeded transfer fraud case so the investigation UI shows a
+  //    non-card movement (beneficiary destination, no acquired merchant) without needing a runtime run.
+  {
+    paymentExecutionInstanceReference: 'e0000004-0000-4000-8000-000000000004',
+    paymentOrderInstanceReference:     'e0000004-0000-4000-8000-000000000004',
+    beneficiaryType: 'user',
+    initiatorPartyReference: INITIATOR,
+    beneficiaryPartyReference: 'b0000003-0000-4000-8000-000000000003',
+    beneficiaryArrangementReference: 'cab00002-0000-4000-8000-000000000002',
+    sourcePayoutAccountReference: SOURCE_ACCOUNT,
+    resolvedPayoutAccountReference: 'pau00007-0000-4000-8000-000000000007',
+    grossAmount: 1450, netAmount: 1450, feeAmount: 0, currency: 'EUR',
+    paymentExecutionRail: 'sepa',
+    routingNote: 'P2P transfer held for investigation by the pre-initiation risk gate',
+    paymentExecutionRemittanceInformation: 'Car deposit',
+    paymentExecutionStatus: 'pending',
+    initiatedAt: HELD_AT,
+    resolutionLog: [
+      { stepName: 'risk.hold', stepOutcome: 'fallback', stepNote: 'fds.high.risk', stepDateTime: HELD_AT },
+    ],
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    recordCreatedDateTime: HELD_AT, recordUpdatedDateTime: HELD_AT, schemaVersion: 1,
+  },
   // v18: three Espresso Works commission executions across two months → dashboard revenue.
   commissionExecution('e0000101-0000-4000-8000-000000000101', 48.0, new Date('2026-06-12T09:00:00.000Z')),
   commissionExecution('e0000102-0000-4000-8000-000000000102', 120.0, new Date('2026-06-27T14:30:00.000Z')),
@@ -115,7 +145,7 @@ export async function seedPaymentExecutions(db: Db) {
     upserted++;
 
     // Apply the balance movement ONLY when the execution is newly inserted (idempotent across
-    // reseeds), and only for settled (completed) transfers — so the seeded balances reconcile with
+    // reseeds), and only for settled (completed) transfers, so the seeded balances reconcile with
     // the account-movement ledger (opening deposit − Σ sent + Σ received). Debit the source; credit
     // an internal destination when present (external IBAN destinations leave the PSP → no credit).
     if (res.upsertedCount === 1 && exec.paymentExecutionStatus === 'completed') {
@@ -129,6 +159,42 @@ export async function seedPaymentExecutions(db: Db) {
         await accountCol.updateOne(
           { payoutAccountInstanceReference: exec.resolvedPayoutAccountReference },
           { $inc: { 'payoutAccountBalance.availableAmount': exec.netAmount }, $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date() } },
+        );
+      }
+    }
+
+    // A collected merchant commission has a holder: credit the PSP revenue ledger and log it,
+    // mirroring what the runtime path does at settlement (commissionSettlement.service). Only fees
+    // attributed to a merchant count; a bare feeAmount is a rail charge, not a commission.
+    //
+    // Deliberately OUTSIDE the upsertedCount guard above: this leg has its own gate (the credit-log
+    // entry), so a reseed over a database whose executions already exist still backfills the ledger,
+    // exactly once. That is what makes plain `setup:seed` converge without a --reset.
+    if (exec.paymentExecutionStatus === 'completed' && exec.fee?.feeMerchantReference && (exec.feeAmount ?? 0) > 0) {
+      const entry: BalanceCreditLogEntry = {
+        creditId: `commission-${exec.paymentExecutionInstanceReference}`,
+        payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE,
+        partyInstanceReference: PSP_REVENUE_PARTY_REFERENCE,
+        amount: exec.feeAmount!,
+        currency: exec.currency,
+        creditType: 'commission',
+        description: `Merchant commission ${exec.fee.feeMerchantReference}`,
+        creditedAt: exec.fee.feeCollectedDateTime,
+        performedByPartyReference: null,
+        referenceId: exec.paymentExecutionInstanceReference,
+        bianServiceDomain: 'SD-66 Payout Account Arrangement',
+        bianControlRecordType: 'PayoutAccountBalance',
+        recordCreatedDateTime: exec.fee.feeCollectedDateTime,
+        schemaVersion: 1,
+      };
+      const logRes = await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION)
+        .updateOne({ creditId: entry.creditId }, { $setOnInsert: entry }, { upsert: true });
+      // Move the balance only when the log entry is newly written, so the credit log always explains
+      // the balance exactly (Σ commission entries == available).
+      if (logRes.upsertedCount === 1) {
+        await accountCol.updateOne(
+          { payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE },
+          { $inc: { 'payoutAccountBalance.availableAmount': exec.feeAmount! }, $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date() } },
         );
       }
     }

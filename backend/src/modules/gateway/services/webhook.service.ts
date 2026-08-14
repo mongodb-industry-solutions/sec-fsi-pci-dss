@@ -32,7 +32,7 @@ export interface WebhookDeliveryResult {
   delivered: boolean;
   statusCode?: number;
   attempts: number;
-  // Full request + merchant response capture for the audit trail (PCI DSS Req 10.7). The HMAC
+  // Full request + merchant response capture for the audit trail (PCI DSS). The HMAC
   // signature header is shown (it is not a secret); the signing secret is never included.
   request: { method: string; url: string; headers: Record<string, string>; body: WebhookEvent };
   response?: { status: number; headers: Record<string, string>; body: unknown };
@@ -41,7 +41,7 @@ export interface WebhookDeliveryResult {
 
 /**
  * Deliver an HMAC-signed webhook with retry, capturing the request and the merchant's response.
- * `opts.maxAttempts` bounds the retries — pass 1 for inline delivery (e.g. during a payment) so a
+ * `opts.maxAttempts` bounds the retries: pass 1 for inline delivery (e.g. during a payment) so a
  * slow/unreachable endpoint never blocks the payment response; omit for background delivery.
  */
 export async function deliverWebhook(

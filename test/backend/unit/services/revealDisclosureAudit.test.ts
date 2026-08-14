@@ -4,9 +4,9 @@
  *         backend/src/vendors/middleware/rbac.ts
  *         backend/src/vendors/encryption/roleClients.ts
  *
- * PCI DSS Req 10.2.1.1/10.2.2 and EBA/GL/2019/04 §31(d): every server-side disclosure of a
+ * PCI DSS and EBA/GL/2019/04 §31(d): every server-side disclosure of a
  * sensitive value emits exactly one compliance event naming the affected data, never its value.
- * PCI DSS Req 7.2.2 / ISO 27001 A.8.2: the Level 2 QE client is granted by a named capability,
+ * PCI DSS / ISO 27001 A.8.2: the Level 2 QE client is granted by a named capability,
  * not by passing a literal role string to getDbForRole inside a service.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -160,7 +160,7 @@ describe('no hardcoded role in sensitive-tier client selection (test 27)', () =>
 
   it('never calls getDbForRole with a literal role string', () => {
     const offenders: string[] = [];
-    // getDbForRole('<literal>' ...) — a quoted first argument is a hardcoded tier grant.
+    // getDbForRole('<literal>' ...): a quoted first argument is a hardcoded tier grant.
     const pattern = /getDbForRole\(\s*['"]/;
     for (const file of walk(SRC)) {
       const rel = file.slice(SRC.length + 1);

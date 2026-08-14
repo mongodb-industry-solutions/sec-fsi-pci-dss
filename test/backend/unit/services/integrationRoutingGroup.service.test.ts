@@ -1,7 +1,7 @@
 /**
  * Unit tests (dev.v30 FT / FR-30.9, FR-30.11): resolveProviderFromGroup routing strategies.
  * These pin the EDA + Hexagonal routing contract (R9): provider groups route providers by
- * category. No DB — a minimal in-memory collection mock drives findOne.
+ * category. No DB: a minimal in-memory collection mock drives findOne.
  *
  * Source: backend/src/modules/provider/services/integrationRoutingGroup.service.ts
  */
@@ -75,7 +75,7 @@ describe('resolveProviderFromGroup', () => {
         { externalProviderArrangementInstanceReference: 'B', externalProviderArrangementStatus: 'active', externalProviderHealthStatus: 'ok' },
         { externalProviderArrangementInstanceReference: 'C', externalProviderArrangementStatus: 'active', externalProviderHealthStatus: 'ok' },
       ]);
-      // Members declared out of order — C is the highest priority (5).
+      // Members declared out of order: C is the highest priority (5).
       const group = makeGroup('primary_fallback', [member('A', 10), member('B', 20), member('C', 5)]);
       const result = await resolveProviderFromGroup(db, group);
       expect(result?.externalProviderArrangementInstanceReference).toBe('C');

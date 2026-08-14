@@ -1,4 +1,4 @@
-// BIAN SD-66: Payout Account Arrangement — REST controller (v17)
+// Payout Account Arrangement, REST controller (v17)
 // Routes mounted at /accounts → /api/v1/accounts/:partyRef
 // Scope: customer can only access own accounts; staff roles can view all.
 
@@ -31,7 +31,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 function safeAccount(doc: unknown) {
   // Strip QE-encrypted fields from the public response. Include boolean hints so the UI
-  // can show a reveal button without exposing the plaintext. PCI DSS Req 3.3.
+  // can show a reveal button without exposing the plaintext. PCI DSS.
   const { payoutAccountIban, payoutAccountRoutingNumber, _id, ...rest } = doc as any;
   void _id;
   return {
@@ -65,7 +65,7 @@ function safeMerchantAccount(doc: Record<string, unknown>) {
 
 export async function payoutAccountController(fastify: FastifyInstance) {
 
-  // ── GET /accounts (+ /:partyRef) — list a party's payout accounts ─────────────────────────────
+  // ── GET /accounts (+ /:partyRef), list a party's payout accounts ─────────────────────────────
   // Session: staff any party, customer own; QE-stripped with reveal hints.
   // OAuth: owner from token.sub, masked-IBAN projection. Scope read:accounts.
   const listHandler = async (request: FastifyRequest, reply: FastifyReply) => {
@@ -149,7 +149,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
           payoutAccountBicSwift: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
           payoutAccountCorrespondentBic: { type: 'string', minLength: 8, maxLength: 11, pattern: '^[A-Za-z]{4}[A-Za-z]{2}[A-Za-z0-9]{2}([A-Za-z0-9]{3})?$' },
           payoutAccountBankAddress: { type: 'string', maxLength: 200 },
-          // QE-encrypted — omit entirely when not provided (null triggers error 31041)
+          // QE-encrypted: omit entirely when not provided (null triggers error 31041)
           payoutAccountIban: { type: 'string', minLength: 15, maxLength: 34 },
           payoutAccountRoutingNumber: { type: 'string', maxLength: 50 },
         },
@@ -325,8 +325,8 @@ export async function payoutAccountController(fastify: FastifyInstance) {
   });
 
   // GET /:partyRef/:accountRef/cards
-  // BIAN SD-88 cardAccountReference: list payment cards funded by this account.
-  // PCI Req 7: scoped to the account owner; no CHD returned (masked PAN only).
+  // cardAccountReference: list payment cards funded by this account.
+  // PCI DSS: scoped to the account owner; no CHD returned (masked PAN only).
   fastify.get('/:partyRef/:accountRef/cards', {
     preHandler: requirePermission('accounts', 'view'),
     schema: {
@@ -351,7 +351,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
   });
 
   // GET /:partyRef/:accountRef/iban
-  // PCI DSS Req 3.3: IBAN reveal. Scoped to:
+  // PCI DSS: IBAN reveal. Scoped to:
   //   - account owner (customer with own partyRef)
   //   - level2_investigator (financial fraud investigation)
   //   - security_auditor (compliance oversight)
@@ -360,7 +360,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     preHandler: requirePermission('accounts', 'view'),
     schema: {
       tags: ['accounts'],
-      summary: 'Reveal decrypted IBAN — account owner, L2 investigator or security auditor only (PCI DSS Req 3.3)',
+      summary: 'Reveal decrypted IBAN, account owner, L2 investigator or security auditor only (PCI DSS Req 3.3)',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -412,9 +412,9 @@ export async function payoutAccountController(fastify: FastifyInstance) {
   });
 
   // GET /api/v1/accounts/:partyRef/transfers
-  // Customer-scoped P2P transfer history (BIAN SD-65 paymentExecutionProcedure, beneficiaryType: 'user').
+  // Customer-scoped P2P transfer history (paymentExecutionProcedure, beneficiaryType: 'user').
   // Returns transfers where initiatorPartyReference === partyRef (sent) or beneficiaryPartyReference === partyRef (received).
-  // PCI DSS Req 7: customer role is restricted to their own partyRef; analysts/auditors may query any partyRef.
+  // PCI DSS: customer role is restricted to their own partyRef; analysts/auditors may query any partyRef.
   fastify.get('/:partyRef/transfers', {
     preHandler: requirePermission('accounts', 'view'),
     schema: {
@@ -472,7 +472,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     const { page = 1, limit = 20 } = request.query as { page?: number; limit?: number };
     const user = getUser(request);
 
-    // PCI DSS Req 7: customers may only view their own transfers
+    // PCI DSS: customers may only view their own transfers
     if (user?.role === 'customer' && user.partyRef !== partyRef) {
       return reply.status(403).send({ error: 'Access denied: you may only view your own transfers.' });
     }
@@ -519,7 +519,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
 
   // GET /api/v1/accounts/transfer/:transferRef
   // Single P2P transfer lookup by paymentExecutionInstanceReference.
-  // Customer scope: must be initiator or recipient (PCI DSS Req 7).
+  // Customer scope: must be initiator or recipient (PCI DSS).
   fastify.get('/transfer/:transferRef', {
     preHandler: requirePermission('accounts', 'view'),
     schema: {
@@ -609,7 +609,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     );
 
     // Fallback: if the execution predates the sourcePayoutAccountReference field, look up
-    // the initiator's primary active account (PCI DSS Req 10 — source must always be traceable).
+    // the initiator's primary active account (PCI DSS: source must always be traceable).
     let sourceAccountRef = exec.sourcePayoutAccountReference ?? null;
     if (!sourceAccountRef && exec.initiatorPartyReference) {
       const fallback = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
@@ -636,13 +636,13 @@ export async function payoutAccountController(fastify: FastifyInstance) {
           recipientCurrency = destCcy;
           recipientAmount   = fx.amount;
           fxRate            = fx.rate;
-        } catch { /* no FX config — leave null */ }
+        } catch { /* no FX config: leave null */ }
       }
     }
 
     // Sender display fields (PSD2/SEPA: the payee legitimately sees the debtor name + a source account
-    // identifier). initiatorName from SD-13 party; sourceAccountMasked is the origin IBAN masked to
-    // last-4 (GDPR minimisation — the recipient never gets the full IBAN or an openable account link).
+    // identifier). initiatorName from party; sourceAccountMasked is the origin IBAN masked to
+    // last-4 (GDPR minimisation: the recipient never gets the full IBAN or an openable account link).
     let initiatorName: string | null = null;
     if (exec.initiatorPartyReference) {
       const p = await db.collection<{ partyName?: string }>(PARTY_COLLECTION)
@@ -654,7 +654,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       const srcAcct = await getPayoutAccount(db, sourceAccountRef);
       if (srcAcct?.payoutAccountIban) sourceAccountMasked = maskAccountIdentifier(srcAcct.payoutAccountIban);
     }
-    // Beneficiary alias: the owner-defined label (SD-54 counterpartyLabel) of the saved payee, so the
+    // Beneficiary alias: the owner-defined label (counterpartyLabel) of the saved payee, so the
     // sender's Recipient block can show a friendly "To: <alias>" instead of only the opaque reference.
     let beneficiaryAlias: string | null = null;
     if (exec.beneficiaryArrangementReference) {
@@ -708,12 +708,12 @@ export async function payoutAccountController(fastify: FastifyInstance) {
   // POST /api/v1/accounts/:accountRef/credit
   // Deposit funds into a payout account (bank-in, admin credit, initial deposit).
   // Restricted to manage permission (system_admin, level2_investigator, bank_ops roles).
-  // Creates an immutable balanceCreditLog entry for full audit trail (PCI DSS Req 10).
+  // Creates an immutable balanceCreditLog entry for full audit trail (PCI DSS).
   fastify.post('/:accountRef/credit', {
     preHandler: requirePermission('accounts', 'manage'),
     schema: {
       tags: ['accounts'],
-      summary: 'Credit a payout account balance (BIAN SD-66 — bank deposit / admin)',
+      summary: 'Credit a payout account balance (BIAN SD-66, bank deposit / admin)',
       security: [{ bearerAuth: [] }],
       params: { type: 'object', required: ['accountRef'], properties: { accountRef: { type: 'string' } } },
       body: {

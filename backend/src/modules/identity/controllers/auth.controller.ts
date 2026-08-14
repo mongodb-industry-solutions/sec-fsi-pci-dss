@@ -122,8 +122,8 @@ Password for all demo users: \`demo-password\``,
     }
   });
 
-  // POST /api/v1/auth/register — public self-registration for local domains that enable it.
-  // Reuses createUser (SD-91 + linked SD-13 party). Role is always the lowest-privilege `customer`
+  // POST /api/v1/auth/register: public self-registration for local domains that enable it.
+  // Reuses createUser (+ linked party). Role is always the lowest-privilege `customer`
   // (never client-selectable). Status is `pending` unless the domain auto-approves, in which case
   // it is `active`. This gates login only; it does NOT imply KYC approval (a separate process).
   fastify.post('/register', {
@@ -179,7 +179,7 @@ Password for all demo users: \`demo-password\``,
   });
 
   // Server-side logout: invalidate every outstanding session token for the caller by advancing
-  // their SD-91 session epoch. Stateless (no token store): the auth middleware rejects any token
+  // their session epoch. Stateless (no token store): the auth middleware rejects any token
   // whose stamped epoch is now behind. The client still clears its cookie, but this closes the gap
   // where a stale/copied token stayed valid until natural expiry (e.g. a hosted checkout that reads
   // the PSP session to surface saved cards). Behind the global middleware, so `request.user` is set.
@@ -201,7 +201,7 @@ Password for all demo users: \`demo-password\``,
     return reply.status(200).send({ loggedOut: true });
   });
 
-  // POST /api/v1/auth/password/change — the authenticated user changes their own password.
+  // POST /api/v1/auth/password/change: the authenticated user changes their own password.
   // Requires the current password plus the new one (server also re-checks the policy). Confirmation
   // matching is a client-side concern, but the API accepts only `currentPassword` + `newPassword`.
   // On success every OTHER session is invalidated (epoch bump) and a fresh token is returned for
@@ -348,8 +348,8 @@ a \`customerAgreement\` record.`,
       partyInstanceReference = authRec?.partyInstanceReference;
     }
 
-    // Load the SD-13 Party record (KYC-typical demographics: name, DOB, nationality, postal
-    // address, contact points) so every role — staff included — has a populated profile.
+    // Load the Party record (KYC-typical demographics: name, DOB, nationality, postal
+    // address, contact points) so every role: staff included, has a populated profile.
     // fastify.db is the L2 client, so QE fields (email/phone) return decrypted for the caller.
     let party: Record<string, unknown> | null = null;
     if (partyInstanceReference) {

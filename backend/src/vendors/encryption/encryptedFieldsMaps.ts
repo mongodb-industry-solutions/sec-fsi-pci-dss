@@ -39,7 +39,7 @@ export function buildEncryptedFieldsMaps(
     textSearch ? { queryType: qt, ...params } : { queryType: 'equality', contention: 8 };
 
   return {
-    // -- SD-13: Party Data Management ----------------------------------------─
+    // -- Party Data Management ----------------------------------------─
     party: {
       fields: [
         {
@@ -72,7 +72,9 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'date',
           queries: {
             queryType: 'range',
-            min: new Date('1900-01-01'), max: new Date('2020-01-01'),
+            // Upper bound is in the future on purpose: the index must cover minors (a KYC
+            // exception an auditor looks for) and any newborn onboarded later.
+            min: new Date('1900-01-01'), max: new Date('2035-01-01'),
             sparsity: 1, trimFactor: 4,
           },
         },
@@ -94,7 +96,7 @@ export function buildEncryptedFieldsMaps(
           bsonType: 'string',
           queries: { queryType: 'equality', contention: 8 },
         },
-        // GDPR PII — QE:none (L2 only). Postal address is sensitive personal data;
+        // GDPR PII: QE:none (L2 only). Postal address is sensitive personal data;
         // encrypted at rest, decrypted only for the L2 client (or the party themselves).
         ...(includeSensitive ? [
           { keyId: deks.partyAddress, path: 'partyPostalAddress', bsonType: 'object' },
@@ -102,7 +104,7 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // -- SD-254: Card Transaction Log ----------------------------------------─
+    // -- Card Transaction Log ----------------------------------------─
     // paymentCardReference is NOT in QE - card token is not CHD under PCI DSS v4.0.
     cardTransactionLog: {
       fields: [
@@ -133,8 +135,8 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // -- SD-53: Customer Agreement Procedure ----------------------------------
-    // PII (email, phone, name) lives in SD-13 party. customerAgreementReference is
+    // -- Customer Agreement Procedure ----------------------------------
+    // PII (email, phone, name) lives in party. customerAgreementReference is
     // a business key (not PII) so it stays here as QE:equality.
     customerAgreementProcedure: {
       fields: [
@@ -260,7 +262,7 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // -- SD-88: Payment Card Management --------------------------------------─
+    // -- Payment Card Management --------------------------------------─
     // paymentCardReference (token) is NOT in QE - same rule as cardTransactionLog.
     // paymentCardExpirationDate IS protected: CHD when co-located with a card reference.
     paymentCardManagement: {
@@ -298,7 +300,7 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // -- SD-91: Customer Authentication --------------------------------------─
+    // -- Customer Authentication --------------------------------------─
     customerAuthenticationAssessment: {
       fields: [
         {
@@ -310,8 +312,8 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // -- SD-66: Payout Account Arrangement -----------------------------------─
-    // IBAN and routing number are GDPR Art. 32 / PSD2 sensitive bank data — QE:none, L2 only.
+    // -- Payout Account Arrangement -----------------------------------─
+    // IBAN and routing number are GDPR Art. 32 / PSD2 sensitive bank data: QE:none, L2 only.
     // (Not PCI DSS: PCI scope is card data / PAN, not bank accounts.)
     // No QE:equality needed (accounts are looked up by payoutAccountInstanceReference).
     ...(includeSensitive ? {
@@ -321,7 +323,7 @@ export function buildEncryptedFieldsMaps(
             keyId: deks.payoutIban,
             path: 'payoutAccountIban',
             bsonType: 'string',
-            // QE:none — non-searchable, retrieval only
+            // QE:none, non-searchable, retrieval only
           },
           {
             keyId: deks.payoutRouting,
@@ -332,9 +334,9 @@ export function buildEncryptedFieldsMaps(
       },
     } : {}),
 
-    // -- SD-65: Payment Execution Procedure ----------------------------------─
+    // -- Payment Execution Procedure ----------------------------------─
     // destinationIban holds the full IBAN of an UNREGISTERED external destination the user typed
-    // for a one-off bank transfer. GDPR Art. 32 / PSD2 sensitive bank data — QE:none, L2 only.
+    // for a one-off bank transfer. GDPR Art. 32 / PSD2 sensitive bank data: QE:none, L2 only.
     // (Not PCI DSS.) The masked form (destinationAccountMasked) stays plaintext for list views.
     ...(includeSensitive ? {
       paymentExecutionProcedure: {
@@ -343,13 +345,13 @@ export function buildEncryptedFieldsMaps(
             keyId: deks.execDestIban,
             path: 'destinationIban',
             bsonType: 'string',
-            // QE:none — non-searchable, retrieval only
+            // QE:none, non-searchable, retrieval only
           },
         ],
       },
     } : {}),
 
-    // -- SD-65 (v28): Request to Pay canonical record ------------------------─
+    // -- (v28): Request to Pay canonical record ------------------------─
     // RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD). Sensitive request PII is
     // GDPR-minimized: aliases are indexed by a non-reversible SHA-256 hash (payeeAliasHash/
     // payerAliasHash, plaintext) while the plaintext alias, free-text remittance, structured
@@ -366,6 +368,8 @@ export function buildEncryptedFieldsMaps(
         ],
       },
     } : {}),
+
+    // qrPaymentRepresentation: no QE by design, TTL forbids it (6346501). Payload derived on read (CH-1).
   };
 }
 

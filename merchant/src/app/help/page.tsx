@@ -102,7 +102,7 @@ export default function HelpPage() {
           </Card>
           <Card icon={<Lock className="h-5 w-5" aria-hidden />} title="Data minimisation">
             Sensitive identifiers (PAN, IBAN) never reach the merchant in clear; they arrive masked. That keeps this app
-            in <Chip tone="accent">PCI DSS SAQ A</Chip> scope.
+            in <Chip tone="accent">PCI DSS</Chip> scope.
           </Card>
         </div>
       </section>

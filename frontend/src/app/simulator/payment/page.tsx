@@ -38,11 +38,11 @@ const TEST_CARDS = simulatorConfig.testCards;
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
   expiry: '12/28',
-  cvv: '',
+  cvv : '',
   email: 'luis.fernandez@back.es',
   phone: '+44 7700 900123',
   amount: '850.00',
-  description: '',
+  description : '',
   merchantName: 'TechGadgets Ltd.',
   merchantCategoryCode: '5734',
 };
@@ -283,11 +283,11 @@ export default function PaymentPage() {
           // Expiry is card data: take the scenario's own card expiry (not a blanket constant).
           expiry: found.prefill.cardExpiry ?? '',
           // CVV is entered by the user at payment time (never predefined). Placeholder hints the demo value.
-          cvv: '',
+          cvv : '',
           email: found.prefill.email,
           phone: found.prefill.phone,
           amount: String(found.prefill.amount),
-          description: '',
+          description : '',
           merchantName: selMerchantName,
           merchantCategoryCode: selMerchantMcc ?? found.prefill.merchantCategoryCode,
         });
@@ -595,7 +595,7 @@ export default function PaymentPage() {
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 CVV
-                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS Req 3.2). The demo issuer accepts 123; any other value is declined." />
+                <Tooltip text="Card verification value. Sent to the card issuer for authorization only, never stored or logged (PCI DSS). The demo issuer accepts 123; any other value is declined." />
               </label>
               <div className="relative">
                 <input
@@ -895,7 +895,7 @@ export default function PaymentPage() {
               </p>
               <p>
                 If the amount exceeded <strong>${simulatorConfig.fraudAmountThreshold}</strong> or the MCC is high-risk, a
-                <strong> FraudDiagnosisCase</strong> (BIAN SD-83) was automatically opened and you
+                <strong> FraudDiagnosisCase</strong> was automatically opened and you
                 will be redirected to the Investigation Dashboard.
               </p>
               <p>
@@ -910,7 +910,7 @@ export default function PaymentPage() {
               <span className="text-gray-600">Transaction ID</span>
               <span className="font-mono text-xs text-gray-800">
                 {result.txnId.slice(0, 16)}…
-                <Tooltip text="UUID of the cardTransaction document (BIAN SD-254 Control Record). Use this to fetch the transaction via GET /api/v1/transactions/:id." />
+                <Tooltip text="UUID of the cardTransaction document. Use this to fetch the transaction via GET /api/v1/transactions/:id." />
               </span>
             </div>
             <div className="flex justify-between">

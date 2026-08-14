@@ -1,8 +1,8 @@
 // Bus payload contracts for the funds-availability gate of the `card_payment` process (v17).
-// Reference-led: no CHD, no IBAN — only the PSP-internal card token and journey correlationId.
+// Reference-led: no CHD, no IBAN, only the PSP-internal card token and journey correlationId.
 // correlationId = transactionId, matching the other card_payment gates (cardPayment.events.ts).
 //
-// BIAN: SD-36 Account Information (AIS). The gate is provider-indifferent: the built-in
+// BIAN: Account Information (AIS). The gate is provider-indifferent: the built-in
 // account-information module reads the PSP internal ledger; an external PSD2 AIS provider
 // substitutes it via dispatchProvider without changing these contracts.
 
@@ -13,9 +13,9 @@
  *           Refunds are credits and do not require a funds hold.
  */
 export interface FundsCheckRequested {
-  cardToken: string;                        // tokenized card-on-file reference — resolves funding account
+  cardToken: string;                        // tokenized card-on-file reference, resolves funding account
   amount: number;                           // transaction amount in the TRANSACTION currency
-  currency: string;                         // ISO-4217 — transaction currency
+  currency: string;                         // ISO-4217, transaction currency
   cardTransactionType: 'purchase' | 'cash_advance' | 'fee' | 'refund' | 'balance_transfer' | 'adjustment';
 }
 

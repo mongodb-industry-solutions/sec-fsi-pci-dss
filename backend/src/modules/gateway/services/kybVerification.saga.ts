@@ -1,4 +1,4 @@
-// BIAN SD-89 KYB verification saga (v31, §5bis.4). Mirrors PaymentAuthorizationSaga: a scatter-gather
+// KYB verification saga (v31, §5bis.4). Mirrors PaymentAuthorizationSaga: a scatter-gather
 // keyed by correlationId (= merchantAgreementInstanceReference) that collects the entity-level
 // completions (kyb_business + hrp_sanctions + aml_monitoring), composes the structured entity verdict,
 // persists it via applyKybScreeningVerdict (which also sets the BQ:Step status through the shared

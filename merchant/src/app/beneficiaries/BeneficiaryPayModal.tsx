@@ -1,6 +1,6 @@
 'use client';
-// Unified beneficiary action modal (v28). One component drives BOTH "Send money" (P2P, SD-65) and
-// "Request money" (RTP, SD-65 intent) so the two flows share an identical, simplified UI. The row only
+// Unified beneficiary action modal (v28). One component drives BOTH "Send money" (P2P) and
+// "Request money" (RTP, intent) so the two flows share an identical, simplified UI. The row only
 // shows a compact button; all data capture happens in a modal (portalled to <body> to escape any
 // transformed ancestor). Reuses the existing server actions and the PSP API only.
 //
@@ -9,7 +9,8 @@
 // inbox), so no QR/deep-link is shown here (the link target is the PSP app, not a public page).
 import { useState, useTransition } from 'react';
 import { createPortal } from 'react-dom';
-import { Send, HandCoins, Loader2, CheckCircle2, TriangleAlert, X, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
+import { Send, HandCoins, Loader2, CheckCircle2, TriangleAlert, X, RotateCcw, Clock, ClipboardList } from 'lucide-react';
 import { sendToBeneficiary, requestMoney } from '@/lib/actions';
 import { Tip } from '@/components/ui/Tooltip';
 import type { AccountOption } from '@/lib/accounts';
@@ -57,8 +58,12 @@ export default function BeneficiaryPayModal({
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [ok, setOk] = useState(true);
+  // Outcome of the completed action, so the confirmation can be a receipt rather than a sentence.
+  const [receipt, setReceipt] = useState<{
+    amount?: number; currency?: string; reference?: string; status?: string; held?: boolean;
+  } | null>(null);
 
-  function reset() { setAmount(''); setText(''); setMsg(null); setOk(true); setDone(false); }
+  function reset() { setAmount(''); setText(''); setMsg(null); setOk(true); setDone(false); setReceipt(null); }
   function close() { setOpen(false); reset(); }
 
   function submit() {
@@ -70,8 +75,18 @@ export default function BeneficiaryPayModal({
         ? await sendToBeneficiary({ beneficiaryToken, amount: value, currency, fromAccountRef: fromAccountRef || undefined, note: text.trim() || undefined })
         : await requestMoney({ amount: value, currency, purpose: text.trim() || undefined, payerCounterpartyReference: beneficiaryToken });
       setOk(!!res.ok);
-      if (res.ok) { setDone(true); setMsg(res.message ?? cfg.done); }
-      else setMsg(res.message ?? 'Failed.');
+      if (res.ok) {
+        const d = (res.data ?? {}) as { amount?: number; currency?: string; transferReference?: string; paymentRequestInstanceReference?: string; status?: string };
+        setReceipt({
+          amount: d.amount ?? value,
+          currency: d.currency ?? currency,
+          reference: d.transferReference ?? d.paymentRequestInstanceReference,
+          status: d.status,
+          held: d.status === 'pending',
+        });
+        setDone(true);
+        setMsg(res.message ?? cfg.done);
+      } else setMsg(res.message ?? 'Failed.');
     });
   }
 
@@ -97,17 +112,52 @@ export default function BeneficiaryPayModal({
             {beneficiaryLabel && <p className="mb-3 text-sm text-muted">To <span className="font-medium text-ink">{beneficiaryLabel}</span></p>}
 
             {done ? (
-              /* Confirmation state — identical for send and request. Only Repeat / Close. */
+              /* Receipt: the amount leads, the state is in words, and the reference is a detail rather
+                 than the headline. Same shape for send and request. */
               <div className="space-y-4">
-                <div className="flex flex-col items-center gap-2 py-2 text-center">
-                  <CheckCircle2 className="h-10 w-10 text-leaf-deep" aria-hidden />
-                  <p className="text-sm font-medium text-ink">{msg ?? cfg.done}</p>
+                <div className="flex flex-col items-center gap-1 py-1 text-center">
+                  {receipt?.held
+                    ? <Clock className="h-9 w-9 text-[var(--warn)]" aria-hidden />
+                    : <CheckCircle2 className="h-9 w-9 text-leaf-deep" aria-hidden />}
+                  {receipt?.amount != null && (
+                    <p className="text-2xl font-semibold text-ink">
+                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: receipt.currency ?? currency }).format(receipt.amount)}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted">{beneficiaryLabel ? `To ${beneficiaryLabel}` : cfg.title}</p>
+                  <p className="mt-1 text-sm font-medium text-ink">{msg ?? cfg.done}</p>
                 </div>
-                <div className="flex items-center justify-end gap-2">
-                  <Tip label="Start another with a clean form.">
-                    <button onClick={reset} className="btn-ghost text-sm"><RotateCcw className="h-4 w-4" aria-hidden /> Repeat</button>
-                  </Tip>
-                  <button onClick={close} className="btn-primary text-sm">Close</button>
+
+                {receipt?.held && (
+                  <p className="rounded-lg border border-line bg-[var(--warn-bg)] px-3 py-2 text-xs text-[var(--warn)]">
+                    A security review was opened. The transfer completes only if the review clears it; nothing
+                    has reached the beneficiary yet.
+                  </p>
+                )}
+
+                {receipt?.reference && (
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+                    <dt className="text-muted">Reference</dt>
+                    <dd className="truncate font-mono text-ink" title={receipt.reference}>{receipt.reference}</dd>
+                    {receipt.status && (
+                      <>
+                        <dt className="text-muted">State</dt>
+                        <dd className="capitalize text-ink">{receipt.held ? 'on hold, under review' : receipt.status.replace(/_/g, ' ')}</dd>
+                      </>
+                    )}
+                  </dl>
+                )}
+
+                <div className="flex items-center justify-between gap-2">
+                  <Link href="/history" className="btn-ghost text-sm" onClick={close}>
+                    <ClipboardList className="h-4 w-4" aria-hidden /> View in history
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Tip label="Start another with a clean form.">
+                      <button onClick={reset} className="btn-ghost text-sm"><RotateCcw className="h-4 w-4" aria-hidden /> Repeat</button>
+                    </Tip>
+                    <button onClick={close} className="btn-primary text-sm">Close</button>
+                  </div>
                 </div>
               </div>
             ) : mode === 'send' && !hasAccounts ? (

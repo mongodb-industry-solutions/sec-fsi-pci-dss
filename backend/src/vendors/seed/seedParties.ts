@@ -4,8 +4,8 @@ import * as fs from 'fs';
 import { PARTY_COLLECTION, PartyPostalAddress } from '../../modules/identity/models/party.model';
 import { phoneDigest } from '../encryption/digest';
 
-// Deterministic KYC/demographic backfill (BIAN SD-13 Party Reference Data). Applies uniformly to
-// every party (customer + employee), so staff profiles are as realistic as customers' — KYC-typical
+// Deterministic KYC/demographic backfill (Party Reference Data). Applies uniformly to
+// every party (customer + employee), so staff profiles are as realistic as customers': KYC-typical
 // data (DOB, nationality, postal address) belongs to the Party record, not the customer agreement.
 // Values are derived from partyInstanceReference so they are stable across reseeds (no ID churn).
 
@@ -67,7 +67,7 @@ function inferCountry(phone: string | undefined): string {
       if (normalized.startsWith(prefix)) return country;
     }
   }
-  return 'ES'; // .es digital bank — default residence
+  return 'ES'; // .es digital bank: default residence
 }
 
 export interface PartySeedRecord {
@@ -120,7 +120,7 @@ export async function seedParties(db: Db) {
     if (record.partyMobilePhoneNumber) {
       record.partyMobilePhoneNumberDigest = phoneDigest(record.partyMobilePhoneNumber);
     }
-    // Backfill KYC-typical demographics (SD-13) so every party — staff included — is realistic.
+    // Backfill KYC-typical demographics so every party: staff included, is realistic.
     enrichDemographics(record);
 
     await db.collection(PARTY_COLLECTION).updateOne(

@@ -6,8 +6,8 @@ import { useNotify } from './ui/ConfirmProvider';
 import { useNotificationsStream } from '../lib/useNotificationsStream';
 
 // ADR-031: customer-facing question/response section, shown on a transaction below the security
-// notes. Questions are posed by L1/L2 investigators (SD-83); the customer picks a predefined option
-// or "Other" (free text). Once submitted, the response is immutable (PCI DSS Req 10).
+// notes. Questions are posed by L1/L2 investigators ; the customer picks a predefined option
+// or "Other" (free text). Once submitted, the response is immutable (PCI DSS).
 export function CustomerQuestionsPanel({ txnId, token, onAnswered }: { txnId: string; token: string; onAnswered?: () => void }) {
   const notify = useNotify();
   const [questions, setQuestions] = useState<CustomerQuestion[]>([]);

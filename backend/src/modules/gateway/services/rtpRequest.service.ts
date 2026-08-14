@@ -1,4 +1,4 @@
-// BIAN SD-65 Payment Order — Request to Pay domain service (v28).
+// Payment Order: Request to Pay domain service (v28).
 // RTP is an INTENT domain, strictly separate from payment execution. This service owns the request
 // record lifecycle (create/get/list/present/view/cancel + transition), the per-request timeseries
 // event trail, and the business/compliance ledger emissions. Approval → linked execution lives in
@@ -131,7 +131,7 @@ export async function createRtpRequest(db: Db, input: CreateRtpInput): Promise<P
 
   const receivingAccount = await resolveReceivingAccount(db, input);
 
-  // Resolve the payer party from the requester's beneficiary (SD-54) when only the counterparty token
+  // Resolve the payer party from the requester's beneficiary when only the counterparty token
   // is provided (e.g. the merchant flow, which never handles raw party refs). Verifies ownership.
   let payerPartyReference = input.payerPartyReference;
   if (!payerPartyReference && input.payerCounterpartyReference) {
@@ -141,7 +141,7 @@ export async function createRtpRequest(db: Db, input: CreateRtpInput): Promise<P
     payerPartyReference = arr?.counterpartyPartyReference;
   }
 
-  // Privacy model: the requester's own name is server-derived from their SD-13 party (authoritative,
+  // Privacy model: the requester's own name is server-derived from their party (authoritative,
   // authorized basic datum the payer may see on approval), not taken from client input. Falls back to
   // any client-provided payeeName only if the party lookup yields nothing.
   let payeeName = input.payeeName;

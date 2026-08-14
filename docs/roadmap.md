@@ -21,7 +21,7 @@
 
 ## BIAN Compliance Status *(achieved 2026-06-08)*
 
-All collection names, type suffixes, and `bianServiceDomain` values were brought into strict BIAN compliance as a pre-v1 alignment pass. This is not a new iteration — it is a baseline correction that all iterations (v1–v5) inherit.
+All collection names, type suffixes, and `bianServiceDomain` values were brought into strict BIAN compliance as a pre-v1 alignment pass. This is not a new iteration: it is a baseline correction that all iterations (v1–v5) inherit.
 
 | Compliance decision | Standard | Status |
 |---|---|---|
@@ -280,7 +280,7 @@ Card-on-file management is its own section (`/system/cards` list + `/system/card
 | 20b.1 | List saved cards | `GET /api/v1/customer/:customerId/cards` returns the customer's cards (masked PAN + status); rendered by `SavedCardsPanel` at `/system/cards` |
 | 20b.2 | Add a card, optionally marking it preferred | `POST /api/v1/customer/:customerId/cards` with `paymentCardIsPreferred?: boolean`. **Preferred is set only at add time** (checkbox on `/system/cards/new`); there is no toggle-preferred action on an existing card |
 | 20b.3 | View card detail | `GET /api/v1/customer/:customerId/cards/:cardId` (surrogate token, expiry QE:none, alias/note) |
-| 20b.4 | Edit alias/note only | `PATCH /api/v1/customer/:customerId/cards/:cardId` — alias/note are the only mutable attributes |
+| 20b.4 | Edit alias/note only | `PATCH /api/v1/customer/:customerId/cards/:cardId`, alias/note are the only mutable attributes |
 | 20b.5 | Deactivate / reactivate a card | `PATCH /api/v1/customer/:customerId/cards/:cardId/status { active: boolean }`; a deactivated card is declined by the PSP on every operation regardless of issuer decision |
 | 20b.6 | Remove a card (soft-delete, replaces the old revoke-via-status) | `DELETE /api/v1/customer/:customerId/cards/:cardId`; confirmation dialog required; emits a compliance audit event server-side (PCI DSS Req 10) |
 
@@ -383,7 +383,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 | P4.1 | `POST /api/v1/gateway/tokens` creates a `tokenVault` record linked to a `customerAgreementProcedure` | Record visible in Atlas; `tokenVaultNetworkToken` is ciphertext if populated |
 | P4.2 | `GET /api/v1/gateway/tokens/:token` returns token metadata without `tokenVaultNetworkToken` | Response includes `tokenVaultStatus`, `tokenVaultCreatedAt`, `tokenVaultLastUsedAt`; network token absent |
 
-#### FR-v4-P5: Frontend — Merchant Context
+#### FR-v4-P5: Frontend, Merchant Context
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
@@ -395,24 +395,24 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
-| P6.1 | Customer can submit a merchant application via `POST /api/v1/merchants` — application starts at `under_review` | Atlas document has `merchantAgreementStatus: 'under_review'`; `merchantOwnerPartyReference` FK populated from JWT |
+| P6.1 | Customer can submit a merchant application via `POST /api/v1/merchants`: application starts at `under_review` | Atlas document has `merchantAgreementStatus: 'under_review'`; `merchantOwnerPartyReference` FK populated from JWT |
 | P6.2 | `merchant_officer` role can list all pending applications via `GET /api/v1/merchants?status=under_review` | Officer dashboard shows applications with merchant name, category, owner, submitted date |
-| P6.3 | `merchant_officer` can approve an application via `PATCH /api/v1/merchants/:id/review` — body `{ action: 'approve', reviewNote: '...' }` | Status transitions to `agreed`; `merchantReviewedByPartyReference`, `merchantReviewedDateTime`, `merchantReviewNote` populated |
-| P6.4 | `merchant_officer` can reject an application via `PATCH /api/v1/merchants/:id/review` — body `{ action: 'reject', reviewNote: '...' }` | Status transitions to `rejected`; review metadata populated |
+| P6.3 | `merchant_officer` can approve an application via `PATCH /api/v1/merchants/:id/review`, body `{ action: 'approve', reviewNote: '...' }` | Status transitions to `agreed`; `merchantReviewedByPartyReference`, `merchantReviewedDateTime`, `merchantReviewNote` populated |
+| P6.4 | `merchant_officer` can reject an application via `PATCH /api/v1/merchants/:id/review`, body `{ action: 'reject', reviewNote: '...' }` | Status transitions to `rejected`; review metadata populated |
 | P6.5 | Webhook event `merchant.agreement.activated` is emitted when a merchant is approved | Event payload includes `merchantAgreementInstanceReference`, `merchantName`, `reviewedByPartyReference` |
 | P6.6 | Frontend: `/system/merchant` shows "Request Merchant Account" form when authenticated customer has no linked merchant | Form includes all required BIAN fields; "Load test data" dropdown with 3 presets |
 | P6.7 | Frontend: after submission, merchant portal shows "Application under review" state with application details | Status badge displayed; timestamp shown |
-| P6.8 | Frontend: `/system/merchant/review` route accessible to `merchant_officer` — shows pending applications queue | Each card has Approve / Reject buttons; review notes input field |
-| P6.9 | Seed data: `backend/data/merchants.json` contains 3 records — 1 `active`, 1 `under_review`, 1 `active` (different owner) | `npm run db:seed` inserts all 3 without error |
+| P6.8 | Frontend: `/system/merchant/review` route accessible to `merchant_officer`, shows pending applications queue | Each card has Approve / Reject buttons; review notes input field |
+| P6.9 | Seed data: `backend/data/merchants.json` contains 3 records, 1 `active`, 1 `under_review`, 1 `active` (different owner) | `npm run db:seed` inserts all 3 without error |
 
 #### FR-v4-P7: Debug Mode (Ch-05)
 
 | # | Requirement | Acceptance Criteria |
 |---|---|---|
 | P7.1 | `[⚡ Debug]` button visible in top nav bar when `DEMO_DEBUG_ENABLED=true` env var is set | Button absent when env var is absent or false |
-| P7.2 | Toggle persists across navigation via `localStorage` key `demo_debug_mode` | Reload browser tab — debug state unchanged |
+| P7.2 | Toggle persists across navigation via `localStorage` key `demo_debug_mode` | Reload browser tab: debug state unchanged |
 | P7.3 | When debug ON: every entity card shows a BIAN Service Domain chip (e.g., `SD-89 · Merchant Relations`) | Chip visible on merchant cards, transaction cards, case cards |
-| P7.4 | When debug ON: every encrypted field shows a lock icon with QE mode tooltip | Tooltip text: `"QE:equality — BSON Binary subtype 6 · PCI DSS Req 3.5.1"` |
+| P7.4 | When debug ON: every encrypted field shows a lock icon with QE mode tooltip | Tooltip text: `"QE:equality, BSON Binary subtype 6 · PCI DSS Req 3.5.1"` |
 | P7.5 | When debug ON: key entity pages show a `DebugRawDoc` panel with live MongoDB document | Panel uses `GET /api/v1/system/raw/:collection/:id`; encrypted fields show as `Binary('...')` |
 | P7.6 | When debug ON: action buttons have `[ℹ]` icon opening an info panel | Info panel shows: BIAN Action Term, HTTP endpoint, MongoDB operation, PCI DSS control |
 | P7.7 | When debug ON: forms show "Load test data" dropdown | Dropdown has 2–3 realistic presets; selecting one fills all form fields |
@@ -449,7 +449,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 
 ### Objective
 
-Introduce AI agent integration into the fraud investigation workflow. The primary target is the MongoDB Agentic Platform (Magenta preferred), but the architecture is designed so that any external agentic system — such as Agentic ThreatSight360 (fsi/fsi-aml-fraud-detection) — can integrate through the same REST (Representational State Transfer) API surface using a `level2_investigator` service credential.
+Introduce AI agent integration into the fraud investigation workflow. The primary target is the MongoDB Agentic Platform (Magenta preferred), but the architecture is designed so that any external agentic system: such as Agentic ThreatSight360 (fsi/fsi-aml-fraud-detection), can integrate through the same REST (Representational State Transfer) API surface using a `level2_investigator` service credential.
 
 The agent automatically pre-reviews each fraud case when it opens, queries the encrypted QE collections to gather context, produces a structured draft diagnosis, and presents it to the L1 analyst as a suggested action. The human analyst confirms, overrides, or escalates. This demonstrates how agentic AI integrates with existing encrypted data workflows without relaxing security controls.
 
@@ -510,7 +510,7 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 ---
 
-## v6 — Integration Hub & Compliance Orchestration
+## v6: Integration Hub & Compliance Orchestration
 
 **Goal:** Connect the demo to external compliance systems using BIAN SD-193 External Provider Arrangements. Every compliance function ships with an internal default provider that works out-of-the-box. External providers (Refinitiv, FICO, Onfido, NICE Actimize, etc.) can be registered at runtime and override the internal defaults. This transforms the demo from an isolated proof-of-concept to an integration-ready reference architecture.
 
@@ -518,7 +518,7 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 **BIAN Service Domains:** SD-193 (External Provider Arrangements) + all existing SDs for internal defaults (SD-63, SD-13, SD-53, SD-89, SD-99, SD-83)
 
-**PCI DSS:** Req 12.8 (third-party service provider list and agreements), Req 10.2.1 (audit log of provider access), Req 10.7 (log retention 90 days), Req 6.3.3 (credential protection), Req 7.1 (Separation of Duties — system_admin vs devops admin)
+**PCI DSS:** Req 12.8 (third-party service provider list and agreements), Req 10.2.1 (audit log of provider access), Req 10.7 (log retention 90 days), Req 6.3.3 (credential protection), Req 7.1 (Separation of Duties, system_admin vs devops admin)
 
 **Pre-requisites:** v5 (AI Agent fraud investigation) complete.
 
@@ -528,21 +528,21 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 | ID | Feature | Acceptance Criteria | Priority |
 |---|---|---|---|
-| FR-v6-01 | Integration Registry — CRUD | system_admin can register, view, update, and list integration providers via `/api/v1/integrations`. Non-system_admin roles receive 403. | Critical |
-| FR-v6-02 | Integration Registry — API key management | POST /integrations returns plaintext key exactly once. Subsequent GET never exposes the key — only a visible prefix (e.g. `fds_live_...`). POST /rotate-key invalidates old key and returns new key once. | Critical |
+| FR-v6-01 | Integration Registry: CRUD | system_admin can register, view, update, and list integration providers via `/api/v1/integrations`. Non-system_admin roles receive 403. | Critical |
+| FR-v6-02 | Integration Registry: API key management | POST /integrations returns plaintext key exactly once. Subsequent GET never exposes the key, only a visible prefix (e.g. `fds_live_...`). POST /rotate-key invalidates old key and returns new key once. | Critical |
 | FR-v6-03 | Internal-First dispatch | For each integration type, the dispatch service uses the internal handler when no active external provider is registered. The system never returns errors due to absent external configuration. | Critical |
 | FR-v6-04 | External provider dispatch (sync) | When an active external provider is registered for `fraud_detection` or `hrp_sanctions`, the dispatch service calls the provider's endpoint, parses the response, and updates the relevant record. Timeout and retry policy are respected. | High |
 | FR-v6-05 | External provider dispatch (async + callback) | When an active external provider is registered for `kyc_identity`, `kyb_business`, or `aml_monitoring` in async mode, the dispatch service sends a request and waits for a callback on `/webhooks/{type}/{id}/callback`. | High |
-| FR-v6-06 | Inbound callback — HMAC validation | Every POST to `/webhooks/*` validates the `X-Webhook-Signature: sha256=<hmac>` header. Requests without a valid signature return 401. | Critical |
+| FR-v6-06 | Inbound callback: HMAC validation | Every POST to `/webhooks/*` validates the `X-Webhook-Signature: sha256=<hmac>` header. Requests without a valid signature return 401. | Critical |
 | FR-v6-07 | Integration Event audit log | Every dispatch, callback, health check, and test fires an `IntegrationEvent` record. The record includes timestamp, event type, arrangement reference, status, latency, and a SHA-256 hash of the payload (not the payload itself). | Critical |
 | FR-v6-08 | Provider health check + test | POST /integrations/:id/test fires a synthetic event to the configured endpoint and returns `{ status, latencyMs }`. The `externalProviderHealthStatus` field is updated after every test. | High |
-| FR-v6-09 | Suspend integration | POST /integrations/:id/suspend sets status to `suspended`. Internal providers (externalProviderIsInternal: true) return 400 — cannot be suspended. | High |
+| FR-v6-09 | Suspend integration | POST /integrations/:id/suspend sets status to `suspended`. Internal providers (externalProviderIsInternal: true) return 400, cannot be suspended. | High |
 | FR-v6-10 | system_admin role | A new `system_admin` role can log in via `/system`. After login, the user is redirected to `/system/admin`. The role has no access to fraud investigation or merchant approval workflows. | Critical |
-| FR-v6-11 | Admin portal — integration dashboard | `/system/admin` shows 6 integration type tiles (one per type), each with the active provider name, health status indicator, and last check time. Internal providers show a "Built-in" badge. | High |
-| FR-v6-12 | Admin portal — integration list | `/system/admin/integrations` lists all providers with name, type, status, mode (sync/async), health, and last event timestamp. | High |
-| FR-v6-13 | Admin portal — integration detail + test | `/system/admin/integrations/[id]` shows full provider config (no key hash visible), event log (last 20), and a "Test connection" button. After test, latency and status are displayed. | High |
-| FR-v6-14 | Admin portal — register new integration | `/system/admin/integrations/new` wizard: select type → enter name/endpoint/auth scheme → paste API key → select trigger events → submit. API key is shown in a one-time reveal panel after creation. | High |
-| FR-v6-15 | Admin portal — token lifecycle | `/system/admin/tokens` lists API tokens by prefix, creation date, and last-used date. "Rotate key" and "Suspend" actions available. | Medium |
+| FR-v6-11 | Admin portal: integration dashboard | `/system/admin` shows 6 integration type tiles (one per type), each with the active provider name, health status indicator, and last check time. Internal providers show a "Built-in" badge. | High |
+| FR-v6-12 | Admin portal: integration list | `/system/admin/integrations` lists all providers with name, type, status, mode (sync/async), health, and last event timestamp. | High |
+| FR-v6-13 | Admin portal: integration detail + test | `/system/admin/integrations/[id]` shows full provider config (no key hash visible), event log (last 20), and a "Test connection" button. After test, latency and status are displayed. | High |
+| FR-v6-14 | Admin portal: register new integration | `/system/admin/integrations/new` wizard: select type → enter name/endpoint/auth scheme → paste API key → select trigger events → submit. API key is shown in a one-time reveal panel after creation. | High |
+| FR-v6-15 | Admin portal: token lifecycle | `/system/admin/tokens` lists API tokens by prefix, creation date, and last-used date. "Rotate key" and "Suspend" actions available. | Medium |
 | FR-v6-16 | Pre-seeded internal providers | On first seed, 3 internal providers are created: FDS (fraud_detection), HRPC (hrp_sanctions), AML (aml_monitoring). All have `externalProviderIsInternal: true` and `externalProviderArrangementStatus: active`. | Critical |
 
 ---
@@ -568,7 +568,7 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 | BIAN SD | Role in v6 | New or Existing |
 |---|---|---|
-| SD-193 External Provider Arrangements | `integrationRegistry` collection — the Integration Hub registry | **New** |
+| SD-193 External Provider Arrangements | `integrationRegistry` collection: the Integration Hub registry | **New** |
 | SD-63 Fraud Evaluation | Internal FDS default provider | Existing (SD-63 already implemented) |
 | SD-13 Party Reference Data | Internal HRPC sanctions default | Existing (HRPC endpoint already implemented) |
 | SD-53 Customer Agreement | Internal KYC identity default (BQ:Step) | Existing (KYC BQ:Step already implemented) |
@@ -609,7 +609,7 @@ As with v3 and v4, external agent adoption (e.g. Agentic ThreatSight360 performi
 
 ---
 
-## v17 — Bank-Movement Cycle Precision (Funds-Availability Gate + FX)
+## v17: Bank-Movement Cycle Precision (Funds-Availability Gate + FX)
 
 ### Objective
 Close the money-movement cycle so it is precise with no balance discrepancy at origin or destination (users or merchants): card authorization must verify real funding-account balance from the DB, decline on insufficient funds per BIAN, and keep balances consistent across the tarjeta → cuenta → ejecución → destino chain. See [engineering-proposal.md ADR-038](engineering-proposal.md).
@@ -627,7 +627,7 @@ Close the money-movement cycle so it is precise with no balance discrepancy at o
 | FR-v17-07 | P2P atomicity | P2P debit respects the conditional `$gte`; if the recipient credit fails, the sender debit is reverted. Cross-currency credit is FX-converted to the recipient account currency. |
 | FR-v17-08 | Seed reconciliation | Seeders default to EUR; `pending/reserved` start at 0; `balanceCreditLog.initial_deposit == total balance`. No account starts negative. |
 
-### Definition of Done — v17
+### Definition of Done: v17
 - [ ] No card payment can be `authorized` without sufficient funds (in account currency, post-FX).
 - [ ] Every hold is released on decline; settlement clears the hold exactly once; no orphan holds or double debits.
 - [ ] No balance goes negative at origin or destination (user or merchant) in any intermediate state.
@@ -635,7 +635,7 @@ Close the money-movement cycle so it is precise with no balance discrepancy at o
 - [ ] Unit tests green (funds gate compensation, FX, checkFunds); `npm run build` exits 0.
 - [ ] (Pending infra) integration + E2E green.
 
-## v18 — Merchant SSO App + Commission & Activity Attribution
+## v18: Merchant SSO App + Commission & Activity Attribution
 
 > Delivered under **development plan v18** (`tmp/dev.v17.plan.md` lineage). "v18" is a development-plan
 > iteration, not a product release version (product themes are v1–v5). FR ids below carry the `v18` tag
@@ -643,7 +643,7 @@ Close the money-movement cycle so it is precise with no balance discrepancy at o
 
 ### Objective
 Give merchants an external, SSO-authenticated experience: sign in with their PSP identity, view the PSP
-activity attributed to them, and configure their commission — without forking the PSP data model or
+activity attributed to them, and configure their commission: without forking the PSP data model or
 crossing the CHD boundary. See [engineering-proposal.md ADR-041](engineering-proposal.md).
 
 ### FR-v18: Functional Requirements
@@ -652,14 +652,14 @@ crossing the CHD boundary. See [engineering-proposal.md ADR-041](engineering-pro
 |---|---|---|---|
 | FR-v18-01 | Merchant SSO app | Standalone Next.js app `merchant/` (no DB, no Fastify) authenticates via OAuth2/OIDC SSO as a confidential client and reads PSP data via the PSP API only; local port `8082` / container `8080`; env prefix `PSP_MERCHANT_` | ✅ |
 | FR-v18-02 | Commission model | Numeric fee reuses `paymentExecutionProcedure.feeAmount` (SD-65) + attribution sub-doc `fee {feeMerchantReference, feeRateApplied, feeCollectedDateTime}`; rate `merchantCommissionRate` on SD-89, editable in merchant settings and audited; `commissionRevenue` derived. No new collection | ✅ |
-| FR-v18-03 | PSP merchant activity view | PSP staff can view activity attributed per merchant, driven by `businessProcessEvent` attribution fields (`clientId`, `merchantAgreementReference`, `actingPartyReference`, `actingChannel`) — no new collection | ✅ |
+| FR-v18-03 | PSP merchant activity view | PSP staff can view activity attributed per merchant, driven by `businessProcessEvent` attribution fields (`clientId`, `merchantAgreementReference`, `actingPartyReference`, `actingChannel`), no new collection | ✅ |
 | FR-v18-04 | Cross-merchant authorizations audit | L1 / L2 / auditor can audit authorizations across merchants (per-merchant filter, acting party, channel) | ✅ |
 | FR-v18-05 | Authorized Applications | End users see "Authorized Applications" (connected apps) with per-app operations (view / revoke) | ✅ |
 | FR-v18-06 | Granular + incremental consent | User selects scopes at consent; unknown scope → `invalid_scope` (RFC 6749); broadening scope forces re-consent; scopes use PSP `verb:resource` convention | ✅ |
 | FR-v18-07 | Merchant branding | Merchant app branding driven by OIDC client metadata `logo_uri` / `client_uri` | ✅ |
 | FR-v18-08 | Boundary & scopes | Merchant-facing PSP endpoints use `skipAuth` + `validateMerchantToken` + sub-binding; least-privilege scopes; no CHD in merchant app (PCI SAQ A); IBAN masked-only (GDPR/PSD2) | ✅ |
 
-### Definition of Done — v18
+### Definition of Done: v18
 - [x] Merchant app runs standalone (no DB/Fastify), SSO login, PSP-API-only integration.
 - [x] Commission modelled BIAN-purely (SD-65 fee + attribution sub-doc, SD-89 rate) with no new collection; rate configurable in merchant settings and audited.
 - [x] PSP merchant activity view + cross-merchant authorizations audit for L1/L2/auditor via `businessProcessEvent` attribution.
@@ -684,7 +684,7 @@ These requirements apply to all versions from v1 onward:
 | NFR-X-06 | Type safety | `npm run build` exits 0 at every version: no TypeScript `any` escape hatches in production code |
 | NFR-X-07 | Agent security | AI agents (v5) use only the public API layer: no direct MongoDB credentials or DEK access |
 
-## Bank Transfers (ACH / SEPA / SWIFT) — capability add-on
+## Bank Transfers (ACH / SEPA / SWIFT): capability add-on
 
 > Delivered under **development plan v17** (`tmp/dev.v17.plan.md`, tranche "v17.1"). "v17" is a
 > development-plan iteration, not a product release version (product themes are v1–v5). FR ids below
@@ -738,7 +738,7 @@ with an enrolled device key. Real software authenticator (browser WebCrypto), no
 | FR-v24-08 | PSP frontend | "Passwordless credentials" section (enroll/rotate/revoke, browser WebCrypto non-extractable + IndexedDB); Authorized Applications shows a "Passwordless (CIBA)" badge and revokes client authorization | ✅ |
 | FR-v24-09 | Setup/seed | `--reset` + reseed reproduces the two collections, indexes, the demo credential and the ciba-enabled client | ✅ |
 
-### Definition of Done — v24
+### Definition of Done: v24
 - [x] Enrollment + CIBA endpoints live under flat `/api/v1/auth/` (token endpoint unchanged, new grant branch).
 - [x] Public keys only stored (PCI Req.3); anti-replay via one-time auth_req_id + monotonic signCount (Req.8); audit via `emitComplianceEvent` (Req.10); HTTPS notification endpoint for ping/push (Req.4).
 - [x] AAL1 stated precisely (real software authenticator + user-presence); AAL2 deferred to platform UV with no contract change; no mock authenticator.
@@ -749,7 +749,7 @@ with an enrolled device key. Real software authenticator (browser WebCrypto), no
 
 *Added 2026-07-09 (v24).*
 
-## v27 — KYC Field Expansion + Queryable Encryption Search Showcase
+## v27: KYC Field Expansion + Queryable Encryption Search Showcase
 
 > Delivered under **development plan v27** (`tmp/dev.v27.plan.md`). Extends the KYC (CDD) data
 > model with structured identity attributes and uses them to demonstrate every QE search type
@@ -777,7 +777,7 @@ encrypted fields, with the server never seeing plaintext, while staying aligned 
 | FR-v27-10 | Text-search gating | `PSP_QE_TEXT_SEARCH=false` degrades substring/prefix/suffix to `QE:equality` (contention 8) so setup succeeds on pre-8.2 clusters without losing encryption or lookup-tier access. |
 | FR-v27-11 | Seed completeness | `--reset` + reseed leaves no new field unset (rows 1–20 of plan §3). Enrichment is deterministic (stable across reseeds) and idempotent (JSON-provided values win). |
 
-### Definition of Done — v27 (Phases 0–3)
+### Definition of Done: v27 (Phases 0–3)
 - [x] All new field names BIAN-prefixed (`party*` / `customerAgreement*` / `customerAgreementKycCheck*`).
 - [x] One DEK per encrypted field (16 new DEKs); nested QE leaves under plaintext parent sub-docs.
 - [x] Explicit `contention` on all low-cardinality `QE:equality` fields.
@@ -789,7 +789,7 @@ encrypted fields, with the server never seeing plaintext, while staying aligned 
 
 *Added 2026-07-16 (v27, Phases 0–3).*
 
-## v28 — Request to Pay (RTP) + shared QR
+## v28: Request to Pay (RTP) + shared QR
 
 > Delivered under **development plan v28** (`tmp/dev.v28.plan.md`). BIAN-aligned Request to Pay
 > as an intent domain separate from payment execution, between beneficiaries/counterparties,
@@ -821,7 +821,7 @@ payment states are independently queryable, screened, auditable, and SEPA/ISO 20
 | FR-v28-12 | Account preconditions | Payee with no active payout account cannot request; payer with no active account cannot approve; both rejected with machine-readable reason | ⏳ |
 | FR-v28-13 | Funds, screening & balance | Payer picks funding account or default; funds sufficiency (AIS) + FDS/HRP/AML checked before execution; balances of source+destination update via hold→settle→credit | ⏳ |
 
-### Definition of Done — v28
+### Definition of Done: v28
 - [ ] Requests create/deliver/view/accept/reject/cancel/expire end to end
 - [ ] Accepted requests create immutable linked payment orders routed via provider
 - [ ] Inter-service events durable and replayable; duplicate create/accept idempotent
@@ -842,7 +842,7 @@ payment states are independently queryable, screened, auditable, and SEPA/ISO 20
 
 *Added 2026-07-17 (v28).*
 
-## v29 — Global card & account administration via built-in modules
+## v29: Global card & account administration via built-in modules
 
 > Delivered under **development plan v29** (`tmp/dev.v29.plan.md`). Moves the **global administration
 > surface** (CRUD + listing) of cards (BIAN SD-88) and payout accounts (BIAN SD-66) onto the built-in
@@ -873,7 +873,7 @@ self-service routes, gated to the internal provider and fully audited (PCI DSS R
 | FR-29.9 | Internal module configuration (v29.1) | `operations_officer` also holds `modules:[view,manage]` and administers the config/policies of all 11 internal modules. The `GET/PUT /api/v1/modules/<cap>/config` routes (previously unguarded) require `requirePermission('modules','view'|'manage')`. Auth (`authDomains`, SD-16) stays exclusive to `manager`. | ✅ |
 | FR-29.10 | Role-aware admin landing + config edit gating (v29.2) | `operations_officer` gains `providers:[view]` (read-only) so its admin landing shows module cards with the provider status serving each capability (internal vs external / `managed_externally`); provider CRUD stays with `manager`. Editing module config is gated by `modules:manage`: `PUT /modules/<cap>/config` is exclusive to `operations_officer`; `manager` drops to `modules:view` (read-only, system/security oversight), `GET .../config` accessible by `operations_officer`, `manager`, `security_auditor`. Confirmed philosophy: `operations_officer` owns internal business logic/financial processes, `manager` owns system/platform. | ✅ |
 
-### Definition of Done — v29
+### Definition of Done: v29
 - [x] FR-29.1–29.8 with green acceptance specs.
 - [x] `operations_officer` builtin role (scope `all`, `cards:[view,manage]`, `accounts:[view,manage]`, `modules:[view,manage]`, `providers:[view]`, `auditEvents:[view]`, SD-88/SD-66) added data-driven; SoD distinct from `manager` (keeps provider CRUD/authDomains/roles, holds `modules:view` only) and `customer`.
 - [x] Two demo users seeded (Olivia Moreno featured, Daniel Rossi), password `demo-password`, idempotent upsert.
@@ -1013,3 +1013,133 @@ anyone who clicks twice in front of an audience. Full analysis, decisions and ex
 - [ ] E2E: the card link from a transaction detail resolves for staff. Pending the reseed.
 
 *Added 2026-07-29 (v33).*
+
+---
+
+## v34: Commission settlement (the fee actually moves)
+
+Driver: the merchant commission was recorded but never moved. `feeAmount` was persisted on the
+acquiring record and a `merchant.commission.collected` event was emitted, while the payout path
+hard-coded `feeAmount: 0` and credited the merchant the full gross. Nobody was debited for the fee
+and no account received it, so the PSP's "revenue" existed only as an aggregation. A-06 (deferred in
+ADR-041) is now closed on both legs: the fee is withheld from the gross at execution creation, and
+credited to a PSP revenue ledger at settlement.
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v34-01 | The commission is withheld, never added | the buyer is charged `grossAmount` and nothing else; a merchant-attributed payout execution is created with `netAmount = grossAmount − feeAmount` and its `fee` attribution sub-doc in a single insert; the rail is asked to move `netAmount`, so the commission never leaves the PSP |
+| FR-v34-02 | The collected fee has a holder | a PSP revenue ledger (SD-13 `service_account` party + SD-66 `internal_ledger` account) is credited `feeAmount` at settlement, in the same movement that withholds it from the merchant hold: merchant `pendingAmount −= fee`, PSP `availableAmount += fee`; no new collection |
+| FR-v34-03 | No fee means no movement | a merchant with no configured (or out-of-range) `merchantCommissionRate` yields `feeAmount 0`, no `fee` attribution, `netAmount == grossAmount` and zero balance movements, so any operation that does not state a fee stays balanced |
+| FR-v34-04 | The pending hold always clears to zero | the hold is taken on the gross, so the fee leg is derived as `grossConverted − netConverted` in the merchant account currency rather than converted on its own; after settlement `pendingAmount` returns to its pre-authorization value whatever the FX rounding |
+| FR-v34-05 | The cardholder is released the gross | clearing the buyer's funding hold uses `execution.grossAmount`, not the settled net, so the commission never shrinks what is released to the payer |
+| FR-v34-06 | Collection is auditable and collected once | every posting writes a `balanceCreditLog` entry of `creditType: 'commission'` keyed `commission-{executionRef}` plus a `merchant.commission.settled` business process event; a replayed settlement event posts nothing further (PCI DSS Req 10) |
+| FR-v34-07 | Revenue is not double counted | the dashboard `commissionRevenue` counts a card-originated commission once: the execution source contributes only fees with no acquiring counterpart (`cardTransactionInstanceReference` absent) |
+| FR-v34-09 | A payout that never settles releases its reservation | every terminal path after the authorization reservation gives it back: beneficiary validation refused (`exception`), rail submission refused (`failed`), rail rejection after `in_flight` (`failed`), and any unexpected error in the pipeline (`exception`); after each one the merchant `pendingAmount` returns to its pre-authorization value |
+| FR-v34-10 | The reversal does not invent money | releasing a beneficiary reservation decrements `pendingAmount` only and never credits `availableAmount`, because the funds never landed; a P2P sender keeps the existing `releaseCardHold` (pending to available) since those are its own funds |
+| FR-v34-11 | Balance movements survive event redelivery | the SD-65 state transition is the idempotency gate for every balance movement in the settled and failed handlers, so a redelivered `bank.transfer.settled` or `.failed` cannot credit or reverse the same execution twice |
+| FR-v34-12 | Every AIS and PISP action is auditable by transaction id | the SD-65 execution is linked to the acquiring record as soon as it is created (not after the rail accepts), each dispatch payload carries `cardTransactionInstanceReference` as the end-to-end reference, and the settled / failed / commission / hold-release events all carry `txnId`; so the audit trail's reference search returns the whole payout leg (wire I/O included, success and failure alike) from the transaction id alone |
+| FR-v34-13 | A transfer already with the rail is never compensated locally | once the PISP accepts the submission the reservation belongs to the rail outcome: an error after that point annotates the record and leaves the reservation, so `bank.transfer.settled` / `.failed` remains the only thing that resolves it and `pendingAmount` cannot be double-reversed |
+| FR-v34-08 | The merchant UI explains the commission | the `/products` price/commission block and the payment-result modal carry an info tooltip stating the fee is retained from the price rather than added to it, with the applied percentage |
+
+### NFR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| NFR-v34-01 | Reuse before creation (P8) | `computeFee` stays the single commission calculation for both the acquiring and the payout path; the posting composes the existing SD-66 balance primitives (`settleCardDebit`, `creditDirect`) and adds no new balance operation; the merchant app shares one `COMMISSION_HELP` string across every commission figure |
+| NFR-v34-02 | Setup and seed remain the only source of truth (P7) | the PSP revenue party and account are created by `vendors/seed/seedPspRevenueAccount.ts`; seeded commission executions credit that ledger and log it; no ad-hoc migration |
+| NFR-v34-03 | A plain reseed converges (no drop required) | no collection, QE encryptedFields, DEK or index changed, so `setup:seed` alone is sufficient: the party and account upsert, and the commission credit is gated by its own credit-log entry rather than by the execution being newly inserted, so it backfills an existing database exactly once |
+| NFR-v34-04 | No standards deviation | no new collection and no new model: the PSP is an SD-13 party holding an SD-66 account; SD-65 keeps `feeAmount` as the numeric source of truth with `fee` as attribution only; `commission` is not an admin-issuable credit type (system-posted only); the ledger never touches CHD |
+| NFR-v34-06 | The compensation is provider-indifferent | the reversal is driven by the OUTCOME of a `dispatchProvider` call, never by which provider answered, so replacing the builtin AIS or PISP module with an external service (ADR-039) cannot leave the ledger inconsistent; a refusal, a transport error and a timeout all reach the same compensating action |
+| NFR-v34-05 | Settlement is never blocked, and no amount is stranded | a missing revenue account or a lost idempotency race moves neither leg and never blocks the payout; the merchant is still credited its net; on a missing revenue ledger the fee is released to the merchant so `pendingAmount` still clears to zero, the PSP forgoing the fee rather than holding an uncollectable amount |
+
+### Definition of Done
+
+- [x] `test:unit` green (602 tests, 66 files), including `commissionSettlement.test.ts` (both legs, zero fee, idempotency, missing account) and `payoutHoldRelease.test.ts` (the reversal is the inverse of the reservation and credits nothing).
+- [x] Both type-checks clean (backend and merchant app).
+- [x] `technical-spec.md` §1 (SD-65 fee semantics, credit types, PSP revenue ledger) and §10 (ownership matrix) updated with the code.
+- [x] ADR-056 and ADR-057 (including the audit-correlation decision) recorded in `engineering-proposal.md`; ADR-041's deferred A-06 note closed.
+- [ ] `setup:seed` (no drop needed): performed by the user. Historical executions written before v34 keep `netAmount == grossAmount`; they are past records, not corrected by a reseed.
+- [ ] E2E: a merchant payment settles, the merchant balance grows by the net and the PSP revenue ledger by the fee. Pending the reseed.
+
+*Added 2026-07-30 (v34).*
+
+## v35: QR surface corrections (corrective, no new capability)
+
+Driver: the v34 analysis (`.agents/specs/dev.v34.plan.md`) evaluated the MongoDB QR payment
+architecture material against the platform and concluded the capability already exists (v28: canonical
+rail-agnostic `paymentRequestProcedure` + `qrPaymentRepresentation` + `RailResolver` + provider routing),
+so nothing new should be built. What it did find were defects on the existing QR surface, in exactly the
+controls area the source material never covers: a cleartext EPC payload carrying the creditor IBAN and
+payee name on the only payment collection with neither QE nor tests, a `payloadFormat` value the API
+accepted but never implemented, a state-changing route guarded at read level, and a dead unencrypted
+free-shape field inviting a raw-payload store. Decisions recorded in ADR-058.
+
+Rejected as no value (do not implement): QR ingestion engine as a separate module (would duplicate the
+RTP create path), UPI/Pix/SGQR parsers, compound shard key for the static-merchant-QR hotspot
+(undemonstrable on a single deployment, documented as a design only), ISO 8583 bitmap encoder, full
+ISO 20022 pain.013 serialization, CPM merchant-scans-consumer flow (deferred, needs a new persona).
+
+### FR
+
+| Id | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v35-01 | The creditor PII never lands in the QR record | `encodedPayload` is durable only for `'url'`; a `'sepa_epc'` record is stored with no payload and the EPC form is derived on read from `paymentRequestProcedure` + `payoutAccountArrangement`; the stored document contains no IBAN; the issue endpoint accepts no `iban`/`payeeName`/`amount`. The collection stays plaintext with its TTL intact (QE is impossible: TTL indexes are forbidden on encrypted collections, err 6346501) |
+| FR-v35-02 | An unbuildable payload format is refused, never downgraded | `payloadFormat` is `'url'` or `'sepa_epc'`; an unsupported value raises `QrPayloadError` → 400 `unsupported_payload_format`; `'sepa_epc'` on a subject other than `rtp_request` → 400 `unsupported_subject_for_format`; an unresolvable creditor account → 409 `epc_source_unavailable`; in the 400 cases no record is inserted |
+| FR-v35-03 | The EPC069-12 payload stays to spec | service tag `BCD`, version `002`, charset `1`, type `SCT`, correct field order, payee name capped at 70 chars, remittance at 140, amount as `<CCY><2dp>` |
+| FR-v35-04 | Issuing a QR is write-level | `POST /rtp/requests/:ref/qr` requires `paymentRequests:manage` / `write:rtp`; `level1_analyst` and `security_auditor` get 403; a customer requester passes the guard; `GET /gateway/qr/:ref` stays read-level |
+| FR-v35-05 | No raw ingestion payload is retained | `paymentRequestProcedure.originalPayload` is removed; the canonical record plus `paymentRequestEvent` remain the audit history |
+| FR-v35-06 | The QR lifecycle is covered by tests | `issueQr` is idempotent per `(subjectType, subjectReference)`, does not reuse an expired QR, and scopes the lookup to unconsumed records; `resolveQr` returns null for missing/consumed/expired and marks a single-use QR consumed exactly once while never consuming a reusable one |
+
+### Definition of Done
+
+- [x] `test:unit` green, including the new `qrRepresentation.test.ts` (16 cases) and `qrCollectionShape.test.ts` (2 cases, pinning that the collection stays unencrypted and keeps its TTL). The CH-1/CH-2 assertions were written first and confirmed failing against the pre-v35 code.
+- [x] Backend and frontend type-checks clean.
+- [x] Integration spec `test/backend/integration/routes/qr.test.ts` added for the permission guards (skips without `TEST_MONGODB_URI`, as the rest of the suite does).
+- [x] `technical-spec.md` §14.1 (QR payload derived on read, `originalPayload` removed), §14.5 (write-level issue) and §10 (SD-65 RTP + QR ownership row, previously missing) updated with the code.
+- [x] ADR-058 recorded in `engineering-proposal.md`, including the rejected QE alternative and why the TTL constraint rules it out.
+- [x] **No schema change**: no new collection, field, index, DEK or QE map entry. `vendors/setup/*` and `vendors/encryption/*` change by comment only, so `setup:db` needs no reset for this iteration and no seeder changes (there is no QR seeder; QRs are issued on demand).
+- [ ] E2E: a QR renders on all three consumers (RTP page, request page, `RequestMoneyModal`) and `encodedPayload` survives the response schema; a `sepa_epc` QR on a seeded RTP request renders a valid EPC payload.
+
+*Added 2026-08-05 (v35).*
+
+## v36: Risk hold across every movement + unified movement API
+
+A risk signal (fraud, sanctions, AML) no longer rejects a payment: it holds it, opens an investigation
+and waits for L1/L2. The investigation UI works for every movement kind, and the transaction read
+surface becomes one collection with one merge.
+
+| FR | Requirement | Acceptance criteria |
+|---|---|---|
+| FR-v36-01 | A fraud verdict holds a card payment, never declines it | `fds.scoring.completed` always carries `outcome: 'approved'` with the verdict; a `review`/`decline` recommendation authorizes the payment, withholds the payout (no execution, no ledger movement) and opens a case for L1 |
+| FR-v36-02 | A sanctions match holds and opens a case | `hrp.screening.completed` carries `sanctionsMatch` and completes approved; the saga merges it into the risk verdict (`review`, score floored at 90, `rulesFired += sanctions_match`) so the case is opened and the payment never completes without an explicit resolution |
+| FR-v36-03 | An AML alert is supervised | an AML-only alert opens a case; a payout still `routing`/`scheduled` is recalled and withheld; once handed to the rail it is not recallable and that is recorded as `payout.recall.not.possible` |
+| FR-v36-04 | A transfer is held, not rejected | bank/P2P: sender funds held, execution in `pending` + `risk.hold` step, nothing dispatched; the route answers 202 `status: 'pending'` with `holdReason`; any AML severity holds |
+| FR-v36-05 | The investigation outcome closes the movement | `fraud.case.resolved` → `cleared` releases the withheld payout / submits the held transfer; `confirmed_fraud` returns the hold and declines (card) or reverses (transfer); only a still-held movement is actionable |
+| FR-v36-06 | A held RTP approval follows the investigation | funds held, execution `pending` + `risk.hold` linked to the request, request stays `accepted`; released → `payment_initiated`, reversed → `payment_failed`; VoP mismatch keeps rejecting |
+| FR-v36-07 | The case detail supports every movement kind | `transactionKind` + execution/request link on the case; the read-model resolves the operation, the counterparty (beneficiary / external account / payee) with the owner party and both accounts, and infers the kind for cases opened before ADR-062; no merchant panel on a non-card movement |
+| FR-v36-08 | Restricted identity stays restricted | the RTP `payeeName` (QE:none) and the payee account holder are withheld from L1 with `labelRestricted: true`; account IBAN / routing number never reach this surface; the account drill-down link is offered only with `accounts:view` |
+| FR-v36-09 | One movement collection | `GET /transactions` returns every kind by default as `kind`-discriminated rows, `kind` narrows, filters `status`/`merchant`/`cardToken`/`maskedPan`/`email`/`transactionId`, single `{results,total,page,limit}` envelope; `/transactions/all` removed; `GET /transactions/:id` resolves any kind |
+| FR-v36-10 | The merge exists once | `gateway/services/paymentMovement.service.ts` owns normalization, RTP de-dup and paging; the merchant channel and the staff/session channel consume it; the customer history page issues one request and no longer merges |
+| FR-v36-11 | The external consumer is unaffected | leafy-wallet's merchant-OAuth call keeps its rows, envelope and field names; no RTP rows are added to a merchant-isolated view; a unit test asserts the consumer's exact field reads |
+| FR-v36-12 | Every movement is visible to oversight roles | `/system/transactions` lists card payments, transfers and payment requests for L1 / L2 / auditor with a kind badge, counterparty, destination, rail and the `held` / `case` markers; each row reaches its detail. Panels awaiting the enrichment read-model render an animated skeleton with `role="status"` instead of nothing |
+| FR-v36-13 | The collection accepts the page size its clients request | `limit` ceiling is 200 (the merged history page requests 200); 201 → 400; the paged envelope is unchanged. Pinned by an integration test against the real route, since a stubbed E2E does not exercise schema validation |
+| FR-v36-14 | A widened endpoint does not break its readers | the customer detail page discriminates on `kind`, not on a 404, so a transfer reference renders the transfer view; `StatusChip` degrades to a neutral chip on a missing status. Pinned by an E2E asserting no page error |
+| FR-v36-15 | The collection is never public, and it is scoped per caller | `/api/v1/transactions` stays public for POST only (simulator payment creation); the collection GET requires a token (401 without one). A customer sees only their own movements and cannot widen the scope with another email; `direction` is relative to the viewer, so an inbound transfer reads `received` |
+| FR-v36-16 | Gate indicators read as plain language | `formatRiskIndicator` translates `fds.*`, `hrp.*`, `aml.*`, `vop.*` and the engine rule ids; the transaction detail uses the formatter |
+
+### Definition of Done
+
+- [x] `test:unit` green (82 files / 764 cases at close), including `paymentMovement.test.ts` (22),
+      `caseEnrichmentMovements.test.ts` (18), `riskHoldParity.test.ts` (9), `transferRiskHold.test.ts` (11)
+      and `payoutInvestigationHold.test.ts` (8).
+- [x] `npx playwright test --project=chromium` green (114 specs).
+- [x] Backend and frontend type-checks clean.
+- [x] ADR-059..063 recorded in `engineering-proposal.md`; `technical-spec.md` updated (gate policy, hold
+      lifecycle, case discriminator, movement collection).
+- [x] **No schema change**: two optional plaintext fields on `fraudDiagnosisCase` and one additive RTP
+      state-machine transition. No collection, index, DEK or QE map change → no `--reset`. Seed gains a
+      held beneficiary transfer + its `p2p` case so the non-card investigation path is demonstrable.
+
+*Added 2026-08-13 (v36).*

@@ -2,7 +2,7 @@
  * Integration tests: /api/v1/events routes RBAC (ADR-025 / F7.3)
  * Source: backend/src/modules/provider/controllers/processEvent.controller.ts
  *
- * Requires TEST_MONGODB_URI env var — skips gracefully when not set.
+ * Requires TEST_MONGODB_URI env var: skips gracefully when not set.
  * Spins up a real Fastify app against a seeded test Atlas cluster.
  *
  * Acceptance criteria (roadmap.md §v7):
@@ -22,7 +22,7 @@ import type { FastifyInstance } from 'fastify';
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;
 
-describe('ADR-025: /api/v1/events routes — RBAC', () => {
+describe('ADR-025: /api/v1/events routes, RBAC', () => {
   let app: FastifyInstance;
   // JWT for level1_analyst (sarah.chen@back.es)
   let analystToken: string;

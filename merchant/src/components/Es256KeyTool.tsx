@@ -1,5 +1,5 @@
 'use client';
-// Standalone ES256 key generator (v25 profile utility). These are DISTINCT, THROWAWAY keys — NOT the
+// Standalone ES256 key generator (v25 profile utility). These are DISTINCT, THROWAWAY keys, NOT the
 // login credential. They are generated extractable so they can be downloaded (JWK/PEM), are never stored
 // in the login authenticator, are never enrolled at the PSP, and are never used to authenticate. Their
 // download therefore has no impact on login/system security.

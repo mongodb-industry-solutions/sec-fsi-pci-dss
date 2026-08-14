@@ -1,5 +1,5 @@
 'use client';
-// Remove-beneficiary control (SD-54). Sends only the opaque token to the removeBeneficiary server action;
+// Remove-beneficiary control . Sends only the opaque token to the removeBeneficiary server action;
 // the PSP soft-deletes the arrangement scoped to the acting user. A two-step confirm avoids accidental
 // deletes. On success the list is refreshed.
 import { useState, useTransition } from 'react';
