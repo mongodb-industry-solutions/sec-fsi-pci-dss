@@ -4085,8 +4085,13 @@ fire-and-forget and never blocks the auth response (Req 10.2.1).
 
 **Movement collection (v36 / ADR-063).** `GET /api/v1/transactions` is the single collection for every
 financial movement. Rows are `kind`-discriminated (`card` | `transfer` | `rtp`) and every kind is
-returned by default; `kind` narrows. Filters: `status`, `merchant`, `cardToken`, `maskedPan`, `email`,
-`transactionId`, `page`, `limit`. Envelope `{ results, total, page, limit }`. Channels are resolved by
+returned by default; `kind` narrows. Filters: `status` (comma-separated list allowed, so one request
+covers a status group), `direction` (`in` | `out`), `method` (`card` | `payment_link` | `redirect` |
+`p2p` | `bank` | `rtp`), `fraud` (`any` | `none` | exact case status), `q` (free text over
+merchant/beneficiary, masked PAN, concept, reference, rail, MCC, case reference and amount), `merchant`,
+`cardToken`, `maskedPan`, `email`, `transactionId`, `page`, `limit`. All narrowing is server-side and
+applied BEFORE paging, so `total` is the filtered count and a client never downloads rows it does not
+render. Envelope `{ results, total, page, limit }`. Channels are resolved by
 authentication (customer → own movements, merchant OAuth → merchant-isolated, staff → `transactions:view`).
 `GET /transactions/all` was removed (same resource, non-REST alias). `GET /transactions/:id` resolves a
 reference of ANY kind: a card payment returns its `cardTransaction` document, a transfer/RTP returns the

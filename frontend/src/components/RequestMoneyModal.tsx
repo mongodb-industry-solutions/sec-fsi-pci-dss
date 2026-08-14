@@ -7,9 +7,10 @@ import { useState } from 'react';
 import { HandCoins, X, Check } from 'lucide-react';
 import { api, type QrRepresentationDTO } from '../lib/api';
 import { QrRepresentation } from './QrRepresentation';
+import { formatAmount } from '../lib/money';
 
 function fmtAmount(n: number, currency: string) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n);
+  return formatAmount(n, currency, { locale: 'en-GB' });
 }
 
 export interface RequestMoneyModalProps {

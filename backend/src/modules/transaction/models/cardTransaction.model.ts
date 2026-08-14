@@ -69,12 +69,9 @@ export interface CardTransactionLogControlRecord {
   schemaVersion: number;
 }
 
-export type CardTransactionStatus =
-  | 'authorized'
-  | 'declined'
-  | 'pending'
-  | 'settled'
-  | 'disputed';
+// Runtime list first, type derived from it, so the seeder validates fixtures against one domain.
+export const CARD_TRANSACTION_STATUSES = ['authorized', 'declined', 'pending', 'settled', 'disputed'] as const;
+export type CardTransactionStatus = typeof CARD_TRANSACTION_STATUSES[number];
 
 export type CardTransactionType =
   | 'purchase'

@@ -8,6 +8,7 @@ import { Pagination } from '../../../components/Pagination';
 import { Mail, Type, Search, X, Lock, CreditCard, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { RequirePermission } from '../../../components/RequirePermission';
+import { formatAmount } from '../../../lib/money';
 
 // v36 (ADR-063): the collection returns normalized movement rows, so this list shows card payments,
 // transfers and payment requests alike. L1 / L2 / auditor see every movement, each at their access level.
@@ -326,7 +327,7 @@ export default function TransactionsPage() {
                     </td>
                     <td className="px-4 py-2.5 font-semibold whitespace-nowrap">
                       {m.grossAmount != null && m.currency
-                        ? new Intl.NumberFormat('en-US', { style: 'currency', currency: m.currency }).format(m.grossAmount)
+                        ? formatAmount(m.grossAmount, m.currency)
                         : '-'}
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs text-gray-600">

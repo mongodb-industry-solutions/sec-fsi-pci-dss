@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import * as path from 'path';
 import * as fs from 'fs';
-import { CARD_TRANSACTION_COLLECTION } from '../../modules/transaction/models/cardTransaction.model';
+import { CARD_TRANSACTION_COLLECTION, CARD_TRANSACTION_STATUSES } from '../../modules/transaction/models/cardTransaction.model';
 import {
   repointTransactionsToCards,
   type AgreementSeed,
@@ -27,6 +27,23 @@ export async function seedTransactions(db: Db) {
     readFixture<CardSeed>('paymentCards.json'),
     readFixture<AgreementSeed>('customerAgreements.json'),
   );
+
+  // A status outside the declared domain fails in the consumers that map it, so the seed refuses it.
+  // An absent or non-string status is reported apart: it is a broken record, not a new state.
+  const domain = new Set<string>(CARD_TRANSACTION_STATUSES);
+  const statuses = txns.map((t) => (t as { cardTransactionStatus?: unknown }).cardTransactionStatus);
+  const malformed = statuses.filter((s) => typeof s !== 'string' || s.trim() === '').length;
+  const offDomain = [...new Set(
+    statuses.filter((s): s is string => typeof s === 'string' && s.trim() !== '' && !domain.has(s.trim())),
+  )];
+  if (malformed > 0 || offDomain.length > 0) {
+    throw new Error(
+      `cardTransactions.json fails the CardTransactionStatus domain: ` +
+      `${malformed} record(s) without a usable status` +
+      (offDomain.length > 0 ? `, unknown status(es): ${offDomain.join(', ')}` : '') +
+      '. Add the state to the model and its consumers, or fix the fixture.',
+    );
+  }
 
   for (const record of txns) {
     await db.collection(CARD_TRANSACTION_COLLECTION).updateOne(

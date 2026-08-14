@@ -11,10 +11,11 @@ import { getToken, decodeToken } from '../../../../../../lib/auth';
 import { Breadcrumb, type Crumb } from '../../../../../../components/Breadcrumb';
 import { LoadingIndicator } from '../../../../../../components/LoadingIndicator';
 import { useConfirm, useNotify } from '../../../../../../components/ui/ConfirmProvider';
+import { formatAmount } from '../../../../../../lib/money';
 
 function money(amount?: number | null, currency?: string | null): string {
   if (amount == null) return '-';
-  try { return new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'USD' }).format(amount); }
+  try { return formatAmount(amount, currency || 'USD'); }
   catch { return `${amount.toFixed(2)} ${currency ?? ''}`.trim(); }
 }
 

@@ -6,6 +6,7 @@ import { BRAND } from '../../../../config/brand';
 import { deriveCardToken } from '../../../../lib/cardTokenize';
 import { useViewerSavedCards, SavedCardSelector, PayingWithSummary, SignedInBadge } from '../../../../components/gateway/SavedCardSelector';
 import { Lock, CreditCard, CheckCircle, XCircle, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { formatAmount } from '../../../../lib/money';
 
 type LinkData = Awaited<ReturnType<typeof api.paymentLinks.resolve>>;
 type PageState = 'loading' | 'ready' | 'paying' | 'success' | 'declined' | 'unavailable' | 'error';
@@ -142,9 +143,6 @@ function PaymentLinkPageInner() {
       setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     }
   }
-
-  const formatAmount = (amount: number, currency: string) =>
-    new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
 
   if (state === 'loading') {
     return (

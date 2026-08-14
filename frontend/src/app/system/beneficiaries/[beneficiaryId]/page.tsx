@@ -11,6 +11,7 @@ import { api } from '../../../../lib/api';
 import { getToken, decodeToken } from '../../../../lib/auth';
 
 import { serviceDomainLabel } from '../../../../lib/serviceDomain';
+import { formatAmount } from '../../../../lib/money';
 interface BeneficiaryDetail {
   counterpartyArrangementReference: string;
   ownerPartyReference: string;
@@ -40,7 +41,7 @@ function fmtDateTime(iso: string) {
 }
 
 function fmtAmount(n: number, currency: string) {
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency }).format(n);
+  return formatAmount(n, currency, { locale: 'en-GB' });
 }
 
 // ── Send Money Modal ──────────────────────────────────────────────────────────

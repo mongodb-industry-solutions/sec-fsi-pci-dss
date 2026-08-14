@@ -13,6 +13,7 @@ import { Pagination } from '../../../../components/Pagination';
 import { RequirePermission } from '../../../../components/RequirePermission';
 import { useConfirm, useNotify } from '../../../../components/ui/ConfirmProvider';
 import Link from 'next/link';
+import { formatAmount } from '../../../../lib/money';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -133,7 +134,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function fmtAmount(amount: number, currency: string) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
+  return formatAmount(amount, currency, { maximumFractionDigits: 2 });
 }
 
 function fmtDate(iso?: string) {

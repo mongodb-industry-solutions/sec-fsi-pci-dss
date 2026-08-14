@@ -11,6 +11,7 @@ import type { Db } from 'mongodb';
 import {
   normalizeExecutionRow, normalizeRequestRow, normalizeCardRow,
   dedupeRtpExecutions, sortAndPage, listNonCardMovements, getMovementByRef,
+  filterMovements, movementDirection, movementMethod, needsFraudCases,
   type MovementRow,
 } from '../../../../backend/src/modules/gateway/services/paymentMovement.service';
 import type { PaymentExecutionProcedure } from '../../../../backend/src/modules/gateway/models/paymentExecution.model';
@@ -272,5 +273,73 @@ describe('external consumer contract (leafy-wallet)', () => {
   it('the paged envelope keeps its field names', () => {
     const paged = sortAndPage([normalizeExecutionRow(execution(), PARTY)], 1, 20);
     expect(Object.keys(paged).sort()).toEqual(['results', 'total']);
+  });
+});
+
+// v36: narrowing moved server-side so a page carries the FILTERED total. Filtering a page in the
+// client reported the count of that page, and a status group covers several states.
+describe('movement filters', () => {
+  const row = (over: Partial<MovementRow> = {}): MovementRow => ({
+    kind: 'card', paymentExecutionInstanceReference: 'txn-1', direction: 'sent',
+    grossAmount: 100, currency: 'EUR', paymentExecutionRail: 'card',
+    paymentExecutionStatus: 'settled', concept: 'Coffee', beneficiaryName: 'Espresso Works',
+    destinationAccountMasked: '****-****-****-4242', initiatedAt: null, completedAt: null, ...over,
+  });
+
+  it('matches a status group, not just one state', () => {
+    const rows = [row({ paymentExecutionStatus: 'settled' }), row({ paymentExecutionStatus: 'completed' }), row({ paymentExecutionStatus: 'pending' })];
+    expect(filterMovements(rows, { statuses: ['settled', 'completed'] })).toHaveLength(2);
+  });
+
+  it('reads direction as the viewer sees the money', () => {
+    expect(movementDirection(row({ transactionType: 'refund' }))).toBe('in');
+    expect(movementDirection(row({ transactionType: 'purchase' }))).toBe('out');
+    expect(movementDirection(row({ paymentExecutionStatus: 'declined' }))).toBe('neutral');
+    expect(movementDirection(row({ kind: 'transfer', direction: 'received' }))).toBe('in');
+  });
+
+  it('derives the acceptance method, keeping bank apart from p2p', () => {
+    expect(movementMethod(row())).toBe('card');
+    expect(movementMethod(row({ acceptanceMethod: 'payment_link' }))).toBe('payment_link');
+    expect(movementMethod(row({ acceptanceMethod: 'redirect_checkout' }))).toBe('redirect');
+    expect(movementMethod(row({ kind: 'transfer', paymentExecutionRail: 'sepa' }))).toBe('bank');
+    expect(movementMethod(row({ kind: 'transfer', paymentExecutionRail: 'internal_ledger' }))).toBe('p2p');
+    expect(movementMethod(row({ kind: 'rtp' }))).toBe('rtp');
+  });
+
+  it('narrows by investigation status', () => {
+    const flagged = row({ fraudCase: { created: true, status: 'open' } });
+    const clean = row({ paymentExecutionInstanceReference: 'txn-2', fraudCase: { created: false } });
+    expect(filterMovements([flagged, clean], { fraud: 'any' })).toEqual([flagged]);
+    expect(filterMovements([flagged, clean], { fraud: 'none' })).toEqual([clean]);
+    expect(filterMovements([flagged, clean], { fraud: 'open' })).toEqual([flagged]);
+  });
+
+  it('searches merchant, masked PAN, concept, reference and amount', () => {
+    const rows = [row()];
+    for (const q of ['espresso', '4242', 'coffee', 'txn-1', '100']) {
+      expect(filterMovements(rows, { q }), q).toHaveLength(1);
+    }
+    expect(filterMovements(rows, { q: 'nothing-matches' })).toHaveLength(0);
+  });
+
+  it('combines filters and leaves an empty set when they conflict', () => {
+    const rows = [row({ transactionType: 'refund' })];
+    expect(filterMovements(rows, { direction: 'in', method: 'card' })).toHaveLength(1);
+    expect(filterMovements(rows, { direction: 'out', method: 'card' })).toHaveLength(0);
+  });
+
+  it('asks for investigation data only when a filter needs it', () => {
+    expect(needsFraudCases({ fraud: 'any' })).toBe(true);
+    expect(needsFraudCases({ q: 'case-1' })).toBe(true);
+    expect(needsFraudCases({ statuses: ['settled'], direction: 'out' })).toBe(false);
+  });
+
+  it('never throws on a row missing the fields it filters by', () => {
+    const sparse = { kind: 'card', paymentExecutionInstanceReference: 'x', direction: 'sent',
+      currency: 'EUR', paymentExecutionRail: null, paymentExecutionStatus: 'unknown',
+      concept: null, beneficiaryName: null, destinationAccountMasked: null,
+      initiatedAt: null, completedAt: null } as MovementRow;
+    expect(() => filterMovements([sparse], { q: 'a', direction: 'in', method: 'card', fraud: 'any' })).not.toThrow();
   });
 });
