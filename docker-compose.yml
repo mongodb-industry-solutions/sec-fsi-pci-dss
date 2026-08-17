@@ -33,8 +33,35 @@ services:
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       # Used by the merchant seeder to resolve the OIDC branding URLs (logo_uri/client_uri).
       PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
+      # In-network bank host. Private by construction: no host port is published for bankcore.
+      PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+    depends_on:
+      bankcore:
+        condition: service_started
     volumes:
       - ./backend/keys:/app/backend/keys:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  # bankcore: the Open Banking bank (ASPSP). PRIVATE service: the browser never calls it, the PSP
+  # dispatches to it over the compose network. No host port is published on purpose.
+  bankcore:
+    build:
+      context: .
+      dockerfile: bankcore/Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PSP_BANKCORE_SEED_DATA_DIR: /app/bankcore/data
+      MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      PSP_BANKCORE_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      # In-network PSP host, for the consent status callbacks bankcore delivers to its TPP.
+      PSP_BASE_URL: ${PSP_BASE_URL:-http://backend:8080}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s

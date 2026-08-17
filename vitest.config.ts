@@ -4,7 +4,10 @@ import { resolve } from 'path';
 export default defineConfig({
   resolve: {
     // v37: run the shared package from source, so a test never sees a stale dist build.
-    alias: { '@leafypay/eventbus': resolve(__dirname, 'packages/eventbus/src/index.ts') },
+    alias: {
+      '@leafypay/eventbus': resolve(__dirname, 'packages/eventbus/src/index.ts'),
+      '@leafypay/platform-links': resolve(__dirname, 'packages/platform-links/src/index.ts'),
+    },
   },
   test: {
     globals: true,

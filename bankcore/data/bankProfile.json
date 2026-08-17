@@ -1,0 +1,30 @@
+[
+  {
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "bankProfileName": "Verdant Bank",
+    "bankProfileLegalName": "Verdant Bank, S.A.",
+    "bankProfileCountryCode": "ES",
+    "bankProfileBic": "VRDNESMMXXX",
+    "bankProfileIbanBankCodes": ["9820"],
+    "bankProfileBinRanges": [
+      { "binRangeFrom": "453900", "binRangeTo": "453999", "binRangeScheme": "visa" },
+      { "binRangeFrom": "520100", "binRangeTo": "520199", "binRangeScheme": "mastercard" },
+      { "binRangeFrom": "340100", "binRangeTo": "340199", "binRangeScheme": "amex" }
+    ],
+    "bankProfileSupportedRails": ["book_transfer", "sepa", "sepa_instant", "swift"],
+    "bankProfileCapabilities": [
+      "aspsp",
+      "account_information",
+      "payment_initiation",
+      "funds_confirmation",
+      "card_issuer",
+      "card_authorization",
+      "credit_bureau"
+    ],
+    "bankProfileStatus": "active",
+    "bianServiceDomain": "Bank Profile",
+    "bianControlRecordType": "BankProfile",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  }
+]

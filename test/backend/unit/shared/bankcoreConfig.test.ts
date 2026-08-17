@@ -34,14 +34,26 @@ describe('v37 P0.4/P0.6: bankcore configuration', () => {
     expect((await loadConfig({ PSP_BANKCORE_ENABLED: '' })).enabled).toBe(false);
   });
 
-  it('the bank database defaults to a separate database on the PSP cluster', async () => {
+  it('the bank connection falls back to the PSP cluster', async () => {
     const bankcore = await loadConfig({
       PSP_BANKCORE_DB_URI: undefined,
-      PSP_BANKCORE_DB_NAME: undefined,
       MONGODB_URI: 'mongodb://example/psp',
     });
     expect(bankcore.dbUri).toBe('mongodb://example/psp');
-    expect(bankcore.dbName).toBe('bankcoredb');
+  });
+
+  it('the bank database is always a separate database from the PSP one', async () => {
+    // The literal default cannot be asserted here: the repo .env sets PSP_BANKCORE_DB_NAME, and
+    // dotenv reinjects it whatever the test deletes. The invariant is what matters anyway, since
+    // sharing one database would put the bank's ledger back inside the PSP's.
+    vi.resetModules();
+    const { config } = await import('../../../../backend/src/config');
+    expect(config.bankcore.dbName).toBeTruthy();
+    expect(config.bankcore.dbName).not.toBe(config.mongodb.dbName);
+  });
+
+  it('env.example documents bankcoredb as the default database', () => {
+    expect(readFileSync(ENV_EXAMPLE, 'utf8')).toContain('PSP_BANKCORE_DB_NAME=bankcoredb');
   });
 
   it('the keyvault namespace is the PSP KMS namespace, never the application database', async () => {

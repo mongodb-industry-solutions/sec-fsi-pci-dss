@@ -24,6 +24,16 @@ env:
   # Browser-facing Swagger UI (/help link) → PUBLIC backend URL (the API base above is in-cluster only).
   PSP_MERCHANT_SWAGGER_URL: "https://sec-fsi-pci-dss-backend.industrysolutions.staging.corp.mongodb.com/doc"
 
+  # ── bankcore, the Open Banking bank (ASPSP), v37 ───────────────────────────────────────────────
+  # Kill switch. With it off the PSP uses its built-in banking engines and never calls the bank.
+  PSP_BANKCORE_ENABLED: "false"
+  # PRIVATE in-cluster service. bankcore has NO public ingress: the browser calls the PSP, which
+  # dispatches. Giving it a public hostname would create exactly the surface this design avoids.
+  PSP_BANKCORE_BASE_URL: "http://sec-fsi-pci-dss-bankcore-web-app:80"
+  # The bank's callback to the PSP resolves from PSP_BASE_URL above (in-cluster), so no new variable.
+  # PSD2 consent landing state: automatic keeps the demo unblocked, manual needs an operator.
+  PSP_BANKCORE_CONSENT_MODE: automatic
+
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging
   # Merchant OAuth client id/secret + session cookie key — populate these keys in the
@@ -32,6 +42,8 @@ envSecrets:
   PSP_MERCHANT_OAUTH_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
   PSP_MERCHANT_SESSION_SECRET: sec-fsi-pci-dss-secrets-staging
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-staging
+  # Bank database, separate from the PSP one on the same cluster.
+  PSP_BANKCORE_DB_NAME: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-staging

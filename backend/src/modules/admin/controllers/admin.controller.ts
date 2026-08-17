@@ -174,6 +174,12 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'type-check': ['run', 'type-check'],
   'setup:db:drop': ['run', 'setup:db:drop'],
   'setup:check': ['run', 'setup:check'],
+  // v37: bank scoped entries, so one bank can be rebuilt without touching the PSP. The unscoped
+  // setup:db and setup:seed already cover it through orchestration.
+  'setup:db:bankcore': ['run', 'setup:db', '--prefix', 'bankcore'],
+  'setup:seed:bankcore': ['run', 'setup:seed', '--prefix', 'bankcore'],
+  'setup:db:drop:bankcore': ['run', 'setup:db:drop', '--prefix', 'bankcore'],
+  'setup:check:bankcore': ['run', 'setup:check', '--prefix', 'bankcore'],
 };
 
 type RateLimitStore = Map<string, { count: number; reset: number }>;

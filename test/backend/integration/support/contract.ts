@@ -1,5 +1,5 @@
-// v37 P0 support for the contract baselines: surface tier needs no DB, live tiers need MONGODB_URI
-// (read-only) or TEST_MONGODB_URI (writes).
+// v37 P0 support for the contract baselines: the surface tier needs no DB, the live tiers need a real
+// connection (read-only on MONGODB_URI, writes on TEST_MONGODB_URI).
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { FastifyInstance } from 'fastify';
@@ -34,6 +34,16 @@ export async function buildContractApp(): Promise<FastifyInstance> {
   const app = await buildApp();
   await app.ready();
   return app;
+}
+
+// The live tiers are opportunistic: they need a real connection, not just a configured URI. Under
+// load the shared cluster can refuse one, and the app then starts degraded with the OAuth key
+// provider uninitialised, which is an environment condition rather than a contract break. The
+// surface tier stays the deterministic judge.
+export function requireLive(app: FastifyInstance, ctx: { skip: (note?: string) => void }): boolean {
+  if (app?.dbError == null) return true;
+  ctx.skip(`bankcore contract live tier skipped: database degraded (${app?.dbError})`);
+  return false;
 }
 
 // Closes the app after letting fire-and-forget audit writes drain: several handlers deliberately

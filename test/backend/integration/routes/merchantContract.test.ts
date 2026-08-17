@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { WebhookService } from '../../../../backend/src/modules/gateway/services/merchantWebhook.service';
 import { signWebhookPayload, verifyWebhookSignature } from '../../../../backend/src/modules/gateway/services/webhook.service';
 import {
-  LIVE_READ, buildContractApp, closeContractApp, mintOAuthToken, readSeedFile, routeExists, requiredBlocks,
+  LIVE_READ, buildContractApp, closeContractApp, requireLive, mintOAuthToken, readSeedFile, routeExists, requiredBlocks,
 } from '../support/contract';
 
 // Espressoworks, the seeded demo merchant used by merchant/.
@@ -110,14 +110,15 @@ describe('v37 P0.2: merchant app and CIBA contract baseline', () => {
     for (const field of ['transactionReference', 'merchantReference', 'amount', 'status', 'statusCode', 'maskedPan', 'cardToken']) {
       expect(payload.data).toHaveProperty(field);
     }
-    // PCI DSS Req 3: a webhook carries a masked PAN and a token, never a PAN.
+    // PCI DSS: a webhook carries a masked PAN and a token, never a PAN.
     expect(String(payload.data.maskedPan)).toMatch(/\*|x|X/);
   });
 
   // ── Live read tier: scope gating on the merchant channel ────────────────────────────────────
   const live = LIVE_READ ? it : it.skip;
 
-  live('a token without the required scope is refused with insufficient_scope', async () => {
+  live('a token without the required scope is refused with insufficient_scope', async (ctx) => {
+    if (!requireLive(app, ctx)) return;
     const merchants = readSeedFile<MerchantSeed[]>('merchants.json');
     const clientId = merchants
       .find((m) => m.merchantAgreementInstanceReference === MERCHANT_REF)!
@@ -130,7 +131,8 @@ describe('v37 P0.2: merchant app and CIBA contract baseline', () => {
     expect(res.body.error).toBe('insufficient_scope');
   });
 
-  live('a request with no token is refused with 401', async () => {
+  live('a request with no token is refused with 401', async (ctx) => {
+    if (!requireLive(app, ctx)) return;
     const res = await supertest(app.server).get('/api/v1/beneficiaries');
     expect(res.status).toBe(401);
   });
