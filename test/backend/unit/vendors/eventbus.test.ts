@@ -4,10 +4,10 @@
  * delivery, idempotency by eventId, and the correlated trail.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
-import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventStore';
+import { EventBusInProcess } from '@leafypay/eventbus';
+import type { EventStore } from '@leafypay/eventbus';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
-import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
+import type { DomainEvent } from '@leafypay/eventbus';
 
 class FakeStore implements EventStore {
   events: DomainEvent[] = [];

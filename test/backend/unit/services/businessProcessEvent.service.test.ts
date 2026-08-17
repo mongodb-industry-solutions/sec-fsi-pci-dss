@@ -18,7 +18,7 @@ import {
   emitComplianceEvent,
   LedgerProjection,
 } from '../../../../backend/src/modules/provider/services/businessProcessEvent.service';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { EventBusInProcess } from '@leafypay/eventbus';
 import { setEventBus, getEventBus, makeEvent } from '../../../../backend/src/vendors/eventbus';
 
 const mockDb = { collection: h.collection } as never;

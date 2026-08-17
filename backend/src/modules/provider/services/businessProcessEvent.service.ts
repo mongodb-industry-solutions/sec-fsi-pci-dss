@@ -15,7 +15,7 @@ import {
 
 // CHD scrubbing is owned by the eventbus vendor (single source of truth, PCI DSS / ADR-014).
 // Re-exported here so existing importers keep working unchanged.
-import { sanitizeDeep } from '../../../vendors/eventbus/sanitize';
+import { sanitizeDeep } from '../../../vendors/eventbus';
 export { sanitizeDeep };
 import { getEventBus, makeEvent, type BusinessProcess, type EventBus, type DomainEvent } from '../../../vendors/eventbus';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../../identity/models/customerAuthentication.model';

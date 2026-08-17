@@ -30,10 +30,10 @@ vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.
 vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.service', () => ({ sendMerchantPaymentCallback: vi.fn().mockResolvedValue(undefined) }));
 
 import { createTransaction } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
-import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventStore';
+import { EventBusInProcess } from '@leafypay/eventbus';
+import type { EventStore } from '@leafypay/eventbus';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
-import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
+import type { DomainEvent } from '@leafypay/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
 import { ProviderGroups } from '../../../../backend/src/providers/groups/providerGroups';
 import {

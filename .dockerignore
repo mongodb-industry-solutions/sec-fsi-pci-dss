@@ -49,3 +49,6 @@ coverage/
 *.log
 *.tgz
 *.tsbuildinfo
+
+# Shared workspace packages are copied and rebuilt inside the image (v37).
+packages/*/dist/

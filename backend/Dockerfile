@@ -42,6 +42,10 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 COPY package.json ./
 RUN npm install --ignore-scripts
 
+# Shared workspace packages, built before the backend installs them via file: (v37).
+COPY packages/ packages/
+RUN cd packages/eventbus && npm install
+
 # Backend package.json — "fsi-pci-dss-demo": "file:.." now resolves to /app/
 COPY backend/package.json backend/
 RUN cd backend && npm install

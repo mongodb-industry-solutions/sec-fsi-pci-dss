@@ -262,7 +262,7 @@ describe('updateCase publishes the resolution', () => {
 
   async function captureResolution(status: string, caseDoc: Record<string, unknown>) {
     const { setEventBus, getEventBus } = await import('../../../../backend/src/vendors/eventbus');
-    const { EventBusInProcess } = await import('../../../../backend/src/vendors/eventbus/EventBusInProcess');
+    const { EventBusInProcess } = await import('@leafypay/eventbus');
     setEventBus(new EventBusInProcess());
     const seen: Array<Record<string, unknown>> = [];
     getEventBus().subscribe('fraud.case.resolved', (e) => { seen.push(e.payload as Record<string, unknown>); });

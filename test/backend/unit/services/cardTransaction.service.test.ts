@@ -57,7 +57,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/merchantCallback.servi
 
 import { createTransaction, getTransactionById, getAllTransactions } from '../../../../backend/src/modules/transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../../../backend/src/modules/provider/services/integrationDispatch.service';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { EventBusInProcess } from '@leafypay/eventbus';
 import { setEventBus, getEventBus } from '../../../../backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
 import { ProviderGroups } from '../../../../backend/src/providers/groups/providerGroups';

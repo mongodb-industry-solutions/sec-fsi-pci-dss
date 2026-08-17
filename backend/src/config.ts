@@ -118,6 +118,25 @@ export const config = {
     seedDataDir: pspEnv('SEED_DATA_DIR'),
   },
 
+  bankcore: {
+    // v37 kill switch, default off: the PSP keeps its built-in banking engines and its ledger.
+    enabled: pspEnv('BANKCORE_ENABLED', 'false') === 'true',
+    // Private, service-to-service. The only bankcore URL: the browser never talks to the bank.
+    baseUrl: pspEnv('BANKCORE_BASE_URL', 'http://localhost:8083')!,
+    // Bootstrap only: everything else about the TPP relationship is a seeded record.
+    dbUri: pspEnv('BANKCORE_DB_URI') ?? env('MONGODB_URI', '')!,
+    dbName: pspEnv('BANKCORE_DB_NAME', 'bankcoredb')!,
+    // Shared keyvault: bankcore reuses the PSP DEKs, so there is no new key material.
+    keyVaultNamespace: pspEnv('BANKCORE_KEY_VAULT_NAMESPACE')
+      ?? `${env('MONGODB_DB_NAME', 'pcidb')}.keyVault`,
+    cryptSharedLibPath: pspEnv('BANKCORE_CRYPT_SHARED_LIB_PATH')
+      ?? env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
+    // 'automatic' lands a new PSD2 consent valid; 'manual' leaves it received for an operator.
+    consentMode: (pspEnv('BANKCORE_CONSENT_MODE', 'automatic')!) as 'automatic' | 'manual',
+    port: parseInt(pspEnv('BANKCORE_PORT', '8083')!, 10),
+    eventBusEngine: (pspEnv('BANKCORE_EVENT_BUS_ENGINE', 'in-process')!) as 'in-process' | 'kafka' | 'rabbitmq',
+  },
+
   payout: {
     // Builtin payment-initiation module: simulated settlement delays (T+N)
     settlementDelayT1Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T1_MS', '3000')!, 10),

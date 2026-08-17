@@ -5,10 +5,10 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { resolveEventBusEngine, initEventBus } from '../../../../backend/src/vendors/eventbus';
-import { BrokerEventBus } from '../../../../backend/src/vendors/eventbus/BrokerEventBus';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
-import type { EventStore } from '../../../../backend/src/vendors/eventbus/EventStore';
-import type { DomainEvent } from '../../../../backend/src/vendors/eventbus/types';
+import { BrokerEventBus } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@leafypay/eventbus';
+import type { EventStore } from '@leafypay/eventbus';
+import type { DomainEvent } from '@leafypay/eventbus';
 
 const fakeStore: EventStore = {
   async append() {}, async trail() { return [] as DomainEvent[]; }, async byProcess() { return [] as DomainEvent[]; },

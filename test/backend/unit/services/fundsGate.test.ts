@@ -20,7 +20,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.s
   releaseCardHold: h.releaseCardHold,
 }));
 
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { EventBusInProcess } from '@leafypay/eventbus';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 import type { Db } from 'mongodb';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';

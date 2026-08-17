@@ -158,7 +158,9 @@ export async function oauthController(fastify: FastifyInstance) {
       consumes: ['application/x-www-form-urlencoded'],
     },
   }, async (req: FastifyRequest, reply: FastifyReply) => {
-    const body = req.body as Record<string, string>;
+    // A POST with no form body leaves req.body undefined; without this the failure audit below
+    // dereferences it off-request and surfaces as an unhandled rejection instead of a 400.
+    const body = (req.body ?? {}) as Record<string, string>;
     const auth = parseBasicAuth(req.headers.authorization);
 
     try {

@@ -46,7 +46,7 @@ vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.
 vi.mock('../../../../backend/src/modules/transaction/services/cardTransaction.service', () => ({ declineTransaction: h.declineTransaction }));
 
 import type { Db } from 'mongodb';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { EventBusInProcess } from '@leafypay/eventbus';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 import { PayoutOrchestrationProcess } from '../../../../backend/src/modules/gateway/services/payoutOrchestration.process';
 

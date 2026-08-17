@@ -49,7 +49,7 @@ vi.mock('../../../../backend/src/modules/notification/notifications.service', ()
 }));
 
 import type { Db } from 'mongodb';
-import { EventBusInProcess } from '../../../../backend/src/vendors/eventbus/EventBusInProcess';
+import { EventBusInProcess } from '@leafypay/eventbus';
 import { makeEvent } from '../../../../backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../backend/src/modules/transaction/services/paymentAuthorization.saga';
 import { PayoutOrchestrationProcess } from '../../../../backend/src/modules/gateway/services/payoutOrchestration.process';

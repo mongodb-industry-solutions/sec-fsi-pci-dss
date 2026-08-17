@@ -9,7 +9,7 @@
 import { Db } from 'mongodb';
 import * as crypto from 'crypto';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { redactSecrets } from '../../../vendors/eventbus/sanitize';
+import { redactSecrets } from '../../../vendors/eventbus';
 import { ProcessEventOutcome } from '../../provider/models/externalProviderArrangement.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../../gateway/models/merchantAgreement.model';
 import { PARTY_AUTHORIZATION_CODE_COLLECTION } from '../models/partyAuthorizationCode.model';
