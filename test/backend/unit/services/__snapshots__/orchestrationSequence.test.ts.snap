@@ -1,0 +1,42 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`v37 N5: orchestration sequence baseline > the payment authorization saga keeps its subscription set 1`] = `
+[
+  "card.issuer.validation.completed",
+  "card.payment.authorization.requested",
+  "fds.scoring.completed",
+  "funds.check.completed",
+  "hrp.screening.completed",
+]
+`;
+
+exports[`v37 N5: orchestration sequence baseline > the post-authorization process keeps its subscription set 1`] = `
+[
+  "aml.monitoring.completed",
+  "card.payment.authorization.completed",
+]
+`;
+
+exports[`v37 N5: orchestration sequence baseline > the post-transfer compliance process still hangs off the completion event 1`] = `
+[
+  "p2p.transfer.completed",
+]
+`;
+
+exports[`v37 N5: orchestration sequence baseline > the settlement notification keeps every subscriber it has today 1`] = `
+{
+  "payout": [
+    "aml.monitoring.completed",
+    "bank.transfer.failed",
+    "bank.transfer.settled",
+    "card.payment.authorization.completed",
+    "fraud.case.resolved",
+  ],
+  "rtp": [
+    "bank.transfer.failed",
+    "bank.transfer.settled",
+    "transfer.hold.released",
+    "transfer.hold.reversed",
+  ],
+}
+`;
