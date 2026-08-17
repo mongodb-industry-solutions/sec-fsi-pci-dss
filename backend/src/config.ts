@@ -126,9 +126,10 @@ export const config = {
     // Bootstrap only: everything else about the TPP relationship is a seeded record.
     dbUri: pspEnv('BANKCORE_DB_URI') ?? env('MONGODB_URI', '')!,
     dbName: pspEnv('BANKCORE_DB_NAME', 'bankcoredb')!,
-    // Shared keyvault: bankcore reuses the PSP DEKs, so there is no new key material.
+    // Shared keyvault: bankcore reuses the PSP DEKs, so there is no new key material. It is the KMS
+    // namespace, not the application database, which is what getKmsConfig() builds.
     keyVaultNamespace: pspEnv('BANKCORE_KEY_VAULT_NAMESPACE')
-      ?? `${env('MONGODB_DB_NAME', 'pcidb')}.keyVault`,
+      ?? `${pspEnv('KMS_KEY_VAULT_DATABASE', 'encryption')}.${pspEnv('KMS_KEY_VAULT_COLLECTION', '__keyVault')}`,
     cryptSharedLibPath: pspEnv('BANKCORE_CRYPT_SHARED_LIB_PATH')
       ?? env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
     // 'automatic' lands a new PSD2 consent valid; 'manual' leaves it received for an operator.

@@ -44,12 +44,23 @@ describe('v37 P0.4/P0.6: bankcore configuration', () => {
     expect(bankcore.dbName).toBe('bankcoredb');
   });
 
-  it('the keyvault namespace defaults to the shared PSP keyvault', async () => {
+  it('the keyvault namespace is the PSP KMS namespace, never the application database', async () => {
+    // Sharing the DEKs means sharing the KMS namespace. Pointing at <MONGODB_DB_NAME>.keyVault
+    // instead would silently give bankcore an empty key vault of its own.
+    vi.resetModules();
+    const { config } = await import('../../../../backend/src/config');
+    const { getKmsConfig } = await import('../../../../backend/src/vendors/encryption/kms');
+    expect(config.bankcore.keyVaultNamespace).toBe(getKmsConfig().namespace);
+    expect(config.bankcore.keyVaultNamespace).not.toBe(`${config.mongodb.dbName}.keyVault`);
+  });
+
+  it('the keyvault namespace follows the PSP KMS variables when they are set', async () => {
     const bankcore = await loadConfig({
       PSP_BANKCORE_KEY_VAULT_NAMESPACE: undefined,
-      MONGODB_DB_NAME: 'pcidb',
+      PSP_KMS_KEY_VAULT_DATABASE: 'vaultdb',
+      PSP_KMS_KEY_VAULT_COLLECTION: 'keys',
     });
-    expect(bankcore.keyVaultNamespace).toBe('pcidb.keyVault');
+    expect(bankcore.keyVaultNamespace).toBe('vaultdb.keys');
   });
 
   it('crypt_shared defaults to the PSP path, since both services must load the same version', async () => {
