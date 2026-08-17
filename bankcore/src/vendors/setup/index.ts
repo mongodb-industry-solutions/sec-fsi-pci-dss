@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { createCollections } from './createCollections';
+import { provisionBankDeks } from '../encryption/keyVault';
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
@@ -26,11 +27,15 @@ export async function runSetup(reset = false): Promise<void> {
     const db = client.db(config.mongodb.dbName);
     console.log(`Connected to the bank database "${config.mongodb.dbName}"\n`);
 
-    console.log('1. Creating collections...');
-    await createCollections(db, reset);
+    console.log('1. Provisioning DEKs in the shared key vault...');
+    const deks = await provisionBankDeks(client);
     console.log('');
 
-    console.log('2. Creating indexes...');
+    console.log('2. Creating collections...');
+    await createCollections(db, deks, reset);
+    console.log('');
+
+    console.log('3. Creating indexes...');
     await createIndexes(db);
     console.log('');
 

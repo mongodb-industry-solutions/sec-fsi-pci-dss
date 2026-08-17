@@ -1,6 +1,10 @@
 import { Db, IndexSpecification, CreateIndexesOptions } from 'mongodb';
 import { BANK_PROFILE_COLLECTION } from '../../modules/aspsp/models/bankProfile.model';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
+import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accountArrangement.model';
+import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
+import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
+import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -30,6 +34,39 @@ const INDEXES: IndexPlan[] = [
     collection: BANK_PROFILE_COLLECTION,
     keys: { 'bankProfileBinRanges.binRangeFrom': 1, 'bankProfileBinRanges.binRangeTo': 1 },
     options: { name: 'bankProfile_bin_ranges' },
+  },
+  // The ledger. Every balance mutation filters on the account reference plus an active status, so
+  // that pair is the index the conditional updates ride on.
+  {
+    collection: ACCOUNT_ARRANGEMENT_COLLECTION,
+    keys: { accountArrangementInstanceReference: 1 },
+    options: { unique: true, name: 'accountArrangement_ref_unique' },
+  },
+  {
+    collection: ACCOUNT_ARRANGEMENT_COLLECTION,
+    keys: { accountHolderInstanceReference: 1, accountStatus: 1 },
+    options: { name: 'accountArrangement_holder_status' },
+  },
+  {
+    collection: ACCOUNT_HOLDER_COLLECTION,
+    keys: { accountHolderInstanceReference: 1 },
+    options: { unique: true, name: 'accountHolder_ref_unique' },
+  },
+  // A statement is "this account, newest first", which is exactly this index.
+  {
+    collection: ACCOUNT_MOVEMENT_COLLECTION,
+    keys: { accountArrangementInstanceReference: 1, movementValueDateTime: -1 },
+    options: { name: 'accountMovement_account_time' },
+  },
+  {
+    collection: ACCOUNT_MOVEMENT_COLLECTION,
+    keys: { movementCorrelationId: 1 },
+    options: { name: 'accountMovement_correlation' },
+  },
+  {
+    collection: BALANCE_CREDIT_LOG_COLLECTION,
+    keys: { accountArrangementInstanceReference: 1, recordCreatedDateTime: -1 },
+    options: { name: 'balanceCreditLog_account_time' },
   },
   // The event store: idempotent append plus correlated replay of a whole journey.
   {

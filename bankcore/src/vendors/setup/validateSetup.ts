@@ -1,6 +1,10 @@
 import { Db } from 'mongodb';
 import { BANK_PROFILE_COLLECTION, BankProfileControlRecord } from '../../modules/aspsp/models/bankProfile.model';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
+import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accountArrangement.model';
+import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
+import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
+import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -14,6 +18,10 @@ export interface ValidationResult {
 
 const REQUIRED_COLLECTIONS = [
   BANK_PROFILE_COLLECTION,
+  ACCOUNT_ARRANGEMENT_COLLECTION,
+  ACCOUNT_HOLDER_COLLECTION,
+  ACCOUNT_MOVEMENT_COLLECTION,
+  BALANCE_CREDIT_LOG_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -67,6 +75,16 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
       && (profile.bankProfileIbanBankCodes?.length > 0 || profile.bankProfileBinRanges?.length > 0);
     add(`bankProfile ${profile.bankProfileBic ?? '(no BIC)'} routable`, routable,
       routable ? undefined : 'needs a BIC plus at least one IBAN bank code or BIN range');
+  }
+
+  // The ledger must be encrypted where it holds personal data: an accountArrangement created without
+  // its encryptedFields would store IBANs in clear and no read would ever complain.
+  for (const name of [ACCOUNT_ARRANGEMENT_COLLECTION, ACCOUNT_HOLDER_COLLECTION]) {
+    const info = existing.has(name)
+      ? (await db.listCollections({ name }).toArray())[0] as { options?: { encryptedFields?: { fields?: unknown[] } } } | undefined
+      : undefined;
+    const fields = info?.options?.encryptedFields?.fields?.length ?? 0;
+    add(`QE on ${name}`, fields > 0, fields > 0 ? `${fields} encrypted field(s)` : 'no encryptedFields; needs --reset');
   }
 
   // Links: absolute, well formed, and of the right kind for their consumer. A wrong host fails as an
