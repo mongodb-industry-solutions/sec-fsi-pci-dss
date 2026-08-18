@@ -233,9 +233,19 @@ export function mapPaymentStatusChange(notification: VerifiedNotification): Appl
       detail: `settled, re-emitted as bank.transfer.settled`,
       busEvent: {
         name: 'bank.transfer.settled',
+        // The payload has to be the shape the EXISTING subscriber reads, which is
+        // `paymentExecutionInstanceReference`. The bank knows our reference as the end to end id, so that is
+        // what it maps to.
+        //
+        // Found by a live run: without this the event fired, the subscriber looked up `undefined`, returned
+        // silently, and the transfer sat in `in_flight` forever. Exactly the "a missing notification leaves a
+        // transfer pending in silence" failure this boundary was warned about, and no test would have caught
+        // it, because both halves were individually correct.
         payload: {
-          paymentReference: notification.subjectReference,
-          endToEndIdentification: notification.detail.endToEndIdentification,
+          paymentExecutionInstanceReference: notification.detail.endToEndIdentification,
+          aspspPaymentReference: notification.subjectReference,
+          railRef: String(notification.subjectReference),
+          completedAt: new Date().toISOString(),
           transactionStatus: status,
         },
       },
@@ -249,8 +259,8 @@ export function mapPaymentStatusChange(notification: VerifiedNotification): Appl
       busEvent: {
         name: 'bank.transfer.failed',
         payload: {
-          paymentReference: notification.subjectReference,
-          endToEndIdentification: notification.detail.endToEndIdentification,
+          paymentExecutionInstanceReference: notification.detail.endToEndIdentification,
+          aspspPaymentReference: notification.subjectReference,
           transactionStatus: status,
           reason: notification.detail.reason,
         },

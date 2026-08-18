@@ -15,6 +15,7 @@ import { getIdempotent, saveIdempotent } from '../services/idempotency.service';
 import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
 import type { BankRail, RailDestination, RecurringScheme } from '../../../shared/services/bankTransfer';
 import type { MandateFrequency } from '../models/recurringMandate.model';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 
 function getUser(request: unknown): JwtUserPayload | undefined {
   return (request as { user?: JwtUserPayload }).user;
@@ -161,6 +162,97 @@ export async function transferController(fastify: FastifyInstance) {
       settlementSchedule: body.settlementSchedule,
     });
     if (idemKey) await saveIdempotent(fastify.db, 'transfer.bank', user.partyRef, idemKey, result);
+    return reply.code(result.status === 'submitted' ? 202 : 422).send(result);
+  });
+
+  // POST /api/v1/gateway/transfers/own
+  //
+  // A transfer between two accounts the SAME person holds. It is a real credit transfer over SEPA, ACH or
+  // SWIFT, not a PSP book entry: the accounts are at banks, and the banks move the money.
+  //
+  // The destination is named by its account REFERENCE rather than by its coordinates, which is the whole
+  // point of a separate route. The browser never needs the full IBAN of an account it already owns (data
+  // minimisation), and the server is the one that proves both accounts belong to the caller, which a client
+  // asserting "this is mine" could not.
+  fastify.post('/own', {
+    preHandler: requirePermission('beneficiaries', 'manage'),
+    schema: {
+      tags: ['transfers'],
+      summary: 'Transfer between two accounts of the same owner',
+      description:
+        'A real credit transfer between two accounts the caller holds, executed by the bank that holds the '
+        + 'debtor account. Both accounts are verified to belong to the caller server-side.\n\n'
+        + 'It has no third party, so counterparty screening and payee verification do not apply; access '
+        + 'control and traceability do, and the compliance event records that distinction rather than '
+        + 'reusing the peer-to-peer pipeline and fabricating a result about someone who is not involved.',
+      security: [{ bearerAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['fromAccountRef', 'toAccountRef', 'amount'],
+        properties: {
+          fromAccountRef: { type: 'string' },
+          toAccountRef: { type: 'string' },
+          amount: { type: 'number', exclusiveMinimum: 0 },
+          reference: { type: 'string', maxLength: 140 },
+        },
+      },
+    },
+  }, async (request, reply) => {
+    const user = getUser(request);
+    if (!user?.partyRef) return reply.code(401).send({ error: 'Unauthenticated' });
+    const body = request.body as { fromAccountRef: string; toAccountRef: string; amount: number; reference?: string };
+
+    if (body.fromAccountRef === body.toAccountRef) {
+      return reply.code(422).send({ error: 'The source and destination accounts are the same.' });
+    }
+
+    // Both sides, scoped to the caller's party in the QUERY: an account that is not theirs is not found
+    // rather than refused, so this cannot be used to probe for other people's account references.
+    const accounts = await fastify.db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+      .find({
+        partyInstanceReference: user.partyRef,
+        payoutAccountInstanceReference: { $in: [body.fromAccountRef, body.toAccountRef] },
+      })
+      .toArray();
+    const from = accounts.find((a) => a.payoutAccountInstanceReference === body.fromAccountRef);
+    const to = accounts.find((a) => a.payoutAccountInstanceReference === body.toAccountRef);
+    if (!from || !to) {
+      return reply.code(404).send({ error: 'One of the accounts does not exist or is not yours.' });
+    }
+    if (from.payoutAccountStatus !== 'active' || to.payoutAccountStatus !== 'active') {
+      return reply.code(422).send({ error: 'Both accounts must be active.' });
+    }
+    if (!to.payoutAccountIban) {
+      // Without coordinates there is nothing to instruct the bank with. The PSP revenue ledger and a wallet
+      // are the accounts this excludes, and they are not destinations for a customer transfer.
+      return reply.code(422).send({ error: 'The destination account has no bank coordinates.' });
+    }
+
+    const idemKey = request.headers['idempotency-key'] as string | undefined;
+    if (idemKey) {
+      const prior = await getIdempotent<ExecuteBankTransferResult>(fastify.db, 'transfer.own', user.partyRef, idemKey);
+      if (prior) return reply.code(prior.status === 'submitted' ? 202 : 422).send(prior);
+    }
+
+    // The SAME service as any other bank transfer. Same owner and third party differ only in how the
+    // destination was resolved, which is the property P5.1 asks for: one path, one set of controls.
+    const result = await executeBankTransfer(fastify.db, {
+      initiatorPartyRef: user.partyRef,
+      amount: body.amount,
+      currency: from.payoutAccountCurrency,
+      destination: {
+        countryCode: to.payoutAccountCountryCode,
+        iban: to.payoutAccountIban,
+        bic: to.payoutAccountBicSwift,
+        beneficiaryName: to.payoutAccountHolderName ?? to.payoutAccountAlias,
+      } as RailDestination,
+      reference: body.reference ?? `Transfer to ${to.payoutAccountAlias ?? 'my account'}`,
+      fromAccountRef: body.fromAccountRef,
+      // Proven above by resolving both accounts against the caller's own party, which is why the service
+      // takes it as an input rather than re-deriving it.
+      sameOwnerDestination: true,
+    });
+    if (idemKey) await saveIdempotent(fastify.db, 'transfer.own', user.partyRef, idemKey, result);
     return reply.code(result.status === 'submitted' ? 202 : 422).send(result);
   });
 

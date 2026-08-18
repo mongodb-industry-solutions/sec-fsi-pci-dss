@@ -185,8 +185,23 @@ describe('v37 P4.3: what each event does to the PSP', () => {
     // process by the built-in engine. Renaming it would leave transfers pending in silence.
     expect(applied.busEvent).toMatchObject({
       name: 'bank.transfer.settled',
-      payload: { paymentReference: 'pmt-1', endToEndIdentification: 'PSP-PAY-1' },
+      // Our reference under the name the subscriber reads, the bank's carried alongside.
+      payload: { paymentExecutionInstanceReference: 'PSP-PAY-1', aspspPaymentReference: 'pmt-1' },
     });
+  });
+
+  it('names the payload field the EXISTING subscriber reads, not a new one', () => {
+    const applied = mapPaymentStatusChange({
+      eventId: 'evt-10', eventType: 'payment.status.changed', subjectReference: 'pmt-bank-1',
+      status: 'ACSC', detail: { endToEndIdentification: 'psp-exec-1' },
+    });
+    // `payoutOrchestration` reads `paymentExecutionInstanceReference`. A live run found that a payload using
+    // any other name fires the event, has the subscriber look up `undefined`, return silently, and leave the
+    // transfer in `in_flight` forever. Both halves were individually correct, which is why only an end to end
+    // run caught it.
+    expect(applied.busEvent!.payload.paymentExecutionInstanceReference).toBe('psp-exec-1');
+    // The bank's own id is carried alongside, not in place of ours.
+    expect(applied.busEvent!.payload.aspspPaymentReference).toBe('pmt-bank-1');
   });
 
   it('re-emits a rejected or cancelled payment as failed', () => {

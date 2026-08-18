@@ -36,6 +36,8 @@ export interface MovementRow {
   feeAmount?: number;
   currency: string;
   paymentExecutionRail: string | null;
+  // What KIND of movement it is when the rail cannot say (P5.5). Read from the execution, never guessed.
+  movementMethodOverride?: string | null;
   paymentExecutionStatus: string;
   concept: string | null;
   beneficiaryName: string | null;
@@ -91,6 +93,7 @@ export function normalizeExecutionRow(exec: PaymentExecutionProcedure, viewerPar
     feeAmount: exec.feeAmount,
     currency: currencyOf(exec.currency),
     paymentExecutionRail: exec.paymentExecutionRail ?? null,
+    movementMethodOverride: exec.paymentExecutionMovementMethod ?? null,
     paymentExecutionStatus: status(exec.paymentExecutionStatus),
     concept: exec.paymentExecutionRemittanceInformation ?? exec.routingNote ?? null,
     beneficiaryName: exec.beneficiaryName ?? null,
@@ -208,7 +211,10 @@ export async function attachFraudCases(db: Db, rows: MovementRow[]): Promise<Mov
 // ── Filters, applied to the merged set before paging, so `total` is the filtered count ──────────
 
 /** Movement method: the two-axis taxonomy (how it was accepted) as opposed to its lifecycle state. */
-export type MovementMethod = 'card' | 'payment_link' | 'redirect' | 'p2p' | 'bank' | 'rtp';
+// P5.5: `same_owner` is its own method. It used to fall back to `p2p`, which was wrong AND silent: a
+// movement between two accounts of one owner has no counterparty, so calling it peer-to-peer misfiled it
+// for every consumer that reads this, including the fraud and AML views.
+export type MovementMethod = 'card' | 'payment_link' | 'redirect' | 'p2p' | 'bank' | 'rtp' | 'same_owner';
 
 export interface MovementFilters {
   /** Lifecycle states; a UI status group covers several, so this is a list. */
@@ -235,7 +241,12 @@ export function movementDirection(row: MovementRow): 'in' | 'out' | 'neutral' {
 
 export function movementMethod(row: MovementRow): MovementMethod {
   if (row.kind === 'rtp') return 'rtp';
-  if (row.kind === 'transfer') return BANK_RAILS.has((row.paymentExecutionRail ?? '').toLowerCase()) ? 'bank' : 'p2p';
+  if (row.kind === 'transfer') {
+    // The execution says so explicitly when it is a same-owner movement, so this is read rather than
+    // guessed from the rail. A rail cannot tell you whose accounts are at either end.
+    if (row.movementMethodOverride === 'same_owner_transfer') return 'same_owner';
+    return BANK_RAILS.has((row.paymentExecutionRail ?? '').toLowerCase()) ? 'bank' : 'p2p';
+  }
   const accepted = (row.acceptanceMethod ?? '').toLowerCase();
   if (accepted === 'payment_link') return 'payment_link';
   if (accepted === 'redirect_checkout') return 'redirect';

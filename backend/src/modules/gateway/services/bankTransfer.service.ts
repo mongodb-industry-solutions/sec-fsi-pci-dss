@@ -18,6 +18,8 @@ import { screenTransfer, openTransferFraudCase, TransferScreeningResult } from '
 import { RISK_HOLD_STEP } from './transferReview.service';
 import { getPayoutAccount } from './payoutAccount.service';
 import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
+import { initiatePaymentAtBank, selectPaymentProduct } from '../../../providers/payment-initiation/services/bankcorePis.client';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { config as appConfig } from '../../../config';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 
@@ -84,6 +86,9 @@ export interface ExecuteBankTransferInput {
   amount: number;
   currency: string;
   destination: RailDestination;
+  // Set by a caller that has already PROVEN the destination is another account of the initiator, by
+  // resolving it from a reference scoped to their party. Never accepted from a client request body.
+  sameOwnerDestination?: boolean;
   rail?: BankRail;                 // user override
   reference?: string;              // ISO 20022 remittance info
   fromAccountRef?: string;         // optional chosen source payout account ; validated for ownership
@@ -149,7 +154,16 @@ export async function executeBankTransfer(
     // must have its money reserved, and `reverseHeldTransfer` releases exactly this hold on confirmed
     // fraud. Parking the execution without holding would make that reversal move money that was never
     // reserved. No source account (transfer not drawn from a PSP account) means nothing to hold.
-    if (input.fromAccountRef) {
+    // The reservation is the bank's when the account is linked, and this path runs BEFORE the delegation is
+    // resolved below, so it is resolved here too rather than holding a projection.
+    const linkedSource = input.fromAccountRef
+      ? await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION).findOne({
+        payoutAccountInstanceReference: input.fromAccountRef,
+        payoutAccountBankAccountReference: { $exists: true },
+        payoutAccountConsentReference: { $exists: true },
+      })
+      : null;
+    if (input.fromAccountRef && !(appConfig.bankcore.enabled && linkedSource)) {
       const held = await holdCardFunds(db, input.fromAccountRef, input.amount);
       if (!held) {
         const errors = ['Insufficient available balance to hold this transfer for review.'];
@@ -185,6 +199,30 @@ export async function executeBankTransfer(
     return { executionReference: executionRef, status: 'pending', rail, currency: input.currency, holdReason: screen.reason ?? 'Held for security review.' };
   }
 
+  const destinationIban = input.destination.iban?.replace(/\s/g, '');
+  // Whether the destination is one of the initiator's OWN accounts.
+  //
+  // Told to this service by the caller that RESOLVED it, not re-derived here, and that is not a matter of
+  // trust: the same-owner route looks both accounts up by reference scoped to the caller's party, which is a
+  // stronger proof than matching an IBAN. Re-deriving it here is also impossible without a schema change,
+  // since `payoutAccountIban` is encrypted with no equality index and the driver refuses the query outright.
+  //
+  // Consequence, recorded rather than hidden: a same-owner transfer typed into the EXTERNAL form as raw
+  // coordinates is not classified as same-owner. Fixing that needs an equality index on the PSP's IBAN.
+  const sameOwner = input.sameOwnerDestination === true;
+
+  // The debtor account, and whether the bank that holds it is the one that must execute (P5.1/P5.3).
+  const sourceAccount = input.fromAccountRef
+    ? await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ payoutAccountInstanceReference: input.fromAccountRef })
+    : null;
+  const delegateToBank = Boolean(
+    appConfig.bankcore.enabled
+    && sourceAccount?.payoutAccountBankAccountReference
+    && sourceAccount?.payoutAccountAspspReference
+    && sourceAccount?.payoutAccountConsentReference,
+  );
+
   // 2. Persist the execution in routing state (append-only resolution log).
   const execution: PaymentExecutionProcedure = {
     paymentExecutionInstanceReference: executionRef,
@@ -199,6 +237,10 @@ export async function executeBankTransfer(
     feeAmount: preview.feeAmount ?? 0,
     currency: input.currency,
     paymentExecutionRail: rail,
+    // P5.5: a same-owner movement gets its own method rather than falling back to the P2P classification.
+    // The fallback was silent, which is what made it wrong: nothing said the classification was a guess.
+    ...(sameOwner ? { paymentExecutionMovementMethod: 'same_owner_transfer' } : {}),
+    ...(delegateToBank ? { paymentExecutionDelegatedToAspsp: true } : {}),
     routingNote: `${appConfig.payout.sandbox ? '[sandbox] ' : ''}${input.reference ? `Bank transfer: ${input.reference}` : `Bank transfer via ${rail.toUpperCase()}`}`,
     // ISO 20022 remittance info: the clean concept/reference the user typed (queryable for AML/FDS).
     ...(input.reference ? { paymentExecutionRemittanceInformation: input.reference } : {}),
@@ -216,30 +258,63 @@ export async function executeBankTransfer(
   };
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
 
-  // 3. Dispatch through the payment_initiation provider (ADR-039: provider-based, never direct import).
-  //    Destination coordinates stay transaction-scoped; only the PSP-opaque execution ref rides here.
-  const dispatch = await dispatchProvider(
-    db,
-    'payment_initiation',
-    'provider.payment_initiation.transfer.requested',
-    {
-      clientReference: executionRef,
-      paymentExecutionInstanceReference: executionRef,
-      railType: rail,
+  // 3. Dispatch. As PISP to the bank holding the debtor account when there is one, otherwise through the
+  //    built-in provider (ADR-039: provider-based, never a direct import). Destination coordinates stay
+  //    transaction-scoped; only the PSP-opaque execution ref rides here.
+  let submitted: boolean;
+  let dispatchNote: string;
+  let bankPaymentReference: string | undefined;
+
+  if (delegateToBank && sourceAccount) {
+    const initiated = await initiatePaymentAtBank({
+      debtorAccount: sourceAccount,
+      creditorIban: destinationIban ?? '',
+      creditorName: input.destination.beneficiaryName?.trim() || 'Beneficiary',
+      creditorAgentBic: input.destination.bic,
       amount: input.amount,
       currency: input.currency,
-      settlementSchedule,
-      paymentReference: input.reference ?? '',
-    },
-    { entityType: 'execution', entityId: executionRef, processType: 'payment_processing' },
-  );
+      remittanceInformation: input.reference,
+      endToEndIdentification: executionRef,
+      // The PSP picks the PRODUCT from the corridor; the bank picks the rail it actually executes on.
+      product: selectPaymentProduct({
+        currency: input.currency,
+        creditorCountryCode: input.destination.countryCode,
+      }),
+    });
+    submitted = Boolean(initiated.bankPaymentReference);
+    bankPaymentReference = initiated.bankPaymentReference;
+    dispatchNote = submitted
+      ? `aspsp payment=${initiated.bankPaymentReference} status=${initiated.transactionStatus}`
+      : `aspsp refused: ${initiated.error}`;
+  } else {
+    const dispatch = await dispatchProvider(
+      db,
+      'payment_initiation',
+      'provider.payment_initiation.transfer.requested',
+      {
+        clientReference: executionRef,
+        paymentExecutionInstanceReference: executionRef,
+        railType: rail,
+        amount: input.amount,
+        currency: input.currency,
+        settlementSchedule,
+        paymentReference: input.reference ?? '',
+      },
+      { entityType: 'execution', entityId: executionRef, processType: 'payment_processing' },
+    );
+    submitted = dispatch.status === 'sent' || dispatch.status === 'received';
+    dispatchNote = `provider=${dispatch.provider} status=${dispatch.status}`;
+  }
 
-  const submitted = dispatch.status === 'sent' || dispatch.status === 'received';
   await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
     { paymentExecutionInstanceReference: executionRef },
     {
-      $set: { paymentExecutionStatus: submitted ? 'in_flight' : 'failed', recordUpdatedDateTime: new Date() },
-      $push: { resolutionLog: { stepName: 'provider.dispatch', stepOutcome: submitted ? 'found' : 'failed', stepNote: `provider=${dispatch.provider} status=${dispatch.status}`, stepDateTime: new Date() } },
+      $set: {
+        paymentExecutionStatus: submitted ? 'in_flight' : 'failed',
+        ...(bankPaymentReference ? { aspspPaymentReference: bankPaymentReference } : {}),
+        recordUpdatedDateTime: new Date(),
+      },
+      $push: { resolutionLog: { stepName: 'provider.dispatch', stepOutcome: submitted ? 'found' : 'failed', stepNote: dispatchNote, stepDateTime: new Date() } },
     },
   );
 
@@ -257,7 +332,14 @@ export async function executeBankTransfer(
     processType: 'payment_processing', processAction: 'bank.transfer.funds.moved',
     processOutcome: submitted ? 'approved' : 'rejected',
     performedByPartyReference: input.initiatorPartyRef, performedByRole: 'customer',
-    eventSummary: { grossAmount: input.amount, currency: input.currency, rail, beneficiaryType: 'user' },
+    // P5.6: a transfer between two accounts of the same beneficial owner has NO third party, so there is no
+    // counterparty to screen and no payee to verify. Recording that explicitly is the point: reusing the
+    // third-party pipeline would fabricate a screening result about someone who is not involved. Access
+    // control and traceability still apply, which is why the event is emitted at all.
+    eventSummary: {
+      grossAmount: input.amount, currency: input.currency, rail, beneficiaryType: 'user',
+      ...(sameOwner ? { sameBeneficialOwner: true, counterpartyScreening: 'not_applicable' } : {}),
+    },
     bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
   });
 

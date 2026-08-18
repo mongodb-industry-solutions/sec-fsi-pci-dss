@@ -2445,6 +2445,19 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined },
         token,
       ),
+    // v37 P5.2: between two accounts the caller holds. The destination is named by its reference, not by
+    // its coordinates: the browser never needs the IBAN of an account it already owns, and the server is
+    // what proves both accounts are the caller's.
+    own: (
+      body: { fromAccountRef: string; toAccountRef: string; amount: number; reference?: string },
+      token: string,
+      idempotencyKey?: string,
+    ) =>
+      apiFetch<{ executionReference: string; status: string; rail?: string; feeAmount?: number; currency: string; errors?: string[] }>(
+        `/api/v1/gateway/transfers/own`,
+        { method: 'POST', body: JSON.stringify(body), headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined },
+        token,
+      ),
     status: (ref: string, token: string) =>
       apiFetch<{ executionReference: string; status: string; rail?: string; grossAmount: number; feeAmount: number; currency: string; failureReason?: string; completedAt?: string }>(
         `/api/v1/gateway/transfers/${encodeURIComponent(ref)}/status`,

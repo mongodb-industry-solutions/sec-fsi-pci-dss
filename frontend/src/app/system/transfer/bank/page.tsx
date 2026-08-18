@@ -192,7 +192,27 @@ function RegisteredAccountForm({ partyRef, token, onDone }: { partyRef: string; 
 
     if (destType === 'own') {
       if (!toAccountRef) { setError('Select a destination account.'); return; }
-      setError('Account-to-account transfers are not yet available. Please use "Send to contact" to transfer via a saved contact.');
+      setError('');
+      try {
+        // A real credit transfer between two accounts you hold, over the same rails as any other: the bank
+        // holding the source account moves the money. The destination is sent as its REFERENCE, so the
+        // browser never handles the IBAN of an account it already owns.
+        const res = await api.transfers.own(
+          { fromAccountRef: fromRef, toAccountRef, amount: parsed, reference: note.trim() || undefined },
+          token,
+        );
+        const destination = accounts.find(a => a.payoutAccountInstanceReference === toAccountRef);
+        setSuccess({
+          label: destination?.payoutAccountAlias ?? 'your account',
+          amount: parsed,
+          currency: res.currency,
+          ref: res.executionReference,
+          status: res.status,
+          note: note.trim() || undefined,
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Transfer failed.');
+      }
       return;
     }
 

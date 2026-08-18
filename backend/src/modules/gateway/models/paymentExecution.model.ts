@@ -50,6 +50,9 @@ export interface PaymentExecutionProcedure {
   // NO balances for this execution. Explicit on the record rather than derived from a runtime flag, because
   // the settlement handler runs later and must know what was actually done, not what is configured now.
   paymentExecutionDelegatedToAspsp?: boolean;
+  // v37 P5.5: what KIND of movement this is, when the rail cannot say. Today only `same_owner_transfer`,
+  // which used to be misfiled as peer-to-peer because a rail cannot tell you whose accounts are at each end.
+  paymentExecutionMovementMethod?: 'same_owner_transfer';
   // The bank's own payment id, so the PSP's instruction and the bank's execution resolve to each other.
   aspspPaymentReference?: string;
 
