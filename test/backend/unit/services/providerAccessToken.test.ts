@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Db } from 'mongodb';
 import {
-  getProviderAccessToken, resetProviderTokenCache,
+  getProviderAccessToken, getProviderBaseUrl, resetProviderTokenCache,
 } from '../../../../backend/src/modules/provider/services/providerAccessToken.service';
 
 const WITH_CREDENTIAL = {
@@ -25,6 +25,8 @@ const WITH_CREDENTIAL = {
       tokenCachingEnabled: true,
     },
   },
+  // P4.1: where the bank is, on the same record as the credential to reach it with.
+  externalProviderBaseUrl: 'http://bank:8083',
 };
 
 function fakeDb(records: unknown[]): Db {
@@ -42,6 +44,32 @@ function fakeTokenEndpoint(payload: unknown, ok = true, status = 200) {
 }
 
 beforeEach(() => resetProviderTokenCache());
+
+describe('v37 P4.1: where the bank is comes from the record, not the environment', () => {
+  it('resolves the base URL of the active provider', async () => {
+    const result = await getProviderBaseUrl('account_information', { db: fakeDb([WITH_CREDENTIAL]) });
+    expect(result.baseUrl).toBe('http://bank:8083');
+  });
+
+  it('trims a trailing slash, so a path is never joined onto a double one', async () => {
+    const withSlash = { ...WITH_CREDENTIAL, externalProviderBaseUrl: 'http://bank:8083/' };
+    const result = await getProviderBaseUrl('account_information', { db: fakeDb([withSlash]) });
+    expect(result.baseUrl).toBe('http://bank:8083');
+  });
+
+  it('refuses a record carrying credentials but no base URL, rather than guessing a host', async () => {
+    const withoutUrl = { ...WITH_CREDENTIAL, externalProviderBaseUrl: undefined };
+    const result = await getProviderBaseUrl('account_information', { db: fakeDb([withoutUrl]) });
+    expect(result.baseUrl).toBeUndefined();
+    expect(result.error).toContain('base URL');
+  });
+
+  it('refuses a relative endpoint: the built-in loopback path is not a bank', async () => {
+    const relative = { ...WITH_CREDENTIAL, externalProviderBaseUrl: '/api/v1/modules/account-information/validate' };
+    const result = await getProviderBaseUrl('account_information', { db: fakeDb([relative]) });
+    expect(result.baseUrl).toBeUndefined();
+  });
+});
 
 describe('v37 P3.7b: the PSP exchanges its credential for a scoped token', () => {
   it('posts the client credentials grant and returns the access token', async () => {

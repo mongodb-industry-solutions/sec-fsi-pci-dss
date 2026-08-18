@@ -281,6 +281,11 @@ export interface ExternalProviderArrangement {
   externalProviderApiKeyHash?: string;       // bcrypt, never returned
   externalProviderApiKeyPrefix?: string;
   externalProviderAuthScheme?: IntegrationAuth;
+  // Absolute base URL of a provider whose API is a REST RESOURCE api rather than a single endpoint (v37).
+  // `externalProviderApiEndpoint` stays the one-endpoint dispatch target the Hub posts to; a provider like
+  // an ASPSP has a path and a method per operation, so its adapter needs the host and builds the rest.
+  // Written by the seeder per environment, so repointing at another provider is a data change.
+  externalProviderBaseUrl?: string;
 
   externalProviderCallbackEnabled: boolean;
   externalProviderCallbackPath?: string;

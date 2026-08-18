@@ -13,6 +13,10 @@ import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/payment
 import {
   BANK_MODULE_CONFIGURATION_COLLECTION, BANK_CAPABILITY_KEYS, BankModuleConfigurationControlRecord,
 } from '../../modules/admin/models/bankModuleConfiguration.model';
+import {
+  TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION, TppEventSubscriptionControlRecord,
+} from '../../modules/tpp-trust/models/tppEventSubscription.model';
+import { assertLinks as assertSubscriptionLinks } from '@leafypay/platform-links';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -38,6 +42,8 @@ const REQUIRED_COLLECTIONS = [
   BANK_CONSENT_ACCESS_LOG_COLLECTION,
   PAYMENT_INITIATION_COLLECTION,
   BANK_MODULE_CONFIGURATION_COLLECTION,
+  TPP_EVENT_SUBSCRIPTION_COLLECTION,
+  TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -174,6 +180,33 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
   const mode = consentConfig?.bankModuleConfiguration?.consentMode;
   add('the consent mode is configured to a valid value', mode === 'automatic' || mode === 'manual',
     `consentMode: ${String(mode)}`);
+
+  // A subscription with no callback, or a relative one, means every notification fails as an opaque
+  // unreachable. Checking the shape at setup is far cheaper than finding it when a transfer hangs.
+  const subscriptions = await db.collection<TppEventSubscriptionControlRecord>(TPP_EVENT_SUBSCRIPTION_COLLECTION)
+    .find({}, { projection: { _id: 0 } })
+    .toArray()
+    .catch(() => []);
+  add('tppEventSubscription seeded', subscriptions.length > 0, `${subscriptions.length} subscription(s)`);
+  for (const subscription of subscriptions) {
+    for (const check of assertSubscriptionLinks([
+      {
+        name: `subscription ${subscription.tppRegistrationClientId} callback (private)`,
+        value: subscription.tppEventSubscriptionCallbackUrl,
+        expected: 'private',
+      },
+      {
+        name: `subscription ${subscription.tppRegistrationClientId} JWKS URL (private)`,
+        value: subscription.tppEventSubscriptionJwksUrl,
+        expected: 'private',
+      },
+    ])) {
+      add(check.name, check.ok, check.detail);
+    }
+    const events = subscription.tppEventSubscriptionEventTypes ?? [];
+    add(`subscription ${subscription.tppRegistrationClientId} names its events`, events.length > 0,
+      events.length > 0 ? events.join(', ') : 'a subscription for nothing delivers nothing');
+  }
 
   // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN
   // must be one this bank actually owns.

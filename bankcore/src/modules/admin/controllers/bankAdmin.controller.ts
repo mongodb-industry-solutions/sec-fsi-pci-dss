@@ -10,6 +10,10 @@ import { TPP_REGISTRATION_COLLECTION, TppRegistrationControlRecord, TppRegistrat
 import { hashClientSecret } from '../../tpp-trust/services/tppRegistration.service';
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BankConsentAgreementControlRecord, ConsentStatus } from '../../consent/models/bankConsent.model';
 import { changeConsentStatus, findConsentByReference } from '../../consent/services/consent.service';
+import {
+  TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+  TppEventSubscriptionControlRecord, TppWebhookDeliveryLogRecord,
+} from '../../tpp-trust/models/tppEventSubscription.model';
 
 // Administration of the bank's own internals: engine configuration, TPP registrations, consent status.
 //
@@ -48,7 +52,7 @@ const TERMINAL_BY_BANK: ConsentStatus[] = ['valid', 'rejected', 'revokedByPsu'];
 
 export async function bankAdminController(fastify: FastifyInstance) {
   // ── Engine configuration ─────────────────────────────────────────────────────────────────────
-  fastify.get('/module-config', {
+  fastify.get('/module/config', {
     preValidation: requireAdmin,
     schema: {
       tags: ['admin'],
@@ -66,7 +70,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
     },
   }, async () => ({ results: await listModuleConfigurations(fastify.db) }));
 
-  fastify.get('/module-config/:capability', {
+  fastify.get('/module/config/:capability', {
     preValidation: requireAdmin,
     schema: {
       tags: ['admin'],
@@ -84,7 +88,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
     return record;
   });
 
-  fastify.put('/module-config/:capability', {
+  fastify.put('/module/config/:capability', {
     preValidation: requireAdmin,
     schema: {
       tags: ['admin'],
@@ -123,7 +127,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   // ── TPP registrations ────────────────────────────────────────────────────────────────────────
-  fastify.get('/tpp-registrations', {
+  fastify.get('/tpp/registrations', {
     preValidation: requireAdmin,
     schema: {
       tags: ['admin'],
@@ -148,7 +152,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
     return { results: records.map(publicRegistration) };
   });
 
-  fastify.patch('/tpp-registrations/:reference/status', {
+  fastify.patch('/tpp/registrations/:reference/status', {
     preValidation: requireAdmin,
     schema: {
       tags: ['admin'],
@@ -180,7 +184,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
     return publicRegistration(updated!);
   });
 
-  fastify.post('/tpp-registrations/:reference/rotate-secret', {
+  fastify.post('/tpp/registrations/:reference/secret/rotate', {
     preValidation: requireAdmin,
     schema: {
       tags: ['admin'],
@@ -232,6 +236,67 @@ export async function bankAdminController(fastify: FastifyInstance) {
       },
     );
     return { tppRegistrationClientId: existing.tppRegistrationClientId, clientSecret };
+  });
+
+  // ── Notification subscriptions and the delivery inspector ────────────────────────────────────
+  fastify.get('/tpp/subscriptions', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'List the notification subscriptions',
+      description:
+        'Where the bank delivers, which events it sends, how it signs them and its retry policy. A '
+        + 'subscription that omits an event type silently stops delivering it, which is why the event list '
+        + 'is worth being able to read.',
+      security: [{ adminAuth: [] }],
+      response: {
+        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
+        401: ERROR,
+        403: ERROR,
+      },
+    },
+  }, async () => ({
+    results: await fastify.db.collection<TppEventSubscriptionControlRecord>(TPP_EVENT_SUBSCRIPTION_COLLECTION)
+      .find({}, { projection: { _id: 0 } }).toArray(),
+  }));
+
+  fastify.get('/tpp/deliveries', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Inspect notification deliveries',
+      description:
+        'One row per ATTEMPT, newest first, so a retry that eventually succeeded is distinguishable from a '
+        + 'first-time success. Filter by outcome to see only what failed, or by subject to follow one '
+        + 'consent or payment.\n\n'
+        + 'This exists because a notification that silently never arrived is the failure mode that leaves a '
+        + 'transfer stuck in `pending` with nothing to look at.',
+      security: [{ adminAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          outcome: { type: 'string', description: 'delivered, failed or skipped.' },
+          subject: { type: 'string', description: 'The consent or payment reference the event was about.' },
+          limit: { type: 'integer', minimum: 1, maximum: 200 },
+        },
+      },
+      response: {
+        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
+        401: ERROR,
+        403: ERROR,
+      },
+    },
+  }, async (request) => {
+    const { outcome, subject, limit } = request.query as { outcome?: string; subject?: string; limit?: number };
+    const filter: Record<string, unknown> = {};
+    if (outcome) filter.deliveryOutcome = outcome;
+    if (subject) filter.tppEventSubjectReference = subject;
+    const results = await fastify.db.collection<TppWebhookDeliveryLogRecord>(TPP_WEBHOOK_DELIVERY_LOG_COLLECTION)
+      .find(filter, { projection: { _id: 0 } })
+      .sort({ recordCreatedDateTime: -1 })
+      .limit(limit ?? 50)
+      .toArray();
+    return { results };
   });
 
   // ── Consent administration (the manual authorisation path) ───────────────────────────────────

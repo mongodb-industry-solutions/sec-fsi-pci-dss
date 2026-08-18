@@ -5,6 +5,7 @@ import { seedAccountHolders, seedAccountArrangements } from './seedAccounts';
 import { seedTppRegistrations } from './seedTppRegistrations';
 import { seedConsents } from './seedConsents';
 import { seedModuleConfigurations } from './seedModuleConfigurations';
+import { seedEventSubscriptions } from './seedEventSubscriptions';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -27,6 +28,8 @@ export async function runSeed(): Promise<void> {
     await seedConsents(db);
     // Engine configuration, so the admin API has something to edit on a fresh database.
     await seedModuleConfigurations(db);
+    // Where to deliver notifications. After the TPP, since it belongs to one.
+    await seedEventSubscriptions(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();

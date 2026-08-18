@@ -7,6 +7,7 @@ import {
 } from '../models/bankConsent.model';
 import { ACCOUNT_ARRANGEMENT_COLLECTION, AccountArrangementControlRecord } from '../../aspsp/models/accountArrangement.model';
 import { resolveModuleConfig } from '../../admin/services/bankModuleConfiguration.service';
+import { notifyTpp } from '../../tpp-trust/services/eventNotification.service';
 import { config } from '../../../config';
 
 // Consent lifecycle and enforcement. Every AIS and PIS call passes through `resolveConsent`, which is
@@ -130,6 +131,14 @@ export async function createConsent(db: Db, input: CreateConsentInput): Promise<
   };
 
   await collection(db).insertOne(consent);
+  // The creation IS a status change from the TPP's point of view, so it is notified like any other. In
+  // `automatic` mode this is the message that says the link is usable.
+  await notifyTpp(db, input.tppClientId, {
+    eventType: 'consent.status.changed',
+    subjectReference: consent.bankConsentAgreementInstanceReference,
+    status: consent.bankConsentStatus,
+    detail: { reason: consent.bankConsentStatusReason },
+  });
   await recordAccess(db, {
     bankConsentAgreementInstanceReference: consent.bankConsentAgreementInstanceReference,
     bankConsentTppClientId: input.tppClientId,
@@ -167,6 +176,18 @@ export async function findConsentByReference(
   );
 }
 
+/**
+ * Changes a consent's status and tells the TPP.
+ *
+ * The notification fires for EVERY transition, including the instant one in `automatic` mode: instant is
+ * not a reason to skip it, because the PSP must have exactly one way of learning that a consent became
+ * usable. If it only heard about slow transitions it would need a second, optimistic path for fast ones,
+ * which is the branch this design exists to avoid.
+ *
+ * Delivery is deliberately not awaited by the caller's decision: the status change already happened, and
+ * failing it because nobody could be told would be the wrong trade. The status endpoint is the
+ * specification's own fallback for a missed delivery.
+ */
 export async function changeConsentStatus(
   db: Db,
   consentId: string,
@@ -197,6 +218,12 @@ export async function changeConsentStatus(
       accessedResourceKind: 'consent',
       accessDecision: 'granted',
       accessDecisionReason: `status changed to ${status} (${reason})`,
+    });
+    await notifyTpp(db, updated.bankConsentTppClientId, {
+      eventType: 'consent.status.changed',
+      subjectReference: consentId,
+      status,
+      detail: { reason },
     });
   }
   return updated;

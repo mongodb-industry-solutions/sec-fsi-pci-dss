@@ -39,9 +39,12 @@ function bankAnswers(available: string, expected = available, blocked?: string) 
   })) as unknown as typeof fetch;
 }
 
-// The TPP token is injected, so a unit test neither opens a database nor knows how the credential is
-// obtained. That the bank refuses a token at all is asserted in the tpp authorisation suites.
+// The TPP token and the bank's address are both injected, so a unit test neither opens a database nor
+// knows how either is obtained. This is not ceremony: with the real providers in place, this suite silently
+// read the SEEDED provider record from the live database and asserted against the wrong host, which is how
+// a unit test starts depending on the state of a cluster.
 const token = async () => ({ accessToken: 'bank-issued-token' });
+const endpoint = async () => ({ baseUrl: 'http://bank:8083' });
 
 async function load(enabled: boolean) {
   vi.resetModules();
@@ -73,6 +76,7 @@ describe('v37 P2.4: the balance is projected from the bank', () => {
       { bankAccountReference: 'acc-1', consentReference: 'c1' },
       bankAnswers('1234.56'),
       token,
+      endpoint,
     );
     expect(result.balance).toMatchObject({ availableAmount: 1234.56, currency: 'EUR' });
   });
@@ -83,6 +87,7 @@ describe('v37 P2.4: the balance is projected from the bank', () => {
       { bankAccountReference: 'acc-1', consentReference: 'c1' },
       bankAnswers('100.00', '175.50', '20.00'),
       token,
+      endpoint,
     );
     expect(result.balance).toMatchObject({ availableAmount: 100, pendingAmount: 75.5, reservedAmount: 20 });
   });
@@ -94,6 +99,7 @@ describe('v37 P2.4: the balance is projected from the bank', () => {
       { bankAccountReference: 'acc-1', consentReference: 'c1' },
       bankAnswers('12345678.91'),
       token,
+      endpoint,
     );
     expect(result.balance!.availableAmount).toBe(12345678.91);
   });
@@ -122,7 +128,7 @@ describe('v37 P2.4: the balance is projected from the bank', () => {
       ok: true, status: 200,
       json: async () => ({ balances: [{ balanceType: 'expected', balanceAmount: { currency: 'EUR', amount: '10.00' } }] }),
     })) as unknown as typeof fetch;
-    const result = await client.readAccountBalance({ bankAccountReference: 'a', consentReference: 'c' }, noAvailable, token);
+    const result = await client.readAccountBalance({ bankAccountReference: 'a', consentReference: 'c' }, noAvailable, token, endpoint);
     expect(result.balance).toBeUndefined();
     expect(result.error).toContain('interimAvailable');
   });
@@ -141,6 +147,7 @@ describe('v37 P2.5: the PSP asks the bank to credit, and never credits locally o
       { bankAccountReference: 'acc-1', amount: 500, currency: 'EUR', endToEndIdentification: 'CREDIT-42' },
       capturing,
       token,
+      endpoint,
     );
     expect(result).toMatchObject({ applied: true, balanceAfter: 4000 });
     expect(seen.url).toBe('http://bank:8083/v1/accounts/acc-1/credits');
@@ -155,7 +162,7 @@ describe('v37 P2.5: the PSP asks the bank to credit, and never credits locally o
       ok: false, status: 400,
       json: async () => ({ tppMessages: [{ text: 'Account is held in USD' }] }),
     })) as unknown as typeof fetch;
-    const result = await client.requestDemoCredit({ bankAccountReference: 'a', amount: 1, currency: 'EUR' }, refusing, token);
+    const result = await client.requestDemoCredit({ bankAccountReference: 'a', amount: 1, currency: 'EUR' }, refusing, token, endpoint);
     expect(result).toMatchObject({ applied: false, error: 'Account is held in USD' });
   });
 });

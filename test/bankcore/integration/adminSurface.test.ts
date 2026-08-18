@@ -20,12 +20,12 @@ const TPP = () => issueAccessToken(
 
 // Concrete URLs, for calling the app.
 const ADMIN_ROUTES: Array<[string, string]> = [
-  ['GET', '/api/v1/admin/module-config'],
-  ['GET', '/api/v1/admin/module-config/card-issuer'],
-  ['PUT', '/api/v1/admin/module-config/card-issuer'],
-  ['GET', '/api/v1/admin/tpp-registrations'],
-  ['PATCH', '/api/v1/admin/tpp-registrations/tpp-leafypay-001/status'],
-  ['POST', '/api/v1/admin/tpp-registrations/tpp-leafypay-001/rotate-secret'],
+  ['GET', '/api/v1/admin/module/config'],
+  ['GET', '/api/v1/admin/module/config/card-issuer'],
+  ['PUT', '/api/v1/admin/module/config/card-issuer'],
+  ['GET', '/api/v1/admin/tpp/registrations'],
+  ['PATCH', '/api/v1/admin/tpp/registrations/tpp-leafypay-001/status'],
+  ['POST', '/api/v1/admin/tpp/registrations/tpp-leafypay-001/secret/rotate'],
   ['GET', '/api/v1/admin/consents'],
   ['PATCH', '/api/v1/admin/consents/cns-1/status'],
 ];
@@ -33,11 +33,11 @@ const ADMIN_ROUTES: Array<[string, string]> = [
 // The same routes as OpenAPI writes them, with the parameters templated. Kept separate from the concrete
 // list because one is for calling the app and the other for reading its published contract.
 const ADMIN_PATHS = [
-  '/api/v1/admin/module-config',
-  '/api/v1/admin/module-config/{capability}',
-  '/api/v1/admin/tpp-registrations',
-  '/api/v1/admin/tpp-registrations/{reference}/status',
-  '/api/v1/admin/tpp-registrations/{reference}/rotate-secret',
+  '/api/v1/admin/module/config',
+  '/api/v1/admin/module/config/{capability}',
+  '/api/v1/admin/tpp/registrations',
+  '/api/v1/admin/tpp/registrations/{reference}/status',
+  '/api/v1/admin/tpp/registrations/{reference}/secret/rotate',
   '/api/v1/admin/consents',
   '/api/v1/admin/consents/{consentId}/status',
 ];
@@ -58,7 +58,7 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
     const adminPaths = Object.keys(paths).filter((path) => path.startsWith('/api/v1/admin/'));
     expect(adminPaths.length).toBeGreaterThanOrEqual(5);
     // The published Open Banking surface must contain nothing administrative.
-    const leaked = Object.keys(paths).filter((path) => path.startsWith('/v1/') && /admin|module-config|tpp-registration/.test(path));
+    const leaked = Object.keys(paths).filter((path) => path.startsWith('/v1/') && /admin|module\/config|tpp\/registration/.test(path));
     expect(leaked).toEqual([]);
   });
 
@@ -84,7 +84,7 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
 
   it('refuses a valid platform token that is not an admin', async () => {
     const response = await app.inject({
-      method: 'GET', url: '/api/v1/admin/module-config',
+      method: 'GET', url: '/api/v1/admin/module/config',
       headers: { authorization: `Bearer ${NOT_ADMIN()}` },
     });
     expect(response.statusCode).toBe(403);
@@ -92,7 +92,7 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
 
   it('refuses a TPP access token: a third party does not configure the bank', async () => {
     const response = await app.inject({
-      method: 'GET', url: '/api/v1/admin/module-config',
+      method: 'GET', url: '/api/v1/admin/module/config',
       headers: { authorization: `Bearer ${TPP()}` },
     });
     // The TPP token is signed with the bank's own key, so this proves the two mechanisms are separate
@@ -101,14 +101,14 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
   });
 
   it('documents that a configuration change needs no redeploy, which is the point of the surface', () => {
-    const description = paths['/api/v1/admin/module-config/{capability}'].put.description ?? '';
+    const description = paths['/api/v1/admin/module/config/{capability}'].put.description ?? '';
     expect(description).toContain('next invocation');
     // And that it replaces rather than patches, which is what lets an operator remove an entry.
     expect(description).toContain('REPLACES');
   });
 
   it('documents that a rotated secret is returned once and never again', () => {
-    const description = paths['/api/v1/admin/tpp-registrations/{reference}/rotate-secret'].post.description ?? '';
+    const description = paths['/api/v1/admin/tpp/registrations/{reference}/secret/rotate'].post.description ?? '';
     expect(description).toContain('ONCE');
   });
 

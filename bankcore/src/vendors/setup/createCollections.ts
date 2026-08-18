@@ -8,6 +8,9 @@ import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppR
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
 import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models/bankModuleConfiguration.model';
+import {
+  TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+} from '../../modules/tpp-trust/models/tppEventSubscription.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -37,6 +40,8 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   // personal data the bank has no basis to make searchable, so it is stored as sent and never queried by.
   { name: PAYMENT_INITIATION_COLLECTION, purpose: 'payments initiated by a third party, through their lifecycle' },
   { name: BANK_MODULE_CONFIGURATION_COLLECTION, purpose: "configuration of the bank's own engines, edited over its admin API" },
+  { name: TPP_EVENT_SUBSCRIPTION_COLLECTION, purpose: 'where the bank delivers notifications, and how it signs them' },
+  { name: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION, purpose: 'one row per delivery attempt, so a silent failure is visible' },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

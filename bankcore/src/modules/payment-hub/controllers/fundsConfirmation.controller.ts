@@ -28,6 +28,8 @@ function messages(code: string, text: string) {
 // `preValidation`, not `preHandler`: validation runs between them, so authorisation has to come first or
 // an unauthenticated caller is answered about the body format instead of being refused.
 export async function fundsConfirmationController(fastify: FastifyInstance) {
+  // `funds-confirmations` is hyphenated because Berlin Group spells it that way. Our own paths use
+  // hierarchy instead (`/admin/module/config`), but a standard path is copied exactly, not improved.
   fastify.post('/funds-confirmations', {
     preValidation: requireTpp('funds-confirmations', 'CBPII'),
     schema: {

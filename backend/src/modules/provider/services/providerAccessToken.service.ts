@@ -27,6 +27,12 @@ export interface AccessTokenResult {
   error?: string;
 }
 
+export interface ProviderEndpointResult {
+  // Absolute base URL of the provider, as the seeded record holds it.
+  baseUrl?: string;
+  error?: string;
+}
+
 function cacheKey(providerReference: string, scope: string): string {
   return `${providerReference}|${scope}`;
 }
@@ -50,6 +56,34 @@ function oauth2ConfigOf(
   const oauth2 = provider.authConfig.oauth2;
   if (!oauth2?.clientId || !oauth2.tokenEndpoint) return undefined;
   return oauth2;
+}
+
+/**
+ * Resolves where the provider of a capability lives, from the record rather than from the environment.
+ *
+ * This is what makes repointing the PSP at another bank a data change: the seeder writes the absolute
+ * endpoint per environment, and nothing at runtime falls back to a variable, because a silent fallback is
+ * how two environments end up disagreeing about which bank they are talking to.
+ */
+export async function getProviderBaseUrl(
+  providerType: IntegrationProviderType,
+  options: { db?: Db } = {},
+): Promise<ProviderEndpointResult> {
+  let providers;
+  try {
+    providers = await getActiveProvidersForType(await resolveDb(options.db), providerType);
+  } catch (err) {
+    return { error: `provider lookup failed: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  // The credential and the address belong to the same record: a provider carrying one without the other
+  // is misconfigured, and picking them from different records is how a token ends up at the wrong bank.
+  const provider = providers.find((candidate) => (
+    oauth2ConfigOf(candidate) && candidate.externalProviderBaseUrl?.startsWith('http')
+  ));
+  if (!provider) {
+    return { error: `no active ${providerType} provider carries an absolute base URL with credentials` };
+  }
+  return { baseUrl: provider.externalProviderBaseUrl!.replace(/\/$/, '') };
 }
 
 /**

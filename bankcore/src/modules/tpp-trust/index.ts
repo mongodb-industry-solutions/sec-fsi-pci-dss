@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { oauthController } from './controllers/oauth.controller';
+import { jwksController } from './controllers/jwks.controller';
 
 // TPP trust: registration records and the token endpoint that turns a registered client into a scoped
 // access token. Mounted at /v1, alongside the rest of the published surface.
@@ -20,4 +21,6 @@ export async function tppTrustModule(fastify: FastifyInstance) {
     );
     await scope.register(oauthController, { prefix: '/v1' });
   });
+  // At the root, not under /v1: a well-known path is where it is or it is not well known.
+  await fastify.register(jwksController);
 }

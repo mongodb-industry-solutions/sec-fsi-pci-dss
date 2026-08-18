@@ -44,7 +44,7 @@ const PARITY: ParityRow[] = [
   // a wish: the notification path needs a subscription to deliver to, the rest are their own phases.
   { capability: 'recurring mandate (periodic payments)', method: 'post', path: '/v1/periodic-payments/{paymentProduct}', phase: 'P3.9' },
   { capability: 'card issuance and lifecycle', method: 'post', path: '/v1/cards', phase: 'P7' },
-  { capability: 'card authorisation and decline', method: 'post', path: '/v1/card-authorisations', phase: 'P7' },
+  { capability: 'card authorisation and decline', method: 'post', path: '/v1/cards/authorisations', phase: 'P7' },
   { capability: 'card token resolution and masking', method: 'get', path: '/v1/cards/{cardToken}', phase: 'P7' },
   { capability: 'credit assessment', method: 'post', path: '/v1/credit-assessments', phase: 'P8' },
 ];

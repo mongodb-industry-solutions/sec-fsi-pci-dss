@@ -27,4 +27,11 @@ export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
   if (!oauth2.tokenEndpoint.startsWith('http')) {
     oauth2.tokenEndpoint = absoluteEndpoint(bankcoreBaseUrl, oauth2.tokenEndpoint);
   }
+  // The bank's base URL goes on the same record as its credential (P4.1). Picking the two from different
+  // records is how a token ends up presented at the wrong bank.
+  //
+  // It lands in a field of its own rather than replacing `externalProviderApiEndpoint`, because that field
+  // still holds the loopback path the built-in engine answers on, and the kill switch decides which of the
+  // two is used. Flipping it would break the built-in path the moment the records are seeded.
+  record.externalProviderBaseUrl = bankcoreBaseUrl;
 }

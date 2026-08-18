@@ -6,6 +6,7 @@ import {
 } from '../models/paymentInitiation.model';
 import { ACCOUNT_ARRANGEMENT_COLLECTION, AccountArrangementControlRecord } from '../../aspsp/models/accountArrangement.model';
 import { isValidIban } from '../../aspsp/services/bankIdentifier.service';
+import { notifyTpp } from '../../tpp-trust/services/eventNotification.service';
 
 // Payment Initiation Service: what the bank accepts, validates and tracks. It deliberately moves NO
 // money yet.
@@ -149,6 +150,12 @@ export async function findPayment(
   );
 }
 
+/**
+ * Moves a payment to a new status and tells the initiating TPP.
+ *
+ * Every lifecycle outcome is notified, not only the happy one: a rejection and a return arriving days
+ * later are exactly the cases where a PSP that only polls leaves a transfer stuck in `pending`.
+ */
 export async function changeTransactionStatus(
   db: Db,
   paymentId: string,
@@ -167,7 +174,19 @@ export async function changeTransactionStatus(
       },
     },
   );
-  return collection(db).findOne({ paymentInitiationInstanceReference: paymentId }, { projection: { _id: 0 } });
+  const updated = await collection(db)
+    .findOne({ paymentInitiationInstanceReference: paymentId }, { projection: { _id: 0 } });
+  if (updated) {
+    await notifyTpp(db, updated.paymentInitiatingTppClientId, {
+      eventType: 'payment.status.changed',
+      subjectReference: paymentId,
+      status,
+      // The end to end id lets the PSP find its own record without a lookup table.
+      detail: { reason, endToEndIdentification: updated.paymentEndToEndIdentification },
+      correlationId: updated.paymentCorrelationId,
+    });
+  }
+  return updated;
 }
 
 export type CancelResult =

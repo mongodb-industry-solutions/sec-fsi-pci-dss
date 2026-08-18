@@ -16,6 +16,9 @@ const OPEN_BANKING_PREFIX = '/v1/';
 const INFRASTRUCTURE_PATHS = new Set([
   '/',            // redirect to the docs
   '/health',      // infrastructure probe, the path the deploy platform expects
+  // Discovery, not an API: a receiver looks for a key set here or it does not look at all. Public by
+  // design, since a public key is for publishing.
+  '/.well-known/jwks.json',
 ]);
 const DIAGNOSTIC_PREFIX = '/api/v1/system/';
 // Bank administration: engine configuration, TPP registrations, consent decisions. Plain REST and

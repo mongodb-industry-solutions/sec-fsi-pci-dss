@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../../../config';
-import { getProviderAccessToken } from '../../../modules/provider/services/providerAccessToken.service';
+import { getProviderAccessToken, getProviderBaseUrl } from '../../../modules/provider/services/providerAccessToken.service';
 
 // The PSP as AISP, calling the bank's standard read endpoints. Every call carries the identifiers the
 // standard defines, so one payment is traceable across both systems:
@@ -40,6 +40,23 @@ export type TokenProvider = (scope: string) => Promise<{ accessToken?: string; e
 const defaultTokenProvider: TokenProvider = (scope) =>
   getProviderAccessToken('account_information', { scope });
 
+// Where the bank is, from the provider record. `config.bankcore.baseUrl` remains only as the bootstrap
+// value for the health probe and for a first run before the records are seeded: once they are, the record
+// is the answer, so repointing at another bank is a re-seed rather than a redeploy.
+export type EndpointProvider = () => Promise<{ baseUrl?: string; error?: string }>;
+
+const defaultEndpointProvider: EndpointProvider = () => getProviderBaseUrl('account_information');
+
+async function resolveBaseUrl(provider: EndpointProvider): Promise<{ baseUrl?: string; error?: string }> {
+  const resolved = await provider();
+  if (resolved.baseUrl) return resolved;
+  // No record yet is not a reason to fail differently from the bank being unreachable: the caller gets an
+  // error either way and never a fabricated balance.
+  return config.bankcore.baseUrl
+    ? { baseUrl: config.bankcore.baseUrl }
+    : { error: resolved.error ?? 'no bankcore endpoint configured' };
+}
+
 function headers(token: string, consentReference: string, correlationId: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
@@ -69,9 +86,12 @@ export async function readAccountBalance(
   input: { bankAccountReference: string; consentReference: string; correlationId?: string },
   fetchImpl: typeof fetch = fetch,
   tokenProvider: TokenProvider = defaultTokenProvider,
+  endpointProvider: EndpointProvider = defaultEndpointProvider,
 ): Promise<AisReadResult> {
   const correlationId = input.correlationId ?? uuidv4();
-  const url = `${config.bankcore.baseUrl}/v1/accounts/${encodeURIComponent(input.bankAccountReference)}/balances`;
+  const { baseUrl, error: endpointError } = await resolveBaseUrl(endpointProvider);
+  if (!baseUrl) return { error: `AIS endpoint unresolved: ${endpointError}` };
+  const url = `${baseUrl}/v1/accounts/${encodeURIComponent(input.bankAccountReference)}/balances`;
 
   const { accessToken, error: tokenError } = await tokenProvider('accounts balances transactions');
   if (!accessToken) return { error: `AIS authorisation failed: ${tokenError}` };
@@ -143,9 +163,12 @@ export async function requestDemoCredit(
   },
   fetchImpl: typeof fetch = fetch,
   tokenProvider: TokenProvider = defaultTokenProvider,
+  endpointProvider: EndpointProvider = defaultEndpointProvider,
 ): Promise<DemoCreditResult> {
   const correlationId = input.endToEndIdentification ?? uuidv4();
-  const url = `${config.bankcore.baseUrl}/v1/accounts/${encodeURIComponent(input.bankAccountReference)}/credits`;
+  const { baseUrl, error: endpointError } = await resolveBaseUrl(endpointProvider);
+  if (!baseUrl) return { applied: false, error: `bank endpoint unresolved: ${endpointError}` };
+  const url = `${baseUrl}/v1/accounts/${encodeURIComponent(input.bankAccountReference)}/credits`;
 
   // Its own scope: creating funds is not covered by any read scope, so a read-only credential cannot
   // reach this even though it is the same client.

@@ -9,6 +9,9 @@ import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppR
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
 import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models/bankModuleConfiguration.model';
+import {
+  TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+} from '../../modules/tpp-trust/models/tppEventSubscription.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -150,6 +153,33 @@ const INDEXES: IndexPlan[] = [
     collection: BANK_MODULE_CONFIGURATION_COLLECTION,
     keys: { bankModuleConfigurationInstanceReference: 1 },
     options: { unique: true, name: 'bankModuleConfiguration_ref_unique' },
+  },
+  // A notification resolves its subscription by client plus event type on every delivery.
+  {
+    collection: TPP_EVENT_SUBSCRIPTION_COLLECTION,
+    keys: { tppEventSubscriptionInstanceReference: 1 },
+    options: { unique: true, name: 'tppEventSubscription_ref_unique' },
+  },
+  {
+    collection: TPP_EVENT_SUBSCRIPTION_COLLECTION,
+    keys: { tppRegistrationClientId: 1, tppEventSubscriptionActive: 1 },
+    options: { name: 'tppEventSubscription_client_active' },
+  },
+  // The inspector reads newest first, and an investigation starts from the resource that changed.
+  {
+    collection: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+    keys: { recordCreatedDateTime: -1 },
+    options: { name: 'tppWebhookDeliveryLog_time' },
+  },
+  {
+    collection: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+    keys: { tppEventSubjectReference: 1, recordCreatedDateTime: -1 },
+    options: { name: 'tppWebhookDeliveryLog_subject_time' },
+  },
+  {
+    collection: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+    keys: { deliveryOutcome: 1, recordCreatedDateTime: -1 },
+    options: { name: 'tppWebhookDeliveryLog_outcome_time' },
   },
   {
     collection: COUNTERS_COLLECTION,
