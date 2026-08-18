@@ -5,9 +5,11 @@ import { resolve } from 'path';
 dotenv.config({ path: resolve(__dirname, '../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
 import mongodbPlugin from '../src/plugins/mongodb';
+import correlationPlugin from '../src/plugins/correlation';
 import swaggerPlugin from '../src/plugins/swagger';
 import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from '../src/shared/services/logBuffer';
 import { systemModule } from '../src/modules/system';
+import { aispModule } from '../src/modules/aisp';
 import { config } from '../src/config';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -30,6 +32,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   fastify.addSchema({ $id: 'Error', type: 'object', properties: { error: { type: 'string' } }, required: ['error'] });
 
+  // Before anything that logs or writes: every line and every record carries the caller's id.
+  await fastify.register(correlationPlugin);
+
   await fastify.register(swaggerPlugin);
 
   // Fault tolerant like the PSP's: the process still starts so /health can report why it is degraded.
@@ -49,7 +54,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   fastify.addHook('onResponse', (request, reply, done) => {
     appendLog(
       `[${new Date().toISOString()}] ${request.method} ${request.url} -> ${reply.statusCode}`
-      + ` (${reply.elapsedTime.toFixed(0)}ms)`,
+      + ` (${reply.elapsedTime.toFixed(0)}ms) [${request.correlationId}]`,
     );
     done();
   });
@@ -60,7 +65,7 @@ export async function buildApp(): Promise<FastifyInstance> {
     const message = (error.message || '').replace(/\s+/g, ' ').slice(0, 500);
     appendLog(
       `[${new Date().toISOString()}] ERROR ${request.method} ${request.url} -> ${status} `
-      + `[${request.id}] ${error.name || 'Error'}: ${message}`,
+      + `[${request.correlationId}] ${error.name || 'Error'}: ${message}`,
     );
     done();
   });
@@ -111,6 +116,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
+  // Open Banking surface, at the standard's own path.
+  await fastify.register(aispModule);
+  // Diagnostics, explicitly NOT part of the bank's API.
   await fastify.register(systemModule, { prefix: '/api/v1' });
 
   return fastify;
