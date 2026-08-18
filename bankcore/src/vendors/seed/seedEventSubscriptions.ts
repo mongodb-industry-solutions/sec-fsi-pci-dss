@@ -10,8 +10,10 @@ import { config } from '../../config';
 // URL into the record; at runtime only the record is read, with no fallback, because a silent fallback is
 // how two environments end up disagreeing about where the PSP is.
 //
-// The PSP's receiving path is a fixed relative path in the fixture sense: the host is the environment's.
-const PSP_CALLBACK_PATH = '/api/v1/integrations/webhooks/bankcore';
+// The PSP's receiving path. It follows the convention the PSP already uses for provider callbacks rather
+// than opening a new path space, since this is the same family: an external system calling back. Only the
+// authentication differs (a signed JWS instead of an HMAC). The host is the environment's.
+const PSP_CALLBACK_PATH = '/api/v1/providers/callback/bankcore';
 
 export async function seedEventSubscriptions(db: Db): Promise<number> {
   const { pspBaseUrl } = resolvePlatformLinks();

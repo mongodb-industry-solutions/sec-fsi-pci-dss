@@ -54,6 +54,11 @@ export interface PayoutAccountArrangement {
   payoutAccountAspspReference?: string;        // FK → the bank in the ASPSP registry
   payoutAccountBankAccountReference?: string;  // FK → accountArrangement at that bank
   payoutAccountConsentReference?: string;      // FK → the PSD2 consent that authorises access
+  // Last consent status the BANK told us (v37 P4.2/P4.6e). Written when a status-change notification
+  // arrives, not on the next failed call, so a revoked link stops looking usable immediately. The
+  // enumeration is Berlin Group's; anything other than `valid` means not usable.
+  payoutAccountConsentStatus?: string;
+  payoutAccountConsentStatusChangedDateTime?: Date;
 
   bianServiceDomain: 'Payment Initiation';
   bianControlRecordType: 'PayoutAccountArrangement';
