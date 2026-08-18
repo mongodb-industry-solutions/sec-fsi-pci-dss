@@ -14,6 +14,8 @@ import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { initiatePaymentAtBank, selectPaymentProduct } from '../../../providers/payment-initiation/services/bankcorePis.client';
+import { config } from '../../../config';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
 import { RISK_HOLD_STEP } from './transferReview.service';
@@ -144,7 +146,20 @@ export async function executeP2PTransfer(
   }
 
   // 4. Hold sender funds (available -> pending), conditional on sufficient available balance.
-  const held = await holdCardFunds(db, fromAccountRef, amount);
+  //
+  // Skipped entirely when the debtor account is held at a bank: the BANK debits it, and a local hold would
+  // move a projection that the next balance read overwrites. A hold the authoritative ledger knows nothing
+  // about is not a hold, it is a display artefact.
+  const sourceAccount = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+    .findOne({ payoutAccountInstanceReference: fromAccountRef });
+  const delegateToBank = Boolean(
+    config.bankcore.enabled
+    && sourceAccount?.payoutAccountBankAccountReference
+    && sourceAccount?.payoutAccountAspspReference
+    && sourceAccount?.payoutAccountConsentReference,
+  );
+
+  const held = delegateToBank ? true : await holdCardFunds(db, fromAccountRef, amount);
   if (!held) return fail(amount, transferCurrency, 'Insufficient available balance.');
 
   // 5. Create the immutable execution in routing state. sourcePayoutAccountReference marks this
@@ -160,6 +175,9 @@ export async function executeP2PTransfer(
     ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
     sourcePayoutAccountReference: fromAccountRef,
     resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
+    // Recorded BEFORE dispatch, so the settlement handler that runs later knows what was actually done
+    // rather than what the configuration happens to say by then (P5.3).
+    ...(delegateToBank ? { paymentExecutionDelegatedToAspsp: true } : {}),
     grossAmount: amount,
     netAmount: amount,
     feeAmount: 0,
@@ -183,29 +201,68 @@ export async function executeP2PTransfer(
 
   // 6. Dispatch the transfer through the payment_initiation provider (ADR-039). Settlement arrives
   //    asynchronously as bank.transfer.settled/failed and is applied by PayoutOrchestrationProcess.
-  const dispatch = await dispatchProvider(
-    db,
-    'payment_initiation',
-    'provider.payment_initiation.transfer.requested',
-    {
-      clientReference: transferRef,
-      paymentExecutionInstanceReference: transferRef,
-      railType: rail,
+  let submitted: boolean;
+  let dispatchNote: string;
+
+  if (delegateToBank && sourceAccount) {
+    // As PISP, to the bank that holds the DEBTOR account. The PSP never contacts the creditor's institution:
+    // it is not a clearing participant, and reaching the beneficiary's bank is the debtor bank's job.
+    const initiated = await initiatePaymentAtBank({
+      debtorAccount: sourceAccount,
+      creditorIban: recipientAccount.payoutAccountIban ?? '',
+      creditorName: arrangement.counterpartyLabel ?? 'Beneficiary',
+      creditorAgentBic: recipientAccount.payoutAccountBicSwift,
       amount,
       currency: transferCurrency,
-      settlementSchedule: 'T+1',
-      paymentReference: input.note ?? 'P2P transfer',
-    },
-    { entityType: 'execution', entityId: transferRef, processType: 'payment_processing' },
-  );
-  const submitted = dispatch.status === 'sent' || dispatch.status === 'received';
+      remittanceInformation: input.note ?? 'Transfer',
+      endToEndIdentification: transferRef,
+      // The product is the PSP's own derivation from the corridor, which is legitimate TPP work since it is
+      // part of the standard endpoint path. It is NOT a choice of execution rail, which is the bank's.
+      product: selectPaymentProduct({
+        currency: transferCurrency,
+        creditorCountryCode: recipientAccount.payoutAccountCountryCode,
+        // This platform's rail vocabulary has no separate instant SEPA entry, so an instant product is not
+        // requested from the rail alone. When one is added, this is the single place that decides it.
+        instant: false,
+      }),
+    });
+    submitted = Boolean(initiated.bankPaymentReference);
+    dispatchNote = submitted
+      ? `aspsp payment=${initiated.bankPaymentReference} status=${initiated.transactionStatus}`
+      : `aspsp refused: ${initiated.error}`;
+    if (submitted) {
+      await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
+        { paymentExecutionInstanceReference: transferRef },
+        { $set: { aspspPaymentReference: initiated.bankPaymentReference, recordUpdatedDateTime: new Date() } },
+      );
+    }
+  } else {
+    const dispatch = await dispatchProvider(
+      db,
+      'payment_initiation',
+      'provider.payment_initiation.transfer.requested',
+      {
+        clientReference: transferRef,
+        paymentExecutionInstanceReference: transferRef,
+        railType: rail,
+        amount,
+        currency: transferCurrency,
+        settlementSchedule: 'T+1',
+        paymentReference: input.note ?? 'P2P transfer',
+      },
+      { entityType: 'execution', entityId: transferRef, processType: 'payment_processing' },
+    );
+    submitted = dispatch.status === 'sent' || dispatch.status === 'received';
+    dispatchNote = `provider=${dispatch.provider} rail=${rail}`;
+  }
 
   if (!submitted) {
-    // Compensate: release the hold so funds never vanish, mark the execution failed.
-    await releaseCardHold(db, fromAccountRef, amount);
+    // Compensate: release the hold so funds never vanish, mark the execution failed. There is nothing to
+    // release when the BANK was asked to hold, and releasing anyway would credit the customer.
+    if (!delegateToBank) await releaseCardHold(db, fromAccountRef, amount);
     await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
       { paymentExecutionInstanceReference: transferRef },
-      { $set: { paymentExecutionStatus: 'failed', failureReason: `PISP dispatch ${dispatch.status}`, recordUpdatedDateTime: new Date() } },
+      { $set: { paymentExecutionStatus: 'failed', failureReason: `PISP dispatch: ${dispatchNote}`, recordUpdatedDateTime: new Date() } },
     );
     return {
       transferReference: transferRef, amount, currency: transferCurrency,
@@ -218,7 +275,7 @@ export async function executeP2PTransfer(
     { paymentExecutionInstanceReference: transferRef },
     {
       $set: { paymentExecutionStatus: 'in_flight', recordUpdatedDateTime: new Date() },
-      $push: { resolutionLog: { stepName: 'provider.payment_initiation.transfer', stepOutcome: 'found', stepNote: `provider=${dispatch.provider} rail=${rail}`, stepDateTime: new Date() } },
+      $push: { resolutionLog: { stepName: 'provider.payment_initiation.transfer', stepOutcome: 'found', stepNote: dispatchNote, stepDateTime: new Date() } },
     },
   );
 

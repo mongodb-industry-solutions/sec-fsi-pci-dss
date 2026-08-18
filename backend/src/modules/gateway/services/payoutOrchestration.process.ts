@@ -439,6 +439,25 @@ export class PayoutOrchestrationProcess {
         stepNote: `railRef=${p.railRef} netAmount=${p.netAmount} ${p.currency}`,
       });
 
+      // v37 P5.3: when the money movement was delegated to the ASPSP, the PSP moves NOTHING here.
+      //
+      // This is the defect the whole iteration opened with: a PSP cannot credit a beneficiary. The bank that
+      // holds the debtor account debits it, and the creditor is credited by whoever holds THAT account, on
+      // us or through the scheme. Crediting locally invented money and would double it now that a real
+      // ledger exists.
+      //
+      // The instruction is still completed here, by this process, which is what N1 requires: `settled` is the
+      // bank's fact and `completed` is the PSP's decision. The webhook handler only re-emitted the fact.
+      if (execution.paymentExecutionDelegatedToAspsp) {
+        await appendResolutionStep(db, execRef, {
+          stepName: 'aspsp.settlement.recorded',
+          stepOutcome: 'found',
+          stepNote: `the bank moved the money (${execution.aspspPaymentReference ?? 'no bank reference'});`
+            + ' the PSP holds no balance for this transfer',
+        });
+        return;
+      }
+
       // Credit the recipient. Convert to the recipient account currency (FX). The amounts come from
       // OUR execution record, not from the rail payload, so the ledger always matches what we stored.
       if (execution.resolvedPayoutAccountReference) {

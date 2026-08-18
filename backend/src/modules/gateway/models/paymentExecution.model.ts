@@ -46,6 +46,12 @@ export interface PaymentExecutionProcedure {
   initiatorPartyReference?: string;               // FK → party ; set for P2P transfers (enables customer-scoped history)
   sourcePayoutAccountReference?: string;          // FK → payoutAccountArrangement ; sender's account, enables per-account movement ledger
   resolvedPayoutAccountReference?: string;        // FK → payoutAccountArrangement ; recipient's account
+  // v37 P5.3: the money movement was delegated to the ASPSP that holds the debtor account, so the PSP moves
+  // NO balances for this execution. Explicit on the record rather than derived from a runtime flag, because
+  // the settlement handler runs later and must know what was actually done, not what is configured now.
+  paymentExecutionDelegatedToAspsp?: boolean;
+  // The bank's own payment id, so the PSP's instruction and the bank's execution resolve to each other.
+  aspspPaymentReference?: string;
 
   beneficiaryArrangementReference?: string;       // FK → counterpartyArrangement ; set for P2P-to-beneficiary transfers → enables link to the beneficiary
 
