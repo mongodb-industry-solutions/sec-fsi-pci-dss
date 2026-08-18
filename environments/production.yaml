@@ -30,7 +30,9 @@ env:
   PSP_MERCHANT_SWAGGER_URL: "https://sec-fsi-pci-dss-backend.industrysolutions.prod.corp.mongodb.com/doc"
 
   # ── bankcore, the Open Banking bank (ASPSP), v37 ───────────────────────────────────────────────
-  # Kill switch. With it off the PSP uses its built-in banking engines and never calls the bank.
+  # Kill switch. Deliberately still FALSE here while the local default is true: these environments are not
+  # updated until v37 is functional and P11 has verified it, so they keep the built-in engines until then.
+  # Flipping this is a deployment decision, not a code one.
   PSP_BANKCORE_ENABLED: "false"
   # PRIVATE in-cluster service. bankcore has NO public ingress: the browser calls the PSP, which
   # dispatches. Giving it a public hostname would create exactly the surface this design avoids.

@@ -119,8 +119,15 @@ export const config = {
   },
 
   bankcore: {
-    // v37 kill switch, default off: the PSP keeps its built-in banking engines and its ledger.
-    enabled: pspEnv('BANKCORE_ENABLED', 'false') === 'true',
+    // v37 kill switch, default ON since the P4 gate passed (P4.7): the bank holds the ledger, the PSP
+    // reads balances from it, initiates payments through it and authorises cards against it. Setting
+    // `PSP_BANKCORE_ENABLED=false` restores the built-in engines, which is what makes a regression one
+    // environment variable away from being isolated rather than a revert.
+    //
+    // The escape hatch has to be RELIABLE in the off direction, which is the whole point of a kill switch,
+    // so the common falsy spellings all disable it. Requiring the exact string `false` would mean an
+    // operator typing `off` under pressure leaves the bank enabled and thinks they turned it off.
+    enabled: !['false', 'off', 'no', '0'].includes((pspEnv('BANKCORE_ENABLED', 'true') ?? '').trim().toLowerCase()),
     // Private, service-to-service. The only bankcore URL: the browser never talks to the bank.
     baseUrl: pspEnv('BANKCORE_BASE_URL', 'http://localhost:8083')!,
     // Bootstrap only: everything else about the TPP relationship is a seeded record.

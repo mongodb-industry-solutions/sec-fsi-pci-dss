@@ -23,15 +23,25 @@ async function loadConfig(overrides: Record<string, string | undefined>) {
 }
 
 describe('v37 P0.4/P0.6: bankcore configuration', () => {
-  it('the kill switch defaults to off', async () => {
+  // Flipped by P4.7, once the P4 gate passed: the bank is the intended path, and the switch exists to
+  // isolate a regression rather than to hold a phase back.
+  it('the kill switch defaults to ON', async () => {
     const bankcore = await loadConfig({ PSP_BANKCORE_ENABLED: undefined });
-    expect(bankcore.enabled).toBe(false);
+    expect(bankcore.enabled).toBe(true);
   });
 
-  it('only the literal string true enables it', async () => {
-    expect((await loadConfig({ PSP_BANKCORE_ENABLED: 'true' })).enabled).toBe(true);
-    expect((await loadConfig({ PSP_BANKCORE_ENABLED: 'yes' })).enabled).toBe(false);
-    expect((await loadConfig({ PSP_BANKCORE_ENABLED: '' })).enabled).toBe(false);
+  it('every common falsy spelling disables it, because the escape hatch has to be reliable', async () => {
+    // Requiring the exact string `false` would mean an operator typing `off` under pressure leaves the
+    // bank enabled and believes they turned it off. That is the opposite of a kill switch.
+    for (const value of ['false', 'FALSE', ' false ', 'off', 'no', '0']) {
+      expect((await loadConfig({ PSP_BANKCORE_ENABLED: value })).enabled, value).toBe(false);
+    }
+  });
+
+  it('leaves it enabled for anything that is not a disable, including an empty value', async () => {
+    for (const value of ['true', 'TRUE', 'yes', '1', '']) {
+      expect((await loadConfig({ PSP_BANKCORE_ENABLED: value })).enabled, value).toBe(true);
+    }
   });
 
   it('the bank connection falls back to the PSP cluster', async () => {

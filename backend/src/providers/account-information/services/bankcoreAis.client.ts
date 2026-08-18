@@ -200,3 +200,100 @@ export async function requestDemoCredit(
     return { applied: false, error: `bank unreachable: ${err instanceof Error ? err.message : String(err)}` };
   }
 }
+
+// ── Consent acquisition (P4.4) ───────────────────────────────────────────────────────────────────
+//
+// The PSP creates the consent; the bank decides when it becomes usable. Those are different facts and the
+// code keeps them apart: a created consent is not an authorised one, and treating them as the same is the
+// optimistic shortcut that would break against a bank requiring SCA.
+
+export interface CreatedConsent {
+  consentReference?: string;
+  // Berlin Group's enumeration, as the bank reported it. `valid` is the only usable value.
+  consentStatus?: string;
+  error?: string;
+}
+
+/**
+ * Creates an account access consent at the bank for the given IBANs.
+ *
+ * The status comes back from the bank and is stored as reported: in `automatic` mode it is `valid`
+ * immediately, in `manual` mode it is `received` and stays that way until an operator decides. The caller
+ * must not assume the first case, which is the whole point of returning the status rather than a boolean.
+ */
+export async function createBankConsent(
+  input: { accountIbans: string[]; correlationId?: string },
+  fetchImpl: typeof fetch = fetch,
+  tokenProvider: TokenProvider = defaultTokenProvider,
+  endpointProvider: EndpointProvider = defaultEndpointProvider,
+): Promise<CreatedConsent> {
+  const correlationId = input.correlationId ?? uuidv4();
+  const { baseUrl, error: endpointError } = await resolveBaseUrl(endpointProvider);
+  if (!baseUrl) return { error: `consent endpoint unresolved: ${endpointError}` };
+
+  const { accessToken, error: tokenError } = await tokenProvider('accounts');
+  if (!accessToken) return { error: `consent authorisation failed: ${tokenError}` };
+
+  try {
+    const response = await fetchImpl(`${baseUrl}/v1/consents`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'X-Request-ID': correlationId,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      // The standard's access object. Balance and transaction access default to the same accounts at the
+      // bank, so they are not sent: asking for less than is needed would be a narrower consent than the
+      // platform actually uses, and asking by listing them twice adds nothing.
+      body: JSON.stringify({ access: { accounts: input.accountIbans.map((iban) => ({ iban })) } }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    const body = await response.json().catch(() => ({})) as {
+      consentId?: string; consentStatus?: string; tppMessages?: Array<{ code?: string; text?: string }>;
+    };
+    if (!response.ok || !body.consentId) {
+      const refusal = body.tppMessages?.[0];
+      return { error: `consent refused: ${refusal?.code ?? `HTTP ${response.status}`} ${refusal?.text ?? ''}`.trim() };
+    }
+    return { consentReference: body.consentId, consentStatus: body.consentStatus };
+  } catch (err) {
+    return { error: `consent creation unreachable: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
+
+/**
+ * Reads a consent's status. This is the specification's own fallback for a missed notification, which is
+ * why it exists as its own call: polling is how the PSP recovers, never how it normally learns.
+ */
+export async function readBankConsentStatus(
+  input: { consentReference: string; correlationId?: string },
+  fetchImpl: typeof fetch = fetch,
+  tokenProvider: TokenProvider = defaultTokenProvider,
+  endpointProvider: EndpointProvider = defaultEndpointProvider,
+): Promise<{ consentStatus?: string; error?: string }> {
+  const { baseUrl, error: endpointError } = await resolveBaseUrl(endpointProvider);
+  if (!baseUrl) return { error: `consent endpoint unresolved: ${endpointError}` };
+
+  const { accessToken, error: tokenError } = await tokenProvider('accounts');
+  if (!accessToken) return { error: `consent authorisation failed: ${tokenError}` };
+
+  try {
+    const response = await fetchImpl(
+      `${baseUrl}/v1/consents/${encodeURIComponent(input.consentReference)}/status`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'X-Request-ID': input.correlationId ?? uuidv4(),
+          Accept: 'application/json',
+        },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      },
+    );
+    if (!response.ok) return { error: `consent status read failed: HTTP ${response.status}` };
+    const body = await response.json() as { consentStatus?: string };
+    return { consentStatus: body.consentStatus };
+  } catch (err) {
+    return { error: `consent status unreachable: ${err instanceof Error ? err.message : String(err)}` };
+  }
+}
