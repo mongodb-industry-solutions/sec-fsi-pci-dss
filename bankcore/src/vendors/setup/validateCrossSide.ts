@@ -29,6 +29,14 @@ export async function validateCrossSide(db: Db): Promise<CrossSideCheck[]> {
   const checks: CrossSideCheck[] = [];
   const add = (name: string, ok: boolean, detail?: string) => checks.push({ name, ok, detail });
 
+  // A bank-only image ships no PSP workspace, so there is no other side to check against and saying so
+  // is the honest result. A PSP workspace that exists but lacks the fixture IS a defect, hence the two
+  // conditions rather than one.
+  if (!existsSync(PSP_DATA)) {
+    add('cross side consistency', true, 'not applicable: no PSP workspace in this image');
+    return checks;
+  }
+
   const fixture = resolve(PSP_DATA, 'payoutAccounts.json');
   if (!existsSync(fixture)) {
     add('PSP payout account fixture', false, `not found at ${fixture}`);

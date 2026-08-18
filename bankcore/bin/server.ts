@@ -8,6 +8,7 @@ import mongodbPlugin from '../src/plugins/mongodb';
 import correlationPlugin from '../src/plugins/correlation';
 import swaggerPlugin from '../src/plugins/swagger';
 import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from '../src/shared/services/logBuffer';
+import { configurationReport, readinessReport, formatReport } from '../src/shared/services/startupReport';
 import { systemModule } from '../src/modules/system';
 import { aispModule } from '../src/modules/aisp';
 import { tppTrustModule } from '../src/modules/tpp-trust';
@@ -148,14 +149,22 @@ async function start() {
   const app = await buildApp();
   try {
     await app.listen({ port: config.server.port, host: config.server.host });
-    console.log(`.........................................................................`);
-    console.log(`bankcore listening on http://${config.server.host}:${config.server.port}`);
-    console.log(`Swagger UI: http://${config.server.host}:${config.server.port}/doc`);
-    console.log(`database: ${config.mongodb.dbName}, key vault: ${config.kms.keyVaultNamespace}`);
+
+    // The whole report goes through appendLog as well as stdout, so the PSP admin panel shows what this
+    // bank is pointed at without anyone needing pod access.
+    const report = [
+      ...configurationReport(),
+      ...await readinessReport(app.dbError === null ? app.db : undefined, app.dbError),
+    ];
+    const separator = '.........................................................................';
+    for (const line of [separator, 'bankcore is up', ...formatReport(report), separator]) {
+      console.log(line);
+      appendLog(`[${new Date().toISOString()}] STARTUP ${line.trim()}`);
+    }
     if (app.dbError !== null) {
       console.warn(`[bankcore/mongodb] Running in degraded mode: ${app.dbError}`);
+      console.warn('[bankcore/mongodb] API routes return 503 until the database becomes reachable.');
     }
-    console.log(`.........................................................................`);
   } catch (err) {
     app.log.error(err);
     process.exit(1);

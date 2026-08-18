@@ -42,9 +42,12 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 COPY package.json ./
 RUN npm install --ignore-scripts
 
-# Shared workspace packages, built before the backend installs them via file: (v37).
+# Shared workspace packages, built before the backend installs them via file: (v37). BOTH are needed:
+# the backend imports @leafypay/eventbus and @leafypay/platform-links, and each is consumed through its
+# compiled dist, so an uninstalled package fails the build with a missing type rather than at runtime.
 COPY packages/ packages/
 RUN cd packages/eventbus && npm install
+RUN cd packages/platform-links && npm install
 
 # Backend package.json — "fsi-pci-dss-demo": "file:.." now resolves to /app/
 COPY backend/package.json backend/
@@ -54,12 +57,20 @@ RUN cd backend && npm install
 COPY frontend/package*.json frontend/
 RUN cd frontend && npm install --ignore-scripts
 
+# The bank workspace, because this image ORCHESTRATES the bank's setup: bin/setup.ts, bin/seed.ts,
+# bin/validate.ts and bin/setup-drop.ts each run `npm run <script> --prefix bankcore`, and the admin
+# panel exposes the same scripts. Without it every one of them fails here with an npm path error while
+# working on a developer machine, which is the worst place for that difference to live.
+COPY bankcore/package.json bankcore/
+RUN cd bankcore && npm install
+
 # ── Source & test infrastructure ──────────────────────────────────
 COPY backend/ backend/
 COPY test/ test/
 COPY vitest.config.ts tsconfig.base.json ./
 COPY frontend/src/ frontend/src/
 COPY frontend/tsconfig.json frontend/
+COPY bankcore/ bankcore/
 
 # Create keys directory for volume mount (keys are never baked into the image).
 RUN mkdir -p /app/backend/keys
@@ -74,6 +85,9 @@ RUN if [ ! -f backend/data/parties.json ]; then \
 
 # Compile backend TypeScript
 RUN cd backend && npm run build
+
+# The bank's setup and seed run through ts-node from bin/, so no build of bankcore is needed here. The
+# bank SERVICE is a separate image with its own Dockerfile; this is only the orchestration path.
 
 # ── Runtime (non-root) ────────────────────────────────────────────
 # node:20-slim ships a built-in `node` user (uid 1000).

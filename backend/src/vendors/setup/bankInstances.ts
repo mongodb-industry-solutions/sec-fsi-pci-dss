@@ -52,6 +52,15 @@ export async function forEachBank(script: 'setup:db' | 'setup:seed' | 'setup:che
   }
   for (const instance of instances) {
     console.log(`\n  bank:    ${instance.bankInstanceName} (${instance.bankInstanceWorkspace}) → ${script}`);
+    // A registered bank whose workspace is not in the image is a packaging defect, and npm reports it
+    // as a path error that reads like a broken script. Name the actual cause instead.
+    const workspace = resolve(repoRoot(), instance.bankInstanceWorkspace);
+    if (!existsSync(resolve(workspace, 'package.json'))) {
+      throw new Error(
+        `${instance.bankInstanceWorkspace} is registered as a bank but its workspace is not present at `
+        + `${workspace}. This image must ship it, since setup is orchestrated from here.`,
+      );
+    }
     await runScript(instance.bankInstanceWorkspace, script, args);
   }
 }
