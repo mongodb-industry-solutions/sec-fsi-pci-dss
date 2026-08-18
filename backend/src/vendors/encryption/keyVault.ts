@@ -65,6 +65,67 @@ export interface DEKs {
   rtpPayeeName: Binary;           // paymentRequestProcedure.payeeName
 }
 
+/**
+ * Repairs a key vault that already holds several keys under one alt name, then establishes the
+ * uniqueness guarantee that prevents it happening again.
+ *
+ * How a vault gets into that state: provisioning runs from two places, `runSetup` and `buildQEClient`
+ * (once per QE tier), and `getOrCreate` is a check then act. On a FRESH vault with the server running,
+ * those paths race and each creates its own copy. The unique index used to be created only by the
+ * setup path, so nothing stopped it, and once duplicated the index can never be built again: setup
+ * fails with E11000 on every subsequent run and the platform cannot be provisioned at all.
+ *
+ * The repair keeps one key per alt name (the oldest, which is the one anything already encrypted
+ * would have used) and removes only the ALT NAME from the others. The key material stays, so data
+ * encrypted under a duplicate remains decryptable; deleting the keys would make it unreadable
+ * forever, which is not a trade to make for a naming conflict.
+ */
+export async function ensureKeyVaultIntegrity(client: MongoClient): Promise<{ repaired: string[] }> {
+  const keyVaultColl = client.db(kmsConfig.database).collection(kmsConfig.collection);
+  const repaired: string[] = [];
+
+  const duplicates = await keyVaultColl.aggregate<{ _id: string; keys: Array<{ id: unknown; created: Date }> }>([
+    { $unwind: '$keyAltNames' },
+    { $group: { _id: '$keyAltNames', keys: { $push: { id: '$_id', created: '$creationDate' } } } },
+    { $match: { $expr: { $gt: [{ $size: '$keys' }, 1] } } },
+  ]).toArray();
+
+  for (const duplicate of duplicates) {
+    const ordered = [...duplicate.keys].sort((a, b) => new Date(a.created).getTime() - new Date(b.created).getTime());
+    const [, ...losers] = ordered;
+    await keyVaultColl.updateMany(
+      { _id: { $in: losers.map((k) => k.id) } as never },
+      { $pull: { keyAltNames: duplicate._id } as never },
+    );
+    repaired.push(`${duplicate._id} (kept 1 of ${ordered.length})`);
+  }
+
+  // An emptied array is not the same as no array: `keyAltNames: []` still satisfies the partial
+  // filter and indexes as a single undefined value, so several of them collide with each other and
+  // the index still cannot build. Remove the field once nothing is left in it.
+  // Unconditional: a previous repair may have left the empty arrays behind, and this run would then
+  // find no duplicates, skip the cleanup, and still fail to build the index.
+  const emptied = await keyVaultColl.updateMany(
+    { keyAltNames: { $size: 0 } },
+    { $unset: { keyAltNames: '' } as never },
+  );
+  if (emptied.modifiedCount > 0) {
+    console.log(`    dropped the empty alt-name array on ${emptied.modifiedCount} superseded key(s)`);
+  }
+
+  if (repaired.length > 0) {
+    console.log(`    repaired duplicate DEK alt names: ${repaired.join(', ')}`);
+  }
+
+  // Establish the guarantee for every provisioning path, not just the setup one.
+  await keyVaultColl.createIndex(
+    { keyAltNames: 1 },
+    { unique: true, partialFilterExpression: { keyAltNames: { $exists: true } } },
+  );
+
+  return { repaired };
+}
+
 export async function provisionDataEncryptionKeys(client: MongoClient): Promise<DEKs> {
   const kmsProviders = buildKmsProviders();
   const cmkOptions = buildCmkOptions();
@@ -76,18 +137,31 @@ export async function provisionDataEncryptionKeys(client: MongoClient): Promise<
 
   const keyVaultColl = client.db(kmsConfig.database).collection(kmsConfig.collection);
 
+  // Before any key is created, whichever path got here first.
+  await ensureKeyVaultIntegrity(client);
+
   async function getOrCreate(keyName: string): Promise<Binary> {
     const existing = await keyVaultColl.findOne({ keyAltNames: keyName });
     if (existing) {
       console.log(`    reuse: ${keyName}`);
       return existing._id as unknown as Binary;
     }
-    const id = await clientEncryption.createDataKey(
-      kmsConfig.provider,
-      { masterKey: cmkOptions?.aws, keyAltNames: [keyName] }
-    );
-    console.log(`    new:   ${keyName}`);
-    return id as unknown as Binary;
+    try {
+      const id = await clientEncryption.createDataKey(
+        kmsConfig.provider,
+        { masterKey: cmkOptions?.aws, keyAltNames: [keyName] }
+      );
+      console.log(`    new:   ${keyName}`);
+      return id as unknown as Binary;
+    } catch (err) {
+      // Another provisioning path won the race between the read above and this write. With the unique
+      // index in place that is now a clean refusal, so adopt the key it created instead of failing.
+      if ((err as { code?: number }).code !== 11000) throw err;
+      const winner = await keyVaultColl.findOne({ keyAltNames: keyName });
+      if (!winner) throw err;
+      console.log(`    reuse: ${keyName} (created concurrently)`);
+      return winner._id as unknown as Binary;
+    }
   }
 
   // Lookup tier

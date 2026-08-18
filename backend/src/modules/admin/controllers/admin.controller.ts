@@ -174,6 +174,10 @@ const ALLOWED_NPM_COMMANDS: Record<string, string[]> = {
   'type-check': ['run', 'type-check'],
   'setup:db:drop': ['run', 'setup:db:drop'],
   'setup:check': ['run', 'setup:check'],
+  // Full rebuild from the panel. Needed after any change to encryptedFields, since setup skips a
+  // collection that already exists, and it covers the PSP and every registered bank in one run.
+  'setup:db:reset': ['run', 'setup:db:reset'],
+  'setup:reset': ['run', 'setup:reset'],
   // v37: bank scoped entries, so one bank can be rebuilt without touching the PSP. The unscoped
   // setup:db and setup:seed already cover it through orchestration.
   'setup:db:bankcore': ['run', 'setup:db', '--prefix', 'bankcore'],

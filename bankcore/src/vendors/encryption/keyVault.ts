@@ -24,9 +24,19 @@ export async function provisionBankDeks(client: MongoClient): Promise<BankDeks> 
       console.log(`    reuse: ${keyName}`);
       return existing._id as unknown as Binary;
     }
-    const id = await clientEncryption.createDataKey(config.kms.provider, { masterKey, keyAltNames: [keyName] });
-    console.log(`    new:   ${keyName}`);
-    return id as unknown as Binary;
+    try {
+      const id = await clientEncryption.createDataKey(config.kms.provider, { masterKey, keyAltNames: [keyName] });
+      console.log(`    new:   ${keyName}`);
+      return id as unknown as Binary;
+    } catch (err) {
+      // The vault is shared with the PSP, which enforces one key per alt name. Losing the race between
+      // the read above and this write is a clean refusal, so adopt the key the winner created.
+      if ((err as { code?: number }).code !== 11000) throw err;
+      const winner = await keyVault.findOne({ keyAltNames: keyName });
+      if (!winner) throw err;
+      console.log(`    reuse: ${keyName} (created concurrently)`);
+      return winner._id as unknown as Binary;
+    }
   }
 
   return {
