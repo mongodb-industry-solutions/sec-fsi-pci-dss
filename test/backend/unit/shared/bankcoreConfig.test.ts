@@ -107,8 +107,12 @@ describe('v37 P0.4/P0.6: bankcore configuration', () => {
     expect(example).not.toMatch(/^BANKCORE_/m);
   });
 
-  it('no public bankcore URL variable exists, by design', () => {
+  it('the public URL is documented and separate from the private one', () => {
+    // Decision revised: the bank publishes its Open Banking docs so the API can be reviewed and
+    // exercised, while the PSP keeps reaching it in-cluster. Operating on the API needs a registered
+    // TPP's credentials, so a public docs surface opens nothing.
     const example = readFileSync(ENV_EXAMPLE, 'utf8');
-    expect(example).not.toContain('PSP_BANKCORE_PUBLIC_URL');
+    expect(example).toContain('PSP_BANKCORE_PUBLIC_URL=');
+    expect(example).toContain('PSP_BANKCORE_BASE_URL=');
   });
 });

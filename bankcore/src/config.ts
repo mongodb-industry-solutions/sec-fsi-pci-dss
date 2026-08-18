@@ -20,8 +20,11 @@ export const config = {
     host: env('HOST', '0.0.0.0')!,
     // Own port: the merchant app already owns 8082.
     port: parseInt(pspEnv('BANKCORE_PORT', '8083')!, 10),
-    // Private, service to service. bankcore has no public ingress and no browser ever calls it.
+    // Private, service to service. This is the URL the PSP uses.
     baseUrl: pspEnv('BANKCORE_BASE_URL', 'http://localhost:8083')!,
+    // Public, browser facing, for reviewing and exercising the Open Banking API in Swagger. Empty by
+    // default: a deployment that does not publish the bank simply has no public server entry.
+    publicUrl: pspEnv('BANKCORE_PUBLIC_URL', '')!,
     // The PSP host, for the status-change callbacks bankcore delivers to its registered TPP.
     pspBaseUrl: pspEnv('BASE_URL', 'http://127.0.0.1:8081')!,
   },
@@ -52,6 +55,9 @@ export const config = {
   },
 
   app: {
+    // Shared with the PSP so bankcore can verify the platform admin token on its diagnostics. The
+    // Open Banking surface is protected by TPP client credentials instead (P3.7b).
+    jwtSecret: pspEnv('JWT_SECRET', 'dev-secret-change-me')!,
     eventBusEngine: (pspEnv('BANKCORE_EVENT_BUS_ENGINE', 'in-process')!) as 'in-process' | 'kafka' | 'rabbitmq',
     eventBusTopicPrefix: pspEnv('BANKCORE_EVENT_BUS_TOPIC_PREFIX', 'bankcore')!,
     seedDataDir: pspEnv('BANKCORE_SEED_DATA_DIR'),

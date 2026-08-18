@@ -1,10 +1,11 @@
 // v37 P1.9/P6.7e-f: bankcore appears in the admin monitoring panel, and it is probed WITHOUT the
 // browser ever leaving the frontend origin.
 //
-// The property being protected is the one the design depends on: bankcore is a private service with
-// no public ingress, so a direct browser fetch fails as a CORS error locally and as unreachable in
-// staging. Same bug, two symptoms, neither pointing at the cause. The Next.js rewrite is the fix, and
-// this suite is the mechanical guard the plan asks for.
+// The bank publishes its Open Banking docs so the API can be reviewed and exercised, but the PSP and
+// the panel still reach it over the private network: the panel must work in an environment that does
+// not publish the bank at all, and a direct browser fetch would fail as a CORS error locally and as
+// unreachable in staging, the same bug with two symptoms. The Next.js rewrite is what keeps that true,
+// and this suite is the mechanical guard the plan asks for.
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
@@ -34,16 +35,19 @@ describe('v37 P1.9: bankcore in the admin monitoring panel', () => {
   it('is probed through the frontend proxy, never at its own origin', () => {
     const bankcore = DEFAULTS.services.find((s) => s.id === 'bankcore')!;
     expect(bankcore.useApiBase, 'bankcore is not behind the PSP API base').toBe(false);
-    expect(bankcore.url).toBe('/bankcore-health');
+    expect(bankcore.url).toBe('/health/bankcore');
     // A same-origin relative path is the whole point: no host, no scheme, no preflight.
     expect(bankcore.url.startsWith('/')).toBe(true);
   });
 
   it('the rewrite resolves the private in-cluster host, with no public fallback', () => {
     const config = read('frontend/next.config.js');
-    expect(config).toContain("{ source: '/bankcore-health', destination: `${bankcoreUrl}/health` }");
+    expect(config).toContain("{ source: '/health/bankcore', destination: `${bankcoreUrl}/health` }");
+    // Semantic, per-service aliases; the bare /health on this origin stays the backend's.
+    expect(config).toContain("{ source: '/health/merchant', destination: `${merchantUrl}/health` }");
+    // The proxy always uses the PRIVATE host, even though the bank now has a public one: the panel
+    // must work in an environment that does not publish the bank at all.
     expect(config).toContain('NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE');
-    // There is no public bankcore hostname to fall back to, unlike the merchant.
     expect(config).not.toContain('NEXT_PUBLIC_PSP_URL_BANKCORE_PUBLIC');
   });
 
@@ -67,7 +71,7 @@ describe('v37 P1.9: bankcore in the admin monitoring panel', () => {
   });
 });
 
-describe('v37 P1.7b: bankcore is deployable, and private', () => {
+describe('v37 P1.7b: bankcore is deployable, and its API is reviewable', () => {
   const drone = read('.drone.yml');
 
   it('has an image build and a deploy step in both pipelines', () => {
@@ -77,20 +81,31 @@ describe('v37 P1.7b: bankcore is deployable, and private', () => {
     expect(drone).toContain('dockerfile: bankcore/Dockerfile');
   });
 
-  it('is deployed with NO ingress in either environment', () => {
-    // A bank API is not something you expose to a browser. The chart's probe uses the in-cluster
-    // /health, which is why no public hostname is needed for monitoring to work.
-    // Bound each step at the next one, or the slice would run on into deploy-frontend, which does
-    // declare ingress hosts.
+  it('is published in both environments, so its API can be reviewed', () => {
+    // Bound each step at the next one, or the slice runs on into the following deploy step.
     const bankcoreSteps = drone
       .split('- name: deploy-bankcore-')
       .slice(1)
       .map((rest) => rest.split('\n  - name:')[0]);
     expect(bankcoreSteps).toHaveLength(2);
     for (const step of bankcoreSteps) {
-      expect(step).toContain('ingress.enabled=false');
-      expect(step).not.toMatch(/ingress\.hosts/);
+      expect(step).toContain('ingress.enabled=true');
+      expect(step).toMatch(/ingress\.hosts\[0\]=sec-fsi-pci-dss-bankcore\./);
+      // Same flag the backend uses: reachable without corp SSO, since the API itself is protected.
+      expect(step).toContain('ingress.authenticated=false');
     }
+  });
+
+  it('the diagnostics endpoints are not published along with the docs', () => {
+    // Being reachable made the log buffer world readable, and the TPP protection does not cover it
+    // because that lands in P3.7b. The platform admin token does.
+    const controller = read('bankcore/src/modules/system/controllers/system.controller.ts');
+    expect(controller).toContain('preHandler: requireAdmin');
+    expect(read('bankcore/src/vendors/middleware/adminAuth.ts')).toContain("payload.role !== 'admin'");
+    // /health stays open: the deploy platform probes it and it carries no data. Check the ROUTE, not
+    // the file, since the guard is imported at the top.
+    const healthRoute = controller.split("fastify.get('/health'")[1].split("fastify.get('/logs'")[0];
+    expect(healthRoute).not.toContain('preHandler');
   });
 
   it('the frontend image is built knowing the private bankcore host', () => {

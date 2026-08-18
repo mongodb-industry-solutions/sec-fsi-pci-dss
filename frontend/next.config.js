@@ -48,8 +48,15 @@ const nextConfig = {
         return [
             { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
             { source: '/health', destination: `${backendUrl}/health` },
-            { source: '/merchant-health', destination: `${merchantUrl}/health` },
-            { source: '/bankcore-health', destination: `${bankcoreUrl}/health` },
+            // Per-service health aliases. They exist only because bare /health on this origin is
+            // already the backend's; each one forwards to that service's OWN /health, which is also
+            // the path the deploy platform probes.
+            { source: '/health/merchant', destination: `${merchantUrl}/health` },
+            { source: '/health/bankcore', destination: `${bankcoreUrl}/health` },
+            // Swagger UI of the bank, same-origin so it works in every environment. The API behind it
+            // needs a registered TPP's credentials, so publishing the docs opens nothing.
+            { source: '/doc/bankcore', destination: `${bankcoreUrl}/doc` },
+            { source: '/doc/bankcore/:path*', destination: `${bankcoreUrl}/doc/:path*` },
         ];
     },
 };

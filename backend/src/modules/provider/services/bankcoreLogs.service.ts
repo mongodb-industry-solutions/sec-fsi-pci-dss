@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { config } from '../../../config';
 import { appendLog } from '../../../shared/services/logBuffer';
 
@@ -9,9 +10,12 @@ export async function fetchBankcoreLogs(
 ): Promise<{ lines: string[]; error?: string }> {
   if (!config.bankcore.enabled) return { lines: [], error: 'PSP_BANKCORE_ENABLED is false' };
   try {
+    // Short-lived platform admin token, verified by bankcore with the shared secret. The Open Banking
+    // surface uses TPP client credentials instead; this is only the diagnostics channel.
+    const token = jwt.sign({ role: 'admin' }, config.app.jwtSecret, { expiresIn: 60 });
     const response = await fetchImpl(
       `${config.bankcore.baseUrl}/api/v1/system/logs?limit=${limit}`,
-      { signal: AbortSignal.timeout(3000) },
+      { signal: AbortSignal.timeout(3000), headers: { Authorization: `Bearer ${token}` } },
     );
     if (!response.ok) {
       const error = `bankcore logs unavailable: HTTP ${response.status}`;

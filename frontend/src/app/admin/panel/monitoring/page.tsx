@@ -40,6 +40,10 @@ interface CheckResult {
 
 const CONFIG_KEY  = 'pci_monitoring_config';
 const PAUSED_KEY  = 'pci_monitoring_paused';
+// Ids of shipped defaults this browser has already been offered. Without it a newly shipped service
+// never appears for anyone who already has a stored config, and re-offering it unconditionally would
+// resurrect a service the operator deliberately deleted.
+const KNOWN_KEY   = 'pci_monitoring_known_defaults';
 const MAX_HISTORY = 20;
 
 function loadConfig(): MonitoringService[] {
@@ -52,6 +56,18 @@ function loadConfig(): MonitoringService[] {
 
 function saveConfig(services: MonitoringService[]): void {
   try { localStorage.setItem(CONFIG_KEY, JSON.stringify(services)); } catch { /* quota */ }
+}
+
+function loadKnownDefaults(): string[] {
+  try {
+    const raw = localStorage.getItem(KNOWN_KEY);
+    if (raw) return JSON.parse(raw) as string[];
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveKnownDefaults(ids: string[]): void {
+  try { localStorage.setItem(KNOWN_KEY, JSON.stringify([...new Set(ids)])); } catch { /* quota */ }
 }
 
 function loadPaused(): boolean {
@@ -695,20 +711,30 @@ export default function MonitoringPage() {
     }
   }, []);
 
-  // Initialize: load from localStorage, preload defaults if empty
+  // Initialize: load from localStorage, then adopt any shipped default this browser has not seen yet.
+  // A service added to monitoring-defaults.json has to reach existing operators too, and it must not
+  // come back once they have removed it, so "already offered" is tracked separately from the config.
   useEffect(() => {
     const stored = loadConfig();
     setPaused(loadPaused());
-    if (stored.length > 0) {
-      setServices(stored);
-      setInitialized(true);
-    } else {
-      fetchDefaults().then(defaults => {
+    fetchDefaults().then(defaults => {
+      const known = loadKnownDefaults();
+      if (stored.length === 0) {
         setServices(defaults);
         if (defaults.length > 0) saveConfig(defaults);
-        setInitialized(true);
-      });
-    }
+      } else {
+        const present = new Set(stored.map(s => s.id));
+        const adopted = defaults.filter(d => !present.has(d.id) && !known.includes(d.id));
+        const merged = adopted.length > 0 ? [...stored, ...adopted] : stored;
+        setServices(merged);
+        if (adopted.length > 0) saveConfig(merged);
+      }
+      saveKnownDefaults([...known, ...defaults.map(d => d.id)]);
+      setInitialized(true);
+    }).catch(() => {
+      setServices(stored);
+      setInitialized(true);
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manage polling timers: restart when services or paused state changes
@@ -766,6 +792,7 @@ export default function MonitoringPage() {
     setConfirmReset(false);
     const defaults = await fetchDefaults();
     updateServices(defaults);
+    saveKnownDefaults(defaults.map(d => d.id));
     setHistory({});
   }
 

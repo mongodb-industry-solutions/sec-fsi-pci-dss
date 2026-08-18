@@ -121,10 +121,15 @@ steps:
       values:
         - image.tag=git-${DRONE_COMMIT_SHA:0:7}
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
-        # NO ingress on purpose: bankcore is a bank API, reached only in-cluster by the PSP and the
-        # frontend proxy. Giving it a public hostname would create the browser-reachable surface the
-        # design avoids, and the chart's health probe already uses the in-cluster /health.
-        - ingress.enabled=false
+        # Public ingress so the Open Banking API can be reviewed and exercised in Swagger. Publishing
+        # the docs opens nothing: every operation needs an access token issued to a REGISTERED TPP,
+        # and AIS/PIS additionally need a consent in `valid`. The diagnostics endpoints require the
+        # platform admin token. The PSP still reaches the bank in-cluster, never through this host.
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-bankcore.industrysolutions.staging.corp.mongodb.com
+        # Same flag the backend uses: Kanopy defaults the ingress to corp Okta SSO, and false makes it
+        # reachable for review. Verify the flag name against web-app chart 4.25.0 on the first run.
+        - ingress.authenticated=false
         - mesh.enabled=true
       wait: true
       timeout: 300s
@@ -301,10 +306,15 @@ steps:
       values:
         - image.tag=git-${DRONE_COMMIT_SHA:0:7}
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
-        # NO ingress on purpose: bankcore is a bank API, reached only in-cluster by the PSP and the
-        # frontend proxy. Giving it a public hostname would create the browser-reachable surface the
-        # design avoids, and the chart's health probe already uses the in-cluster /health.
-        - ingress.enabled=false
+        # Public ingress so the Open Banking API can be reviewed and exercised in Swagger. Publishing
+        # the docs opens nothing: every operation needs an access token issued to a REGISTERED TPP,
+        # and AIS/PIS additionally need a consent in `valid`. The diagnostics endpoints require the
+        # platform admin token. The PSP still reaches the bank in-cluster, never through this host.
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-bankcore.industrysolutions.prod.corp.mongodb.com
+        # Same flag the backend uses: Kanopy defaults the ingress to corp Okta SSO, and false makes it
+        # reachable for review. Verify the flag name against web-app chart 4.25.0 on the first run.
+        - ingress.authenticated=false
         - mesh.enabled=true
       wait: true
       timeout: 300s

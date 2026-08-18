@@ -30,6 +30,11 @@ env:
   # PRIVATE in-cluster service. bankcore has NO public ingress: the browser calls the PSP, which
   # dispatches. Giving it a public hostname would create exactly the surface this design avoids.
   PSP_BANKCORE_BASE_URL: "http://sec-fsi-pci-dss-bankcore-web-app:80"
+  # PUBLIC bankcore host, browser facing: Swagger UI for reviewing and exercising the bank's Open
+  # Banking API. Operating on it requires a registered TPP's credentials, so the docs being public
+  # opens nothing. Server to server traffic keeps using the in-cluster URL above.
+  PSP_BANKCORE_PUBLIC_URL: "https://sec-fsi-pci-dss-bankcore.industrysolutions.staging.corp.mongodb.com"
+  PSP_BANKCORE_SWAGGER_URL: "https://sec-fsi-pci-dss-bankcore.industrysolutions.staging.corp.mongodb.com/doc"
   # The bank's callback to the PSP resolves from PSP_BASE_URL above (in-cluster), so no new variable.
   # PSD2 consent landing state: automatic keeps the demo unblocked, manual needs an operator.
   PSP_BANKCORE_CONSENT_MODE: automatic

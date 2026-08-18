@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { readLogs } from '../../../shared/services/logBuffer';
+import { requireAdmin } from '../../../vendors/middleware/adminAuth';
 import { config } from '../../../config';
 
 // Diagnostics the PSP admin panel reads over the private network. No cardholder data, no secrets.
@@ -41,12 +42,17 @@ export async function systemController(fastify: FastifyInstance) {
   });
 
   fastify.get('/logs', {
+    // Admin only: bankcore is publicly reachable so its API can be reviewed, and a log buffer is not
+    // something to publish.
+    preHandler: requireAdmin,
     schema: {
       tags: ['system'],
       summary: 'Recent bankcore log lines',
       description:
         'Ring buffer of recent lines (warn and above, plus request summaries), so a broken bank is '
-        + 'diagnosable from the PSP admin panel instead of only from pod logs.',
+        + 'diagnosable from the PSP admin panel instead of only from pod logs. Requires the platform '
+        + 'admin token.',
+      security: [{ adminAuth: [] }],
       querystring: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 500 } } },
       response: {
         200: {
