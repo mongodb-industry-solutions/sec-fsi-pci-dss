@@ -13,6 +13,7 @@ import { systemModule } from '../src/modules/system';
 import { aispModule } from '../src/modules/aisp';
 import { tppTrustModule } from '../src/modules/tpp-trust';
 import { consentModule } from '../src/modules/consent';
+import { pispModule } from '../src/modules/pisp';
 import { config } from '../src/config';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -52,6 +53,29 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (fastify.dbError !== null && url.startsWith('/api/') && !isHealth) {
       return reply.status(503).send({ error: 'Service unavailable', detail: fastify.dbError });
     }
+  });
+
+  // A schema validation failure must still look like this bank's API. Fastify answers with its own
+  // {statusCode, error, message} body, and a route whose error schema declares `tppMessages` then strips
+  // that to `{}`: the caller gets an empty 400 for the most common mistake there is. Rendering it here
+  // means every route keeps its `required` and its types in the published contract without that cost.
+  fastify.setErrorHandler((error, request, reply) => {
+    const validation = (error as { validation?: Array<{ instancePath?: string; message?: string }> }).validation;
+    if (validation?.length) {
+      const detail = validation
+        .map((issue) => `${issue.instancePath || 'body'} ${issue.message ?? 'is invalid'}`.trim())
+        .join('; ');
+      const isOpenBanking = request.url.startsWith('/v1/');
+      return reply.status(400).send(isOpenBanking
+        ? { tppMessages: [{ category: 'ERROR', code: 'FORMAT_ERROR', text: detail }] }
+        : { error: 'Bad Request', detail });
+    }
+    const failure = error as { statusCode?: number; message?: string };
+    const status = failure.statusCode ?? 500;
+    // PCI DSS and GDPR: never the stack, and never an internal message on a 500.
+    return reply.status(status).send(status >= 500
+      ? { error: 'Internal Server Error' }
+      : { error: failure.message ?? 'Request failed' });
   });
 
   fastify.addHook('onResponse', (request, reply, done) => {
@@ -125,6 +149,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // Consent before the reads it authorises: nothing in AIS answers with data without one.
   await fastify.register(consentModule);
   await fastify.register(aispModule);
+  await fastify.register(pispModule);
   // Diagnostics, explicitly NOT part of the bank's API.
   await fastify.register(systemModule, { prefix: '/api/v1' });
 

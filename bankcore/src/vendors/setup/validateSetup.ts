@@ -9,6 +9,7 @@ import { TPP_REGISTRATION_COLLECTION, TppRegistrationControlRecord } from '../..
 import {
   BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION, BankConsentAgreementControlRecord,
 } from '../../modules/consent/models/bankConsent.model';
+import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -32,6 +33,7 @@ const REQUIRED_COLLECTIONS = [
   TPP_REGISTRATION_COLLECTION,
   BANK_CONSENT_AGREEMENT_COLLECTION,
   BANK_CONSENT_ACCESS_LOG_COLLECTION,
+  PAYMENT_INITIATION_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -147,6 +149,11 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
   const covering = valid.filter((consent) => (consent.bankConsentAccess?.accounts ?? []).length > 0);
   add('every seeded consent covers at least one account', valid.length === covering.length,
     valid.length === covering.length ? undefined : 'a consent granting nothing is unusable');
+  // Payment access is derived from the account list, so a consent that grants accounts but no payments
+  // came from an older seed and would refuse every initiation with a consent error.
+  const withPayments = valid.filter((consent) => (consent.bankConsentAccess?.payments ?? []).length > 0);
+  add('every seeded consent authorises payments from its accounts', valid.length === withPayments.length,
+    valid.length === withPayments.length ? undefined : 're-seed: the consent predates payment access');
 
   // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN
   // must be one this bank actually owns.

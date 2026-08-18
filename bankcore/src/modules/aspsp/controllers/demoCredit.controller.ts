@@ -10,7 +10,7 @@ export async function demoCreditController(fastify: FastifyInstance) {
   fastify.post('/accounts/:accountId/credits', {
     // Its own scope, granted separately: no standard scope covers creating funds, and folding it into
     // an AIS scope would let a read-only credential top up an account.
-    preHandler: requireTpp('demo-credits'),
+    preValidation: requireTpp('demo-credits'),
     schema: {
       tags: ['accounts'],
       summary: 'Credit an account (demo operation)',

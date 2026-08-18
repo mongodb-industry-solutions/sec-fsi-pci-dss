@@ -93,6 +93,9 @@ export async function createConsent(db: Db, input: CreateConsentInput): Promise<
     // dedicated access list as a narrowing, and narrowing to nothing would create a useless consent.
     balances: refs(input.balanceIbans, accountRefs),
     transactions: refs(input.transactionIbans, accountRefs),
+    // Derived, never requested: the standard's access object has no payment entry, and this exists so
+    // initiation uses the same gate as the reads instead of a second authorisation path.
+    payments: accountRefs,
   };
 
   const automatic = config.bank.consentMode === 'automatic';
@@ -293,6 +296,8 @@ export async function toBerlinGroupConsent(
   return {
     consentId: consent.bankConsentAgreementInstanceReference,
     consentStatus: consent.bankConsentStatus,
+    // Only the three lists the standard defines. `payments` is internal and is not disclosed as if it
+    // were part of the access object a TPP can negotiate.
     access: {
       accounts: asIbans(consent.bankConsentAccess.accounts),
       balances: asIbans(consent.bankConsentAccess.balances),

@@ -18,13 +18,19 @@ export type ConsentStatus =
 // What the consent grants, per the standard's access object. Stored as the bank's own account
 // references rather than IBANs: the IBAN is already encrypted on the account record, and copying it
 // here would store the same personal datum twice for no gain. It is resolved back to an IBAN on read.
+//
+// `payments` is the bank's OWN field and is deliberately not part of the standard access object, which
+// covers account information only. It is derived from the account list at creation, so a TPP never asks
+// for it and it is never returned: what it exists for is to let payment initiation go through the same
+// single consent gate as the reads, rather than growing a second authorisation path.
 export interface ConsentAccessScope {
   accounts: string[];
   balances: string[];
   transactions: string[];
+  payments: string[];
 }
 
-export type ConsentAccessKind = 'accounts' | 'balances' | 'transactions';
+export type ConsentAccessKind = 'accounts' | 'balances' | 'transactions' | 'payments';
 
 export interface BankConsentAgreementControlRecord {
   // The standard's consentId.

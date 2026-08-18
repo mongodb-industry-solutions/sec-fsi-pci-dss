@@ -59,7 +59,7 @@ function messages(code: string, text: string) {
 export async function consentController(fastify: FastifyInstance) {
   // ── POST /v1/consents ────────────────────────────────────────────────────────────────────────
   fastify.post('/consents', {
-    preHandler: requireTpp('accounts', 'AISP'),
+    preValidation: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['consent'],
       summary: 'Create an account access consent',
@@ -138,7 +138,7 @@ export async function consentController(fastify: FastifyInstance) {
 
   // ── GET /v1/consents/{consentId} ─────────────────────────────────────────────────────────────
   fastify.get('/consents/:consentId', {
-    preHandler: requireTpp('accounts', 'AISP'),
+    preValidation: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['consent'],
       summary: 'Read a consent',
@@ -159,7 +159,7 @@ export async function consentController(fastify: FastifyInstance) {
 
   // ── GET /v1/consents/{consentId}/status ──────────────────────────────────────────────────────
   fastify.get('/consents/:consentId/status', {
-    preHandler: requireTpp('accounts', 'AISP'),
+    preValidation: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['consent'],
       summary: 'Read the status of a consent',
@@ -186,7 +186,7 @@ export async function consentController(fastify: FastifyInstance) {
 
   // ── DELETE /v1/consents/{consentId} ──────────────────────────────────────────────────────────
   fastify.delete('/consents/:consentId', {
-    preHandler: requireTpp('accounts', 'AISP'),
+    preValidation: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['consent'],
       summary: 'Terminate a consent',

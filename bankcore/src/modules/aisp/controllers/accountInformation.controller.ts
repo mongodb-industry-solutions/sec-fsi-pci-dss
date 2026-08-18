@@ -116,7 +116,7 @@ async function authorise(
 export async function accountInformationController(fastify: FastifyInstance) {
   // ── GET /v1/accounts ─────────────────────────────────────────────────────────────────────────
   fastify.get('/accounts', {
-    preHandler: requireTpp('accounts', 'AISP'),
+    preValidation: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read the accounts a consent gives access to',
@@ -157,7 +157,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // ── GET /v1/accounts/{accountId} ─────────────────────────────────────────────────────────────
   fastify.get('/accounts/:accountId', {
-    preHandler: requireTpp('accounts', 'AISP'),
+    preValidation: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read one account',
@@ -184,7 +184,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // ── GET /v1/accounts/{accountId}/balances ────────────────────────────────────────────────────
   fastify.get('/accounts/:accountId/balances', {
-    preHandler: requireTpp('balances', 'AISP'),
+    preValidation: requireTpp('balances', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read the balances of an account',
@@ -239,7 +239,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // ── GET /v1/accounts/{accountId}/transactions ────────────────────────────────────────────────
   fastify.get('/accounts/:accountId/transactions', {
-    preHandler: requireTpp('transactions', 'AISP'),
+    preValidation: requireTpp('transactions', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read the movements of an account',

@@ -185,7 +185,9 @@ function main(): void {
   const consents = [...accountsByHolder.entries()].map(([holderRef, accountRefs]) => ({
     bankConsentAgreementInstanceReference: consentRefFor(holderRef),
     bankConsentAccountHolderInstanceReference: holderRef,
-    bankConsentAccess: { accounts: accountRefs, balances: accountRefs, transactions: accountRefs },
+    bankConsentAccess: {
+      accounts: accountRefs, balances: accountRefs, transactions: accountRefs, payments: accountRefs,
+    },
     bankConsentRecurringIndicator: true,
     bankConsentFrequencyPerDay: 4,
     bankConsentValidUntil: CONSENT_VALID_UNTIL,

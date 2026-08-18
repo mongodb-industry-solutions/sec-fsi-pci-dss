@@ -7,6 +7,7 @@ import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountM
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
+import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -119,6 +120,29 @@ const INDEXES: IndexPlan[] = [
     collection: BANK_CONSENT_ACCESS_LOG_COLLECTION,
     keys: { accessCorrelationId: 1 },
     options: { name: 'bankConsentAccessLog_correlation' },
+  },
+  // A payment is read by its id plus the TPP that initiated it, which is also how it is scoped.
+  {
+    collection: PAYMENT_INITIATION_COLLECTION,
+    keys: { paymentInitiationInstanceReference: 1 },
+    options: { unique: true, name: 'paymentInitiation_ref_unique' },
+  },
+  {
+    collection: PAYMENT_INITIATION_COLLECTION,
+    keys: { paymentInitiatingTppClientId: 1, transactionStatus: 1, recordCreatedDateTime: -1 },
+    options: { name: 'paymentInitiation_tpp_status_time' },
+  },
+  // The correlation query that ties a payment to the PSP's own record of it.
+  {
+    collection: PAYMENT_INITIATION_COLLECTION,
+    keys: { paymentEndToEndIdentification: 1 },
+    options: { name: 'paymentInitiation_end_to_end' },
+  },
+  // The debit side of a payment is looked up per account when reconciling what was presented.
+  {
+    collection: PAYMENT_INITIATION_COLLECTION,
+    keys: { 'paymentDebtor.accountReference': 1, recordCreatedDateTime: -1 },
+    options: { name: 'paymentInitiation_debtor_time' },
   },
   {
     collection: COUNTERS_COLLECTION,
