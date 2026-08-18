@@ -14,6 +14,7 @@ import { aispModule } from '../src/modules/aisp';
 import { tppTrustModule } from '../src/modules/tpp-trust';
 import { consentModule } from '../src/modules/consent';
 import { pispModule } from '../src/modules/pisp';
+import { paymentHubModule } from '../src/modules/payment-hub';
 import { config } from '../src/config';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -150,6 +151,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(consentModule);
   await fastify.register(aispModule);
   await fastify.register(pispModule);
+  await fastify.register(paymentHubModule);
   // Diagnostics, explicitly NOT part of the bank's API.
   await fastify.register(systemModule, { prefix: '/api/v1' });
 
