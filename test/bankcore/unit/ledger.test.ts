@@ -32,14 +32,18 @@ function fakeDb(accounts: Account[]) {
     });
 
   const collection = (name: string) => ({
+    // Mirrors the driver under Queryable Encryption: `returnDocument: 'after'` is REJECTED, so this
+    // returns a snapshot from BEFORE the change. A fake that returned the mutated document would hide
+    // the constraint, which is exactly how it reached a live run unnoticed.
     async findOneAndUpdate(filter: Record<string, unknown>, update: Record<string, Record<string, unknown>>) {
       const doc = accounts.find((a) => matches(a, filter));
       if (!doc) return null;
+      const before = { ...doc, accountBalance: { ...doc.accountBalance } };
       for (const [path, delta] of Object.entries(update.$inc ?? {})) {
         const [, field] = path.split('.');
         (doc.accountBalance as unknown as Record<string, number>)[field] += delta as number;
       }
-      return doc;
+      return before;
     },
     async countDocuments(filter: Record<string, unknown>) {
       return accounts.filter((a) => matches(a, filter)).length;

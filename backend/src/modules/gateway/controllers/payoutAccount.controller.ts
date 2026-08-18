@@ -26,6 +26,8 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry, CreditType } from '../models/balanceCreditLog.model';
 import { creditDirect } from '../services/payoutAccountBalance.service';
+import { requestDemoCredit } from '../../../providers/account-information/services/bankcoreAis.client';
+import { config } from '../../../config';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -740,6 +742,8 @@ export async function payoutAccountController(fastify: FastifyInstance) {
           },
         },
         404: { $ref: 'Error#' },
+        // v37: the bank refusing or being unreachable is not the PSP's fault, and it must not read as one.
+        502: { $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
@@ -771,8 +775,32 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       recordCreatedDateTime: now,
       schemaVersion: 1,
     };
-    await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION).insertOne(entry);
-    await creditDirect(db, accountRef, body.amount);
+    // v37 P2.5: the PSP no longer mints money. With the bank enabled it ASKS the institution that holds
+    // the account to credit it, and the bank writes its own audit entry; with the flag off the local
+    // ledger path is unchanged. The endpoint stays, because the frontend and the invariants depend on
+    // it: what moved is the effect, not the route.
+    const linked = await db.collection<{ payoutAccountBankAccountReference?: string }>('payoutAccountArrangement')
+      .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountBankAccountReference: 1 } });
+
+    if (config.bankcore.enabled && linked?.payoutAccountBankAccountReference) {
+      const credited = await requestDemoCredit({
+        bankAccountReference: linked.payoutAccountBankAccountReference,
+        amount: body.amount,
+        currency: body.currency,
+        reason: entry.description,
+        requestedBy: user?.role ?? 'admin',
+        // The PSP's own id for this operation, so the bank's movement is queryable from here.
+        endToEndIdentification: creditId,
+      });
+      if (!credited.applied) {
+        // No local fallback: crediting locally would be exactly the money minting this removes.
+        return reply.status(502).send({ error: `The bank refused the credit: ${credited.error}` });
+      }
+      await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION).insertOne(entry);
+    } else {
+      await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION).insertOne(entry);
+      await creditDirect(db, accountRef, body.amount);
+    }
 
     emitProcessEvent(db, {
       entityType: 'account', entityId: accountRef,

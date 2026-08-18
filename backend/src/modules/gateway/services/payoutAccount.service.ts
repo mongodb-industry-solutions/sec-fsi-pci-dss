@@ -4,6 +4,7 @@
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'node:crypto';
+import { projectBalances, projectBalance } from './payoutAccountBalanceProjection';
 import {
   PAYOUT_ACCOUNT_COLLECTION,
   PayoutAccountArrangement,
@@ -88,7 +89,9 @@ export async function listPayoutAccounts(
     col.find(query).sort({ payoutAccountIsDefault: -1, recordCreatedDateTime: -1 }).skip(skip).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
-  return { results, total };
+  // v37 P2.4: with the bank enabled, the balance comes from the institution that holds the account, at
+  // the same field path every consumer already reads. With it off this is a no-op.
+  return { results: await projectBalances(results), total };
 }
 
 // v29 admin (built-in module account-information): cross-party GLOBAL payout-account list for
@@ -120,8 +123,10 @@ export async function getPayoutAccount(
   db: Db,
   payoutAccountRef: string,
 ): Promise<PayoutAccountArrangement | null> {
-  return db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+  const account = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
     .findOne({ payoutAccountInstanceReference: payoutAccountRef });
+  // Same projection as the list path, so a single-account read never disagrees with the list.
+  return account ? projectBalance(account) : null;
 }
 
 export async function getDefaultPayoutAccount(

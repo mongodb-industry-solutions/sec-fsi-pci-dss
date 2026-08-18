@@ -29,8 +29,11 @@ function stamps() {
   return { 'accountBalance.lastUpdatedDateTime': now, recordUpdatedDateTime: now.toISOString() };
 }
 
-// One conditional update, returning the document AFTER it so the caller can record the movement
-// without a second read that another writer could have changed underneath it.
+// One conditional update. It returns the document BEFORE the change, because Queryable Encryption
+// rejects `returnDocument: 'after'` outright (EncryptedFindAndModifyNewNotSupported), and the balance
+// after is then the before plus the increment this very operation applied. That is still a single
+// atomic write: the guard lives in the filter, so nothing between the read and the write can slip in,
+// and reading the document again afterwards is what would have been racy.
 async function applyIncrement(
   db: Db,
   accountRef: string,
@@ -48,17 +51,19 @@ async function applyIncrement(
   const inc: Record<string, number> = {};
   for (const [field, delta] of Object.entries(increments)) inc[path(field as BalanceField)] = delta as number;
 
-  const updated = await db.collection<AccountArrangementControlRecord>(ACCOUNT_ARRANGEMENT_COLLECTION)
-    .findOneAndUpdate(filter, { $inc: inc, $set: stamps() }, { returnDocument: 'after' });
+  const before = await db.collection<AccountArrangementControlRecord>(ACCOUNT_ARRANGEMENT_COLLECTION)
+    .findOneAndUpdate(filter, { $inc: inc, $set: stamps() }, { returnDocument: 'before' });
 
-  if (!updated) {
+  if (!before) {
     // Distinguish "no such active account" from "the guard refused", since the two send whoever is
     // debugging in different directions.
     const exists = await db.collection(ACCOUNT_ARRANGEMENT_COLLECTION)
       .countDocuments({ accountArrangementInstanceReference: accountRef, accountStatus: 'active' }, { limit: 1 });
     return { applied: false, reason: exists ? guardReason : 'account_not_found_or_inactive' };
   }
-  return { applied: true, balanceAfter: updated.accountBalance.availableAmount };
+  const availableDelta = increments.availableAmount ?? 0;
+  const balanceAfter = Number((before.accountBalance.availableAmount + availableDelta).toFixed(2));
+  return { applied: true, balanceAfter };
 }
 
 async function recordMovement(
