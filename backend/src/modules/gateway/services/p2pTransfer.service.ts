@@ -10,7 +10,7 @@ import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
 import { getPayoutAccount, getDefaultPayoutAccount } from './payoutAccount.service';
-import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
+import { holdAvailableFunds, releaseReservation } from './payoutAccountBalance.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
@@ -95,7 +95,7 @@ export async function executeP2PTransfer(
   // A risk signal holds the transfer instead of rejecting it: hold the sender funds FIRST so the money
   // is immobilised, then park the execution in `pending` with no rail dispatch (ADR-060).
   if (screen.hold) {
-    const heldFunds = await holdCardFunds(db, fromAccountRef, amount);
+    const heldFunds = await holdAvailableFunds(db, fromAccountRef, amount);
     if (!heldFunds) return fail(amount, transferCurrency, 'Insufficient available balance.');
     const heldExec: PaymentExecutionProcedure = {
       paymentExecutionInstanceReference: transferRef,
@@ -120,7 +120,7 @@ export async function executeP2PTransfer(
     try {
       await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(heldExec);
     } catch (err) {
-      await releaseCardHold(db, fromAccountRef, amount).catch(() => { /* best effort */ });
+      await releaseReservation(db, fromAccountRef, amount).catch(() => { /* best effort */ });
       console.error('[p2p] could not persist the held execution; hold released:', err);
       return fail(amount, transferCurrency, 'Could not hold this transfer for review. No funds were moved.');
     }
@@ -159,7 +159,7 @@ export async function executeP2PTransfer(
     && sourceAccount?.payoutAccountConsentReference,
   );
 
-  const held = delegateToBank ? true : await holdCardFunds(db, fromAccountRef, amount);
+  const held = delegateToBank ? true : await holdAvailableFunds(db, fromAccountRef, amount);
   if (!held) return fail(amount, transferCurrency, 'Insufficient available balance.');
 
   // 5. Create the immutable execution in routing state. sourcePayoutAccountReference marks this
@@ -259,7 +259,7 @@ export async function executeP2PTransfer(
   if (!submitted) {
     // Compensate: release the hold so funds never vanish, mark the execution failed. There is nothing to
     // release when the BANK was asked to hold, and releasing anyway would credit the customer.
-    if (!delegateToBank) await releaseCardHold(db, fromAccountRef, amount);
+    if (!delegateToBank) await releaseReservation(db, fromAccountRef, amount);
     await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
       { paymentExecutionInstanceReference: transferRef },
       { $set: { paymentExecutionStatus: 'failed', failureReason: `PISP dispatch: ${dispatchNote}`, recordUpdatedDateTime: new Date() } },

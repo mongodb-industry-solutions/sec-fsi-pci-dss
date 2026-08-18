@@ -51,7 +51,7 @@ export async function creditAvailable(
  * refused, rail returned the transfer).
  *
  * pendingAmount -= amount and availableAmount is deliberately NOT credited: the funds never landed,
- * so crediting them would invent money. That is what separates this from releaseCardHold, which
+ * so crediting them would invent money. That is what separates this from releaseReservation, which
  * returns a SENDER's own funds. Leaving the amount in pending instead would show the beneficiary an
  * incoming credit that can never settle.
  */
@@ -133,12 +133,17 @@ export async function creditDirect(
 }
 
 /**
- * Hold funds on card authorization (cardholder / issuer perspective).
- * Moves amount from availableAmount → pendingAmount atomically.
- * Conditional on sufficient available balance: returns false if insufficient.
- * PCI DSS: no SAD stored; operates only on PSP-internal UUID references.
+ * Moves amount from availableAmount → pendingAmount atomically, conditional on sufficient available
+ * balance: returns false if insufficient. No SAD stored; operates only on PSP-internal UUID references.
+ *
+ * **Renamed from `holdCardFunds` in v37 P5.4, because the old name asserted something untrue of most of its
+ * callers.** A card authorisation IS a pre-authorisation at the issuer. On SEPA and ACH there is no such
+ * thing: a hold there is the PSP reserving against its own record so a customer cannot spend the same money
+ * twice while a transfer is in flight, and once the ledger lives at the bank it has **no accounting effect
+ * at all** (the bank holds the money; this only moves a projection). Calling it a card hold implied a
+ * guarantee the rail does not give.
  */
-export async function holdCardFunds(
+export async function holdAvailableFunds(
   db: Db,
   payoutAccountRef: string,
   amount: number,
@@ -164,7 +169,7 @@ export async function holdCardFunds(
  * Clear the pending hold when a card purchase settles.
  * Decrements pendingAmount only: available was already reduced at auth time.
  */
-export async function settleCardDebit(
+export async function settleReservedDebit(
   db: Db,
   payoutAccountRef: string,
   amount: number,
@@ -181,10 +186,10 @@ export async function settleCardDebit(
 
 /**
  * Release a card authorization hold back to available (compensation when a later gate declines the
- * journey after funds were already held). Inverse of holdCardFunds: pending -= amount, available += amount.
+ * journey after funds were already held). Inverse of reserveFunds: pending -= amount, available += amount.
  * Idempotent-safe at the amount level; callers must only release an amount they actually held.
  */
-export async function releaseCardHold(
+export async function releaseReservation(
   db: Db,
   payoutAccountRef: string,
   amount: number,

@@ -6,7 +6,7 @@ import { recordPendingCorrelation } from '../../modules/provider/services/pendin
 import { publishIssuerValidationCompleted } from '../../modules/transaction/services/cardTransaction.service';
 import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
-import { holdCardFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
+import { holdAvailableFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
 import { holdFundsAtBank, isBankLinked } from '../card-authorization/services/bankcoreCardAuthorisation.client';
 import { config } from '../../config';
 import { resolveAndConvert } from '../currency-exchange/services/currencyExchange.service';
@@ -296,7 +296,7 @@ export class ProviderGroups {
     }
 
     // Atomic hold ($gte-conditional): the authoritative funds decision while the ledger is still local.
-    const held = await holdCardFunds(this.db, accountRef, amountInAccountCcy);
+    const held = await holdAvailableFunds(this.db, accountRef, amountInAccountCcy);
     if (!held) {
       publish({ outcome: 'declined', responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS, decisionReason: DECISION_REASON_INSUFFICIENT_FUNDS, available, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
       return;

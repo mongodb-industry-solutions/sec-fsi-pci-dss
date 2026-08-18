@@ -10,8 +10,8 @@ const h = vi.hoisted(() => ({
   openTransferFraudCase: vi.fn(async () => {}),
   getPayoutAccount: vi.fn(),
   getDefaultPayoutAccount: vi.fn(async () => null),
-  holdCardFunds: vi.fn(async () => true),
-  releaseCardHold: vi.fn(async () => true),
+  holdAvailableFunds: vi.fn(async () => true),
+  releaseReservation: vi.fn(async () => true),
   dispatchProvider: vi.fn(async () => ({ provider: 'internal', status: 'received', responseBody: {} })),
   emitProcessEvent: vi.fn(),
   emitComplianceEvent: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/payoutAccount.service'
   getPayoutAccount: h.getPayoutAccount, getDefaultPayoutAccount: h.getDefaultPayoutAccount,
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  holdCardFunds: h.holdCardFunds, releaseCardHold: h.releaseCardHold,
+  holdAvailableFunds: h.holdAvailableFunds, releaseReservation: h.releaseReservation,
 }));
 vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider }));
 vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.service', () => ({
@@ -67,23 +67,23 @@ const input = { initiatorPartyRef: PARTY, counterpartyArrangementRef: 'cab-1', f
 describe('the P2P risk hold compensates a persistence failure', () => {
   beforeEach(() => {
     for (const fn of Object.values(h)) (fn as { mockClear?: () => void }).mockClear?.();
-    h.holdCardFunds.mockResolvedValue(true);
+    h.holdAvailableFunds.mockResolvedValue(true);
     h.getPayoutAccount.mockResolvedValue(SENDER);
     h.screenTransfer.mockResolvedValue({ hold: true, indicators: ['fds.high.risk'], score: 78 });
   });
 
   it('holds the funds and parks the execution on the happy path', async () => {
     const res = await executeP2PTransfer(db(), input);
-    expect(h.holdCardFunds).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
+    expect(h.holdAvailableFunds).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
     expect(h.insertOne).toHaveBeenCalled();
     expect(res.status).toBe('pending');
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 
   it('releases the hold when the held execution cannot be persisted', async () => {
     h.insertOne.mockRejectedValueOnce(new Error('write failed'));
     const res = await executeP2PTransfer(db(), input);
-    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
+    expect(h.releaseReservation).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
     expect(res.status).toBe('failed');
     expect(res.failureReason).toMatch(/no funds were moved/i);
   });

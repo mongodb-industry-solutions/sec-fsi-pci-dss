@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import { EventBus, DomainEvent, makeEvent } from '../../../vendors/eventbus';
 import { completeAuthorized, declineTransaction } from './cardTransaction.service';
-import { releaseCardHold } from '../../gateway/services/payoutAccountBalance.service';
+import { releaseReservation } from '../../gateway/services/payoutAccountBalance.service';
 
 // Real-PSP Phase-1 gate (dev.v8 F4): card-payment authorization waits on card-issuer + fraud scoring
 // (FDS) + sanctions screening (HRP), each arriving as its own bus event. The saga aggregates the
@@ -130,7 +130,7 @@ export class PaymentAuthorizationSaga {
   private async releaseHold(st: JourneyState): Promise<void> {
     if (!st.fundsHold || st.holdReleased) return;
     st.holdReleased = true;
-    try { await releaseCardHold(this.db, st.fundsHold.accountRef, st.fundsHold.amount); }
-    catch (err) { console.error('[saga] releaseCardHold failed:', err); }
+    try { await releaseReservation(this.db, st.fundsHold.accountRef, st.fundsHold.amount); }
+    catch (err) { console.error('[saga] releaseReservation failed:', err); }
   }
 }

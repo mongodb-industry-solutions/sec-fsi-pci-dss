@@ -9,8 +9,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({
   debitPending: vi.fn(async () => true),
-  releaseCardHold: vi.fn(async () => true),
-  settleCardDebit: vi.fn(async () => true),
+  releaseReservation: vi.fn(async () => true),
+  settleReservedDebit: vi.fn(async () => true),
   creditAvailable: vi.fn(async () => true),
   creditDirect: vi.fn(async () => true),
   releasePendingCredit: vi.fn(async () => true),
@@ -28,7 +28,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  debitPending: h.debitPending, releaseCardHold: h.releaseCardHold, settleCardDebit: h.settleCardDebit,
+  debitPending: h.debitPending, releaseReservation: h.releaseReservation, settleReservedDebit: h.settleReservedDebit,
   creditAvailable: h.creditAvailable, creditDirect: h.creditDirect, releasePendingCredit: h.releasePendingCredit,
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/paymentExecution.service', () => ({
@@ -132,7 +132,7 @@ describe('case resolution closes the withheld payment', () => {
   it('confirmed fraud: returns the cardholder hold and declines, without paying the merchant', async () => {
     await wire('authorized').publish(caseResolved('confirmed_fraud'));
     await waitFor(() => h.declineTransaction.mock.calls.length > 0);
-    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), 'acc-holder', 100);
+    expect(h.releaseReservation).toHaveBeenCalledWith(expect.anything(), 'acc-holder', 100);
     expect(h.declineTransaction).toHaveBeenCalledWith(expect.anything(), TXN, 'confirmed_fraud', 'fraud_confirmed');
     expect(h.debitPending).not.toHaveBeenCalled();
   });
@@ -142,7 +142,7 @@ describe('case resolution closes the withheld payment', () => {
     await flush();
     // Give the (correctly skipped) resolution path the same window the acting paths get.
     await new Promise((r) => setTimeout(r, 200));
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
     expect(h.declineTransaction).not.toHaveBeenCalled();
   });
 
@@ -153,7 +153,7 @@ describe('case resolution closes the withheld payment', () => {
       payload: { fraudDiagnosisInstanceReference: 'case-2', outcome: 'confirmed_fraud' },
     }));
     await flush();
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
     expect(h.debitPending).not.toHaveBeenCalled();
   });
 });
@@ -182,6 +182,6 @@ describe('case resolution on a held transfer', () => {
     await wireNoCardTxn().publish(caseResolved('referred'));
     await flush();
     expect(h.declineTransaction).not.toHaveBeenCalled();
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 });

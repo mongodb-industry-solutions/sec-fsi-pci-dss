@@ -17,7 +17,7 @@ import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/b
 import { screenTransfer, openTransferFraudCase, TransferScreeningResult } from './transferRiskGate';
 import { RISK_HOLD_STEP } from './transferReview.service';
 import { getPayoutAccount } from './payoutAccount.service';
-import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
+import { holdAvailableFunds, releaseReservation } from './payoutAccountBalance.service';
 import { initiatePaymentAtBank, selectPaymentProduct } from '../../../providers/payment-initiation/services/bankcorePis.client';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { config as appConfig } from '../../../config';
@@ -164,7 +164,7 @@ export async function executeBankTransfer(
       })
       : null;
     if (input.fromAccountRef && !(appConfig.bankcore.enabled && linkedSource)) {
-      const held = await holdCardFunds(db, input.fromAccountRef, input.amount);
+      const held = await holdAvailableFunds(db, input.fromAccountRef, input.amount);
       if (!held) {
         const errors = ['Insufficient available balance to hold this transfer for review.'];
         await recordException(db, executionRef, input, errors, now);
@@ -176,7 +176,7 @@ export async function executeBankTransfer(
       await recordRiskHold(db, executionRef, input, rail, screen, now);
     } catch (err) {
       if (input.fromAccountRef) {
-        await releaseCardHold(db, input.fromAccountRef, input.amount).catch(() => { /* best effort */ });
+        await releaseReservation(db, input.fromAccountRef, input.amount).catch(() => { /* best effort */ });
       }
       console.error('[bank-transfer] could not persist the held execution; hold released:', err);
       const errors = ['Could not hold this transfer for review. No funds were moved.'];
@@ -185,7 +185,10 @@ export async function executeBankTransfer(
     // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
     await openTransferFraudCase(db, {
       transferRef: executionRef, initiatorPartyRef: input.initiatorPartyRef, indicators: screen.indicators,
-      score: screen.score, amount: input.amount, currency: input.currency, kind: 'bank_transfer',
+      score: screen.score, amount: input.amount, currency: input.currency,
+      // The kind is stated, not defaulted: a same-owner movement has no counterparty for the investigation
+      // read-model to resolve, and saying `bank_transfer` would have it look for one.
+      kind: input.sameOwnerDestination ? 'same_owner' : 'bank_transfer',
       beneficiaryLabel: input.destination.beneficiaryName,
     });
     emitComplianceEvent(db, {

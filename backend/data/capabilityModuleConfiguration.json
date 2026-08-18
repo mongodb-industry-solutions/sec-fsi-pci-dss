@@ -5,24 +5,85 @@
     "moduleDomain": "fraud",
     "capabilityModuleStatus": "active",
     "moduleConfig": {
-      "amount": { "reviewAmount": 500 },
-      "riskyMcc": ["5812", "6011", "7995"],
-      "velocity": { "window24hMax": 5 },
-      "bands": { "reviewAtOrAbove": 50, "declineAtOrAbove": 120 },
+      "amount": {
+        "reviewAmount": 500
+      },
+      "riskyMcc": [
+        "5812",
+        "6011",
+        "7995"
+      ],
+      "velocity": {
+        "window24hMax": 5
+      },
+      "bands": {
+        "reviewAtOrAbove": 50,
+        "declineAtOrAbove": 120
+      },
       "rules": [
-        { "id": "HIGH_VALUE_TXN", "label": "Amount over 500", "when": { "field": "amount", "op": "gt", "value": 500 }, "score": 60, "action": "review" },
-        { "id": "ELEVATED_VALUE_TXN", "label": "Amount over 250", "when": { "field": "amount", "op": "gt", "value": 250 }, "score": 40 },
-        { "id": "RISKY_MCC", "label": "Merchant category on the risky list", "when": { "field": "merchantCategoryCode", "op": "in", "value": ["5812", "6011", "7995"] }, "score": 35, "action": "review" },
-        { "id": "VELOCITY_24H", "label": "More than 5 transactions in 24h", "when": { "field": "recentTransactionCount24h", "op": "gt", "value": 5 }, "score": 30, "action": "review" }
+        {
+          "id": "HIGH_VALUE_TXN",
+          "label": "Amount over 500",
+          "when": {
+            "field": "amount",
+            "op": "gt",
+            "value": 500
+          },
+          "score": 60,
+          "action": "review"
+        },
+        {
+          "id": "ELEVATED_VALUE_TXN",
+          "label": "Amount over 250",
+          "when": {
+            "field": "amount",
+            "op": "gt",
+            "value": 250
+          },
+          "score": 40
+        },
+        {
+          "id": "RISKY_MCC",
+          "label": "Merchant category on the risky list",
+          "when": {
+            "field": "merchantCategoryCode",
+            "op": "in",
+            "value": [
+              "5812",
+              "6011",
+              "7995"
+            ]
+          },
+          "score": 35,
+          "action": "review"
+        },
+        {
+          "id": "VELOCITY_24H",
+          "label": "More than 5 transactions in 24h",
+          "when": {
+            "field": "recentTransactionCount24h",
+            "op": "gt",
+            "value": 5
+          },
+          "score": 30,
+          "action": "review"
+        }
       ],
       "scoreScaleMax": 100
     },
     "moduleCallbackEndpoints": [
-      { "event": "fds.scored", "path": "/api/v1/providers/callback/fds/int-internal-fds-001" }
+      {
+        "event": "fds.scored",
+        "path": "/api/v1/providers/callback/fds/int-internal-fds-001"
+      }
     ],
     "bianServiceDomain": "SD-63 Fraud Evaluation",
     "bianControlRecordType": "FraudEvaluationAssessment",
-    "pciDssRequirements": ["Req 10.2.1", "Req 12.3.1", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -32,17 +93,49 @@
     "moduleDomain": "fraud",
     "capabilityModuleStatus": "active",
     "moduleConfig": {
-      "thresholds": { "match": 95, "closeMatch": 80 },
-      "strategy": { "exact": true, "normalized": true, "tokenOrderInsensitive": true, "fuzzy": true, "maxEditDistance": 2, "aliasMatch": false },
-      "policy": { "closeMatch": "warn", "noMatch": "warn", "mandatoryAboveAmount": 0 },
-      "markets": ["ES", "FR", "DE", "IT", "NL", "IE", "PT", "BE", "AT", "FI", "GB"]
+      "thresholds": {
+        "match": 95,
+        "closeMatch": 80
+      },
+      "strategy": {
+        "exact": true,
+        "normalized": true,
+        "tokenOrderInsensitive": true,
+        "fuzzy": true,
+        "maxEditDistance": 2,
+        "aliasMatch": false
+      },
+      "policy": {
+        "closeMatch": "warn",
+        "noMatch": "warn",
+        "mandatoryAboveAmount": 0
+      },
+      "markets": [
+        "ES",
+        "FR",
+        "DE",
+        "IT",
+        "NL",
+        "IE",
+        "PT",
+        "BE",
+        "AT",
+        "FI",
+        "GB"
+      ]
     },
     "moduleCallbackEndpoints": [
-      { "event": "vop.verified", "path": "/api/v1/providers/callback/vop/int-internal-vop-001" }
+      {
+        "event": "vop.verified",
+        "path": "/api/v1/providers/callback/vop/int-internal-vop-001"
+      }
     ],
     "bianServiceDomain": "SD-13 Party Data Management",
     "bianControlRecordType": "PartyReferenceDataDirectoryEntry",
-    "pciDssRequirements": ["Req 10.2.1", "Req 12.3.1"],
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1"
+    ],
     "recordCreatedDateTime": "2026-07-17T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-17T00:00:00.000Z"
   },
@@ -51,13 +144,27 @@
     "capability": "hrp",
     "moduleDomain": "fraud",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "screeningLists": ["OFAC_SDN", "EU_Consolidated", "UN_Consolidated", "PEP_Global"], "matchThreshold": 85 },
+    "moduleConfig": {
+      "screeningLists": [
+        "OFAC_SDN",
+        "EU_Consolidated",
+        "UN_Consolidated",
+        "PEP_Global"
+      ],
+      "matchThreshold": 85
+    },
     "moduleCallbackEndpoints": [
-      { "event": "hrp.screened", "path": "/api/v1/providers/callback/hrp/int-internal-hrp-001" }
+      {
+        "event": "hrp.screened",
+        "path": "/api/v1/providers/callback/hrp/int-internal-hrp-001"
+      }
     ],
     "bianServiceDomain": "SD-13 Party Data Management",
     "bianControlRecordType": "PartyReferenceDataDirectoryEntry",
-    "pciDssRequirements": ["Req 12.8.1", "Req 12.8.5"],
+    "pciDssRequirements": [
+      "Req 12.8.1",
+      "Req 12.8.5"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -66,13 +173,26 @@
     "capability": "aml",
     "moduleDomain": "fraud",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "watchlistSources": ["OFAC_SDN", "FATF", "EU_Consolidated"], "continuousMonitoring": false },
+    "moduleConfig": {
+      "watchlistSources": [
+        "OFAC_SDN",
+        "FATF",
+        "EU_Consolidated"
+      ],
+      "continuousMonitoring": false
+    },
     "moduleCallbackEndpoints": [
-      { "event": "aml.screened", "path": "/api/v1/providers/callback/aml/int-internal-aml-001" }
+      {
+        "event": "aml.screened",
+        "path": "/api/v1/providers/callback/aml/int-internal-aml-001"
+      }
     ],
     "bianServiceDomain": "SD-99 Suspicious Activity Analysis",
     "bianControlRecordType": "SuspiciousActivityAnalysisAssessment",
-    "pciDssRequirements": ["Req 10.2.1", "Req 12.3.1"],
+    "pciDssRequirements": [
+      "Req 10.2.1",
+      "Req 12.3.1"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -81,13 +201,33 @@
     "capability": "kyc",
     "moduleDomain": "customer",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "defaultLevel": "basic", "reVerificationDays": 365, "consentRequired": true, "decisionMode": "automated", "decisionAutoApproveMaxRisk": "low", "decisionAutoRejectOn": ["sanctions_hit", "kyc_failed"], "decisionEscalateToManualOn": ["pep_hit", "adverse_media_hit"] },
+    "moduleConfig": {
+      "defaultLevel": "basic",
+      "reVerificationDays": 365,
+      "consentRequired": true,
+      "decisionMode": "automated",
+      "decisionAutoApproveMaxRisk": "low",
+      "decisionAutoRejectOn": [
+        "sanctions_hit",
+        "kyc_failed"
+      ],
+      "decisionEscalateToManualOn": [
+        "pep_hit",
+        "adverse_media_hit"
+      ]
+    },
     "moduleCallbackEndpoints": [
-      { "event": "kyc.verified", "path": "/api/v1/providers/callback/kyc/int-internal-kyc-001" }
+      {
+        "event": "kyc.verified",
+        "path": "/api/v1/providers/callback/kyc/int-internal-kyc-001"
+      }
     ],
     "bianServiceDomain": "SD-53 Customer Agreement",
     "bianControlRecordType": "CustomerAgreementProcedure",
-    "pciDssRequirements": ["Req 8.1", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 8.1",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -96,13 +236,33 @@
     "capability": "kyb",
     "moduleDomain": "gateway",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "dueDiligenceLevel": "standard", "uboDisclosureThreshold": 25, "pepScreeningIncluded": true, "decisionMode": "manual", "decisionAutoApproveMaxRisk": "low", "decisionAutoRejectOn": ["sanctions_hit", "kyb_failed"], "decisionEscalateToManualOn": ["pep_hit", "adverse_media_hit"] },
+    "moduleConfig": {
+      "dueDiligenceLevel": "standard",
+      "uboDisclosureThreshold": 25,
+      "pepScreeningIncluded": true,
+      "decisionMode": "manual",
+      "decisionAutoApproveMaxRisk": "low",
+      "decisionAutoRejectOn": [
+        "sanctions_hit",
+        "kyb_failed"
+      ],
+      "decisionEscalateToManualOn": [
+        "pep_hit",
+        "adverse_media_hit"
+      ]
+    },
     "moduleCallbackEndpoints": [
-      { "event": "kyb.verified", "path": "/api/v1/providers/callback/kyb/int-internal-kyb-001" }
+      {
+        "event": "kyb.verified",
+        "path": "/api/v1/providers/callback/kyb/int-internal-kyb-001"
+      }
     ],
     "bianServiceDomain": "SD-89 Merchant Relations",
     "bianControlRecordType": "MerchantAgreementProcedure",
-    "pciDssRequirements": ["Req 12.8.1", "Req 12.8.3"],
+    "pciDssRequirements": [
+      "Req 12.8.1",
+      "Req 12.8.3"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -111,13 +271,22 @@
     "capability": "credit-bureau",
     "moduleDomain": "customer",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "scoreRangeMin": 300, "scoreRangeMax": 850, "scoringModel": "internal-v1" },
+    "moduleConfig": {
+      "scoreRangeMin": 300,
+      "scoreRangeMax": 850,
+      "scoringModel": "internal-v1"
+    },
     "moduleCallbackEndpoints": [
-      { "event": "credit-bureau.scored", "path": "/api/v1/providers/callback/credit/bureau/int-internal-cb-001" }
+      {
+        "event": "credit-bureau.scored",
+        "path": "/api/v1/providers/callback/credit/bureau/int-internal-cb-001"
+      }
     ],
     "bianServiceDomain": "SD-60 Customer Credit Rating",
     "bianControlRecordType": "CustomerCreditRatingState",
-    "pciDssRequirements": ["Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -126,13 +295,23 @@
     "capability": "card-authorization",
     "moduleDomain": "gateway",
     "capabilityModuleStatus": "active",
-    "moduleConfig": { "mockMode": true, "enableThreeDS": false, "merchantCode": "MC-PSP-001" },
+    "moduleConfig": {
+      "mockMode": true,
+      "enableThreeDS": false,
+      "merchantCode": "MC-PSP-001"
+    },
     "moduleCallbackEndpoints": [
-      { "event": "card-authorization.authorized", "path": "/api/v1/providers/callback/card/authorization/int-internal-card-auth-001" }
+      {
+        "event": "card-authorization.authorized",
+        "path": "/api/v1/providers/callback/card/authorization/int-internal-card-auth-001"
+      }
     ],
     "bianServiceDomain": "SD-15 Card Authorization",
     "bianControlRecordType": "CardAuthorizationRecord",
-    "pciDssRequirements": ["Req 3.3", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 3.3",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -147,18 +326,72 @@
       "enforceLuhn": true,
       "verifyCardholderName": false,
       "networks": [
-        { "name": "VISA", "prefixes": ["4"], "lengths": [13, 16, 19], "cvvLength": 3, "enabled": true },
-        { "name": "MASTERCARD", "prefixes": ["51-55", "2221-2720"], "lengths": [16], "cvvLength": 3, "enabled": true },
-        { "name": "AMEX", "prefixes": ["34", "37"], "lengths": [15], "cvvLength": 4, "enabled": true },
-        { "name": "DISCOVER", "prefixes": ["6011", "644-649", "65"], "lengths": [16, 19], "cvvLength": 3, "enabled": true }
+        {
+          "name": "VISA",
+          "prefixes": [
+            "4"
+          ],
+          "lengths": [
+            13,
+            16,
+            19
+          ],
+          "cvvLength": 3,
+          "enabled": true
+        },
+        {
+          "name": "MASTERCARD",
+          "prefixes": [
+            "51-55",
+            "2221-2720"
+          ],
+          "lengths": [
+            16
+          ],
+          "cvvLength": 3,
+          "enabled": true
+        },
+        {
+          "name": "AMEX",
+          "prefixes": [
+            "34",
+            "37"
+          ],
+          "lengths": [
+            15
+          ],
+          "cvvLength": 4,
+          "enabled": true
+        },
+        {
+          "name": "DISCOVER",
+          "prefixes": [
+            "6011",
+            "644-649",
+            "65"
+          ],
+          "lengths": [
+            16,
+            19
+          ],
+          "cvvLength": 3,
+          "enabled": true
+        }
       ]
     },
     "moduleCallbackEndpoints": [
-      { "event": "card.issuer.validation.approved", "path": "/api/v1/providers/callback/card/issuer/int-internal-card-issuer-001" }
+      {
+        "event": "card.issuer.validation.approved",
+        "path": "/api/v1/providers/callback/card/issuer/int-internal-card-issuer-001"
+      }
     ],
     "bianServiceDomain": "SD-88 Payment Card",
     "bianControlRecordType": "PaymentCardManagement",
-    "pciDssRequirements": ["Req 3.2", "Req 3.3", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 3.2",
+      "Req 3.3",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-06-14T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-14T00:00:00.000Z"
   },
@@ -175,7 +408,11 @@
     "moduleCallbackEndpoints": [],
     "bianServiceDomain": "SD-36 Open Banking AIS",
     "bianControlRecordType": "AccountInformationValidation",
-    "pciDssRequirements": ["Req 3.3", "Req 7.1", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 3.3",
+      "Req 7.1",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z"
   },
@@ -193,7 +430,40 @@
     "moduleCallbackEndpoints": [],
     "bianServiceDomain": "SD-66 Payment Initiation",
     "bianControlRecordType": "PaymentInitiationProcedure",
-    "pciDssRequirements": ["Req 3.3", "Req 10.2.1", "Req 12.8.1"],
+    "pciDssRequirements": [
+      "Req 3.3",
+      "Req 10.2.1",
+      "Req 12.8.1"
+    ],
+    "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
+    "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+  },
+  {
+    "capabilityModuleInstanceReference": "currency-exchange",
+    "capability": "currency-exchange",
+    "moduleDomain": "payment",
+    "capabilityModuleStatus": "active",
+    "moduleConfig": {
+      "baseCurrency": "EUR",
+      "rates": {
+        "EUR": 1,
+        "USD": 1.08,
+        "GBP": 0.85,
+        "CHF": 0.95,
+        "SGD": 1.45,
+        "NGN": 1650,
+        "PLN": 4.3
+      },
+      "spreadBps": 50
+    },
+    "moduleCallbackEndpoints": [],
+    "bianServiceDomain": "SD-66 Payment Initiation",
+    "bianControlRecordType": "PaymentInitiationProcedure",
+    "pciDssRequirements": [
+      "Req 3.3",
+      "Req 10.2.1",
+      "Req 12.8.1"
+    ],
     "recordCreatedDateTime": "2026-07-01T00:00:00.000Z",
     "recordUpdatedDateTime": "2026-07-01T00:00:00.000Z"
   }

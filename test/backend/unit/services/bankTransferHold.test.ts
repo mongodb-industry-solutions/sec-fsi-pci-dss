@@ -13,8 +13,8 @@ const h = vi.hoisted(() => ({
   screenTransfer: vi.fn(),
   openTransferFraudCase: vi.fn(async () => {}),
   getPayoutAccount: vi.fn(),
-  holdCardFunds: vi.fn(async () => true),
-  releaseCardHold: vi.fn(async () => true),
+  holdAvailableFunds: vi.fn(async () => true),
+  releaseReservation: vi.fn(async () => true),
   dispatchProvider: vi.fn(async () => ({ provider: 'internal', status: 'received', responseBody: {} })),
   emitProcessEvent: vi.fn(),
   emitComplianceEvent: vi.fn(),
@@ -26,7 +26,7 @@ vi.mock('../../../../backend/src/modules/gateway/services/transferRiskGate', () 
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccount.service', () => ({ getPayoutAccount: h.getPayoutAccount }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  holdCardFunds: h.holdCardFunds, releaseCardHold: h.releaseCardHold, settleCardDebit: vi.fn(),
+  holdAvailableFunds: h.holdAvailableFunds, releaseReservation: h.releaseReservation, settleReservedDebit: vi.fn(),
   creditAvailable: vi.fn(), creditDirect: vi.fn(), debitPending: vi.fn(), releasePendingCredit: vi.fn(),
 }));
 vi.mock('../../../../backend/src/modules/provider/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider }));
@@ -63,7 +63,7 @@ const heldExecution = () => (h.insertOne.mock.calls[0]?.[0] ?? {}) as Record<str
 describe('a held bank transfer reserves the money it parks', () => {
   beforeEach(() => {
     for (const fn of Object.values(h)) (fn as { mockClear?: () => void }).mockClear?.();
-    h.holdCardFunds.mockResolvedValue(true);
+    h.holdAvailableFunds.mockResolvedValue(true);
     // Source account owned by the initiator and active, so the ownership check passes.
     h.getPayoutAccount.mockResolvedValue({
       payoutAccountInstanceReference: FROM, partyInstanceReference: PARTY, payoutAccountStatus: 'active',
@@ -73,7 +73,7 @@ describe('a held bank transfer reserves the money it parks', () => {
 
   it('holds the sender funds for the exact amount the reversal would release', async () => {
     const res = await executeBankTransfer(db(), input());
-    expect(h.holdCardFunds).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
+    expect(h.holdAvailableFunds).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
     // Same account + amount the execution records, which is what reverseHeldTransfer reads back.
     const exec = heldExecution();
     expect(exec.sourcePayoutAccountReference).toBe(FROM);
@@ -83,13 +83,13 @@ describe('a held bank transfer reserves the money it parks', () => {
 
   it('parks the execution only after the hold succeeded', async () => {
     await executeBankTransfer(db(), input());
-    const holdOrder = h.holdCardFunds.mock.invocationCallOrder[0];
+    const holdOrder = h.holdAvailableFunds.mock.invocationCallOrder[0];
     const insertOrder = h.insertOne.mock.invocationCallOrder[0];
     expect(holdOrder).toBeLessThan(insertOrder);
   });
 
   it('refuses the movement when the balance cannot cover the hold', async () => {
-    h.holdCardFunds.mockResolvedValue(false);
+    h.holdAvailableFunds.mockResolvedValue(false);
     const res = await executeBankTransfer(db(), input());
     expect(res.status).toBe('exception');
     expect(res.errors?.[0]).toMatch(/insufficient available balance/i);
@@ -100,7 +100,7 @@ describe('a held bank transfer reserves the money it parks', () => {
 
   it('holds nothing when the transfer is not drawn from a PSP account', async () => {
     const res = await executeBankTransfer(db(), input({ fromAccountRef: undefined }));
-    expect(h.holdCardFunds).not.toHaveBeenCalled();
+    expect(h.holdAvailableFunds).not.toHaveBeenCalled();
     expect(res.status).toBe('pending');
     // With no source reference, the reversal has nothing to release either: coherent.
     expect(heldExecution().sourcePayoutAccountReference).toBeUndefined();
@@ -109,7 +109,7 @@ describe('a held bank transfer reserves the money it parks', () => {
   it('still dispatches to the rail when the gate does not hold', async () => {
     h.screenTransfer.mockResolvedValue({ hold: false, indicators: [], score: 10 });
     const res = await executeBankTransfer(db(), input());
-    expect(h.holdCardFunds).not.toHaveBeenCalled();
+    expect(h.holdAvailableFunds).not.toHaveBeenCalled();
     expect(h.dispatchProvider).toHaveBeenCalled();
     expect(res.status).toBe('submitted');
   });
@@ -124,7 +124,7 @@ describe('a held bank transfer reserves the money it parks', () => {
 describe('a failure past the reservation releases the hold', () => {
   beforeEach(() => {
     for (const fn of Object.values(h)) (fn as { mockClear?: () => void }).mockClear?.();
-    h.holdCardFunds.mockResolvedValue(true);
+    h.holdAvailableFunds.mockResolvedValue(true);
     h.getPayoutAccount.mockResolvedValue({
       payoutAccountInstanceReference: FROM, partyInstanceReference: PARTY, payoutAccountStatus: 'active',
     });
@@ -134,7 +134,7 @@ describe('a failure past the reservation releases the hold', () => {
   it('releases the funds when the held execution cannot be persisted', async () => {
     h.insertOne.mockRejectedValueOnce(new Error('write failed'));
     const res = await executeBankTransfer(db(), input());
-    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
+    expect(h.releaseReservation).toHaveBeenCalledWith(expect.anything(), FROM, AMOUNT);
     expect(res.status).toBe('exception');
     expect(res.errors?.[0]).toMatch(/no funds were moved/i);
   });
@@ -142,7 +142,7 @@ describe('a failure past the reservation releases the hold', () => {
   it('has nothing to release when no hold was taken', async () => {
     h.insertOne.mockRejectedValueOnce(new Error('write failed'));
     const res = await executeBankTransfer(db(), input({ fromAccountRef: undefined }));
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
     expect(res.status).toBe('exception');
   });
 });

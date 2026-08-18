@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({
   completeAuthorized: vi.fn(async () => ({ fraudCaseCreated: true, fraudDiagnosisInstanceReference: 'case-1' })),
   declineTransaction: vi.fn(async () => {}),
-  releaseCardHold: vi.fn(async () => true),
+  releaseReservation: vi.fn(async () => true),
   releasePendingCredit: vi.fn(async () => true),
   createFraudCase: vi.fn(async () => ({ fraudDiagnosisInstanceReference: 'case-aml' })),
   emitProcessEvent: vi.fn(),
@@ -26,9 +26,9 @@ vi.mock('../../../../backend/src/modules/transaction/services/cardTransaction.se
   completeAuthorized: h.completeAuthorized, declineTransaction: h.declineTransaction,
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  releaseCardHold: h.releaseCardHold, releasePendingCredit: h.releasePendingCredit,
-  holdCardFunds: vi.fn(async () => true), debitPending: vi.fn(async () => true),
-  settleCardDebit: vi.fn(), creditAvailable: vi.fn(), creditDirect: vi.fn(),
+  releaseReservation: h.releaseReservation, releasePendingCredit: h.releasePendingCredit,
+  holdAvailableFunds: vi.fn(async () => true), debitPending: vi.fn(async () => true),
+  settleReservedDebit: vi.fn(), creditAvailable: vi.fn(), creditDirect: vi.fn(),
 }));
 vi.mock('../../../../backend/src/modules/fraud/services/fraudDiagnosis.service', () => ({ createFraudCase: h.createFraudCase }));
 vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.service', () => ({
@@ -88,7 +88,7 @@ describe('1. sanctions on a card payment: hold + case, never a silent decline', 
     expect(verdict.rulesFired).toContain('sanctions_match');
     expect(verdict.riskScore).toBeGreaterThanOrEqual(90);
     // The hold stays: nothing is released on an authorized-and-held journey.
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 
   it('still declines on an eligibility failure (issuer)', async () => {

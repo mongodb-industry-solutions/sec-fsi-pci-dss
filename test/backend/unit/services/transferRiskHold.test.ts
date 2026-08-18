@@ -11,7 +11,7 @@ const h = vi.hoisted(() => ({
   dispatchProvider: vi.fn(),
   emitProcessEvent: vi.fn(),
   emitComplianceEvent: vi.fn(),
-  releaseCardHold: vi.fn(async () => true),
+  releaseReservation: vi.fn(async () => true),
   transitionExecution: vi.fn(async () => true),
   appendResolutionStep: vi.fn(async () => {}),
   createFraudCase: vi.fn(async () => ({ fraudDiagnosisInstanceReference: 'case-1' })),
@@ -21,8 +21,8 @@ vi.mock('../../../../backend/src/modules/provider/services/businessProcessEvent.
   emitProcessEvent: h.emitProcessEvent, emitComplianceEvent: h.emitComplianceEvent,
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  releaseCardHold: h.releaseCardHold, holdCardFunds: vi.fn(async () => true),
-  settleCardDebit: vi.fn(), creditAvailable: vi.fn(), creditDirect: vi.fn(), releasePendingCredit: vi.fn(),
+  releaseReservation: h.releaseReservation, holdAvailableFunds: vi.fn(async () => true),
+  settleReservedDebit: vi.fn(), creditAvailable: vi.fn(), creditDirect: vi.fn(), releasePendingCredit: vi.fn(),
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/paymentExecution.service', () => ({
   transitionExecution: h.transitionExecution, appendResolutionStep: h.appendResolutionStep,
@@ -109,7 +109,7 @@ describe('the held transfer is only movable through a resolution', () => {
     expect(await submitHeldTransfer(db, EXEC)).toBe(false);
     expect(await reverseHeldTransfer(db, EXEC)).toBe(false);
     expect(h.dispatchProvider).not.toHaveBeenCalled();
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 
   it('refuses an execution that is no longer pending (the findOne filter excludes it)', async () => {
@@ -137,14 +137,14 @@ describe('the held transfer is only movable through a resolution', () => {
 
   it('confirmed fraud: returns the held funds, reverses the execution, dispatches nothing', async () => {
     expect(await reverseHeldTransfer(dbWith(execDoc()), EXEC)).toBe(true);
-    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), 'acc-sender', 900);
+    expect(h.releaseReservation).toHaveBeenCalledWith(expect.anything(), 'acc-sender', 900);
     expect(h.transitionExecution).toHaveBeenCalledWith(expect.anything(), EXEC, 'reversed', expect.anything());
     expect(h.dispatchProvider).not.toHaveBeenCalled();
   });
 
   it('confirmed fraud on a transfer with no internal source account: nothing to return', async () => {
     expect(await reverseHeldTransfer(dbWith(execDoc({ sourcePayoutAccountReference: undefined })), EXEC)).toBe(true);
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 });
 
@@ -192,7 +192,7 @@ describe('a resolution reaches the held execution of an RTP request', () => {
   it('confirmed fraud: returns the funds of the linked execution', async () => {
     const db = dbFor({ execution: execDoc(), request: { linkedPaymentExecutionReference: EXEC } });
     expect(await reverseHeldTransfer(db, REQUEST)).toBe(true);
-    expect(h.releaseCardHold).toHaveBeenCalledWith(expect.anything(), 'acc-sender', 900);
+    expect(h.releaseReservation).toHaveBeenCalledWith(expect.anything(), 'acc-sender', 900);
     expect(h.transitionExecution).toHaveBeenCalledWith(expect.anything(), EXEC, 'reversed', expect.anything());
   });
 

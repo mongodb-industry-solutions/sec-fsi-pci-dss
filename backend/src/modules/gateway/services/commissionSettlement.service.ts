@@ -13,7 +13,7 @@
 import { Db } from 'mongodb';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../models/balanceCreditLog.model';
-import { creditDirect, settleCardDebit } from './payoutAccountBalance.service';
+import { creditDirect, settleReservedDebit } from './payoutAccountBalance.service';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 
 // Deterministic references for the PSP's own revenue ledger (seeded by seedPspRevenueAccount).
@@ -110,7 +110,7 @@ export async function postCommission(db: Db, input: PostCommissionInput): Promis
 
   // Withhold from the merchant hold, then credit the PSP. Order matters only for readability: both
   // legs are single-document $inc operations on payoutAccountArrangement.
-  await settleCardDebit(db, input.merchantAccountRef, input.feeAmount);
+  await settleReservedDebit(db, input.merchantAccountRef, input.feeAmount);
   await creditDirect(db, PSP_REVENUE_ACCOUNT_REFERENCE, creditAmount);
 
   emitProcessEvent(db, {

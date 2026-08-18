@@ -5,14 +5,14 @@
  * At authorization the merchant's incoming amount is reserved (debitPending). Every path that ends
  * without a settlement has to give that reservation back, or the beneficiary keeps an incoming credit
  * that can never arrive. The reversal must NOT credit availableAmount: the funds never landed, so
- * crediting them would invent money. That is what separates it from releaseCardHold, which returns a
+ * crediting them would invent money. That is what separates it from releaseReservation, which returns a
  * sender's own funds.
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
   debitPending,
   releasePendingCredit,
-  releaseCardHold,
+  releaseReservation,
 } from '../../../../backend/src/modules/gateway/services/payoutAccountBalance.service';
 
 function makeDb() {
@@ -46,9 +46,9 @@ describe('releasePendingCredit', () => {
     expect(calls[0].inc['payoutAccountBalance.availableAmount']).toBeUndefined();
   });
 
-  it('differs from releaseCardHold, which returns a sender its own funds', async () => {
+  it('differs from releaseReservation, which returns a sender its own funds', async () => {
     const { db, calls } = makeDb();
-    await releaseCardHold(db, 'pao-1', 39);
+    await releaseReservation(db, 'pao-1', 39);
 
     // A P2P sender gets the money back into available; a payout beneficiary must not.
     expect(calls[0].inc['payoutAccountBalance.availableAmount']).toBe(39);

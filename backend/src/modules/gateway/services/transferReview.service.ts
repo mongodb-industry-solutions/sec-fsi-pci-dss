@@ -8,7 +8,7 @@ import { Db } from 'mongodb';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../models/paymentRequest.model';
 import { transitionExecution, appendResolutionStep } from './paymentExecution.service';
-import { releaseCardHold } from './payoutAccountBalance.service';
+import { releaseReservation } from './payoutAccountBalance.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 
@@ -91,8 +91,8 @@ export async function reverseHeldTransfer(db: Db, reference: string): Promise<bo
 
   const amount = exec.grossAmount ?? exec.netAmount ?? 0;
   if (exec.sourcePayoutAccountReference && amount > 0) {
-    try { await releaseCardHold(db, exec.sourcePayoutAccountReference, amount); }
-    catch (err) { console.error('[transfer-review] releaseCardHold failed:', err); }
+    try { await releaseReservation(db, exec.sourcePayoutAccountReference, amount); }
+    catch (err) { console.error('[transfer-review] releaseReservation failed:', err); }
   }
 
   await transitionExecution(db, executionRef, 'reversed', { failureReason: 'Confirmed fraud on investigation' });

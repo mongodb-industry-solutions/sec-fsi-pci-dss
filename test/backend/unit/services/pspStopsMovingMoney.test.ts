@@ -49,9 +49,9 @@ describe('v37 P5.3: the PSP does not credit a beneficiary', () => {
   it('takes no local hold and releases none when the bank is the one holding', () => {
     const transfer = code('backend/src/modules/gateway/services/p2pTransfer.service.ts');
     // A local hold on a projection is a display artefact the next balance read erases.
-    expect(transfer).toContain('delegateToBank ? true : await holdCardFunds');
+    expect(transfer).toContain('delegateToBank ? true : await holdAvailableFunds');
     // And releasing a hold that was never taken would credit the customer.
-    expect(transfer).toContain('if (!delegateToBank) await releaseCardHold');
+    expect(transfer).toContain('if (!delegateToBank) await releaseReservation');
   });
 
   it('the PSP asks the DEBTOR bank, never the creditor institution', () => {

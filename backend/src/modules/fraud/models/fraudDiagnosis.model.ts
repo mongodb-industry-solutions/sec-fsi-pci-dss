@@ -9,7 +9,10 @@ export { RiskSeverity, AnalystRole };
 export const FRAUD_DIAGNOSIS_COLLECTION = 'fraudDiagnosisCase';
 export const FRAUD_DIAGNOSIS_EVENTS_COLLECTION = 'fraudDiagnosisCaseEvents';
 
-export type FraudCaseTransactionKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp';
+// `same_owner` is its own kind (v37 P5.5). The investigation read-model resolves a counterparty from this
+// value, and a transfer between two accounts of one owner HAS none: defaulting it to `bank_transfer` sent an
+// investigator looking for a beneficiary who does not exist.
+export type FraudCaseTransactionKind = 'card' | 'p2p' | 'bank_transfer' | 'rtp' | 'same_owner';
 
 export interface FraudDiagnosisControlRecord {
   // Identifiers

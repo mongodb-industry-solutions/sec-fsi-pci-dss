@@ -11,7 +11,7 @@ import { PAYMENT_EXECUTION_COLLECTION, type PaymentExecutionStatus } from '../mo
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution, resolveMerchantFee } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
-import { creditAvailable, debitPending, settleCardDebit, creditDirect, releaseCardHold, releasePendingCredit } from './payoutAccountBalance.service';
+import { creditAvailable, debitPending, settleReservedDebit, creditDirect, releaseReservation, releasePendingCredit } from './payoutAccountBalance.service';
 import { postCommission, requiresFeeRelease } from './commissionSettlement.service';
 // ADR-039: AIS + PISP are reached ONLY through dispatchProvider (never a direct builtin import),
 // so an external provider can replace the builtin module without changing this flow.
@@ -466,7 +466,7 @@ export class PayoutOrchestrationProcess {
         const creditAmount = await toAccountCcy(execution.netAmount);
         if (execution.sourcePayoutAccountReference) {
           // P2P bank transfer: clear the sender's hold (pending -= gross) then credit the recipient.
-          await settleCardDebit(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? execution.netAmount);
+          await settleReservedDebit(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? execution.netAmount);
           await creditDirect(db, execution.resolvedPayoutAccountReference, creditAmount);
         } else {
           // Merchant settlement: pending was debited at authorization, move pending -> available.
@@ -556,7 +556,7 @@ export class PayoutOrchestrationProcess {
       // was only promised an incoming credit that now will not arrive (pending -> nothing). Crediting
       // the merchant here would invent money the rail never moved.
       if (execution.sourcePayoutAccountReference) {
-        await releaseCardHold(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? 0);
+        await releaseReservation(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? 0);
       } else if (execution.resolvedPayoutAccountReference) {
         const heldAmount = await this.convert(
           execution.grossAmount ?? 0, execution.currency,
@@ -624,7 +624,7 @@ export class PayoutOrchestrationProcess {
   }
 
   // On settlement, clear the pending hold on the cardholder's funding payout account.
-  // At authorization, the funds gate (holdCardFunds) moved amount available → pending IN THE ACCOUNT
+  // At authorization, the funds gate (holdAvailableFunds) moved amount available → pending IN THE ACCOUNT
   // CURRENCY. Settlement finalizes that same debit, so we convert the settlement amount back to the
   // funding-account currency (FX) before clearing pending: otherwise a mismatched-currency hold would
   // never fully clear. Same static rate table → the cleared amount matches the held amount exactly.
@@ -638,7 +638,7 @@ export class PayoutOrchestrationProcess {
     if (!card?.fundingPayoutAccountInstanceReference) return;
     const accountRef = card.fundingPayoutAccountInstanceReference;
     const heldAmount = await this.convert(amount, settlementCurrency, await this.accountCurrency(accountRef));
-    await settleCardDebit(this.db, accountRef, heldAmount);
+    await settleReservedDebit(this.db, accountRef, heldAmount);
   }
 
   // Confirmed fraud: give the cardholder's held amount back (pending -> available) instead of
@@ -653,7 +653,7 @@ export class PayoutOrchestrationProcess {
     if (!card?.fundingPayoutAccountInstanceReference) return;
     const accountRef = card.fundingPayoutAccountInstanceReference;
     const heldAmount = await this.convert(amount, currency, await this.accountCurrency(accountRef));
-    await releaseCardHold(this.db, accountRef, heldAmount);
+    await releaseReservation(this.db, accountRef, heldAmount);
   }
 
   private async getMerchantSettlementSchedule(merchantRef: string): Promise<'T+0' | 'T+1' | 'T+2' | 'T+3'> {

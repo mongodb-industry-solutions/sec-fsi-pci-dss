@@ -1,12 +1,12 @@
 // v28 RTP approval (in-app, authenticated payer; NO CIBA). Reuses the balance-aware P2P sequence:
 // funds check (AIS) → screening (FDS/HRP/AML + VoP) → hold → create execution → dispatch
 // payment_initiation. Settlement (bank.transfer.settled/failed) is applied by PayoutOrchestrationProcess
-// (settleCardDebit + creditDirect), and projected back onto the request by RtpLifecycleProcess (F5).
+// (settleReservedDebit + creditDirect), and projected back onto the request by RtpLifecycleProcess (F5).
 // The PSP holds no accounts and moves no money directly; every settlement is delegated to providers.
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import { getPayoutAccount, getDefaultPayoutAccount } from './payoutAccount.service';
-import { holdCardFunds, releaseCardHold } from './payoutAccountBalance.service';
+import { holdAvailableFunds, releaseReservation } from './payoutAccountBalance.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitProcessEvent, emitComplianceEvent, EventActivityAttribution } from '../../provider/services/businessProcessEvent.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
@@ -88,7 +88,7 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
 
   // 3. Hold payer funds (available -> pending), conditional on sufficient available balance. Applies to
   // both paths: a risk hold reserves the funds exactly the same, it just never reaches the rail.
-  const held = await holdCardFunds(db, funding.payoutAccountInstanceReference, req.amount);
+  const held = await holdAvailableFunds(db, funding.payoutAccountInstanceReference, req.amount);
   if (!held) throw new RtpError('insufficient_funds', 'Insufficient available balance to approve this request', 422);
 
   // 4. Create the execution (source = payer, resolved = payee). sourcePayoutAccountReference
@@ -165,7 +165,7 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
   const submitted = dispatch.status === 'sent' || dispatch.status === 'received';
 
   if (!submitted) {
-    await releaseCardHold(db, funding.payoutAccountInstanceReference, req.amount); // compensation
+    await releaseReservation(db, funding.payoutAccountInstanceReference, req.amount); // compensation
     await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
       { paymentExecutionInstanceReference: executionRef },
       { $set: { paymentExecutionStatus: 'failed', failureReason: `PISP dispatch ${dispatch.status}`, recordUpdatedDateTime: new Date() } },

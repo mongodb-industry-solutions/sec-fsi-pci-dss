@@ -10,14 +10,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const h = vi.hoisted(() => ({
   completeAuthorized: vi.fn(async () => ({ fraudCaseCreated: false })),
   declineTransaction: vi.fn(async () => {}),
-  releaseCardHold: vi.fn(async () => true),
+  releaseReservation: vi.fn(async () => true),
 }));
 vi.mock('../../../../backend/src/modules/transaction/services/cardTransaction.service', () => ({
   completeAuthorized: h.completeAuthorized,
   declineTransaction: h.declineTransaction,
 }));
 vi.mock('../../../../backend/src/modules/gateway/services/payoutAccountBalance.service', () => ({
-  releaseCardHold: h.releaseCardHold,
+  releaseReservation: h.releaseReservation,
 }));
 
 import { EventBusInProcess } from '@leafypay/eventbus';
@@ -62,7 +62,7 @@ describe('checkFunds (SD-36 AIS)', () => {
 describe('PaymentAuthorizationSaga: funds hold compensation', () => {
   let bus: EventBusInProcess;
   beforeEach(() => {
-    h.completeAuthorized.mockClear(); h.declineTransaction.mockClear(); h.releaseCardHold.mockClear();
+    h.completeAuthorized.mockClear(); h.declineTransaction.mockClear(); h.releaseReservation.mockClear();
     bus = new EventBusInProcess();
     new PaymentAuthorizationSaga({} as Db, bus).register();
   });
@@ -79,7 +79,7 @@ describe('PaymentAuthorizationSaga: funds hold compensation', () => {
     await bus.publish(gate('hrp.screening.completed', 'a', true));
     await flush();
     expect(h.completeAuthorized).toHaveBeenCalledOnce();
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 
   it('releases the hold when a later gate declines the journey', async () => {
@@ -88,7 +88,7 @@ describe('PaymentAuthorizationSaga: funds hold compensation', () => {
     await bus.publish(gate('hrp.screening.completed', 'b', false, { reason: 'sanctions_match' })); // hard decline
     await flush();
     expect(h.declineTransaction).toHaveBeenCalledOnce();
-    expect(h.releaseCardHold).toHaveBeenCalledWith({}, 'acc-1', 75);
+    expect(h.releaseReservation).toHaveBeenCalledWith({}, 'acc-1', 75);
   });
 
   it('releases the hold in the ordering race (decline BEFORE the hold lands)', async () => {
@@ -96,7 +96,7 @@ describe('PaymentAuthorizationSaga: funds hold compensation', () => {
     await bus.publish(gate('hrp.screening.completed', 'c', false, { reason: 'sanctions_match' })); // decline first
     await bus.publish(gate('funds.check.completed', 'c', true, { held: 30, fundingPayoutAccountReference: 'acc-1' })); // late hold
     await flush();
-    expect(h.releaseCardHold).toHaveBeenCalledWith({}, 'acc-1', 30);
+    expect(h.releaseReservation).toHaveBeenCalledWith({}, 'acc-1', 30);
   });
 
   it('does not release when the funds gate itself declines (no hold was made)', async () => {
@@ -104,6 +104,6 @@ describe('PaymentAuthorizationSaga: funds hold compensation', () => {
     await bus.publish(gate('funds.check.completed', 'd', false, { responseCode: '51', reason: 'insufficient_funds' }));
     await flush();
     expect(h.declineTransaction).toHaveBeenCalledOnce();
-    expect(h.releaseCardHold).not.toHaveBeenCalled();
+    expect(h.releaseReservation).not.toHaveBeenCalled();
   });
 });
