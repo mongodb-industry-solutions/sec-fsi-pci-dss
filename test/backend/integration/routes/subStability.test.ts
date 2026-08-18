@@ -49,7 +49,7 @@ describe('v37 P0.3: id_token sub stability', () => {
   const live = LIVE_READ ? it : it.skip;
 
   live('the database mapping matches the seed for every customer', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const { resolvePartyInstanceReference } = await import(
       '../../../../backend/src/modules/identity/services/oauth.service'
     );
@@ -63,7 +63,7 @@ describe('v37 P0.3: id_token sub stability', () => {
   });
 
   live('userinfo answers the same sub the token carries', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const login = customerLogins()[0];
     const sub = login.customerAuthenticationInstanceReference;
     const token = await mintOAuthToken(sub, ['openid', 'profile'], WALLET_CLIENT_ID);

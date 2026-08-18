@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { seedBankProfile } from './seedBankProfile';
+import { seedAccountHolders, seedAccountArrangements } from './seedAccounts';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -14,6 +15,9 @@ export async function runSeed(): Promise<void> {
     const db = client.db(config.mongodb.dbName);
     console.log(`Seeding the bank database "${config.mongodb.dbName}"\n`);
     await seedBankProfile(db);
+    // Holders before accounts: an account references its holder.
+    await seedAccountHolders(db);
+    await seedAccountArrangements(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();

@@ -1,7 +1,6 @@
 import { spawn } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
-import { config } from '../../config';
 
 // Registered bank instances, as data. Adding a bank is a record here plus its own database, never a
 // change to the setup entry point.
@@ -37,19 +36,15 @@ function runScript(workspace: string, script: string, args: string[]): Promise<v
   });
 }
 
-// Dropping is about cleaning state, not about enabling a feature, so it runs whatever the flag says.
-// The PSP drop takes the SHARED key vault with it: a bank database left behind would keep QE
-// collections pointing at DEKs that no longer exist, and that surfaces later as an opaque decryption
-// failure rather than as "you forgot to drop the bank".
-const RUNS_REGARDLESS_OF_FLAG = new Set(['setup:db:drop']);
-
-// Runs one npm script across every registered bank. Skipped while the kill switch is off, so a
-// PSP-only deployment never builds a database it does not use.
+// Runs one npm script across every registered bank.
+//
+// Deliberately NOT gated on PSP_BANKCORE_ENABLED. The kill switch governs runtime behaviour, which
+// bank the PSP talks to; building and seeding a database it does not yet read costs nothing and is
+// inert. Gating setup on it produced the opposite of a safe default: a half-built split that looks
+// fine until someone flips the flag and only then discovers the bank has no accounts. Dropping is
+// gated even less, since the PSP drop takes the SHARED key vault with it and a surviving bank
+// database would keep QE collections pointing at DEKs that no longer exist.
 export async function forEachBank(script: 'setup:db' | 'setup:seed' | 'setup:check' | 'setup:db:drop', args: string[] = []): Promise<void> {
-  if (!config.bankcore.enabled && !RUNS_REGARDLESS_OF_FLAG.has(script)) {
-    console.log(`  skip:    bankcore ${script} (PSP_BANKCORE_ENABLED is false)`);
-    return;
-  }
   const instances = bankInstances();
   if (instances.length === 0) {
     console.log('  skip:    no bank instance registered in data/bankInstances.json');

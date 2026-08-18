@@ -36,14 +36,27 @@ export async function buildContractApp(): Promise<FastifyInstance> {
   return app;
 }
 
-// The live tiers are opportunistic: they need a real connection, not just a configured URI. Under
-// load the shared cluster can refuse one, and the app then starts degraded with the OAuth key
-// provider uninitialised, which is an environment condition rather than a contract break. The
-// surface tier stays the deterministic judge.
-export function requireLive(app: FastifyInstance, ctx: { skip: (note?: string) => void }): boolean {
-  if (app?.dbError == null) return true;
-  ctx.skip(`bankcore contract live tier skipped: database degraded (${app?.dbError})`);
-  return false;
+// The live tiers are opportunistic: they need a real connection AND a seeded database, not just a
+// configured URI. Two environment conditions are not contract breaks and must not read as ones:
+// under load the shared cluster can refuse a connection (the app then starts degraded with the OAuth
+// key provider uninitialised), and a freshly created database answers every read with nothing. The
+// surface tier stays the deterministic judge in both cases.
+export async function requireLive(
+  app: FastifyInstance,
+  ctx: { skip: (note?: string) => void },
+): Promise<boolean> {
+  if (app?.dbError != null) {
+    ctx.skip(`live tier skipped: database degraded (${app.dbError})`);
+    return false;
+  }
+  const seeded = await app.db.collection('customerAuthenticationAssessment')
+    .countDocuments({}, { limit: 1 })
+    .catch(() => 0);
+  if (seeded === 0) {
+    ctx.skip('live tier skipped: database is not seeded (run npm run setup:reset)');
+    return false;
+  }
+  return true;
 }
 
 // Closes the app after letting fire-and-forget audit writes drain: several handlers deliberately

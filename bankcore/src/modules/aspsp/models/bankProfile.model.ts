@@ -34,7 +34,17 @@ export interface BankProfileControlRecord {
   // ISO 9362. The bank is identified by this everywhere a BIC is expected.
   bankProfileBic: string;
   // ISO 13616 national bank identifiers this bank owns, so an IBAN resolves to it without a lookup.
+  // One entry per country it operates in: a single institution with branches, not several banks.
   bankProfileIbanBankCodes: string[];
+  bankProfileCountriesServed?: string[];
+  // Which national code belongs to which country, so an IBAN is built and read the same way on both
+  // sides. bankProfileIbanBankCodes stays the flat list the router matches against.
+  bankProfileNationalBankCodeByCountry?: Record<string, string>;
+  // Published coordinates a real counterparty would use: correspondent for cross-border legs, and the
+  // registered address that appears on a transfer advice.
+  bankProfileCorrespondentBic?: string;
+  bankProfileAddress?: string;
+  bankProfileWebsite?: string;
   // ISO/IEC 7812 ranges this bank issues cards in.
   bankProfileBinRanges: BinRange[];
   bankProfileSupportedRails: BankRail[];

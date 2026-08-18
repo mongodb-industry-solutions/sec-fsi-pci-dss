@@ -53,11 +53,12 @@ describe('v37: reset wiring', () => {
     expect(dropBin.indexOf("forEachBank('setup:db:drop')")).toBeLessThan(dropBin.indexOf('runDrop()'));
   });
 
-  it('the bank drop is not gated on the kill switch', () => {
-    // Leaving a bank database behind while the shared key vault is dropped is a broken state, and it
-    // only surfaces later as an opaque decryption failure.
+  it('no orchestrated script is gated on the kill switch', () => {
+    // The flag governs runtime behaviour. Gating setup on it built a half-split database that looked
+    // fine until someone flipped the flag, and gating the drop left a bank pointing at DEKs the
+    // shared key vault no longer had.
     const orchestrator = readFileSync(resolve(ROOT, 'backend/src/vendors/setup/bankInstances.ts'), 'utf8');
-    expect(orchestrator).toContain("RUNS_REGARDLESS_OF_FLAG = new Set(['setup:db:drop'])");
+    expect(orchestrator).not.toContain('config.bankcore.enabled');
   });
 
   it('the bank drop never touches the shared key vault', () => {

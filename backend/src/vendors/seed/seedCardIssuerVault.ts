@@ -1,19 +1,39 @@
 import { Db } from 'mongodb';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
 import { upsertVaultRecord } from '../../providers/card-issuer/services/cardIssuerVault.service';
 import { DEFAULT_SERVICE_CODE } from '../../providers/card-issuer/services/cardVerificationKey.service';
 import { CARD_ISSUER_VAULT_COLLECTION } from '../../providers/card-issuer/models/cardIssuerVault.model';
 
 // Deterministic issuer data derived from the STABLE surrogate token (never random), so the seed is
-// idempotent (R6) and cross-references stay intact. Network-correct BIN + length; the display last4
-// is preserved from the existing masked PAN.
-const NETWORK_BIN: Record<string, { prefix: string; length: number }> = {
-  VISA:       { prefix: '4',  length: 16 },
-  MASTERCARD: { prefix: '52', length: 16 },
-  AMEX:       { prefix: '34', length: 15 },
-  ELO:        { prefix: '50', length: 16 },
+// idempotent (R6) and cross-references stay intact. Network-correct length; the display last4 is
+// preserved from the existing masked PAN.
+//
+// v37: the BIN is the ISSUER's, read from the registered bank's declared ranges, not a bare network
+// prefix. A card whose BIN falls outside every registered range is unroutable: nothing can decide
+// which issuer owns it, and the router refuses it rather than picking a default.
+const NETWORK_LENGTH: Record<string, number> = {
+  VISA: 16,
+  MASTERCARD: 16,
+  AMEX: 15,
+  ELO: 16,
 };
+
+interface BinRange { binRangeFrom: string; binRangeTo: string; binRangeScheme?: string }
+
+// The bank's own ranges. Read from the bank fixture so the two sides cannot drift: bankcore is the
+// issuer of record from P7 onward, and its bankProfile is where its BIN ranges live.
+function issuerBinRanges(): Record<string, BinRange> {
+  const fixture = join(__dirname, '../../../../bankcore/data/bankProfile.json');
+  const profiles = JSON.parse(readFileSync(fixture, 'utf8')) as Array<{ bankProfileBinRanges: BinRange[] }>;
+  const bySchemeName: Record<string, BinRange> = {};
+  for (const range of profiles[0]?.bankProfileBinRanges ?? []) {
+    if (range.binRangeScheme) bySchemeName[range.binRangeScheme.toUpperCase()] = range;
+  }
+  return bySchemeName;
+}
 
 function digitsFromToken(token: string, n: number): string {
   // Stable pseudo-random digits from the token hash.
@@ -26,12 +46,16 @@ function digitsFromToken(token: string, n: number): string {
   return out.slice(0, n);
 }
 
-// Build a deterministic full PAN: network BIN + deterministic middle digits + the display last4.
-function buildPan(token: string, network: string, last4: string): { pan: string; bin: string } {
-  const spec = NETWORK_BIN[network] ?? NETWORK_BIN.VISA;
-  const bin = (spec.prefix + digitsFromToken(token, 6 - spec.prefix.length)).slice(0, 6);
-  const middleLen = spec.length - bin.length - 4;
-  const middle = digitsFromToken(`${token}:mid`, Math.max(0, middleLen));
+// Build a deterministic full PAN: issuer BIN inside the declared range + middle digits + last4.
+function buildPan(token: string, network: string, last4: string, ranges: Record<string, BinRange>): { pan: string; bin: string } {
+  const length = NETWORK_LENGTH[network] ?? NETWORK_LENGTH.VISA;
+  const range = ranges[network] ?? ranges.VISA;
+  if (!range) throw new Error(`no issuer BIN range declared for ${network}; the card would be unroutable`);
+  // Spread deterministically INSIDE the range, so every seeded card is routable to this issuer.
+  const span = Number(range.binRangeTo) - Number(range.binRangeFrom) + 1;
+  const offset = Number(digitsFromToken(`${token}:bin`, 6)) % span;
+  const bin = String(Number(range.binRangeFrom) + offset).padStart(range.binRangeFrom.length, '0');
+  const middle = digitsFromToken(`${token}:mid`, Math.max(0, length - bin.length - 4));
   return { pan: `${bin}${middle}${last4}`, bin };
 }
 
@@ -39,13 +63,14 @@ function buildPan(token: string, network: string, last4: string): { pan: string;
 // The full PAN NEVER lands in the core; the core keeps token + BIN + last4 only (descoped).
 export async function seedCardIssuerVault(db: Db) {
   const cards = await db.collection(PAYMENT_CARD_COLLECTION).find({}).toArray();
+  const ranges = issuerBinRanges();
   let vaulted = 0;
   for (const card of cards) {
     const token = String(card.paymentCardReference ?? '');
     const network = String(card.paymentCardNetwork ?? 'VISA').toUpperCase();
     const last4 = String(card.paymentCardMaskedPanDisplay ?? card.paymentCardLast4 ?? '').replace(/\D/g, '').slice(-4)
       || digitsFromToken(`${token}:l4`, 4);
-    const { pan, bin } = buildPan(token, network, last4);
+    const { pan, bin } = buildPan(token, network, last4, ranges);
 
     // Core stays descoped: set BIN/last4 (non-CHD) and a derived masked display (last4 only). Several
     // read paths return paymentCardMaskedPanDisplay directly, so keep it populated (never blank) rather

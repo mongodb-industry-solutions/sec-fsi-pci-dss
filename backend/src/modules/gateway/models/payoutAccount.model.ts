@@ -48,6 +48,13 @@ export interface PayoutAccountArrangement {
   // PSP internal ledger (Payments, no external provider, MongoDB $inc only)
   payoutAccountBalance: PayoutAccountBalance;
 
+  // v37: this record is a LINK to an account held at a registered bank. The money lives at the bank;
+  // what stays here is which bank holds it, which account it is there, and the display metadata every
+  // existing consumer already reads. `payoutAccountBalance` becomes a projection read through AIS.
+  payoutAccountAspspReference?: string;        // FK → the bank in the ASPSP registry
+  payoutAccountBankAccountReference?: string;  // FK → accountArrangement at that bank
+  payoutAccountConsentReference?: string;      // FK → the PSD2 consent that authorises access
+
   bianServiceDomain: 'Payment Initiation';
   bianControlRecordType: 'PayoutAccountArrangement';
   recordCreatedDateTime: Date;

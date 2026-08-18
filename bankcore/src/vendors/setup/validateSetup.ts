@@ -9,6 +9,7 @@ import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
 import { findOrphanedDeks } from '../encryption/keyVault';
+import { validateCrossSide } from './validateCrossSide';
 import { assertLinks, resolvePlatformLinks } from '@leafypay/platform-links';
 import { config, keyVaultNamespaceParts } from '../../config';
 
@@ -96,6 +97,10 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
   } catch (err) {
     add('DEK references resolve in the shared key vault', false, err instanceof Error ? err.message : String(err));
   }
+
+  // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN
+  // must be one this bank actually owns.
+  for (const check of await validateCrossSide(db)) add(check.name, check.ok, check.detail);
 
   // Links: absolute, well formed, and of the right kind for their consumer. A wrong host fails as an
   // opaque timeout or a generic 503, the same failure mode as a bad crypt_shared path.

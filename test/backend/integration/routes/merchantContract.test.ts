@@ -118,7 +118,7 @@ describe('v37 P0.2: merchant app and CIBA contract baseline', () => {
   const live = LIVE_READ ? it : it.skip;
 
   live('a token without the required scope is refused with insufficient_scope', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const merchants = readSeedFile<MerchantSeed[]>('merchants.json');
     const clientId = merchants
       .find((m) => m.merchantAgreementInstanceReference === MERCHANT_REF)!
@@ -132,7 +132,7 @@ describe('v37 P0.2: merchant app and CIBA contract baseline', () => {
   });
 
   live('a request with no token is refused with 401', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const res = await supertest(app.server).get('/api/v1/beneficiaries');
     expect(res.status).toBe(401);
   });

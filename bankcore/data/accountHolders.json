@@ -1,0 +1,562 @@
+[
+  {
+    "accountHolderInstanceReference": "hld00001-0000-4000-8000-000000000001",
+    "accountHolderName": "Luis Fernandez",
+    "accountHolderCountryCode": "ES",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00002-0000-4000-8000-000000000002",
+    "accountHolderName": "Julia Santos",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00059-0000-4000-8000-000000000059",
+    "accountHolderName": "Lena Fischer",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-06-15T08:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00060-0000-4000-8000-000000000060",
+    "accountHolderName": "Carlos Garcia",
+    "accountHolderCountryCode": "ES",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-06-22T15:30:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00003-0000-4000-8000-000000000003",
+    "accountHolderName": "Carlos Fernandez",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00004-0000-4000-8000-000000000004",
+    "accountHolderName": "Clifford Hegmann",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-02-10T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00005-0000-4000-8000-000000000005",
+    "accountHolderName": "Fatou Diallo",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-02T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00006-0000-4000-8000-000000000006",
+    "accountHolderName": "Percy McGlynn",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-19T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00007-0000-4000-8000-000000000007",
+    "accountHolderName": "Ivan Stamm-Huel",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-19T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00008-0000-4000-8000-000000000008",
+    "accountHolderName": "Patricia Stokes",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-26T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00009-0000-4000-8000-000000000009",
+    "accountHolderName": "Doyle Quitzon",
+    "accountHolderCountryCode": "ES",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-04-12T11:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00010-0000-4000-8000-000000000010",
+    "accountHolderName": "Naomi Bergnaum",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-05-17T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00011-0000-4000-8000-000000000011",
+    "accountHolderName": "Jessica Haag I",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-05-09T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00012-0000-4000-8000-000000000012",
+    "accountHolderName": "Pamela Lubowitz",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-02-22T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00013-0000-4000-8000-000000000013",
+    "accountHolderName": "Warren Hyatt",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00014-0000-4000-8000-000000000014",
+    "accountHolderName": "Devin Heathcote",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-12-28T19:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00015-0000-4000-8000-000000000015",
+    "accountHolderName": "Esther Prohaska Jr.",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-19T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00016-0000-4000-8000-000000000016",
+    "accountHolderName": "Grant Veum",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-12-12T19:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00017-0000-4000-8000-000000000017",
+    "accountHolderName": "Holly Boyer",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-01-01T08:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00018-0000-4000-8000-000000000018",
+    "accountHolderName": "Miss Anna Doyle",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-08-08T15:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00019-0000-4000-8000-000000000019",
+    "accountHolderName": "Tyler Langosh",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-09-25T16:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00020-0000-4000-8000-000000000020",
+    "accountHolderName": "Jason Hegmann",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-05-13T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00021-0000-4000-8000-000000000021",
+    "accountHolderName": "Robin Hirthe-Nienow",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-11T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00022-0000-4000-8000-000000000022",
+    "accountHolderName": "Warren Kohler",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-01-21T08:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00023-0000-4000-8000-000000000023",
+    "accountHolderName": "Morris Hansen III",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-02-18T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00024-0000-4000-8000-000000000024",
+    "accountHolderName": "Katherine Kuhic",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-15T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00025-0000-4000-8000-000000000025",
+    "accountHolderName": "Mr. Fredrick Crooks",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-27T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00026-0000-4000-8000-000000000026",
+    "accountHolderName": "Crystal Hettinger",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-19T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00027-0000-4000-8000-000000000027",
+    "accountHolderName": "Rickey Greenfelder Sr.",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-02-22T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00028-0000-4000-8000-000000000028",
+    "accountHolderName": "Teresa Zemlak",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-09-13T16:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00029-0000-4000-8000-000000000029",
+    "accountHolderName": "Dr. Zachary Turcotte",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-02-18T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00030-0000-4000-8000-000000000030",
+    "accountHolderName": "Francisco Pfannerstill",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-02-14T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00031-0000-4000-8000-000000000031",
+    "accountHolderName": "Kathy Hackett",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-19T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00032-0000-4000-8000-000000000032",
+    "accountHolderName": "Alexis Schiller",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-03-19T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00033-0000-4000-8000-000000000033",
+    "accountHolderName": "Darlene Cartwright",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-03-27T10:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00034-0000-4000-8000-000000000034",
+    "accountHolderName": "Jennie Parisian",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00035-0000-4000-8000-000000000035",
+    "accountHolderName": "Cecilia Barrows PhD",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-01-17T08:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00036-0000-4000-8000-000000000036",
+    "accountHolderName": "Kathryn Beahan",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-06T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00037-0000-4000-8000-000000000037",
+    "accountHolderName": "Pat Lowe",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-15T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00038-0000-4000-8000-000000000038",
+    "accountHolderName": "Bob Conroy",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00039-0000-4000-8000-000000000039",
+    "accountHolderName": "Simon Dare",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-07-23T14:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00040-0000-4000-8000-000000000040",
+    "accountHolderName": "Raquel Davis",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-01-13T08:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00041-0000-4000-8000-000000000041",
+    "accountHolderName": "Sadie Hintz",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-08-16T15:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00042-0000-4000-8000-000000000042",
+    "accountHolderName": "Anita Swaniawski",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-27T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00043-0000-4000-8000-000000000043",
+    "accountHolderName": "Ruth Homenick",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-12-24T19:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00044-0000-4000-8000-000000000044",
+    "accountHolderName": "Miss Brittany Stanton",
+    "accountHolderCountryCode": "ES",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-04-20T11:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00045-0000-4000-8000-000000000045",
+    "accountHolderName": "Aaron Watsica",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-08-08T15:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00046-0000-4000-8000-000000000046",
+    "accountHolderName": "Arnold Mann",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-11T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00047-0000-4000-8000-000000000047",
+    "accountHolderName": "Toby Cormier",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-09-25T16:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00048-0000-4000-8000-000000000048",
+    "accountHolderName": "Alice Hoeger",
+    "accountHolderCountryCode": "FR",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-11-27T18:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00049-0000-4000-8000-000000000049",
+    "accountHolderName": "Andres Yost",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-08-04T15:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00050-0000-4000-8000-000000000050",
+    "accountHolderName": "Mr. Loren Raynor",
+    "accountHolderCountryCode": "ES",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-04-16T11:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00061-0000-4000-8000-000000000061",
+    "accountHolderName": "Priya Patel",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00071-0000-4000-8000-000000000071",
+    "accountHolderName": "Maria Garcia",
+    "accountHolderCountryCode": "NL",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-08-28T15:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00072-0000-4000-8000-000000000072",
+    "accountHolderName": "Ahmed Hassan",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2025-09-09T16:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00058-0000-4000-8000-000000000058",
+    "accountHolderName": "Amara Okafor",
+    "accountHolderCountryCode": "GB",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-07-07T00:00:00.000Z",
+    "schemaVersion": 1
+  }
+]

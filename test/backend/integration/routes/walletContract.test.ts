@@ -105,7 +105,7 @@ describe('v37 P0.1: Leafy Wallet contract baseline', () => {
   const live = LIVE_READ ? it : it.skip;
 
   live('GET /accounts returns { results } with payoutAccountBalance.availableAmount', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const token = await mintOAuthToken(walletSub(), ['read:accounts'], WALLET_CLIENT_ID);
     const res = await supertest(app.server).get('/api/v1/accounts').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
@@ -129,7 +129,7 @@ describe('v37 P0.1: Leafy Wallet contract baseline', () => {
   });
 
   live('GET /beneficiaries returns the counterparty fields the wallet maps', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const token = await mintOAuthToken(walletSub(), ['read:beneficiaries'], WALLET_CLIENT_ID);
     const res = await supertest(app.server).get('/api/v1/beneficiaries').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
@@ -144,7 +144,7 @@ describe('v37 P0.1: Leafy Wallet contract baseline', () => {
   });
 
   live('GET /transactions returns the { results } envelope', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const token = await mintOAuthToken(walletSub(), ['read:transactions'], WALLET_CLIENT_ID);
     const res = await supertest(app.server).get('/api/v1/transactions').set('Authorization', `Bearer ${token}`);
     expect(res.status).toBe(200);
@@ -152,7 +152,7 @@ describe('v37 P0.1: Leafy Wallet contract baseline', () => {
   });
 
   live('GET /gateway/rtp/requests answers both boxes', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     const token = await mintOAuthToken(walletSub(), ['read:rtp'], WALLET_CLIENT_ID);
     for (const box of ['inbox', 'outbox']) {
       const res = await supertest(app.server)
@@ -164,7 +164,7 @@ describe('v37 P0.1: Leafy Wallet contract baseline', () => {
   });
 
   live('a request without a domain parameter is still authorised', async (ctx) => {
-    if (!requireLive(app, ctx)) return;
+    if (!(await requireLive(app, ctx))) return;
     // The wallet sends no domain, realm or tenant. Any endpoint that starts requiring one breaks it.
     const token = await mintOAuthToken(walletSub(), ['read:accounts'], WALLET_CLIENT_ID);
     const res = await supertest(app.server).get('/api/v1/accounts').set('Authorization', `Bearer ${token}`);
