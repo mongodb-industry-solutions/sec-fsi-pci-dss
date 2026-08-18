@@ -37,10 +37,16 @@ function runScript(workspace: string, script: string, args: string[]): Promise<v
   });
 }
 
-// Runs one npm script across every registered bank. Skipped entirely while the kill switch is off,
-// so a PSP-only deployment never builds a database it does not use.
+// Dropping is about cleaning state, not about enabling a feature, so it runs whatever the flag says.
+// The PSP drop takes the SHARED key vault with it: a bank database left behind would keep QE
+// collections pointing at DEKs that no longer exist, and that surfaces later as an opaque decryption
+// failure rather than as "you forgot to drop the bank".
+const RUNS_REGARDLESS_OF_FLAG = new Set(['setup:db:drop']);
+
+// Runs one npm script across every registered bank. Skipped while the kill switch is off, so a
+// PSP-only deployment never builds a database it does not use.
 export async function forEachBank(script: 'setup:db' | 'setup:seed' | 'setup:check' | 'setup:db:drop', args: string[] = []): Promise<void> {
-  if (!config.bankcore.enabled) {
+  if (!config.bankcore.enabled && !RUNS_REGARDLESS_OF_FLAG.has(script)) {
     console.log(`  skip:    bankcore ${script} (PSP_BANKCORE_ENABLED is false)`);
     return;
   }

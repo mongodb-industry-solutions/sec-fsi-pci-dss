@@ -11,6 +11,7 @@
     "build": "tsc",
     "start": "node dist/bin/server.js",
     "setup:db": "ts-node bin/setup.ts",
+    "setup:db:reset": "ts-node bin/setup.ts --reset",
     "setup:db:drop": "ts-node bin/setup-drop.ts",
     "setup:check": "ts-node bin/validate.ts",
     "setup:seed": "ts-node bin/seed.ts",

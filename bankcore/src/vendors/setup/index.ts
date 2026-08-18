@@ -1,7 +1,7 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { createCollections } from './createCollections';
-import { provisionBankDeks } from '../encryption/keyVault';
+import { provisionBankDeks, findOrphanedDeks } from '../encryption/keyVault';
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
@@ -26,6 +26,20 @@ export async function runSetup(reset = false): Promise<void> {
   try {
     const db = client.db(config.mongodb.dbName);
     console.log(`Connected to the bank database "${config.mongodb.dbName}"\n`);
+
+    // A bank database that survived a PSP reset points at DEKs the shared vault no longer has. Fail
+    // here with the remedy, instead of at the first encrypted read with a driver-level message.
+    if (!reset) {
+      const orphans = await findOrphanedDeks(client, config.mongodb.dbName);
+      if (orphans.length > 0) {
+        throw new Error(
+          `These bank collections reference DEKs that no longer exist in ${config.kms.keyVaultNamespace}: `
+          + `${orphans.join(', ')}.\n`
+          + '  The shared key vault was dropped without dropping the bank database.\n'
+          + '  Rebuild it with:  npm run setup:db:reset --prefix bankcore   (or npm run setup:reset from the repo root)',
+        );
+      }
+    }
 
     console.log('1. Provisioning DEKs in the shared key vault...');
     const deks = await provisionBankDeks(client);

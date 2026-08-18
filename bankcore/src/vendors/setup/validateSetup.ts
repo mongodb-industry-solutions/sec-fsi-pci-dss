@@ -8,6 +8,7 @@ import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanc
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
+import { findOrphanedDeks } from '../encryption/keyVault';
 import { assertLinks, resolvePlatformLinks } from '@leafypay/platform-links';
 import { config, keyVaultNamespaceParts } from '../../config';
 
@@ -85,6 +86,15 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
       : undefined;
     const fields = info?.options?.encryptedFields?.fields?.length ?? 0;
     add(`QE on ${name}`, fields > 0, fields > 0 ? `${fields} encrypted field(s)` : 'no encryptedFields; needs --reset');
+  }
+
+  // Same condition the setup refuses to run against: DEK references that outlived their key vault.
+  try {
+    const orphans = await findOrphanedDeks(db.client, config.mongodb.dbName);
+    add('DEK references resolve in the shared key vault', orphans.length === 0,
+      orphans.length === 0 ? undefined : `stale in: ${orphans.join(', ')}; rebuild with setup:db:reset`);
+  } catch (err) {
+    add('DEK references resolve in the shared key vault', false, err instanceof Error ? err.message : String(err));
   }
 
   // Links: absolute, well formed, and of the right kind for their consumer. A wrong host fails as an

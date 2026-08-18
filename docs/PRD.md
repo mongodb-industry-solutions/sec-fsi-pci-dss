@@ -1093,6 +1093,12 @@ npm run setup
 # 3a. Set up the database and seed demo data
 npm run setup:db && npm run setup:seed
 
+# 3a-bis. Rebuilding from scratch (after an encryptedFields change, or to clear demo state)
+npm run setup:reset        # = setup:db:reset + setup:seed, both databases
+
+# Dropping everything first, when a collection has to disappear rather than be recreated:
+npm run setup:db:drop && npm run setup:reset
+
 # 3b. Start the full stack (hot reload)
 npm run dev
 ```
@@ -1106,8 +1112,11 @@ npm run dev
 | `npm run dev:frontend` | Start only the Next.js frontend (:3000) |
 | `npm run dev:backend` | Start only the Fastify API (:3001) |
 | `npm run build` | Build frontend and backend for production |
-| `npm run setup:db` | Create QE collections, provision DEKs and indexes |
-| `npm run setup:seed` | Insert synthetic BIAN-compliant demo data (idempotent) |
+| `npm run setup:db` | Create QE collections, provision DEKs and indexes (PSP, then every registered bank) |
+| `npm run setup:db:reset` | Same, dropping and recreating existing collections first. Needed after any change to `encryptedFields`, since setup skips a collection that already exists |
+| `npm run setup:seed` | Insert synthetic BIAN-compliant demo data (idempotent). Bank first, then the PSP, because the PSP's records reference the bank's |
+| `npm run setup:reset` | Full rebuild: `setup:db:reset` followed by `setup:seed` |
+| `npm run setup:db:drop` | Drop every bank database, then the PSP database and the shared key vault, in that order |
 | `npm run test` | Run unit + integration tests (Vitest) |
 | `npm run test:unit` | Unit tests only (no Atlas required) |
 | `npm run test:integration` | Integration tests (requires `TEST_MONGODB_URI`) |

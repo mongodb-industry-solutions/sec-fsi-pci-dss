@@ -35,3 +35,25 @@ export async function provisionBankDeks(client: MongoClient): Promise<BankDeks> 
     accountHolderEmail: await getOrCreate('DEK-bank-holder-email'),
   };
 }
+
+// Every keyId the bank's QE collections were created with must still exist in the shared key vault.
+// The PSP drop takes that vault with it, so a bank database that survived a PSP reset keeps pointing
+// at DEKs that are gone. Left undetected it surfaces on the first encrypted read as "not all keys
+// requested were satisfied", which reads like a driver fault rather than a stale database.
+export async function findOrphanedDeks(client: MongoClient, dbName: string): Promise<string[]> {
+  const { database, collection } = keyVaultNamespaceParts();
+  const keyVault = client.db(database).collection(collection);
+  const collections = await client.db(dbName)
+    .listCollections({}, { nameOnly: false })
+    .toArray() as Array<{ name: string; options?: { encryptedFields?: { fields?: Array<{ keyId?: Binary }> } } }>;
+
+  const orphans: string[] = [];
+  for (const info of collections) {
+    for (const field of info.options?.encryptedFields?.fields ?? []) {
+      if (!field.keyId) continue;
+      const found = await keyVault.countDocuments({ _id: field.keyId as never }, { limit: 1 });
+      if (!found) orphans.push(info.name);
+    }
+  }
+  return [...new Set(orphans)];
+}
