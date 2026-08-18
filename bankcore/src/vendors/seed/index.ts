@@ -4,6 +4,7 @@ import { seedBankProfile } from './seedBankProfile';
 import { seedAccountHolders, seedAccountArrangements } from './seedAccounts';
 import { seedTppRegistrations } from './seedTppRegistrations';
 import { seedConsents } from './seedConsents';
+import { seedModuleConfigurations } from './seedModuleConfigurations';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -24,6 +25,8 @@ export async function runSeed(): Promise<void> {
     await seedTppRegistrations(db);
     // Consents last: they reference the accounts and the TPP that were just written.
     await seedConsents(db);
+    // Engine configuration, so the admin API has something to edit on a fresh database.
+    await seedModuleConfigurations(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();

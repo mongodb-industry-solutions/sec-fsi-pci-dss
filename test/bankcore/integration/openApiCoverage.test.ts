@@ -18,6 +18,11 @@ const INFRASTRUCTURE_PATHS = new Set([
   '/health',      // infrastructure probe, the path the deploy platform expects
 ]);
 const DIAGNOSTIC_PREFIX = '/api/v1/system/';
+// Bank administration: engine configuration, TPP registrations, consent decisions. Plain REST and
+// deliberately NOT at /v1, because no Open Banking standard covers "configure the card simulator" or
+// "suspend a TPP", and putting them on the surface a TPP integrates against would make that surface
+// non-standard. Admin-token protected, and reached by the browser only through the PSP.
+const ADMIN_PREFIX = '/api/v1/admin/';
 
 interface OpenApiOperation {
   summary?: string;
@@ -69,6 +74,7 @@ describe('v37: bankcore exposes an Open Banking API, fully documented', () => {
     const offenders = Object.keys(paths).filter((path) => (
       !path.startsWith(OPEN_BANKING_PREFIX)
       && !path.startsWith(DIAGNOSTIC_PREFIX)
+      && !path.startsWith(ADMIN_PREFIX)
       && !INFRASTRUCTURE_PATHS.has(path)
     ));
     expect(offenders, 'a private convenience route is a design failure, not a shortcut').toEqual([]);

@@ -6,6 +6,7 @@ import {
   ConsentAccessKind, ConsentAccessScope, ConsentStatus,
 } from '../models/bankConsent.model';
 import { ACCOUNT_ARRANGEMENT_COLLECTION, AccountArrangementControlRecord } from '../../aspsp/models/accountArrangement.model';
+import { resolveModuleConfig } from '../../admin/services/bankModuleConfiguration.service';
 import { config } from '../../../config';
 
 // Consent lifecycle and enforcement. Every AIS and PIS call passes through `resolveConsent`, which is
@@ -44,9 +45,18 @@ export type CreateConsentResult =
   | { ok: true; consent: BankConsentAgreementControlRecord }
   | { ok: false; code: 'CONSENT_INVALID' | 'RESOURCE_UNKNOWN'; text: string };
 
-function defaultValidUntil(): string {
+// Live configuration, read per call from the record the admin API edits. The environment variable seeded
+// that record and is not read at runtime: an operator changing the mode must not need a redeploy, and a
+// runtime fallback to the environment is how two environments end up disagreeing.
+const CONSENT_DEFAULTS = {
+  consentMode: config.bank.consentMode as 'automatic' | 'manual',
+  defaultValidityDays: 365,
+  defaultFrequencyPerDay: 4,
+};
+
+function validUntilInDays(days: number): string {
   const until = new Date();
-  until.setFullYear(until.getFullYear() + 1);
+  until.setDate(until.getDate() + days);
   return until.toISOString().slice(0, 10);
 }
 
@@ -98,7 +108,8 @@ export async function createConsent(db: Db, input: CreateConsentInput): Promise<
     payments: accountRefs,
   };
 
-  const automatic = config.bank.consentMode === 'automatic';
+  const settings = await resolveModuleConfig(db, 'consent', CONSENT_DEFAULTS);
+  const automatic = settings.consentMode !== 'manual';
   const now = new Date().toISOString();
   const consent: BankConsentAgreementControlRecord = {
     bankConsentAgreementInstanceReference: `cns-${uuidv4()}`,
@@ -106,8 +117,8 @@ export async function createConsent(db: Db, input: CreateConsentInput): Promise<
     bankConsentAccountHolderInstanceReference: [...holders][0],
     bankConsentAccess: access,
     bankConsentRecurringIndicator: input.recurringIndicator ?? true,
-    bankConsentFrequencyPerDay: input.frequencyPerDay ?? 4,
-    bankConsentValidUntil: input.validUntil ?? defaultValidUntil(),
+    bankConsentFrequencyPerDay: input.frequencyPerDay ?? settings.defaultFrequencyPerDay,
+    bankConsentValidUntil: input.validUntil ?? validUntilInDays(settings.defaultValidityDays),
     bankConsentStatus: automatic ? 'valid' : 'received',
     bankConsentStatusReason: automatic ? 'tpp_registered' : 'awaiting_bank_authorisation',
     bankConsentStatusChangedDateTime: now,
@@ -138,6 +149,20 @@ export async function findConsent(
   // does not exist, or the endpoint becomes a way to probe for them.
   return collection(db).findOne(
     { bankConsentAgreementInstanceReference: consentId, bankConsentTppClientId: tppClientId },
+    { projection: { _id: 0 } },
+  );
+}
+
+/**
+ * Looks a consent up by reference alone, for the bank's own administration. The TPP-facing finder is
+ * scoped to the caller on purpose; this one is not, which is why it is only reachable behind admin auth.
+ */
+export async function findConsentByReference(
+  db: Db,
+  consentId: string,
+): Promise<BankConsentAgreementControlRecord | null> {
+  return collection(db).findOne(
+    { bankConsentAgreementInstanceReference: consentId },
     { projection: { _id: 0 } },
   );
 }

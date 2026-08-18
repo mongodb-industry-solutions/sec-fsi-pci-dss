@@ -1,12 +1,32 @@
 [
   {
     "accountHolderInstanceReference": "hld00001-0000-4000-8000-000000000001",
-    "accountHolderName": "Luis Fernandez",
+    "accountHolderName": "Account holder",
     "accountHolderCountryCode": "ES",
     "accountHolderStatus": "active",
     "bianServiceDomain": "Party Reference Data Directory",
     "bianControlRecordType": "AccountHolder",
-    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
+    "recordCreatedDateTime": "2026-05-15T10:30:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00058-0000-4000-8000-000000000058",
+    "accountHolderName": "Account holder",
+    "accountHolderCountryCode": "ES",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-06-10T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00057-0000-4000-8000-000000000057",
+    "accountHolderName": "Account holder",
+    "accountHolderCountryCode": "DE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-05-20T14:15:00.000Z",
     "schemaVersion": 1
   },
   {
@@ -547,16 +567,6 @@
     "bianServiceDomain": "Party Reference Data Directory",
     "bianControlRecordType": "AccountHolder",
     "recordCreatedDateTime": "2025-09-09T16:00:00.000Z",
-    "schemaVersion": 1
-  },
-  {
-    "accountHolderInstanceReference": "hld00058-0000-4000-8000-000000000058",
-    "accountHolderName": "Amara Okafor",
-    "accountHolderCountryCode": "GB",
-    "accountHolderStatus": "active",
-    "bianServiceDomain": "Party Reference Data Directory",
-    "bianControlRecordType": "AccountHolder",
-    "recordCreatedDateTime": "2026-07-07T00:00:00.000Z",
     "schemaVersion": 1
   }
 ]

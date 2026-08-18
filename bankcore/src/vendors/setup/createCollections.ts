@@ -7,6 +7,7 @@ import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanc
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
+import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models/bankModuleConfiguration.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -35,6 +36,7 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   // The bank's own payment record. It holds the creditor IBAN a caller supplied, which is third party
   // personal data the bank has no basis to make searchable, so it is stored as sent and never queried by.
   { name: PAYMENT_INITIATION_COLLECTION, purpose: 'payments initiated by a third party, through their lifecycle' },
+  { name: BANK_MODULE_CONFIGURATION_COLLECTION, purpose: "configuration of the bank's own engines, edited over its admin API" },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

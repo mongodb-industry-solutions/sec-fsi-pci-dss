@@ -134,6 +134,16 @@ function main(): void {
     }
 
     const accountRef = accountRefFor(account.payoutAccountInstanceReference);
+    // The derivation drops the three-character prefix, so two payout references differing only there
+    // would map to ONE bank account and silently merge two balances. This is why the PSP's internal
+    // ledgers were renumbered rather than converted in place (P2.7).
+    const clash = arrangements.find((a) => a.accountArrangementInstanceReference === accountRef);
+    if (clash) {
+      throw new Error(
+        `${account.payoutAccountInstanceReference} derives ${accountRef}, which is already taken. `
+        + 'Two payout accounts cannot share one bank account.',
+      );
+    }
     const iban = buildIban(country, accountRef);
     const balance = account.payoutAccountBalance;
 

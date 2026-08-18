@@ -10,6 +10,9 @@ import {
   BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION, BankConsentAgreementControlRecord,
 } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
+import {
+  BANK_MODULE_CONFIGURATION_COLLECTION, BANK_CAPABILITY_KEYS, BankModuleConfigurationControlRecord,
+} from '../../modules/admin/models/bankModuleConfiguration.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -34,6 +37,7 @@ const REQUIRED_COLLECTIONS = [
   BANK_CONSENT_AGREEMENT_COLLECTION,
   BANK_CONSENT_ACCESS_LOG_COLLECTION,
   PAYMENT_INITIATION_COLLECTION,
+  BANK_MODULE_CONFIGURATION_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -154,6 +158,22 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
   const withPayments = valid.filter((consent) => (consent.bankConsentAccess?.payments ?? []).length > 0);
   add('every seeded consent authorises payments from its accounts', valid.length === withPayments.length,
     valid.length === withPayments.length ? undefined : 're-seed: the consent predates payment access');
+
+  // Engine configuration must exist and name a known capability: a record for a capability nothing reads
+  // is a setting an operator can change with no effect, which is worse than no setting at all.
+  const configs = await db.collection<BankModuleConfigurationControlRecord>(BANK_MODULE_CONFIGURATION_COLLECTION)
+    .find({}, { projection: { _id: 0, bankModuleCapability: 1, bankModuleConfiguration: 1 } })
+    .toArray()
+    .catch(() => []);
+  add('bankModuleConfiguration seeded', configs.length > 0, `${configs.length} engine configuration(s)`);
+  const unknown = configs.filter((entry) => !BANK_CAPABILITY_KEYS.includes(entry.bankModuleCapability));
+  add('every engine configuration names a known capability', unknown.length === 0,
+    unknown.length === 0 ? undefined : `unknown: ${unknown.map((e) => e.bankModuleCapability).join(', ')}`);
+  // The consent mode is live configuration, so an invalid value would silently fall back and mislead.
+  const consentConfig = configs.find((entry) => entry.bankModuleCapability === 'consent');
+  const mode = consentConfig?.bankModuleConfiguration?.consentMode;
+  add('the consent mode is configured to a valid value', mode === 'automatic' || mode === 'manual',
+    `consentMode: ${String(mode)}`);
 
   // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN
   // must be one this bank actually owns.

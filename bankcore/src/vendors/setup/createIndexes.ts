@@ -8,6 +8,7 @@ import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanc
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
+import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models/bankModuleConfiguration.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -143,6 +144,12 @@ const INDEXES: IndexPlan[] = [
     collection: PAYMENT_INITIATION_COLLECTION,
     keys: { 'paymentDebtor.accountReference': 1, recordCreatedDateTime: -1 },
     options: { name: 'paymentInitiation_debtor_time' },
+  },
+  // One configuration document per capability, resolved on every call that needs it.
+  {
+    collection: BANK_MODULE_CONFIGURATION_COLLECTION,
+    keys: { bankModuleConfigurationInstanceReference: 1 },
+    options: { unique: true, name: 'bankModuleConfiguration_ref_unique' },
   },
   {
     collection: COUNTERS_COLLECTION,

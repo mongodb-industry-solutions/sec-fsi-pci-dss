@@ -42,6 +42,9 @@ const DEMO_NAME = process.env.KUBE_DEMO_NAME ?? "sec-fsi-pci-dss";
 const RELEASE_BACKEND = process.env.KUBE_RELEASE_BACKEND ?? `${DEMO_NAME}-backend`;
 const RELEASE_FRONTEND = process.env.KUBE_RELEASE_FRONTEND ?? `${DEMO_NAME}-frontend`;
 const RELEASE_MERCHANT = process.env.KUBE_RELEASE_MERCHANT ?? `${DEMO_NAME}-merchant`;
+// The bank (v37). Deployed with ingress.enabled=false, so it has a release and pods but no host: every
+// menu below that asks for a URL deliberately leaves it out.
+const RELEASE_BANKCORE = process.env.KUBE_RELEASE_BANKCORE ?? `${DEMO_NAME}-bankcore`;
 const KSEC_SECRET_STAGING = process.env.KUBE_KSEC_SECRET_STAGING ?? `${DEMO_NAME}-secrets-staging`;
 const KSEC_SECRET_PROD = process.env.KUBE_KSEC_SECRET_PROD ?? `${DEMO_NAME}-secrets-prod`;
 
@@ -538,13 +541,13 @@ async function podLogs() {
   targetBanner();
   // Custom covers anything not fixed here (e.g. the merchant, which isn't always deployed, or any
   // pod visible under option 14) — enter its exact pod name.
-  console.log("\n  1. backend\n  2. frontend\n  3. custom (enter a pod name)");
+  console.log("\n  1. backend\n  2. frontend\n  3. bankcore\n  4. custom (enter a pod name)");
   const input = await ask("Which service? ");
-  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
+  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
   const tail = (await ask("Lines to show (default: 50): ")) || "50";
   const env = kubeEnv();
 
-  if (input === "3") {
+  if (input === "4") {
     const entered = (await ask("Pod or deployment name: ")).trim();
     if (!entered) { warn("No name given."); return; }
     // kubectl logs needs a real POD name. Accept a deployment/release name too: if the entry isn't an
@@ -568,7 +571,7 @@ async function podLogs() {
     return;
   }
 
-  const release = input === "2" ? RELEASE_FRONTEND : RELEASE_BACKEND;
+  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_BANKCORE : RELEASE_BACKEND;
   spawnSync("kubectl", ["logs", "-l", `app.kubernetes.io/instance=${release}`, "-n", IST_NAMESPACE, `--tail=${tail}`, "--all-containers"], { shell: IS_WIN, stdio: "inherit", env });
 }
 
@@ -579,21 +582,24 @@ async function helmStatus() {
   spawnSync("helm", ["status", RELEASE_BACKEND, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
   console.log("\n--- Frontend ---");
   spawnSync("helm", ["status", RELEASE_FRONTEND, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
+  console.log("\n--- Bankcore (private, no ingress) ---");
+  spawnSync("helm", ["status", RELEASE_BANKCORE, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
 }
 
 async function rolloutRestart() {
   targetBanner();
-  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. all");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. bankcore\n  5. all");
   const input = await ask("Restart which? ");
-  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
+  if (!["1", "2", "3", "4", "5"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-5.`); return; }
   // Must run with KUBECONFIG pointing at the staging/prod configs (kubeEnv), otherwise kubectl hits
   // the default/wrong context. run()/execSync does not set it, so use spawnSync with env: kubeEnv().
   const env = kubeEnv();
   const restart = (release: string) =>
     spawnSync("kubectl", ["rollout", "restart", "deployment", `${release}-web-app`, "-n", IST_NAMESPACE], { shell: IS_WIN, stdio: "inherit", env });
-  if (input === "1" || input === "4") restart(RELEASE_BACKEND);
-  if (input === "2" || input === "4") restart(RELEASE_FRONTEND);
-  if (input === "3" || input === "4") restart(RELEASE_MERCHANT);
+  if (input === "1" || input === "5") restart(RELEASE_BACKEND);
+  if (input === "2" || input === "5") restart(RELEASE_FRONTEND);
+  if (input === "3" || input === "5") restart(RELEASE_MERCHANT);
+  if (input === "4" || input === "5") restart(RELEASE_BANKCORE);
   ok("Rollout restart initiated.");
 }
 
@@ -787,10 +793,12 @@ async function describePod() {
 
 async function execIntoPod() {
   targetBanner();
-  console.log("\n  1. backend\n  2. frontend\n  3. merchant");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. bankcore");
   const input = await ask("Which service? ");
-  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
-  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
+  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
+  const release = input === "2" ? RELEASE_FRONTEND
+    : input === "3" ? RELEASE_MERCHANT
+      : input === "4" ? RELEASE_BANKCORE : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   console.log(`${DIM}[cmd]    kubectl exec -it deployment/${deployment} -n ${IST_NAMESPACE} -- sh${NC}`);
   spawnSync("kubectl", ["exec", "-it", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "sh"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
@@ -798,10 +806,12 @@ async function execIntoPod() {
 
 async function checkEnvVars() {
   targetBanner();
-  console.log("\n  1. backend\n  2. frontend\n  3. merchant");
+  console.log("\n  1. backend\n  2. frontend\n  3. merchant\n  4. bankcore");
   const input = await ask("Which service? ");
-  if (!["1", "2", "3"].includes(input)) { warn(`Invalid choice "${input}". Choose 1, 2 or 3.`); return; }
-  const release = input === "2" ? RELEASE_FRONTEND : input === "3" ? RELEASE_MERCHANT : RELEASE_BACKEND;
+  if (!["1", "2", "3", "4"].includes(input)) { warn(`Invalid choice "${input}". Choose 1-4.`); return; }
+  const release = input === "2" ? RELEASE_FRONTEND
+    : input === "3" ? RELEASE_MERCHANT
+      : input === "4" ? RELEASE_BANKCORE : RELEASE_BACKEND;
   const deployment = `${release}-web-app`;
   spawnSync("kubectl", ["exec", `deployment/${deployment}`, "-n", IST_NAMESPACE, "--", "env"], { shell: IS_WIN, stdio: "inherit", env: kubeEnv() });
 }
@@ -898,6 +908,7 @@ async function preDeployChecklist() {
   check("environments/production.yaml", existsSync(join(PROJECT_ROOT, "environments", "production.yaml")));
   check("backend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "backend", "Dockerfile")));
   check("frontend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "frontend", "Dockerfile")));
+  check("bankcore/Dockerfile exists", existsSync(join(PROJECT_ROOT, "bankcore", "Dockerfile")));
 
   const color = failed === 0 ? GREEN : YELLOW;
   console.log(`\n  ${color}Result: ${passed} passed, ${failed} failed${NC}`);

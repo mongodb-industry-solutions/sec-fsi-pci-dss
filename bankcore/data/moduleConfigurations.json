@@ -1,0 +1,90 @@
+[
+  {
+    "bankModuleConfigurationInstanceReference": "consent",
+    "bankModuleCapability": "consent",
+    "bankModuleDescription": "PSD2 consent lifecycle: how a new consent lands and how long it stays valid",
+    "bankModuleConfiguration": {
+      "consentMode": "automatic",
+      "defaultValidityDays": 365,
+      "defaultFrequencyPerDay": 4
+    },
+    "bankModuleConfigurationStatus": "active",
+    "bankModuleConfigurationConsumed": true,
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "BankModuleConfiguration",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "bankModuleConfigurationInstanceReference": "card-issuer",
+    "bankModuleCapability": "card-issuer",
+    "bankModuleDescription": "Card validation rules: accepted CVV, CVV mode, Luhn enforcement, supported networks",
+    "bankModuleConfiguration": {
+      "validCvv": "123",
+      "cvvMode": "both",
+      "enforceLuhn": true,
+      "verifyCardholderName": false,
+      "networks": [
+        { "name": "VISA", "prefixes": ["4"], "lengths": [13, 16, 19], "cvvLength": 3, "enabled": true },
+        { "name": "MASTERCARD", "prefixes": ["51-55", "2221-2720"], "lengths": [16], "cvvLength": 3, "enabled": true },
+        { "name": "AMEX", "prefixes": ["34", "37"], "lengths": [15], "cvvLength": 4, "enabled": true },
+        { "name": "DISCOVER", "prefixes": ["6011", "644-649", "65"], "lengths": [16, 19], "cvvLength": 3, "enabled": true }
+      ]
+    },
+    "bankModuleConfigurationStatus": "active",
+    "bankModuleConfigurationConsumed": false,
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "BankModuleConfiguration",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "bankModuleConfigurationInstanceReference": "card-authorization",
+    "bankModuleCapability": "card-authorization",
+    "bankModuleDescription": "Authorisation decisions: response code mapping and the simulator's decision mode",
+    "bankModuleConfiguration": {
+      "simulatorMode": "scenario_driven",
+      "enableThreeDS": false
+    },
+    "bankModuleConfigurationStatus": "active",
+    "bankModuleConfigurationConsumed": false,
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "BankModuleConfiguration",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "bankModuleConfigurationInstanceReference": "aisp",
+    "bankModuleCapability": "aisp",
+    "bankModuleDescription": "Account information reads: page size and how far back a statement goes",
+    "bankModuleConfiguration": {
+      "defaultTransactionLimit": 100,
+      "maxTransactionLimit": 500
+    },
+    "bankModuleConfigurationStatus": "active",
+    "bankModuleConfigurationConsumed": false,
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "BankModuleConfiguration",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "bankModuleConfigurationInstanceReference": "pisp",
+    "bankModuleCapability": "pisp",
+    "bankModuleDescription": "Payment initiation limits and the products this bank offers",
+    "bankModuleConfiguration": {
+      "maxInstructedAmount": 50000,
+      "enabledPaymentProducts": [
+        "sepa-credit-transfers",
+        "instant-sepa-credit-transfers",
+        "cross-border-credit-transfers"
+      ]
+    },
+    "bankModuleConfigurationStatus": "active",
+    "bankModuleConfigurationConsumed": false,
+    "bianServiceDomain": "Payment Execution",
+    "bianControlRecordType": "BankModuleConfiguration",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  }
+]

@@ -103,6 +103,8 @@ describe('v37 P3.11: parity with what the PSP does today', () => {
       }
     }
     const unlisted = served.filter((route) => !listed.has(route));
+    // Administration lives at /api/v1/admin and is not in this table by design: the table is about what
+    // the PSP calls in place of its built-in engines, not about configuring the bank.
     // An endpoint nobody put in the parity table is an endpoint whose purpose was never argued for. This
     // is the same discipline the Module to Collection matrix enforces for collections.
     expect(unlisted, 'add it to the parity table or remove it').toEqual([]);

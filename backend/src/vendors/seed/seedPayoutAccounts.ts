@@ -5,11 +5,12 @@ import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAc
 import { MERCHANT_AGREEMENT_COLLECTION } from '../../modules/gateway/models/merchantAgreement.model';
 import { generateDemoIban, generateDemoRouting } from '../../modules/gateway/services/payoutAccount.service';
 
-// Merchant → their PSP internal ledger account (seeded alongside this file)
-const MERCHANT_PAYOUT_LEDGER: Record<string, string> = {
-  'm0000001-0000-4000-8000-000000000001': 'pao00001-0000-4000-8000-000000000001',
-  'm0000002-0000-4000-8000-000000000002': 'pao00002-0000-4000-8000-000000000002',
-  'm0000003-0000-4000-8000-000000000003': 'pao00003-0000-4000-8000-000000000003',
+// Merchant → the bank account they are settled into. NOT a PSP-held balance any more (P2.7): a
+// PSP that holds a merchant's funds is doing an EMI's job, and the ledger belongs at the bank.
+const MERCHANT_SETTLEMENT_ACCOUNT: Record<string, string> = {
+  'm0000001-0000-4000-8000-000000000001': 'pau00063-0000-4000-8000-000000000063',
+  'm0000002-0000-4000-8000-000000000002': 'pau00064-0000-4000-8000-000000000064',
+  'm0000003-0000-4000-8000-000000000003': 'pau00065-0000-4000-8000-000000000065',
 };
 
 export async function seedPayoutAccounts(db: Db) {
@@ -21,8 +22,8 @@ export async function seedPayoutAccounts(db: Db) {
   for (const record of records) {
     // Every real bank account (and e-wallet) must carry banking identifiers. Backfill a valid,
     // DETERMINISTIC demo IBAN + routing when the seed data omits them (idempotent: keyed by the
-    // account reference). internal_ledger is the PSP internal balance, not a bank account, so it
-    // intentionally has no IBAN. QE encrypts these fields on write.
+    // account reference). The only remaining internal_ledger is the PSP revenue account, which is
+    // not a bank account and so intentionally has no IBAN. QE encrypts these fields on write.
     const type = record.payoutAccountType;
     if (type === 'bank_account' || type === 'wallet') {
       if (!record.payoutAccountIban) {
@@ -52,12 +53,12 @@ export async function seedPayoutAccounts(db: Db) {
   }
   console.log(`  ${PAYOUT_ACCOUNT_COLLECTION}: ${upserted} upserted (${backfilled} IBAN backfilled)`);
 
-  // Link merchants to their default PSP ledger accounts
-  for (const [merchantRef, payoutRef] of Object.entries(MERCHANT_PAYOUT_LEDGER)) {
+  // Link merchants to the bank account they are settled into
+  for (const [merchantRef, payoutRef] of Object.entries(MERCHANT_SETTLEMENT_ACCOUNT)) {
     await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
       { merchantAgreementInstanceReference: merchantRef },
       { $set: { merchantDefaultPayoutAccountReference: payoutRef } },
     );
   }
-  console.log(`  merchantAgreementProcedure: ${Object.keys(MERCHANT_PAYOUT_LEDGER).length} default payout accounts linked`);
+  console.log(`  merchantAgreementProcedure: ${Object.keys(MERCHANT_SETTLEMENT_ACCOUNT).length} default payout accounts linked`);
 }

@@ -10,6 +10,7 @@ import swaggerPlugin from '../src/plugins/swagger';
 import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from '../src/shared/services/logBuffer';
 import { configurationReport, readinessReport, formatReport } from '../src/shared/services/startupReport';
 import { systemModule } from '../src/modules/system';
+import { adminModule } from '../src/modules/admin';
 import { aispModule } from '../src/modules/aisp';
 import { tppTrustModule } from '../src/modules/tpp-trust';
 import { consentModule } from '../src/modules/consent';
@@ -152,8 +153,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(aispModule);
   await fastify.register(pispModule);
   await fastify.register(paymentHubModule);
-  // Diagnostics, explicitly NOT part of the bank's API.
+  // Diagnostics and administration, explicitly NOT part of the bank's Open Banking API.
   await fastify.register(systemModule, { prefix: '/api/v1' });
+  await fastify.register(adminModule, { prefix: '/api/v1' });
 
   return fastify;
 }
