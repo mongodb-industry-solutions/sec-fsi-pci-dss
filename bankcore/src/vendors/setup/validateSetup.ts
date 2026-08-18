@@ -16,6 +16,9 @@ import {
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION, TppEventSubscriptionControlRecord,
 } from '../../modules/tpp-trust/models/tppEventSubscription.model';
+import {
+  COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION, CounterpartyBankControlRecord,
+} from '../../modules/payment-hub/models/counterpartyBank.model';
 import { assertLinks as assertSubscriptionLinks } from '@leafypay/platform-links';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
@@ -44,6 +47,8 @@ const REQUIRED_COLLECTIONS = [
   BANK_MODULE_CONFIGURATION_COLLECTION,
   TPP_EVENT_SUBSCRIPTION_COLLECTION,
   TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
+  COUNTERPARTY_BANK_COLLECTION,
+  INTERBANK_MESSAGE_LOG_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -207,6 +212,23 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
     add(`subscription ${subscription.tppRegistrationClientId} names its events`, events.length > 0,
       events.length > 0 ? events.join(', ') : 'a subscription for nothing delivers nothing');
   }
+
+  // Without a reachability registry every external payment is refused, and the reason ("no registered
+  // institution owns that bank code") reads like a bug rather than an unseeded database.
+  const counterparties = await db.collection<CounterpartyBankControlRecord>(COUNTERPARTY_BANK_COLLECTION)
+    .find({}, { projection: { _id: 0, counterpartyBankName: 1, counterpartyBankSchemes: 1, counterpartyBankStatus: 1 } })
+    .toArray()
+    .catch(() => []);
+  const reachable = counterparties.filter((c) => c.counterpartyBankStatus === 'reachable');
+  add('counterpartyBank seeded', counterparties.length > 0,
+    `${counterparties.length} institution(s), ${reachable.length} reachable`);
+  const schemeless = reachable.filter((c) => (c.counterpartyBankSchemes ?? []).length === 0);
+  add('every reachable institution names a scheme', schemeless.length === 0,
+    schemeless.length === 0 ? undefined : `no scheme on: ${schemeless.map((c) => c.counterpartyBankName).join(', ')}`);
+  // One unreachable entry on purpose: without it the refusal path cannot be demonstrated.
+  add('a deliberately unreachable institution exists, so the refusal path is demonstrable',
+    counterparties.length > reachable.length,
+    counterparties.length > reachable.length ? undefined : 'seed one, or "cannot be paid" is untestable');
 
   // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN
   // must be one this bank actually owns.

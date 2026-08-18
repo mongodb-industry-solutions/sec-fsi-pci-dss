@@ -12,6 +12,9 @@ import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
 } from '../../modules/tpp-trust/models/tppEventSubscription.model';
+import {
+  COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION,
+} from '../../modules/payment-hub/models/counterpartyBank.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -180,6 +183,33 @@ const INDEXES: IndexPlan[] = [
     collection: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
     keys: { deliveryOutcome: 1, recordCreatedDateTime: -1 },
     options: { name: 'tppWebhookDeliveryLog_outcome_time' },
+  },
+  // Reachability is resolved from the creditor IBAN's bank code on every external payment.
+  {
+    collection: COUNTERPARTY_BANK_COLLECTION,
+    keys: { counterpartyBankInstanceReference: 1 },
+    options: { unique: true, name: 'counterpartyBank_ref_unique' },
+  },
+  {
+    collection: COUNTERPARTY_BANK_COLLECTION,
+    keys: { counterpartyBankIbanBankCodes: 1 },
+    options: { name: 'counterpartyBank_iban_bank_codes' },
+  },
+  {
+    collection: COUNTERPARTY_BANK_COLLECTION,
+    keys: { counterpartyBankBic: 1 },
+    options: { unique: true, name: 'counterpartyBank_bic_unique' },
+  },
+  // Reconciliation reads by payment, and an investigation by the end to end id that spans both databases.
+  {
+    collection: INTERBANK_MESSAGE_LOG_COLLECTION,
+    keys: { paymentInitiationInstanceReference: 1, recordCreatedDateTime: 1 },
+    options: { name: 'interbankMessageLog_payment_time' },
+  },
+  {
+    collection: INTERBANK_MESSAGE_LOG_COLLECTION,
+    keys: { interbankEndToEndIdentification: 1 },
+    options: { name: 'interbankMessageLog_end_to_end' },
   },
   {
     collection: COUNTERS_COLLECTION,

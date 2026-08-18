@@ -6,6 +6,7 @@ import { seedTppRegistrations } from './seedTppRegistrations';
 import { seedConsents } from './seedConsents';
 import { seedModuleConfigurations } from './seedModuleConfigurations';
 import { seedEventSubscriptions } from './seedEventSubscriptions';
+import { seedCounterpartyBanks } from './seedCounterpartyBanks';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -30,6 +31,8 @@ export async function runSeed(): Promise<void> {
     await seedModuleConfigurations(db);
     // Where to deliver notifications. After the TPP, since it belongs to one.
     await seedEventSubscriptions(db);
+    // Who this bank can reach, which is what makes an external payment routable.
+    await seedCounterpartyBanks(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();

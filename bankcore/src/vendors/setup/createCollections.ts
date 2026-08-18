@@ -11,6 +11,9 @@ import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
 } from '../../modules/tpp-trust/models/tppEventSubscription.model';
+import {
+  COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION,
+} from '../../modules/payment-hub/models/counterpartyBank.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -42,6 +45,8 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   { name: BANK_MODULE_CONFIGURATION_COLLECTION, purpose: "configuration of the bank's own engines, edited over its admin API" },
   { name: TPP_EVENT_SUBSCRIPTION_COLLECTION, purpose: 'where the bank delivers notifications, and how it signs them' },
   { name: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION, purpose: 'one row per delivery attempt, so a silent failure is visible' },
+  { name: COUNTERPARTY_BANK_COLLECTION, purpose: 'reachable institutions: BIC, schemes, correspondent, cut-off' },
+  { name: INTERBANK_MESSAGE_LOG_COLLECTION, purpose: 'pacs.008 sent, pacs.002 and pacs.004 received, for reconciliation' },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

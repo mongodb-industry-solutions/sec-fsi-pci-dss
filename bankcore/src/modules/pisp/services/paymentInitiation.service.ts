@@ -156,6 +156,17 @@ export async function findPayment(
  * Every lifecycle outcome is notified, not only the happy one: a rejection and a return arriving days
  * later are exactly the cases where a PSP that only polls leaves a transfer stuck in `pending`.
  */
+/**
+ * Finds a payment by its reference alone, for the bank's own execution path. The API-facing finder is scoped
+ * to the initiating TPP on purpose; this one is not, and it is never reachable from a route.
+ */
+export async function findPaymentByReference(
+  db: Db,
+  paymentId: string,
+): Promise<PaymentInitiationControlRecord | null> {
+  return collection(db).findOne({ paymentInitiationInstanceReference: paymentId }, { projection: { _id: 0 } });
+}
+
 export async function changeTransactionStatus(
   db: Db,
   paymentId: string,

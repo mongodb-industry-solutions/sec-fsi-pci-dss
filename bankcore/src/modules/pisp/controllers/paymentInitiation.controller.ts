@@ -6,6 +6,7 @@ import { PAYMENT_PRODUCTS, PaymentProduct } from '../models/paymentInitiation.mo
 import {
   initiatePayment, findPayment, cancelPayment, toBerlinGroupPayment,
 } from '../services/paymentInitiation.service';
+import { executePayment, reconcileSubmission } from '../../payment-hub/services/paymentExecution.service';
 
 // Berlin Group NextGenPSD2 Payment Initiation Service. The payment product is part of the path, exactly
 // as the specification writes it, so the TPP selects the scheme and the bank decides how it actually
@@ -233,6 +234,30 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
         return { status: result.status, body: messages(result.code, result.text) };
       }
       const paymentId = result.payment.paymentInitiationInstanceReference;
+
+      // Execution is triggered here and NOT awaited. The response is the initiation's own outcome (`ACTC`),
+      // because that is what the caller asked for and what the standard defines; settlement is asynchronous
+      // and arrives as a status notification. Awaiting it would make an instant on-us transfer look
+      // synchronous and an external one look slow, which is the opposite of modelling the boundary honestly.
+      void (async () => {
+        const outcome = await executePayment(fastify.db, paymentId).catch((err) => ({
+          state: 'error' as const, error: err instanceof Error ? err.message : String(err),
+        }));
+        if (outcome.state === 'error') {
+          fastify.log.warn(`[payment-hub] ${paymentId} could not be executed: ${outcome.error}`);
+          return;
+        }
+        // An in-flight payment is reconciled once the scheme has had its expected time. A real deployment
+        // would have the scheme call back or a sweeper poll; this keeps the demo's T+N story without
+        // pretending the answer was synchronous.
+        if (outcome.state === 'in_flight') {
+          const { clearingReference } = outcome;
+          setTimeout(() => {
+            void reconcileSubmission(fastify.db, paymentId, clearingReference).catch(() => {});
+          }, 2500).unref?.();
+        }
+      })();
+
       return {
         status: 201,
         body: {

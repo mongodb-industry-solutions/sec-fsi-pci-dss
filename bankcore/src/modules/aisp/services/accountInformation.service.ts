@@ -78,6 +78,18 @@ export async function findAccount(db: Db, resourceId: string): Promise<AccountAr
     .findOne({ accountArrangementInstanceReference: resourceId }, { projection: { _id: 0 } });
 }
 
+/**
+ * Finds an account by IBAN. Possible because `accountIban` carries a Queryable Encryption equality index,
+ * which the consent work added: without it the driver refuses the query outright.
+ *
+ * Internal to the bank, and deliberately not reachable from the API: a caller must not be able to ask
+ * "whose account is this IBAN" and be answered.
+ */
+export async function findAccountByIban(db: Db, iban: string): Promise<AccountArrangementControlRecord | null> {
+  return db.collection<AccountArrangementControlRecord>(ACCOUNT_ARRANGEMENT_COLLECTION)
+    .findOne({ accountIban: iban }, { projection: { _id: 0 } });
+}
+
 // Accounts of one holder. There is no "all accounts" read: an AIS call is always scoped to the PSU
 // whose consent authorises it, so an unscoped list would be a data leak dressed as a convenience.
 export async function listAccountsForHolder(db: Db, holderReference: string): Promise<AccountArrangementControlRecord[]> {
