@@ -17,6 +17,7 @@ import {
 } from './integrationRegistry.service';
 import { applyMappings } from './fieldMapping.service';
 import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
+import { resolveProvider, resolverKindFor, type ResolutionContext } from './resolverStrategy';
 import { sanitizeDeep } from './businessProcessEvent.service';
 import { resolveEventOutbound } from './providerEventConfig.service';
 
@@ -38,8 +39,40 @@ export async function dispatchProvider(
   type: IntegrationProviderType,
   triggeredBy: string,
   payload: Record<string, unknown>,
-  businessContext?: BusinessContextRef
+  businessContext?: BusinessContextRef,
+  // v37 P6.1: which ENTITY the request is about, for a capability bound to one. Absent for the assessment
+  // capabilities, where any active provider can answer and the routing strategies decide which.
+  resolution?: ResolutionContext,
 ): Promise<DispatchResult> {
+  // ── P6.1: entity-bound capabilities resolve BY THE DATA, before any strategy is considered ──────
+  //
+  // The pipeline below is untouched on purpose. Five capability-specific dispatchers would fork the audit
+  // trail that carries the compliance narrative, so the resolver is injected here and everything after it,
+  // the logging, the events, the field mapping, stays single sourced.
+  if (resolverKindFor(type) === 'entity_bound' && resolution) {
+    const resolved = await resolveProvider(db, type, resolution);
+    if (!resolved.ok) {
+      // A REFUSAL, not a fallback (P6.4). For an entity-bound capability, falling back to another provider
+      // means operating a different institution's account, which is worse than not operating at all.
+      return {
+        provider: 'internal',
+        arrangementId: '',
+        status: 'error',
+        latencyMs: 0,
+        error: `${type} could not be routed: ${resolved.reason}`,
+      };
+    }
+    if (resolved.provider.externalProviderApiEndpoint) {
+      return dispatchExternal(db, resolved.provider, triggeredBy, payload, businessContext);
+    }
+    return logAndReturn(db, resolved.provider, triggeredBy, payload, businessContext, {
+      provider: 'internal',
+      arrangementId: resolved.provider.externalProviderArrangementInstanceReference,
+      status: 'sent',
+      latencyMs: 0,
+    });
+  }
+
   const provider = await getActiveProviderForType(db, type);
 
   if (!provider) {

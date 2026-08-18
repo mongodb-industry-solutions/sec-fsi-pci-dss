@@ -17,9 +17,12 @@ function source(path: string): string {
 
 // Comments are stripped: this is about what the code does, and the explanations are what keep the rules alive.
 function code(path: string): string {
+  // Line comments FIRST. A line comment containing `/*` (a URL like `/api/v1/internal/*`, for instance)
+  // otherwise opens a fake block comment that swallows real code up to the next `*/`. In a `not.toContain`
+  // assertion that makes the gate pass because the code disappeared, which is the worst kind of green.
   return source(path)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '');
+    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
 }
 
 describe('v37 P5.3: the PSP does not credit a beneficiary', () => {

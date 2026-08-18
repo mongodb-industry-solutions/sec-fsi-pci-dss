@@ -22,6 +22,8 @@ export type IntegrationProviderType =
   | 'payment_initiation'     // PISP: executes bank transfers (PSD2)
   | 'currency_exchange'      // v17 FX: converts amounts between ISO-4217 currencies (mid rate + spread)
   | 'vop_verification'       // v28 Verification of Payee: name-vs-account confirmation (EPC VoP / UK CoP)
+  | 'aspsp'                  // v37: the institution that HOLDS the account, as distinct from reading it (AIS)
+                             // or initiating from it (PIS). Its ledger is the authoritative balance.
   | 'generic';
 
 export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
@@ -286,6 +288,12 @@ export interface ExternalProviderArrangement {
   // an ASPSP has a path and a method per operation, so its adapter needs the host and builds the rest.
   // Written by the seeder per environment, so repointing at another provider is a data change.
   externalProviderBaseUrl?: string;
+  // v37 P6.3: what this provider SERVES, which is what an entity-bound capability resolves on. A linked
+  // account or a registered card names its institution directly; a freshly typed IBAN or PAN is matched
+  // against these declared identifiers instead. Seeded data, so a second bank is a record.
+  externalProviderAspspReference?: string;
+  externalProviderIbanBankCodes?: string[];
+  externalProviderBinRanges?: Array<{ binRangeFrom: string; binRangeTo: string }>;
 
   externalProviderCallbackEnabled: boolean;
   externalProviderCallbackPath?: string;

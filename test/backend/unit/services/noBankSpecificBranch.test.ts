@@ -23,9 +23,12 @@ function sourceFiles(directory: string, accumulated: string[] = []): string[] {
 // Strip comments before matching. A comment naming the bank is documentation, and this gate is about what
 // the code DOES: matching prose would make it fire on the very explanations that keep the rule alive.
 function code(path: string): string {
+  // Line comments FIRST: one containing `/*` (a URL like `/api/v1/internal/*`) would otherwise open a fake
+  // block comment and swallow real code up to the next `*/`. In a `not.toContain` assertion that makes this
+  // gate pass by deleting the very code it should be checking, which is the worst kind of green.
   return readFileSync(path, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(['"`])(?:\\.|(?!\1)[^\\])*\1\s*:/g, '$1$1:');
 }
 

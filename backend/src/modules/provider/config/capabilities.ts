@@ -20,6 +20,12 @@ export type CapabilityKey =
   | 'card-authorization'
   | 'card-issuer'
   | 'vop'
+  // v37 P6.2: the three banking capabilities. `account-information` and `payment-initiation` existed as
+  // provider TYPES and in the frontend registry but never in this union, so the backend had no name for
+  // capabilities it was already dispatching to. `aspsp` is new: the bank as the holder of the account.
+  | 'account-information'
+  | 'payment-initiation'
+  | 'aspsp'
   | 'generic';
 
 // Code module that physically owns the capability's internal engine (engine grouped by capability
@@ -148,6 +154,47 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     bianServiceDomain: 'SD-88 Payment Card', // confirm vs technical-spec §9 before Phase 2 seed
     bianControlRecordType: 'PaymentCardManagement',
     pciDssRequirements: ['Req 3.2', 'Req 3.3', 'Req 12.8.1'],
+  },
+  'account-information': {
+    capability: 'account-information',
+    providerType: 'account_information',
+    label: 'Account Information (AISP)',
+    description: 'Reads accounts, balances and movements at the bank that holds them. Consent enforced by the ASPSP.',
+    callbackSegment: 'account-information',
+    frontendFolder: 'account-information',
+    // The engine moved to the bank (v37), so there is no PSP module behind this any more: the adapter calls
+    // the ASPSP. Saying `hasModule: false` is what keeps the admin surface honest about where it runs.
+    moduleDomain: null,
+    hasModule: false,
+    bianServiceDomain: 'Open Banking',
+    bianControlRecordType: 'AccountInformationValidation',
+    pciDssRequirements: ['Req 10.2.1', 'Req 12.8.1'],
+  },
+  'payment-initiation': {
+    capability: 'payment-initiation',
+    providerType: 'payment_initiation',
+    label: 'Payment Initiation (PISP)',
+    description: 'Initiates a credit transfer at the bank holding the debtor account. The bank executes and settles.',
+    callbackSegment: 'payment-initiation',
+    frontendFolder: 'payment-initiation',
+    moduleDomain: null,
+    hasModule: false,
+    bianServiceDomain: 'Payment Execution',
+    bianControlRecordType: 'PaymentExecutionProcedure',
+    pciDssRequirements: ['Req 10.2.1', 'Req 12.8.1'],
+  },
+  aspsp: {
+    capability: 'aspsp',
+    providerType: 'aspsp',
+    label: 'Account Servicing Bank (ASPSP)',
+    description: 'The institution that holds the account: its ledger, its balances and its movements.',
+    callbackSegment: 'aspsp',
+    frontendFolder: 'aspsp',
+    moduleDomain: null,
+    hasModule: false,
+    bianServiceDomain: 'Current Account',
+    bianControlRecordType: 'AccountArrangement',
+    pciDssRequirements: ['Req 10.2.1', 'Req 12.8.1'],
   },
   vop: {
     capability: 'vop',
