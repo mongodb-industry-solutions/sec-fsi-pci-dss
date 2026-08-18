@@ -6,6 +6,9 @@ import {
 
 // Berlin Group NextGenPSD2 Account Information Service, mounted at /v1.
 //
+// Every endpoint requires a TPP access token carrying the scope of its operation group and the AISP
+// role, which the bank issues only through the client credentials grant.
+//
 // Consent enforcement arrives in P3: the endpoints already require the Consent-ID header the standard
 // defines and reject a call without one, so a TPP integrates against the real contract now and only the
 // verification behind it deepens. Answering without a consent reference would teach the wrong shape.
@@ -71,7 +74,7 @@ function consentIdOf(request: { headers: Record<string, unknown> }): string | un
 export async function accountInformationController(fastify: FastifyInstance) {
   // ── GET /v1/accounts ─────────────────────────────────────────────────────────────────────────
   fastify.get('/accounts', {
-    preHandler: requireTpp,
+    preHandler: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read the accounts a consent gives access to',
@@ -113,7 +116,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // ── GET /v1/accounts/{accountId} ─────────────────────────────────────────────────────────────
   fastify.get('/accounts/:accountId', {
-    preHandler: requireTpp,
+    preHandler: requireTpp('accounts', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read one account',
@@ -141,7 +144,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // ── GET /v1/accounts/{accountId}/balances ────────────────────────────────────────────────────
   fastify.get('/accounts/:accountId/balances', {
-    preHandler: requireTpp,
+    preHandler: requireTpp('balances', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read the balances of an account',
@@ -198,7 +201,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // ── GET /v1/accounts/{accountId}/transactions ────────────────────────────────────────────────
   fastify.get('/accounts/:accountId/transactions', {
-    preHandler: requireTpp,
+    preHandler: requireTpp('transactions', 'AISP'),
     schema: {
       tags: ['accounts'],
       summary: 'Read the movements of an account',

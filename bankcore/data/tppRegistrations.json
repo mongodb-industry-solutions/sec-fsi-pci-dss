@@ -1,0 +1,25 @@
+[
+  {
+    "tppRegistrationInstanceReference": "tpp-leafypay-001",
+    "tppRegistrationName": "Leafy Pay",
+    "tppRegistrationGrantedScopes": [
+      "accounts",
+      "balances",
+      "transactions",
+      "payments",
+      "funds-confirmations",
+      "demo-credits"
+    ],
+    "tppRegistrationRoles": ["AISP", "PISP", "CBPII"],
+    "tppRegistrationStatus": "active",
+    "tppRegistrationApiVersion": "1.3.6",
+    "tppRegistrationEnvironment": "sandbox",
+    "tppRegistrationCertificate": {
+      "certificateNotImplementedReason": "eIDAS QWAC/QSEALC and mTLS are deliberately out of scope for this demo; the omission is recorded rather than left implicit"
+    },
+    "bianServiceDomain": "Party Authentication",
+    "bianControlRecordType": "TppRegistration",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  }
+]

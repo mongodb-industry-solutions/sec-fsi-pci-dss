@@ -1,18 +1,16 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import jwt from 'jsonwebtoken';
-import { config } from '../../config';
+import { verifyAccessToken } from '../../modules/tpp-trust/services/tppAccessToken.service';
+import { TppRole, TppScope } from '../../modules/tpp-trust/models/tppRegistration.model';
 
-// Authorisation for the Open Banking surface. bankcore has a public hostname so its API can be
-// reviewed, which means account data cannot be one unauthenticated request away.
+// Authorisation for the Open Banking surface: a token this bank issued to a registered TPP through the
+// client credentials grant, scoped per operation group and per PSD2 role.
 //
-// INTERIM implementation, deliberately narrow: the token is a bearer JWT signed with the shared
-// platform secret, so only the PSP can mint one. P3.7b replaces the verification with
-// `grant_type=client_credentials` against a registered `tppRegistration`, with scopes and roles. The
-// call sites do not change when it does: they already require "a valid TPP token", which is what the
-// specification's security scheme says. What changes is who issues it and what it carries.
+// The token is signed with the bank's own key, so a JWT minted anywhere else on the platform is
+// refused. That is the point: before this, any holder of a platform token could read accounts.
 export interface TppContext {
   clientId: string;
-  scopes: string[];
+  scopes: TppScope[];
+  roles: TppRole[];
 }
 
 declare module 'fastify' {
@@ -21,24 +19,40 @@ declare module 'fastify' {
   }
 }
 
-export async function requireTpp(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const match = /^\s*Bearer\s+(.+?)\s*$/i.exec(request.headers.authorization ?? '');
-  if (!match) {
-    // RFC 6750 shape: a TPP client must be able to tell "no token" from "wrong scope".
-    reply.header('WWW-Authenticate', 'Bearer realm="bankcore"');
-    return reply.status(401).send({
-      tppMessages: [{ category: 'ERROR', code: 'TOKEN_INVALID', text: 'Missing bearer token' }],
-    }) as never;
-  }
-  try {
-    const payload = jwt.verify(match[1], config.app.jwtSecret) as jwt.JwtPayload;
-    request.tpp = {
-      clientId: (payload.client_id as string) ?? (payload.sub as string) ?? 'psp',
-      scopes: typeof payload.scope === 'string' ? payload.scope.split(' ').filter(Boolean) : [],
-    };
-  } catch {
-    return reply.status(401).send({
-      tppMessages: [{ category: 'ERROR', code: 'TOKEN_INVALID', text: 'Invalid bearer token' }],
-    }) as never;
-  }
+function refuse(reply: FastifyReply, status: number, code: string, text: string): never {
+  if (status === 401) reply.header('WWW-Authenticate', 'Bearer realm="bankcore"');
+  return reply.status(status).send({
+    tppMessages: [{ category: 'ERROR', code, text }],
+  }) as never;
+}
+
+/**
+ * Requires a valid TPP token, plus the scope and role the endpoint needs. Both are checked: a scope
+ * says which operation group, a role says which PSD2 capacity the TPP is acting in, and a real ASPSP
+ * grants them independently.
+ */
+export function requireTpp(scope?: TppScope, role?: TppRole) {
+  return async function handler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+    const match = /^\s*Bearer\s+(.+?)\s*$/i.exec(request.headers.authorization ?? '');
+    // RFC 6750 shape: a TPP must be able to tell "no token" from "wrong scope".
+    if (!match) return refuse(reply, 401, 'TOKEN_INVALID', 'Missing bearer token');
+
+    const claims = verifyAccessToken(match[1]);
+    if (!claims) return refuse(reply, 401, 'TOKEN_INVALID', 'Invalid or expired access token');
+
+    if (scope && !claims.scopes.includes(scope)) {
+      return refuse(reply, 403, 'TOKEN_INVALID', `The access token lacks the '${scope}' scope`);
+    }
+    if (role && !claims.roles.includes(role)) {
+      return refuse(reply, 403, 'ROLE_INVALID', `This TPP is not registered as ${role}`);
+    }
+
+    // Checked only once the caller is authorised, so an unauthenticated request never reaches the
+    // database. A bank whose ledger is unreachable is unavailable, not broken.
+    if (request.server.dbError !== null) {
+      return refuse(reply, 503, 'SERVICE_BLOCKED', 'The bank ledger is unavailable');
+    }
+
+    request.tpp = { clientId: claims.clientId, scopes: claims.scopes, roles: claims.roles };
+  };
 }

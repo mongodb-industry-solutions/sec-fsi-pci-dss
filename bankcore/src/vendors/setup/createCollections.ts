@@ -4,6 +4,7 @@ import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accou
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
+import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -24,6 +25,7 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   { name: ACCOUNT_MOVEMENT_COLLECTION, purpose: 'explicit ledger movements, so the ledger is reconcilable' },
   { name: BALANCE_CREDIT_LOG_COLLECTION, purpose: 'audit trail of every balance credit' },
   { name: DOMAIN_EVENT_COLLECTION, purpose: "bankcore's own domain event store" },
+  { name: TPP_REGISTRATION_COLLECTION, purpose: 'registered third parties: client id, secret hash, scopes, roles' },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

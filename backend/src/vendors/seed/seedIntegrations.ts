@@ -8,6 +8,7 @@ import {
 } from '../../modules/provider/models/externalProviderArrangement.model';
 import { deriveEventConfigs } from '../../modules/provider/services/providerEventConfig.service';
 import { seedRoutingGroups } from './seedRoutingGroups';
+import { resolveBankcoreLink } from './resolveProviderCredential';
 
 const DATA_DIR: string = process.env.PSP_SEED_DATA_DIR ?? join(process.cwd(), 'data');
 
@@ -19,6 +20,9 @@ export async function seedIntegrations(db: Db): Promise<void> {
   // No explicit creation needed here.
 
   for (const record of records) {
+    // The TPP credential and the bank's token endpoint: the environment is read at SEED time to write
+    // the record, and at runtime only the record is read.
+    resolveBankcoreLink(record);
     // §2.4: store per-event config on every vendor. Derive it from the trigger-event list + the
     // (template) vendor-global config so the stored doc is per-event (the resolver's source of truth).
     record.externalProviderEvents = deriveEventConfigs(record);

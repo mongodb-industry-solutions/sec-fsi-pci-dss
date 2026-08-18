@@ -10,6 +10,7 @@ import swaggerPlugin from '../src/plugins/swagger';
 import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from '../src/shared/services/logBuffer';
 import { systemModule } from '../src/modules/system';
 import { aispModule } from '../src/modules/aisp';
+import { tppTrustModule } from '../src/modules/tpp-trust';
 import { config } from '../src/config';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -116,7 +117,9 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // Open Banking surface, at the standard's own path.
+  // Open Banking surface, at the standard's own path. The token endpoint comes first: it is what every
+  // other endpoint here requires.
+  await fastify.register(tppTrustModule);
   await fastify.register(aispModule);
   // Diagnostics, explicitly NOT part of the bank's API.
   await fastify.register(systemModule, { prefix: '/api/v1' });

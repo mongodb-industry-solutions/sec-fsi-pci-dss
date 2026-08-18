@@ -31,6 +31,14 @@ export function stripSecrets(doc: ExternalProviderArrangement): IntegrationSumma
   const { externalProviderApiKeyHash, externalProviderCallbackSecretHash, ...safe } = doc;
   void externalProviderApiKeyHash;
   void externalProviderCallbackSecretHash;
+  // The client credential of an oauth2_cc provider is a secret like any other: the admin surface must
+  // show that one is configured without disclosing it.
+  if (safe.authConfig?.oauth2?.clientSecretPlaintext) {
+    safe.authConfig = {
+      ...safe.authConfig,
+      oauth2: { ...safe.authConfig.oauth2, clientSecretPlaintext: '***' },
+    };
+  }
   return safe;
 }
 

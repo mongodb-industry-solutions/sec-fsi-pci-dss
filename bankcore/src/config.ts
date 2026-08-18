@@ -1,4 +1,5 @@
 import * as dotenv from 'dotenv';
+import { createHash } from 'crypto';
 import { resolve } from 'path';
 
 dotenv.config({ path: resolve(__dirname, '../../.env') });
@@ -11,6 +12,12 @@ function pspEnv(name: string, fallback?: string): string | undefined {
 
 function env(name: string, fallback?: string): string | undefined {
   return process.env[name] ?? fallback;
+}
+
+// Domain separated key derivation: a distinct secret per purpose out of one configured value, so two
+// mechanisms never end up accepting each other's tokens.
+function deriveKey(purpose: string, secret: string): string {
+  return createHash('sha256').update(`${purpose}:${secret}`).digest('hex');
 }
 
 export const config = {
@@ -52,6 +59,16 @@ export const config = {
   bank: {
     // 'automatic' lands a new PSD2 consent valid; 'manual' leaves it received for an operator.
     consentMode: (pspEnv('BANKCORE_CONSENT_MODE', 'automatic')!) as 'automatic' | 'manual',
+    // Signs the access tokens the bank issues to its TPPs. It must NOT be the shared platform secret:
+    // the whole point is that a token minted elsewhere on the platform cannot open the banking API. The
+    // default derives a distinct key from it, so a deployment is secure without extra configuration
+    // while still being able to set a genuinely independent one.
+    accessTokenSecret: pspEnv('BANKCORE_ACCESS_TOKEN_SECRET')
+      ?? deriveKey('bankcore-tpp-access-token', pspEnv('JWT_SECRET', 'dev-secret-change-me')!),
+    // Read at SEED time only, to write the bank's verifier and the PSP's credential. At runtime the
+    // bank reads the hash from its registration record and never this value.
+    tppSeedClientId: pspEnv('BANKCORE_TPP_CLIENT_ID', 'leafypay-psp')!,
+    tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', 'dev-bankcore-tpp-secret')!,
   },
 
   app: {

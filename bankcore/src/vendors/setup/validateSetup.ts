@@ -5,6 +5,7 @@ import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accou
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
+import { TPP_REGISTRATION_COLLECTION, TppRegistrationControlRecord } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -24,6 +25,7 @@ const REQUIRED_COLLECTIONS = [
   ACCOUNT_HOLDER_COLLECTION,
   ACCOUNT_MOVEMENT_COLLECTION,
   BALANCE_CREDIT_LOG_COLLECTION,
+  TPP_REGISTRATION_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -96,6 +98,21 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
       orphans.length === 0 ? undefined : `stale in: ${orphans.join(', ')}; rebuild with setup:db:reset`);
   } catch (err) {
     add('DEK references resolve in the shared key vault', false, err instanceof Error ? err.message : String(err));
+  }
+
+  // Without an active TPP holding a secret hash, no caller can obtain a token and the whole API is
+  // closed. That is a fresh-deploy failure worth catching at setup, not on the first read.
+  const registrations = await db.collection<TppRegistrationControlRecord>(TPP_REGISTRATION_COLLECTION)
+    .find({ tppRegistrationStatus: 'active' }, { projection: { _id: 0, tppRegistrationClientId: 1, tppRegistrationClientSecretHash: 1, tppRegistrationRoles: 1, tppRegistrationGrantedScopes: 1 } })
+    .toArray()
+    .catch(() => []);
+  add('tppRegistration seeded and active', registrations.length > 0, `${registrations.length} active TPP(s)`);
+  for (const registration of registrations) {
+    const usable = registration.tppRegistrationClientSecretHash?.startsWith('$2')
+      && registration.tppRegistrationRoles?.length > 0
+      && registration.tppRegistrationGrantedScopes?.length > 0;
+    add(`TPP ${registration.tppRegistrationClientId} can authenticate`, Boolean(usable),
+      usable ? undefined : 'needs a bcrypt secret hash, at least one role and at least one scope');
   }
 
   // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN

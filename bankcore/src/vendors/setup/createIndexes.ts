@@ -5,6 +5,7 @@ import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accou
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
+import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -83,6 +84,17 @@ const INDEXES: IndexPlan[] = [
     collection: DOMAIN_EVENT_COLLECTION,
     keys: { businessProcess: 1, occurredAt: -1 },
     options: { name: 'domainEvent_process_time' },
+  },
+  // Every token request looks a client up by its id, so that lookup is unique and indexed.
+  {
+    collection: TPP_REGISTRATION_COLLECTION,
+    keys: { tppRegistrationClientId: 1 },
+    options: { unique: true, name: 'tppRegistration_client_id_unique' },
+  },
+  {
+    collection: TPP_REGISTRATION_COLLECTION,
+    keys: { tppRegistrationInstanceReference: 1 },
+    options: { unique: true, name: 'tppRegistration_ref_unique' },
   },
   {
     collection: COUNTERS_COLLECTION,

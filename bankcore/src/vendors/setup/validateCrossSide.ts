@@ -5,6 +5,8 @@ import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accou
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { BANK_PROFILE_COLLECTION, BankProfileControlRecord } from '../../modules/aspsp/models/bankProfile.model';
 import { ownsIban, isValidIban } from '../../modules/aspsp/services/bankIdentifier.service';
+import { authenticateTpp } from '../../modules/tpp-trust/services/tppRegistration.service';
+import { config } from '../../config';
 
 // Cross side consistency. A dangling reference between two databases is invisible until a demo breaks
 // in front of someone, so it is asserted rather than assumed.
@@ -72,6 +74,37 @@ export async function validateCrossSide(db: Db): Promise<CrossSideCheck[]> {
   const orphanHolders = accountHolderLinks.filter((a) => !holderRefs.has(a.accountHolderInstanceReference as string));
   add('every bank account has its holder', orphanHolders.length === 0,
     orphanHolders.length === 0 ? undefined : `${orphanHolders.length} account(s) with no holder`);
+
+  // The seeded credential must actually authenticate. A hash that does not verify the configured secret
+  // leaves the whole API closed, and the symptom (every call 401) points at the wrong thing entirely.
+  const authenticated = await authenticateTpp(
+    db, config.bank.tppSeedClientId, config.bank.tppSeedClientSecret, [],
+  );
+  add('the seeded TPP credential authenticates', authenticated.ok,
+    authenticated.ok
+      ? `${config.bank.tppSeedClientId}, scopes: ${authenticated.scopes.join(' ')}`
+      : `${config.bank.tppSeedClientId}: ${authenticated.failure.description}`);
+
+  // The PSP must hold the same credential, pointing at this bank's token endpoint. The two sides are
+  // seeded from one configured value, so a mismatch here means one side was seeded from another.
+  const providerFixture = resolve(PSP_DATA, 'externalProviderArrangement.json');
+  if (existsSync(providerFixture)) {
+    const providers = JSON.parse(readFileSync(providerFixture, 'utf8')) as Array<{
+      externalProviderArrangementInstanceReference: string;
+      authConfig?: { scheme?: string; oauth2?: { tokenEndpoint?: string; scopes?: string[] } };
+    }>;
+    const holders = providers.filter((p) => p.authConfig?.scheme === 'oauth2_cc');
+    add('the PSP holds the TPP credential in a provider record', holders.length > 0,
+      holders.length > 0
+        ? holders.map((p) => p.externalProviderArrangementInstanceReference).join(', ')
+        : 'no provider arrangement declares oauth2_cc');
+    // Every scope the PSP intends to use must be one this bank granted, or the call fails at use time.
+    const granted = authenticated.ok ? authenticated.scopes as string[] : [];
+    const ungranted = holders.flatMap((p) => (p.authConfig?.oauth2?.scopes ?? []))
+      .filter((scope) => !granted.includes(scope));
+    add('every scope the PSP asks for is granted to it', ungranted.length === 0,
+      ungranted.length === 0 ? undefined : `not granted: ${[...new Set(ungranted)].join(' ')}`);
+  }
 
   return checks;
 }

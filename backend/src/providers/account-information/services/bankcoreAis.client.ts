@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
 import { config } from '../../../config';
+import { getProviderAccessToken } from '../../../modules/provider/services/providerAccessToken.service';
 
 // The PSP as AISP, calling the bank's standard read endpoints. Every call carries the identifiers the
 // standard defines, so one payment is traceable across both systems:
@@ -29,17 +29,20 @@ interface BerlinGroupBalancesResponse {
 
 const TIMEOUT_MS = 4000;
 
-// Interim TPP credential: a bearer JWT signed with the shared platform secret, which only this service
-// can mint. P3.7b swaps it for client_credentials against the bank's tppRegistration.
-function tppToken(): string {
-  return jwt.sign({ client_id: 'leafypay-psp', scope: 'accounts balances transactions' }, config.app.jwtSecret, {
-    expiresIn: 120,
-  });
-}
+// The TPP credential is the one held in the provider arrangement record, exchanged at the bank's token
+// endpoint for a scoped access token. No local minting: a token the PSP signs itself is not something
+// the bank has any reason to trust, and accepting one was the hole this closed.
+//
+// The token provider is injected for the same reason the balance reader is: a module mock leaks into
+// other suites, and this one would otherwise open a database connection from a unit test.
+export type TokenProvider = (scope: string) => Promise<{ accessToken?: string; error?: string }>;
 
-function headers(consentReference: string, correlationId: string): Record<string, string> {
+const defaultTokenProvider: TokenProvider = (scope) =>
+  getProviderAccessToken('account_information', { scope });
+
+function headers(token: string, consentReference: string, correlationId: string): Record<string, string> {
   return {
-    Authorization: `Bearer ${tppToken()}`,
+    Authorization: `Bearer ${token}`,
     'Consent-ID': consentReference,
     'X-Request-ID': correlationId,
     Accept: 'application/json',
@@ -65,13 +68,17 @@ export interface AisReadResult {
 export async function readAccountBalance(
   input: { bankAccountReference: string; consentReference: string; correlationId?: string },
   fetchImpl: typeof fetch = fetch,
+  tokenProvider: TokenProvider = defaultTokenProvider,
 ): Promise<AisReadResult> {
   const correlationId = input.correlationId ?? uuidv4();
   const url = `${config.bankcore.baseUrl}/v1/accounts/${encodeURIComponent(input.bankAccountReference)}/balances`;
 
+  const { accessToken, error: tokenError } = await tokenProvider('accounts balances transactions');
+  if (!accessToken) return { error: `AIS authorisation failed: ${tokenError}` };
+
   try {
     const response = await fetchImpl(url, {
-      headers: headers(input.consentReference, correlationId),
+      headers: headers(accessToken, input.consentReference, correlationId),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) {
@@ -125,14 +132,20 @@ export async function requestDemoCredit(
     endToEndIdentification?: string;
   },
   fetchImpl: typeof fetch = fetch,
+  tokenProvider: TokenProvider = defaultTokenProvider,
 ): Promise<DemoCreditResult> {
   const correlationId = input.endToEndIdentification ?? uuidv4();
   const url = `${config.bankcore.baseUrl}/v1/accounts/${encodeURIComponent(input.bankAccountReference)}/credits`;
 
+  // Its own scope: creating funds is not covered by any read scope, so a read-only credential cannot
+  // reach this even though it is the same client.
+  const { accessToken, error: tokenError } = await tokenProvider('demo-credits');
+  if (!accessToken) return { applied: false, error: `bank authorisation failed: ${tokenError}` };
+
   try {
     const response = await fetchImpl(url, {
       method: 'POST',
-      headers: { ...headers('demo-credit', correlationId), 'Content-Type': 'application/json' },
+      headers: { ...headers(accessToken, 'demo-credit', correlationId), 'Content-Type': 'application/json' },
       body: JSON.stringify({
         amount: input.amount,
         currency: input.currency,

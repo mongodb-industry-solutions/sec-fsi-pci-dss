@@ -504,6 +504,20 @@
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/account-information/validate",
+    "authConfig": {
+      "scheme": "oauth2_cc",
+      "oauth2": {
+        "clientId": "",
+        "tokenEndpoint": "/v1/oauth/token",
+        "scopes": [
+          "accounts",
+          "balances",
+          "transactions",
+          "demo-credits"
+        ],
+        "tokenCachingEnabled": true
+      }
+    },
     "externalProviderInternalHandler": "accountInformation.internalHandler",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
@@ -545,6 +559,18 @@
     "externalProviderArrangementStatus": "active",
     "externalProviderIsInternal": true,
     "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/transfer",
+    "authConfig": {
+      "scheme": "oauth2_cc",
+      "oauth2": {
+        "clientId": "",
+        "tokenEndpoint": "/v1/oauth/token",
+        "scopes": [
+          "payments",
+          "funds-confirmations"
+        ],
+        "tokenCachingEnabled": true
+      }
+    },
     "externalProviderInternalHandler": "paymentInitiation.internalHandler",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [

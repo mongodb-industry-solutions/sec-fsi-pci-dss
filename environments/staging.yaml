@@ -38,6 +38,9 @@ env:
   # The bank's callback to the PSP resolves from PSP_BASE_URL above (in-cluster), so no new variable.
   # PSD2 consent landing state: automatic keeps the demo unblocked, manual needs an operator.
   PSP_BANKCORE_CONSENT_MODE: automatic
+  # TPP client id. The matching secret is in envSecrets: both are read at SEED time only, one to write
+  # the bank's bcrypt verifier and one to write the PSP's provider credential.
+  PSP_BANKCORE_TPP_CLIENT_ID: leafypay-psp
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging
@@ -49,6 +52,9 @@ envSecrets:
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-staging
   # Bank database, separate from the PSP one on the same cluster.
   PSP_BANKCORE_DB_NAME: sec-fsi-pci-dss-secrets-staging
+  # TPP client secret and the bank's token signing key. Never inline in this file.
+  PSP_BANKCORE_TPP_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
+  PSP_BANKCORE_ACCESS_TOKEN_SECRET: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-staging

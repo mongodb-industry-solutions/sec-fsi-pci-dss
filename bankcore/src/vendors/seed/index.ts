@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { seedBankProfile } from './seedBankProfile';
 import { seedAccountHolders, seedAccountArrangements } from './seedAccounts';
+import { seedTppRegistrations } from './seedTppRegistrations';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -18,6 +19,8 @@ export async function runSeed(): Promise<void> {
     // Holders before accounts: an account references its holder.
     await seedAccountHolders(db);
     await seedAccountArrangements(db);
+    // The registered TPP, so the PSP can obtain a token the moment both services are up.
+    await seedTppRegistrations(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();
