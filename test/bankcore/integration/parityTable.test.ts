@@ -44,7 +44,10 @@ const PARITY: ParityRow[] = [
   // a wish: the notification path needs a subscription to deliver to, the rest are their own phases.
   { capability: 'recurring mandate (periodic payments)', method: 'post', path: '/v1/periodic-payments/{paymentProduct}', phase: 'P3.9' },
   { capability: 'card issuance and lifecycle', method: 'post', path: '/v1/cards', phase: 'P7' },
-  { capability: 'card authorisation and decline', method: 'post', path: '/v1/cards/authorisations', phase: 'P7' },
+  // Delivered ahead of the rest of the card move, because the PSP's funds gate cannot stay correct once
+  // the ledger is here: its stored balance is a projection, so a local hold decides on stale data.
+  { capability: 'card authorisation and decline', method: 'post', path: '/v1/cards/authorisations', phase: 'done' },
+  { capability: 'release or settle an authorisation hold', method: 'delete', path: '/v1/cards/authorisations/{authorisationReference}', phase: 'done' },
   { capability: 'card token resolution and masking', method: 'get', path: '/v1/cards/{cardToken}', phase: 'P7' },
   { capability: 'credit assessment', method: 'post', path: '/v1/credit-assessments', phase: 'P8' },
 ];

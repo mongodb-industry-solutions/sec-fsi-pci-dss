@@ -17,6 +17,9 @@ export type TppScope =
   | 'transactions'
   | 'payments'
   | 'funds-confirmations'
+  // The issuer's own operation, so not a Berlin Group scope: a card authorisation places a HOLD, which is
+  // strictly more than reading a balance, and it is granted separately for that reason.
+  | 'card-authorisations'
   | 'demo-credits';
 
 export interface TppRegistrationControlRecord {

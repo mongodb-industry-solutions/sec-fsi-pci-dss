@@ -8,6 +8,7 @@
       "transactions",
       "payments",
       "funds-confirmations",
+      "card-authorisations",
       "demo-credits"
     ],
     "tppRegistrationRoles": ["AISP", "PISP", "CBPII"],

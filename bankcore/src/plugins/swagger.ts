@@ -62,7 +62,7 @@ The key vault is shared with the PSP, so both services decrypt with the same DEK
         { name: 'consent', description: 'PSD2 consent lifecycle: create, read, revoke, status' },
         { name: 'accounts', description: 'account information (AIS): accounts, balances, transactions. Consent enforced' },
         { name: 'payments', description: 'payment initiation (PIS): initiate, status, cancel. Consent enforced' },
-        { name: 'cards', description: 'card issuing and authorisation. ISO 8583 response codes downstream' },
+        { name: 'cards', description: 'card issuing and authorisation. ISO 8583 response codes, not Open Banking: no standard covers a card rail' },
         { name: 'admin', description: "bank administration, reached through the PSP: TPP registrations, consent mode, delivery inspector" },
       ],
       components: {

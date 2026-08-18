@@ -7,6 +7,8 @@ import { publishIssuerValidationCompleted } from '../../modules/transaction/serv
 import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
 import { holdCardFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
+import { holdFundsAtBank, isBankLinked } from '../card-authorization/services/bankcoreCardAuthorisation.client';
+import { config } from '../../config';
 import { resolveAndConvert } from '../currency-exchange/services/currencyExchange.service';
 import { applyKycScreeningVerdict } from '../../modules/customer/services/customerAgreement.service';
 import { getCapabilityModuleConfig } from '../../modules/provider/services/capabilityModuleConfig.service';
@@ -256,7 +258,44 @@ export class ProviderGroups {
 
     const available = account.payoutAccountBalance?.availableAmount ?? 0;
 
-    // Atomic hold ($gte-conditional): the authoritative funds decision.
+    // The hold happens where the money is (P4.5). With the bank enabled and the account linked, the PSP's
+    // stored balance is a PROJECTION, so a local hold would decide on stale data and mutate a figure that
+    // is no longer authoritative: correct-looking and wrong. The branch is on whether the account is
+    // LINKED, never on which bank it is at, so a second registered bank needs no change here.
+    if (config.bankcore.enabled && isBankLinked(account)) {
+      const bankHold = await holdFundsAtBank({
+        account, amount: amountInAccountCcy, currency: accountCurrency,
+        cardToken: p.cardToken, transactionType: p.cardTransactionType, clientReference: txnId,
+      });
+      if (bankHold.error) {
+        // FAIL CLOSED. A funds gate that fails open authorises a payment nobody checked, and the
+        // authoritative balance is precisely what we could not reach.
+        publish({
+          outcome: 'declined', responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS,
+          decisionReason: 'funding_bank_unreachable', available, currency: accountCurrency,
+          fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}),
+        });
+        return;
+      }
+      if (!bankHold.approved) {
+        publish({
+          outcome: 'declined',
+          // The issuer's own code, carried through rather than re-derived: it already means what it says.
+          responseCode: bankHold.responseCode ?? RESPONSE_CODE_INSUFFICIENT_FUNDS,
+          decisionReason: DECISION_REASON_INSUFFICIENT_FUNDS, available, currency: accountCurrency,
+          fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}),
+        });
+        return;
+      }
+      publish({
+        outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED, available, held: amountInAccountCcy,
+        currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted,
+        ...(converted ? { fxRate } : {}),
+      });
+      return;
+    }
+
+    // Atomic hold ($gte-conditional): the authoritative funds decision while the ledger is still local.
     const held = await holdCardFunds(this.db, accountRef, amountInAccountCcy);
     if (!held) {
       publish({ outcome: 'declined', responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS, decisionReason: DECISION_REASON_INSUFFICIENT_FUNDS, available, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
