@@ -16,6 +16,8 @@ import { PAYMENT_REQUEST_EVENT_COLLECTION } from '../../modules/gateway/models/p
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
 import { DEMO_TEAM_CONTACT_COLLECTION } from '../../modules/system/models/demoTeamContact.model';
+import { CARD_AUTHORIZATION_COLLECTION } from '../../modules/gateway/models/cardAuthorization.model';
+import { PAYMENT_ORDER_COLLECTION } from '../../modules/gateway/models/paymentOrder.model';
 
 const kmsConfig = getKmsConfig();
 
@@ -214,6 +216,43 @@ export async function createCollections(
     console.log('  created: customerCreditRatingState');
   } else {
     console.log('  skip:    customerCreditRatingState (already exists)');
+  }
+
+  // Payment Order Procedure  -  plaintext order record, no CHD. v37: like the two below it was created
+  // implicitly by its first insert, so it had no indexes and no --reset path.
+  if (!existingNames.has(PAYMENT_ORDER_COLLECTION) || reset) {
+    if (existingNames.has(PAYMENT_ORDER_COLLECTION) && reset) {
+      await db.collection(PAYMENT_ORDER_COLLECTION).drop();
+      console.log(`  dropped: ${PAYMENT_ORDER_COLLECTION}`);
+    }
+    await db.createCollection(PAYMENT_ORDER_COLLECTION);
+    console.log(`  created: ${PAYMENT_ORDER_COLLECTION} (merchant payment orders)`);
+  } else {
+    console.log(`  skip:    ${PAYMENT_ORDER_COLLECTION} (already exists)`);
+  }
+
+  // Counters  -  sequence generator for human-readable references (case numbers, order numbers).
+  // NOT dropped on reset: dropping it would restart every sequence and collide with existing
+  // references that are already in the seeded data.
+  if (!existingNames.has('counters')) {
+    await db.createCollection('counters');
+    console.log('  created: counters (reference sequences)');
+  } else {
+    console.log('  skip:    counters (already exists; never dropped, sequences must not restart)');
+  }
+
+  // Card Authorization Record  -  plaintext, ISO 8583 response codes, no CHD.
+  // v37: was never declared here and got created implicitly by its first insert, so it had no indexes
+  // and no --reset path. P7 moves it to the issuer, and it should start from a declared state.
+  if (!existingNames.has(CARD_AUTHORIZATION_COLLECTION) || reset) {
+    if (existingNames.has(CARD_AUTHORIZATION_COLLECTION) && reset) {
+      await db.collection(CARD_AUTHORIZATION_COLLECTION).drop();
+      console.log(`  dropped: ${CARD_AUTHORIZATION_COLLECTION}`);
+    }
+    await db.createCollection(CARD_AUTHORIZATION_COLLECTION);
+    console.log(`  created: ${CARD_AUTHORIZATION_COLLECTION} (card authorisation decisions)`);
+  } else {
+    console.log(`  skip:    ${CARD_AUTHORIZATION_COLLECTION} (already exists)`);
   }
 
   // Open Banking: Consent Agreement  -  plaintext, no CHD or PII stored here

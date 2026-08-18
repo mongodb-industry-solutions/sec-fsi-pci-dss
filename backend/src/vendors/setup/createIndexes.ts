@@ -12,6 +12,8 @@ import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/payment
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
 import { DEMO_TEAM_CONTACT_COLLECTION } from '../../modules/system/models/demoTeamContact.model';
+import { CARD_AUTHORIZATION_COLLECTION } from '../../modules/gateway/models/cardAuthorization.model';
+import { PAYMENT_ORDER_COLLECTION } from '../../modules/gateway/models/paymentOrder.model';
 import { config } from '../../config';
 
 // ── Self-healing index helpers ────────────────────────────────────────────────
@@ -308,6 +310,28 @@ export async function createIndexes(client: MongoClient) {
   await ensureIndexes(db, DEMO_TEAM_CONTACT_COLLECTION, [
     { key: { demoTeamContactInstanceReference: 1 }, unique: true },
     { key: { active: 1, displayOrder: 1 } },
+  ]);
+
+  // Payment Order Procedure. Lookups are by its own reference, the merchant's own order id, and status.
+  await ensureIndexes(db, PAYMENT_ORDER_COLLECTION, [
+    { key: { paymentOrderInstanceReference: 1 }, unique: true },
+    { key: { paymentOrderReference: 1 }, unique: true },
+    { key: { paymentOrderMerchantReference: 1 } },
+    { key: { paymentOrderExecutionReference: 1 }, sparse: true },
+  ]);
+
+  // Counters: one document per sequence, addressed by name.
+  await ensureIndexes(db, 'counters', [
+    { key: { _id: 1 } },
+  ]);
+
+  // Card Authorization Record. v37: the collection was created implicitly by its first insert, so it
+  // had no indexes at all; every lookup is by its own reference or by the checkout session.
+  await ensureIndexes(db, CARD_AUTHORIZATION_COLLECTION, [
+    { key: { cardAuthorizationInstanceReference: 1 }, unique: true },
+    { key: { checkoutSessionInstanceReference: 1 } },
+    { key: { cardTransactionInstanceReference: 1 }, sparse: true },
+    { key: { cardAuthorizationRequestDateTime: -1 } },
   ]);
 
   // Payment Link Record
