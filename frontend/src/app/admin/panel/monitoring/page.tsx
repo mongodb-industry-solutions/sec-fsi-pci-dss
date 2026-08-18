@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { API_BASE_URL } from '../../../../lib/constants';
 import { JsonView } from '../../../../components/json/JsonView';
+import { mergeMonitoringDefaults } from '../../../../lib/monitoringDefaults';
 import {
   Activity, Plus, PauseCircle, PlayCircle, Trash2,
   RefreshCw, Power, ChevronDown, ChevronUp, RotateCcw,
@@ -711,25 +712,18 @@ export default function MonitoringPage() {
     }
   }, []);
 
-  // Initialize: load from localStorage, then adopt any shipped default this browser has not seen yet.
-  // A service added to monitoring-defaults.json has to reach existing operators too, and it must not
-  // come back once they have removed it, so "already offered" is tracked separately from the config.
+  // Initialize: load from localStorage, then reconcile against the shipped defaults. A service added
+  // to monitoring-defaults.json has to reach existing operators, and one whose endpoint MOVED has to
+  // stop being reported as unreachable. See lib/monitoringDefaults for the ownership split.
   useEffect(() => {
     const stored = loadConfig();
     setPaused(loadPaused());
     fetchDefaults().then(defaults => {
       const known = loadKnownDefaults();
-      if (stored.length === 0) {
-        setServices(defaults);
-        if (defaults.length > 0) saveConfig(defaults);
-      } else {
-        const present = new Set(stored.map(s => s.id));
-        const adopted = defaults.filter(d => !present.has(d.id) && !known.includes(d.id));
-        const merged = adopted.length > 0 ? [...stored, ...adopted] : stored;
-        setServices(merged);
-        if (adopted.length > 0) saveConfig(merged);
-      }
-      saveKnownDefaults([...known, ...defaults.map(d => d.id)]);
+      const merged = mergeMonitoringDefaults(stored, defaults, known);
+      setServices(merged.services);
+      if (merged.changed) saveConfig(merged.services);
+      saveKnownDefaults([...known, ...merged.defaultIds]);
       setInitialized(true);
     }).catch(() => {
       setServices(stored);
