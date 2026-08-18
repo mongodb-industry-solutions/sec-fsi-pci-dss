@@ -38,10 +38,18 @@ const nextConfig = {
             process.env.NEXT_PUBLIC_PSP_URL_MERCHANT ||
             'http://localhost:8082'
         ).replace(/\/+$/, '');
+        // bankcore is probed the same way, and for a stronger reason: it is a PRIVATE service with no
+        // public ingress, so there is no public URL to fall back to. A browser fetch would fail as a
+        // CORS error locally and as unreachable in staging, which is the same bug with two symptoms.
+        const bankcoreUrl = (
+            process.env.NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE ||
+            'http://localhost:8083'
+        ).replace(/\/+$/, '');
         return [
             { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
             { source: '/health', destination: `${backendUrl}/health` },
             { source: '/merchant-health', destination: `${merchantUrl}/health` },
+            { source: '/bankcore-health', destination: `${bankcoreUrl}/health` },
         ];
     },
 };

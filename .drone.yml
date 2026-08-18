@@ -42,6 +42,8 @@ steps:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
         - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
+        # Private only: bankcore has no public hostname, so there is no public counterpart.
+        - NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=http://sec-fsi-pci-dss-bankcore-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -55,6 +57,22 @@ steps:
       repo: industrysolutions/sec-fsi-pci-dss-merchant
       dockerfile: merchant/Dockerfile
       context: merchant/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-bankcore
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-bankcore
+      dockerfile: bankcore/Dockerfile
+      context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
@@ -82,6 +100,31 @@ steps:
         # to authenticated=true; false makes it public. NOTE: verify the flag name against the Kanopy
         # web-app chart 4.25.0 on the first staging run (drone-helm fails the upgrade if it is wrong).
         - ingress.authenticated=false
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.staging.corp.mongodb.com
+      kubernetes_token:
+        from_secret: staging_kubernetes_token
+      values_files:
+        - environments/staging.yaml
+
+  - name: deploy-bankcore-staging
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-bankcore
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
+        # NO ingress on purpose: bankcore is a bank API, reached only in-cluster by the PSP and the
+        # frontend proxy. Giving it a public hostname would create the browser-reachable surface the
+        # design avoids, and the chart's health probe already uses the in-cluster /health.
+        - ingress.enabled=false
         - mesh.enabled=true
       wait: true
       timeout: 300s
@@ -181,6 +224,8 @@ steps:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
         - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
+        # Private only: bankcore has no public hostname, so there is no public counterpart.
+        - NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=http://sec-fsi-pci-dss-bankcore-web-app:80
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -194,6 +239,22 @@ steps:
       repo: industrysolutions/sec-fsi-pci-dss-merchant
       dockerfile: merchant/Dockerfile
       context: merchant/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-bankcore
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-bankcore
+      dockerfile: bankcore/Dockerfile
+      context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
@@ -225,6 +286,31 @@ steps:
       api_server: https://api.prod.corp.mongodb.com
       kubernetes_token:
         from_secret: prod_kubernetes_token
+      values_files:
+        - environments/production.yaml
+
+  - name: deploy-bankcore-production
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-bankcore
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
+        # NO ingress on purpose: bankcore is a bank API, reached only in-cluster by the PSP and the
+        # frontend proxy. Giving it a public hostname would create the browser-reachable surface the
+        # design avoids, and the chart's health probe already uses the in-cluster /health.
+        - ingress.enabled=false
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.prod.corp.mongodb.com
+      kubernetes_token:
+        from_secret: production_kubernetes_token
       values_files:
         - environments/production.yaml
 

@@ -31,9 +31,22 @@
     {
       "id": "merchant-app",
       "name": "Merchant App",
-      "description": "External merchant demo (Espresso Works) — Next.js SSO/API client",
+      "description": "External merchant demo (Espresso Works) \u2014 Next.js SSO/API client",
       "type": "http",
       "url": "/merchant-health",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": false
+    },
+    {
+      "id": "bankcore",
+      "name": "bankcore (ASPSP)",
+      "description": "Open Banking bank behind Leafy Pay: account ledger, card issuer vault, PSD2 consent. Private service, probed through the frontend proxy",
+      "type": "http",
+      "url": "/bankcore-health",
       "method": "GET",
       "enabled": true,
       "intervalMs": 30000,

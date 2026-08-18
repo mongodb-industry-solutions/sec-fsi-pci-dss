@@ -81,6 +81,9 @@ services:
         # compose-network service address, which is exactly the "private" URL an in-VPC integrator uses.
         NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE: ${NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE:-http://backend:8080}
         NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
+        # Private only: the admin monitoring page probes bankcore through the Next.js proxy, so the
+        # browser never leaves the frontend origin and bankcore needs no published port.
+        NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
     ports:
       - "8080:8080"
     env_file:
@@ -90,6 +93,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+      bankcore:
+        condition: service_started
 
   # External merchant demo (Espresso Works). Autonomous Next.js app, NO database.
   # Integrates with the PSP purely via OAuth2/OIDC SSO + API. Container on 8080, host 8082.
