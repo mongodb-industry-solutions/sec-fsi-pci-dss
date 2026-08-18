@@ -46,6 +46,11 @@ COPY tsconfig.base.json ./
 
 RUN cd bankcore && npm run build
 
+# The notification signing key is generated on first use and lives here. Created before the ownership
+# change below, so the non-root user can write it. NOT baked into the image: a signing key in an image is
+# a signing key in a registry.
+RUN mkdir -p /app/bankcore/keys
+
 # ── Runtime (non-root) ────────────────────────────────────────────
 RUN chown -R node:node /app
 USER node

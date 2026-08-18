@@ -1,5 +1,8 @@
 # OAuth/OIDC signing keys — generated locally via `npm run setup:key:rsa`, never commit
 backend/keys/
+# The bank's notification signing key, generated on first use. `*.pem` above already covers the current
+# format; this covers the directory, so a key written in any other format cannot slip through (v37).
+bankcore/keys/
 *.pem
 
 # Logs

@@ -105,6 +105,27 @@ describe('v37: the backend image ships what it orchestrates', () => {
     expect(ignored).toContain('packages/*/dist/');
   });
 
+  it('keeps the bank signing key out of the image and out of git', () => {
+    const dockerfile = read('bankcore/Dockerfile');
+    // The directory must exist and be writable by the non-root user; the KEY must not be in the image.
+    expect(dockerfile).toContain('mkdir -p /app/bankcore/keys');
+    expect(dockerfile).not.toMatch(/COPY\s+bankcore\/keys/);
+    // `*.pem` already covers today's format, but a key written as JSON would slip through it.
+    const ignored = read('.gitignore');
+    expect(ignored).toContain('bankcore/keys/');
+  });
+
+  it('pins one bankcore replica while its signing key is local to the pod', () => {
+    const drone = read('.drone.yml');
+    // Two replicas would sign with two keys while publishing one key set, so a receiver would reject
+    // roughly half the notifications. Both deploys must pin it, not just one.
+    const bankcoreDeploys = drone.split('release: sec-fsi-pci-dss-bankcore').slice(1);
+    expect(bankcoreDeploys.length).toBe(2);
+    for (const section of bankcoreDeploys) {
+      expect(section.slice(0, 1200)).toContain('replicaCount=1');
+    }
+  });
+
   it('pins the same crypt_shared version in both images, since they share a key vault', () => {
     const version = /crypt_shared_v1-linux-[a-z0-9_]+-enterprise-ubuntu2204-([0-9.]+)\.tgz/;
     const backendVersion = version.exec(read('backend/Dockerfile'))?.[1];

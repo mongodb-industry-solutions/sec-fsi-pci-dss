@@ -121,6 +121,10 @@ steps:
       values:
         - image.tag=git-${DRONE_COMMIT_SHA:0:7}
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
+        # ONE replica while the notification signing key is local to the pod (v37). Two replicas would
+        # sign with two different keys while publishing one key set, so a receiver would reject roughly
+        # half the notifications. Same constraint the backend has for its OAuth keys.
+        - replicaCount=1
         # Public ingress so the Open Banking API can be reviewed and exercised in Swagger. Publishing
         # the docs opens nothing: every operation needs an access token issued to a REGISTERED TPP,
         # and AIS/PIS additionally need a consent in `valid`. The diagnostics endpoints require the
@@ -306,6 +310,10 @@ steps:
       values:
         - image.tag=git-${DRONE_COMMIT_SHA:0:7}
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
+        # ONE replica while the notification signing key is local to the pod (v37). Two replicas would
+        # sign with two different keys while publishing one key set, so a receiver would reject roughly
+        # half the notifications. Same constraint the backend has for its OAuth keys.
+        - replicaCount=1
         # Public ingress so the Open Banking API can be reviewed and exercised in Swagger. Publishing
         # the docs opens nothing: every operation needs an access token issued to a REGISTERED TPP,
         # and AIS/PIS additionally need a consent in `valid`. The diagnostics endpoints require the
