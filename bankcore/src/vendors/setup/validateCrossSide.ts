@@ -6,6 +6,9 @@ import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHol
 import { BANK_PROFILE_COLLECTION, BankProfileControlRecord } from '../../modules/aspsp/models/bankProfile.model';
 import { ownsIban, isValidIban } from '../../modules/aspsp/services/bankIdentifier.service';
 import { authenticateTpp } from '../../modules/tpp-trust/services/tppRegistration.service';
+import {
+  BANK_CONSENT_AGREEMENT_COLLECTION, BankConsentAgreementControlRecord,
+} from '../../modules/consent/models/bankConsent.model';
 import { config } from '../../config';
 
 // Cross side consistency. A dangling reference between two databases is invisible until a demo breaks
@@ -21,6 +24,7 @@ interface PspLinkedAccount {
   payoutAccountIban?: string;
   payoutAccountAspspReference?: string;
   payoutAccountBankAccountReference?: string;
+  payoutAccountConsentReference?: string;
 }
 
 export interface CrossSideCheck { name: string; ok: boolean; detail?: string }
@@ -82,6 +86,28 @@ export async function validateCrossSide(db: Db): Promise<CrossSideCheck[]> {
   const orphanHolders = accountHolderLinks.filter((a) => !holderRefs.has(a.accountHolderInstanceReference as string));
   add('every bank account has its holder', orphanHolders.length === 0,
     orphanHolders.length === 0 ? undefined : `${orphanHolders.length} account(s) with no holder`);
+
+  // Every link must name a consent that exists, is valid, and actually covers that account. Any of the
+  // three missing means the PSP shows a stale balance with no visible cause, since a refused read keeps
+  // the last known figure on purpose.
+  const consents = await db.collection<BankConsentAgreementControlRecord>(BANK_CONSENT_AGREEMENT_COLLECTION)
+    .find({}, { projection: { _id: 0, bankConsentAgreementInstanceReference: 1, bankConsentStatus: 1, bankConsentAccess: 1 } })
+    .toArray()
+    .catch(() => []);
+  const consentById = new Map(consents.map((consent) => [consent.bankConsentAgreementInstanceReference, consent]));
+
+  const withoutConsent = psp.filter((a) => !a.payoutAccountConsentReference);
+  add('every PSP link names its consent', withoutConsent.length === 0,
+    withoutConsent.length === 0 ? `${psp.length} linked` : `missing on: ${withoutConsent.slice(0, 3).map((a) => a.payoutAccountInstanceReference).join(', ')}`);
+
+  const brokenConsent = psp.filter((a) => {
+    if (!a.payoutAccountConsentReference) return false;
+    const consent = consentById.get(a.payoutAccountConsentReference);
+    if (!consent || consent.bankConsentStatus !== 'valid') return true;
+    return !(consent.bankConsentAccess?.balances ?? []).includes(a.payoutAccountBankAccountReference ?? '');
+  });
+  add('every consent exists, is valid and covers its account', brokenConsent.length === 0,
+    brokenConsent.length === 0 ? undefined : `broken on: ${brokenConsent.slice(0, 3).map((a) => a.payoutAccountConsentReference).join(', ')}`);
 
   // The seeded credential must actually authenticate. A hash that does not verify the configured secret
   // leaves the whole API closed, and the symptom (every call 401) points at the wrong thing entirely.

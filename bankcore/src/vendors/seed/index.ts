@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { seedBankProfile } from './seedBankProfile';
 import { seedAccountHolders, seedAccountArrangements } from './seedAccounts';
 import { seedTppRegistrations } from './seedTppRegistrations';
+import { seedConsents } from './seedConsents';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -21,6 +22,8 @@ export async function runSeed(): Promise<void> {
     await seedAccountArrangements(db);
     // The registered TPP, so the PSP can obtain a token the moment both services are up.
     await seedTppRegistrations(db);
+    // Consents last: they reference the accounts and the TPP that were just written.
+    await seedConsents(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();

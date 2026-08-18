@@ -1,5 +1,7 @@
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { requireTpp } from '../../../vendors/middleware/tppAuth';
+import { resolveConsent } from '../../consent/services/consent.service';
+import { ConsentAccessKind } from '../../consent/models/bankConsent.model';
 import {
   findAccount, listAccountsForHolder, listTransactions, toBerlinGroupAccount,
 } from '../services/accountInformation.service';
@@ -7,11 +9,10 @@ import {
 // Berlin Group NextGenPSD2 Account Information Service, mounted at /v1.
 //
 // Every endpoint requires a TPP access token carrying the scope of its operation group and the AISP
-// role, which the bank issues only through the client credentials grant.
+// role, plus a consent in `valid` that covers the account being read. The consent is what says WHOSE
+// accounts these are, so there is no holder parameter: a caller cannot name the account holder, and a
+// read is scoped to whoever the consent belongs to.
 //
-// Consent enforcement arrives in P3: the endpoints already require the Consent-ID header the standard
-// defines and reject a call without one, so a TPP integrates against the real contract now and only the
-// verification behind it deepens. Answering without a consent reference would teach the wrong shape.
 // `additionalProperties: true` is not laziness: a strict response schema silently DROPS anything it
 // does not declare, and this platform has already shipped an empty error body that way. An error the
 // caller cannot read is worse than no schema at all.
@@ -66,9 +67,50 @@ const STANDARD_HEADERS = {
   // non-standard error for the most common mistake. The handler returns `tppMessages` instead.
 } as const;
 
+const CONSENT_NOTE =
+  'Requires a consent in `valid` covering this account. A consent that is unknown, not valid, expired '
+  + 'or does not cover the account is refused: enforcement fails closed, so a status this bank does not '
+  + 'recognise is treated as unusable rather than assumed benign.';
+
 function consentIdOf(request: { headers: Record<string, unknown> }): string | undefined {
   const value = request.headers['consent-id'];
   return Array.isArray(value) ? String(value[0]) : (value as string | undefined);
+}
+
+/**
+ * Resolves the consent for a request, answering the standard refusal itself when it does not hold.
+ * Returns undefined once a reply has been sent, so a handler cannot continue by accident.
+ */
+async function authorise(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  kind: ConsentAccessKind,
+  accountReference?: string,
+): Promise<{ holderReference: string; permittedAccounts: string[] } | undefined> {
+  const consentId = consentIdOf(request as never);
+  if (!consentId) {
+    reply.status(400).send({
+      tppMessages: [{ category: 'ERROR', code: 'CONSENT_INVALID', text: 'Consent-ID header is required' }],
+    });
+    return undefined;
+  }
+  const resolution = await resolveConsent(fastify.db, {
+    consentId,
+    tppClientId: request.tpp!.clientId,
+    kind,
+    accountReference,
+    correlationId: request.correlationId,
+  });
+  if (!resolution.ok) {
+    const { status, code, text } = resolution.refusal;
+    reply.status(status).send({ tppMessages: [{ category: 'ERROR', code, text }] });
+    return undefined;
+  }
+  return {
+    holderReference: resolution.consent.bankConsentAccountHolderInstanceReference,
+    permittedAccounts: resolution.consent.bankConsentAccess[kind] ?? [],
+  };
 }
 
 export async function accountInformationController(fastify: FastifyInstance) {
@@ -80,37 +122,36 @@ export async function accountInformationController(fastify: FastifyInstance) {
       summary: 'Read the accounts a consent gives access to',
       description:
         'Berlin Group AIS. Scoped to the account holder the consent covers: there is no unscoped list, '
-        + 'since that would be a data leak dressed as a convenience. `withBalance=true` embeds balances '
-        + 'so a caller needs one round trip instead of one per account.',
+        + 'since that would be a data leak dressed as a convenience, and no holder parameter, since the '
+        + 'consent is what identifies the holder. Only the accounts inside the consent are returned. '
+        + '`withBalance=true` embeds balances so a caller needs one round trip instead of one per '
+        + 'account, and it requires the consent to grant balance access as well.\n\n'
+        + CONSENT_NOTE,
       security: [{ tppToken: [] }],
       headers: STANDARD_HEADERS,
       querystring: {
         type: 'object',
         properties: {
           withBalance: { type: 'boolean', description: 'Embed the balances of each account.' },
-          holderId: { type: 'string', description: 'Account holder at this bank. Derived from the consent once P3 lands.' },
         },
       },
       response: {
         200: { type: 'object', properties: { accounts: { type: 'array', items: ACCOUNT } } },
         400: ERROR_RESPONSE,
         401: ERROR_RESPONSE,
+        403: ERROR_RESPONSE,
       },
     },
   }, async (request, reply) => {
-    const consentId = consentIdOf(request as never);
-    if (!consentId) {
-      return reply.status(400).send({
-        tppMessages: [{ category: 'ERROR', code: 'CONSENT_INVALID', text: 'Consent-ID header is required' }],
-      });
-    }
-    const { withBalance, holderId } = request.query as { withBalance?: boolean; holderId?: string };
-    if (!holderId) {
-      return reply.status(400).send({
-        tppMessages: [{ category: 'ERROR', code: 'PARAMETER_NOT_SUPPORTED', text: 'holderId is required until consent resolution lands (P3)' }],
-      });
-    }
-    const records = await listAccountsForHolder(fastify.db, holderId);
+    const { withBalance } = request.query as { withBalance?: boolean };
+    // Embedding balances IS balance access, so it is authorised as such rather than riding on the list.
+    const authorised = await authorise(fastify, request, reply, withBalance === true ? 'balances' : 'accounts');
+    if (!authorised) return reply;
+
+    const permitted = new Set(authorised.permittedAccounts);
+    const records = (await listAccountsForHolder(fastify.db, authorised.holderReference))
+      // The holder may hold accounts this consent does not cover, and those are not this TPP's to see.
+      .filter((record) => permitted.has(record.accountArrangementInstanceReference));
     return { accounts: records.map((record) => toBerlinGroupAccount(record, withBalance === true)) };
   });
 
@@ -120,19 +161,18 @@ export async function accountInformationController(fastify: FastifyInstance) {
     schema: {
       tags: ['accounts'],
       summary: 'Read one account',
-      description: 'Berlin Group AIS. The account detail, including its IBAN and BIC.',
+      description: `Berlin Group AIS. The account detail, including its IBAN and BIC.\n\n${CONSENT_NOTE}`,
       security: [{ tppToken: [] }],
       headers: STANDARD_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
-      response: { 200: ACCOUNT, 400: ERROR_RESPONSE, 401: ERROR_RESPONSE, 404: ERROR_RESPONSE },
+      response: {
+        200: ACCOUNT, 400: ERROR_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE,
+      },
     },
   }, async (request, reply) => {
-    if (!consentIdOf(request as never)) {
-      return reply.status(400).send({
-        tppMessages: [{ category: 'ERROR', code: 'CONSENT_INVALID', text: 'Consent-ID header is required' }],
-      });
-    }
     const { accountId } = request.params as { accountId: string };
+    if (!await authorise(fastify, request, reply, 'accounts', accountId)) return reply;
+
     const record = await findAccount(fastify.db, accountId);
     if (!record) {
       return reply.status(404).send({
@@ -152,7 +192,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
         'Berlin Group AIS. `interimAvailable` is the spendable figure the PSP projects as its own '
         + 'available amount; `expected` includes what is booked but not settled; `blocked` appears only '
         + 'when something is reserved. Amounts are decimal STRINGS per ISO 20022, since a JSON number '
-        + 'would lose cents on a large value.',
+        + `would lose cents on a large value.\n\n${CONSENT_NOTE}`,
       security: [{ tppToken: [] }],
       headers: STANDARD_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
@@ -176,16 +216,14 @@ export async function accountInformationController(fastify: FastifyInstance) {
         },
         400: ERROR_RESPONSE,
         401: ERROR_RESPONSE,
+        403: ERROR_RESPONSE,
         404: ERROR_RESPONSE,
       },
     },
   }, async (request, reply) => {
-    if (!consentIdOf(request as never)) {
-      return reply.status(400).send({
-        tppMessages: [{ category: 'ERROR', code: 'CONSENT_INVALID', text: 'Consent-ID header is required' }],
-      });
-    }
     const { accountId } = request.params as { accountId: string };
+    if (!await authorise(fastify, request, reply, 'balances', accountId)) return reply;
+
     const record = await findAccount(fastify.db, accountId);
     if (!record) {
       return reply.status(404).send({
@@ -207,7 +245,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
       summary: 'Read the movements of an account',
       description:
         'Berlin Group AIS. Each entry carries `endToEndId`, the PSP\'s own payment id, so one query '
-        + 'correlates a payment across both systems. Debits are negative, per the standard.',
+        + `correlates a payment across both systems. Debits are negative, per the standard.\n\n${CONSENT_NOTE}`,
       security: [{ tppToken: [] }],
       headers: STANDARD_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
@@ -232,16 +270,14 @@ export async function accountInformationController(fastify: FastifyInstance) {
         },
         400: ERROR_RESPONSE,
         401: ERROR_RESPONSE,
+        403: ERROR_RESPONSE,
         404: ERROR_RESPONSE,
       },
     },
   }, async (request, reply) => {
-    if (!consentIdOf(request as never)) {
-      return reply.status(400).send({
-        tppMessages: [{ category: 'ERROR', code: 'CONSENT_INVALID', text: 'Consent-ID header is required' }],
-      });
-    }
     const { accountId } = request.params as { accountId: string };
+    if (!await authorise(fastify, request, reply, 'transactions', accountId)) return reply;
+
     const record = await findAccount(fastify.db, accountId);
     if (!record) {
       return reply.status(404).send({

@@ -5,6 +5,7 @@ import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHol
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
+import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -26,6 +27,10 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   { name: BALANCE_CREDIT_LOG_COLLECTION, purpose: 'audit trail of every balance credit' },
   { name: DOMAIN_EVENT_COLLECTION, purpose: "bankcore's own domain event store" },
   { name: TPP_REGISTRATION_COLLECTION, purpose: 'registered third parties: client id, secret hash, scopes, roles' },
+  // No encrypted fields on either: the consent stores account REFERENCES, not IBANs, so the personal
+  // datum stays in the one encrypted place that already holds it.
+  { name: BANK_CONSENT_AGREEMENT_COLLECTION, purpose: 'account access consent per third party and account set' },
+  { name: BANK_CONSENT_ACCESS_LOG_COLLECTION, purpose: 'evidence of every consent-checked access, granted and refused' },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

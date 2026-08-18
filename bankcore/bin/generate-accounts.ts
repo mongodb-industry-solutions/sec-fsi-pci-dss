@@ -85,6 +85,16 @@ function accountRefFor(payoutRef: string): string {
 function holderRefFor(partyRef: string): string {
   return `hld${partyRef.slice(3)}`;
 }
+// One consent per account holder, derived from the holder reference so both sides compute the same id
+// without a handshake. Derived HERE and nowhere else: the seeder and the PSP fixture both read it from
+// the generated file, so there is no second copy of this rule to drift.
+function consentRefFor(holderRef: string): string {
+  return `cns${holderRef.slice(3)}`;
+}
+
+// A fixed far date rather than "one year from the run": a relative date would make the fixture change on
+// every regeneration, and an expired seeded consent fails every read closed with no obvious cause.
+const CONSENT_VALID_UNTIL = '2030-12-31';
 
 function main(): void {
   const profiles = JSON.parse(readFileSync(resolve(BANKCORE_DATA, 'bankProfile.json'), 'utf8')) as BankProfileControlRecord[];
@@ -97,6 +107,8 @@ function main(): void {
 
   const holders = new Map<string, AccountHolderControlRecord>();
   const arrangements: AccountArrangementControlRecord[] = [];
+  // Account references per holder, which is what the consent's access scope is made of.
+  const accountsByHolder = new Map<string, string[]>();
   let linked = 0;
 
   for (const account of accounts) {
@@ -161,15 +173,33 @@ function main(): void {
     account.payoutAccountCorrespondentBic = bank.bankProfileCorrespondentBic;
     account.payoutAccountAspspReference = bank.bankProfileInstanceReference;
     account.payoutAccountBankAccountReference = accountRef;
+    // The consent that authorises the PSP to read this account. Present on the link from the start, so
+    // the platform is operational straight after seeding.
+    account.payoutAccountConsentReference = consentRefFor(holderRef);
+    accountsByHolder.set(holderRef, [...(accountsByHolder.get(holderRef) ?? []), accountRef]);
     linked++;
   }
 
+  // Access is stored as account REFERENCES, not IBANs: the IBAN is already encrypted on the account
+  // record, and copying it into the consent would store the same personal datum twice for no gain.
+  const consents = [...accountsByHolder.entries()].map(([holderRef, accountRefs]) => ({
+    bankConsentAgreementInstanceReference: consentRefFor(holderRef),
+    bankConsentAccountHolderInstanceReference: holderRef,
+    bankConsentAccess: { accounts: accountRefs, balances: accountRefs, transactions: accountRefs },
+    bankConsentRecurringIndicator: true,
+    bankConsentFrequencyPerDay: 4,
+    bankConsentValidUntil: CONSENT_VALID_UNTIL,
+    recordCreatedDateTime: holders.get(holderRef)!.recordCreatedDateTime,
+  }));
+
   writeFileSync(resolve(BANKCORE_DATA, 'accountHolders.json'), `${JSON.stringify([...holders.values()], null, 2)}\n`);
+  writeFileSync(resolve(BANKCORE_DATA, 'consents.json'), `${JSON.stringify(consents, null, 2)}\n`);
   writeFileSync(resolve(BANKCORE_DATA, 'accountArrangements.json'), `${JSON.stringify(arrangements, null, 2)}\n`);
   writeFileSync(resolve(BACKEND_DATA, 'payoutAccounts.json'), `${JSON.stringify(accounts, null, 2)}\n`);
 
   console.log(`  bankcore/data/accountHolders.json:      ${holders.size} holder(s)`);
   console.log(`  bankcore/data/accountArrangements.json: ${arrangements.length} account(s)`);
+  console.log(`  bankcore/data/consents.json:            ${consents.length} consent(s), one per holder`);
   console.log(`  backend/data/payoutAccounts.json:       ${linked} account(s) turned into links`);
 }
 

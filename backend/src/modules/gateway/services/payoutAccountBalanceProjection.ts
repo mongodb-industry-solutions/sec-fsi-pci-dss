@@ -37,10 +37,19 @@ async function projectOne(
   // An account with no bank link has no bank to ask: the PSP revenue ledger, for instance.
   if (!isLinked(account)) return account;
 
+  // A link with no consent is not readable, and the bank is right to refuse it. Saying so here beats
+  // sending a request that can only come back as a refusal, and it names the actual cause.
+  if (!account.payoutAccountConsentReference) {
+    return {
+      ...account,
+      payoutAccountBalanceSource: 'stored',
+      payoutAccountBalanceStaleReason: 'no account access consent on this link',
+    };
+  }
+
   const { balance, error } = await read({
     bankAccountReference: account.payoutAccountBankAccountReference!,
-    // The consent reference lands in P3; until then the bank requires the header but does not resolve it.
-    consentReference: account.payoutAccountConsentReference ?? 'pending-consent',
+    consentReference: account.payoutAccountConsentReference,
     correlationId,
   });
 

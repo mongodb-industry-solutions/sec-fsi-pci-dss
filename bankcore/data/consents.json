@@ -1,0 +1,1081 @@
+[
+  {
+    "bankConsentAgreementInstanceReference": "cns00001-0000-4000-8000-000000000001",
+    "bankConsentAccountHolderInstanceReference": "hld00001-0000-4000-8000-000000000001",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00001-0000-4000-8000-000000000001",
+        "acc00058-0000-4000-8000-000000000058"
+      ],
+      "balances": [
+        "acc00001-0000-4000-8000-000000000001",
+        "acc00058-0000-4000-8000-000000000058"
+      ],
+      "transactions": [
+        "acc00001-0000-4000-8000-000000000001",
+        "acc00058-0000-4000-8000-000000000058"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00002-0000-4000-8000-000000000002",
+    "bankConsentAccountHolderInstanceReference": "hld00002-0000-4000-8000-000000000002",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00002-0000-4000-8000-000000000002",
+        "acc00059-0000-4000-8000-000000000059"
+      ],
+      "balances": [
+        "acc00002-0000-4000-8000-000000000002",
+        "acc00059-0000-4000-8000-000000000059"
+      ],
+      "transactions": [
+        "acc00002-0000-4000-8000-000000000002",
+        "acc00059-0000-4000-8000-000000000059"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00059-0000-4000-8000-000000000059",
+    "bankConsentAccountHolderInstanceReference": "hld00059-0000-4000-8000-000000000059",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00003-0000-4000-8000-000000000003"
+      ],
+      "balances": [
+        "acc00003-0000-4000-8000-000000000003"
+      ],
+      "transactions": [
+        "acc00003-0000-4000-8000-000000000003"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2026-06-15T08:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00060-0000-4000-8000-000000000060",
+    "bankConsentAccountHolderInstanceReference": "hld00060-0000-4000-8000-000000000060",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00005-0000-4000-8000-000000000005",
+        "acc00006-0000-4000-8000-000000000006",
+        "acc00060-0000-4000-8000-000000000060"
+      ],
+      "balances": [
+        "acc00005-0000-4000-8000-000000000005",
+        "acc00006-0000-4000-8000-000000000006",
+        "acc00060-0000-4000-8000-000000000060"
+      ],
+      "transactions": [
+        "acc00005-0000-4000-8000-000000000005",
+        "acc00006-0000-4000-8000-000000000006",
+        "acc00060-0000-4000-8000-000000000060"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2026-06-22T15:30:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00003-0000-4000-8000-000000000003",
+    "bankConsentAccountHolderInstanceReference": "hld00003-0000-4000-8000-000000000003",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00007-0000-4000-8000-000000000007"
+      ],
+      "balances": [
+        "acc00007-0000-4000-8000-000000000007"
+      ],
+      "transactions": [
+        "acc00007-0000-4000-8000-000000000007"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-27T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00004-0000-4000-8000-000000000004",
+    "bankConsentAccountHolderInstanceReference": "hld00004-0000-4000-8000-000000000004",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00008-0000-4000-8000-000000000008"
+      ],
+      "balances": [
+        "acc00008-0000-4000-8000-000000000008"
+      ],
+      "transactions": [
+        "acc00008-0000-4000-8000-000000000008"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-02-10T09:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00005-0000-4000-8000-000000000005",
+    "bankConsentAccountHolderInstanceReference": "hld00005-0000-4000-8000-000000000005",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00009-0000-4000-8000-000000000009"
+      ],
+      "balances": [
+        "acc00009-0000-4000-8000-000000000009"
+      ],
+      "transactions": [
+        "acc00009-0000-4000-8000-000000000009"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-02T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00006-0000-4000-8000-000000000006",
+    "bankConsentAccountHolderInstanceReference": "hld00006-0000-4000-8000-000000000006",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00010-0000-4000-8000-000000000010"
+      ],
+      "balances": [
+        "acc00010-0000-4000-8000-000000000010"
+      ],
+      "transactions": [
+        "acc00010-0000-4000-8000-000000000010"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-19T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00007-0000-4000-8000-000000000007",
+    "bankConsentAccountHolderInstanceReference": "hld00007-0000-4000-8000-000000000007",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00011-0000-4000-8000-000000000011"
+      ],
+      "balances": [
+        "acc00011-0000-4000-8000-000000000011"
+      ],
+      "transactions": [
+        "acc00011-0000-4000-8000-000000000011"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-19T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00008-0000-4000-8000-000000000008",
+    "bankConsentAccountHolderInstanceReference": "hld00008-0000-4000-8000-000000000008",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00012-0000-4000-8000-000000000012"
+      ],
+      "balances": [
+        "acc00012-0000-4000-8000-000000000012"
+      ],
+      "transactions": [
+        "acc00012-0000-4000-8000-000000000012"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-26T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00009-0000-4000-8000-000000000009",
+    "bankConsentAccountHolderInstanceReference": "hld00009-0000-4000-8000-000000000009",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00013-0000-4000-8000-000000000013"
+      ],
+      "balances": [
+        "acc00013-0000-4000-8000-000000000013"
+      ],
+      "transactions": [
+        "acc00013-0000-4000-8000-000000000013"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-04-12T11:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00010-0000-4000-8000-000000000010",
+    "bankConsentAccountHolderInstanceReference": "hld00010-0000-4000-8000-000000000010",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00014-0000-4000-8000-000000000014"
+      ],
+      "balances": [
+        "acc00014-0000-4000-8000-000000000014"
+      ],
+      "transactions": [
+        "acc00014-0000-4000-8000-000000000014"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-05-17T12:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00011-0000-4000-8000-000000000011",
+    "bankConsentAccountHolderInstanceReference": "hld00011-0000-4000-8000-000000000011",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00015-0000-4000-8000-000000000015"
+      ],
+      "balances": [
+        "acc00015-0000-4000-8000-000000000015"
+      ],
+      "transactions": [
+        "acc00015-0000-4000-8000-000000000015"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-05-09T12:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00012-0000-4000-8000-000000000012",
+    "bankConsentAccountHolderInstanceReference": "hld00012-0000-4000-8000-000000000012",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00016-0000-4000-8000-000000000016"
+      ],
+      "balances": [
+        "acc00016-0000-4000-8000-000000000016"
+      ],
+      "transactions": [
+        "acc00016-0000-4000-8000-000000000016"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-02-22T09:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00013-0000-4000-8000-000000000013",
+    "bankConsentAccountHolderInstanceReference": "hld00013-0000-4000-8000-000000000013",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00017-0000-4000-8000-000000000017"
+      ],
+      "balances": [
+        "acc00017-0000-4000-8000-000000000017"
+      ],
+      "transactions": [
+        "acc00017-0000-4000-8000-000000000017"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00014-0000-4000-8000-000000000014",
+    "bankConsentAccountHolderInstanceReference": "hld00014-0000-4000-8000-000000000014",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00018-0000-4000-8000-000000000018"
+      ],
+      "balances": [
+        "acc00018-0000-4000-8000-000000000018"
+      ],
+      "transactions": [
+        "acc00018-0000-4000-8000-000000000018"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-12-28T19:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00015-0000-4000-8000-000000000015",
+    "bankConsentAccountHolderInstanceReference": "hld00015-0000-4000-8000-000000000015",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00019-0000-4000-8000-000000000019"
+      ],
+      "balances": [
+        "acc00019-0000-4000-8000-000000000019"
+      ],
+      "transactions": [
+        "acc00019-0000-4000-8000-000000000019"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-19T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00016-0000-4000-8000-000000000016",
+    "bankConsentAccountHolderInstanceReference": "hld00016-0000-4000-8000-000000000016",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00020-0000-4000-8000-000000000020"
+      ],
+      "balances": [
+        "acc00020-0000-4000-8000-000000000020"
+      ],
+      "transactions": [
+        "acc00020-0000-4000-8000-000000000020"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-12-12T19:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00017-0000-4000-8000-000000000017",
+    "bankConsentAccountHolderInstanceReference": "hld00017-0000-4000-8000-000000000017",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00021-0000-4000-8000-000000000021"
+      ],
+      "balances": [
+        "acc00021-0000-4000-8000-000000000021"
+      ],
+      "transactions": [
+        "acc00021-0000-4000-8000-000000000021"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-01-01T08:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00018-0000-4000-8000-000000000018",
+    "bankConsentAccountHolderInstanceReference": "hld00018-0000-4000-8000-000000000018",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00022-0000-4000-8000-000000000022"
+      ],
+      "balances": [
+        "acc00022-0000-4000-8000-000000000022"
+      ],
+      "transactions": [
+        "acc00022-0000-4000-8000-000000000022"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-08-08T15:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00019-0000-4000-8000-000000000019",
+    "bankConsentAccountHolderInstanceReference": "hld00019-0000-4000-8000-000000000019",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00023-0000-4000-8000-000000000023"
+      ],
+      "balances": [
+        "acc00023-0000-4000-8000-000000000023"
+      ],
+      "transactions": [
+        "acc00023-0000-4000-8000-000000000023"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-09-25T16:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00020-0000-4000-8000-000000000020",
+    "bankConsentAccountHolderInstanceReference": "hld00020-0000-4000-8000-000000000020",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00024-0000-4000-8000-000000000024"
+      ],
+      "balances": [
+        "acc00024-0000-4000-8000-000000000024"
+      ],
+      "transactions": [
+        "acc00024-0000-4000-8000-000000000024"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-05-13T12:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00021-0000-4000-8000-000000000021",
+    "bankConsentAccountHolderInstanceReference": "hld00021-0000-4000-8000-000000000021",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00025-0000-4000-8000-000000000025"
+      ],
+      "balances": [
+        "acc00025-0000-4000-8000-000000000025"
+      ],
+      "transactions": [
+        "acc00025-0000-4000-8000-000000000025"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-11T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00022-0000-4000-8000-000000000022",
+    "bankConsentAccountHolderInstanceReference": "hld00022-0000-4000-8000-000000000022",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00026-0000-4000-8000-000000000026"
+      ],
+      "balances": [
+        "acc00026-0000-4000-8000-000000000026"
+      ],
+      "transactions": [
+        "acc00026-0000-4000-8000-000000000026"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-01-21T08:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00023-0000-4000-8000-000000000023",
+    "bankConsentAccountHolderInstanceReference": "hld00023-0000-4000-8000-000000000023",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00027-0000-4000-8000-000000000027"
+      ],
+      "balances": [
+        "acc00027-0000-4000-8000-000000000027"
+      ],
+      "transactions": [
+        "acc00027-0000-4000-8000-000000000027"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-02-18T09:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00024-0000-4000-8000-000000000024",
+    "bankConsentAccountHolderInstanceReference": "hld00024-0000-4000-8000-000000000024",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00028-0000-4000-8000-000000000028"
+      ],
+      "balances": [
+        "acc00028-0000-4000-8000-000000000028"
+      ],
+      "transactions": [
+        "acc00028-0000-4000-8000-000000000028"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-15T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00025-0000-4000-8000-000000000025",
+    "bankConsentAccountHolderInstanceReference": "hld00025-0000-4000-8000-000000000025",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00029-0000-4000-8000-000000000029"
+      ],
+      "balances": [
+        "acc00029-0000-4000-8000-000000000029"
+      ],
+      "transactions": [
+        "acc00029-0000-4000-8000-000000000029"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-27T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00026-0000-4000-8000-000000000026",
+    "bankConsentAccountHolderInstanceReference": "hld00026-0000-4000-8000-000000000026",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00030-0000-4000-8000-000000000030"
+      ],
+      "balances": [
+        "acc00030-0000-4000-8000-000000000030"
+      ],
+      "transactions": [
+        "acc00030-0000-4000-8000-000000000030"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-19T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00027-0000-4000-8000-000000000027",
+    "bankConsentAccountHolderInstanceReference": "hld00027-0000-4000-8000-000000000027",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00031-0000-4000-8000-000000000031"
+      ],
+      "balances": [
+        "acc00031-0000-4000-8000-000000000031"
+      ],
+      "transactions": [
+        "acc00031-0000-4000-8000-000000000031"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-02-22T09:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00028-0000-4000-8000-000000000028",
+    "bankConsentAccountHolderInstanceReference": "hld00028-0000-4000-8000-000000000028",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00032-0000-4000-8000-000000000032"
+      ],
+      "balances": [
+        "acc00032-0000-4000-8000-000000000032"
+      ],
+      "transactions": [
+        "acc00032-0000-4000-8000-000000000032"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-09-13T16:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00029-0000-4000-8000-000000000029",
+    "bankConsentAccountHolderInstanceReference": "hld00029-0000-4000-8000-000000000029",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00033-0000-4000-8000-000000000033"
+      ],
+      "balances": [
+        "acc00033-0000-4000-8000-000000000033"
+      ],
+      "transactions": [
+        "acc00033-0000-4000-8000-000000000033"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-02-18T09:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00030-0000-4000-8000-000000000030",
+    "bankConsentAccountHolderInstanceReference": "hld00030-0000-4000-8000-000000000030",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00034-0000-4000-8000-000000000034"
+      ],
+      "balances": [
+        "acc00034-0000-4000-8000-000000000034"
+      ],
+      "transactions": [
+        "acc00034-0000-4000-8000-000000000034"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-02-14T09:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00031-0000-4000-8000-000000000031",
+    "bankConsentAccountHolderInstanceReference": "hld00031-0000-4000-8000-000000000031",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00035-0000-4000-8000-000000000035"
+      ],
+      "balances": [
+        "acc00035-0000-4000-8000-000000000035"
+      ],
+      "transactions": [
+        "acc00035-0000-4000-8000-000000000035"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-19T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00032-0000-4000-8000-000000000032",
+    "bankConsentAccountHolderInstanceReference": "hld00032-0000-4000-8000-000000000032",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00036-0000-4000-8000-000000000036"
+      ],
+      "balances": [
+        "acc00036-0000-4000-8000-000000000036"
+      ],
+      "transactions": [
+        "acc00036-0000-4000-8000-000000000036"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-03-19T10:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00033-0000-4000-8000-000000000033",
+    "bankConsentAccountHolderInstanceReference": "hld00033-0000-4000-8000-000000000033",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00037-0000-4000-8000-000000000037"
+      ],
+      "balances": [
+        "acc00037-0000-4000-8000-000000000037"
+      ],
+      "transactions": [
+        "acc00037-0000-4000-8000-000000000037"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-03-27T10:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00034-0000-4000-8000-000000000034",
+    "bankConsentAccountHolderInstanceReference": "hld00034-0000-4000-8000-000000000034",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00038-0000-4000-8000-000000000038"
+      ],
+      "balances": [
+        "acc00038-0000-4000-8000-000000000038"
+      ],
+      "transactions": [
+        "acc00038-0000-4000-8000-000000000038"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00035-0000-4000-8000-000000000035",
+    "bankConsentAccountHolderInstanceReference": "hld00035-0000-4000-8000-000000000035",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00039-0000-4000-8000-000000000039"
+      ],
+      "balances": [
+        "acc00039-0000-4000-8000-000000000039"
+      ],
+      "transactions": [
+        "acc00039-0000-4000-8000-000000000039"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-01-17T08:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00036-0000-4000-8000-000000000036",
+    "bankConsentAccountHolderInstanceReference": "hld00036-0000-4000-8000-000000000036",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00040-0000-4000-8000-000000000040"
+      ],
+      "balances": [
+        "acc00040-0000-4000-8000-000000000040"
+      ],
+      "transactions": [
+        "acc00040-0000-4000-8000-000000000040"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-06T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00037-0000-4000-8000-000000000037",
+    "bankConsentAccountHolderInstanceReference": "hld00037-0000-4000-8000-000000000037",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00041-0000-4000-8000-000000000041"
+      ],
+      "balances": [
+        "acc00041-0000-4000-8000-000000000041"
+      ],
+      "transactions": [
+        "acc00041-0000-4000-8000-000000000041"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-15T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00038-0000-4000-8000-000000000038",
+    "bankConsentAccountHolderInstanceReference": "hld00038-0000-4000-8000-000000000038",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00042-0000-4000-8000-000000000042"
+      ],
+      "balances": [
+        "acc00042-0000-4000-8000-000000000042"
+      ],
+      "transactions": [
+        "acc00042-0000-4000-8000-000000000042"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00039-0000-4000-8000-000000000039",
+    "bankConsentAccountHolderInstanceReference": "hld00039-0000-4000-8000-000000000039",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00043-0000-4000-8000-000000000043"
+      ],
+      "balances": [
+        "acc00043-0000-4000-8000-000000000043"
+      ],
+      "transactions": [
+        "acc00043-0000-4000-8000-000000000043"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-07-23T14:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00040-0000-4000-8000-000000000040",
+    "bankConsentAccountHolderInstanceReference": "hld00040-0000-4000-8000-000000000040",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00044-0000-4000-8000-000000000044"
+      ],
+      "balances": [
+        "acc00044-0000-4000-8000-000000000044"
+      ],
+      "transactions": [
+        "acc00044-0000-4000-8000-000000000044"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-01-13T08:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00041-0000-4000-8000-000000000041",
+    "bankConsentAccountHolderInstanceReference": "hld00041-0000-4000-8000-000000000041",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00045-0000-4000-8000-000000000045"
+      ],
+      "balances": [
+        "acc00045-0000-4000-8000-000000000045"
+      ],
+      "transactions": [
+        "acc00045-0000-4000-8000-000000000045"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-08-16T15:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00042-0000-4000-8000-000000000042",
+    "bankConsentAccountHolderInstanceReference": "hld00042-0000-4000-8000-000000000042",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00046-0000-4000-8000-000000000046"
+      ],
+      "balances": [
+        "acc00046-0000-4000-8000-000000000046"
+      ],
+      "transactions": [
+        "acc00046-0000-4000-8000-000000000046"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-27T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00043-0000-4000-8000-000000000043",
+    "bankConsentAccountHolderInstanceReference": "hld00043-0000-4000-8000-000000000043",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00047-0000-4000-8000-000000000047"
+      ],
+      "balances": [
+        "acc00047-0000-4000-8000-000000000047"
+      ],
+      "transactions": [
+        "acc00047-0000-4000-8000-000000000047"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-12-24T19:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00044-0000-4000-8000-000000000044",
+    "bankConsentAccountHolderInstanceReference": "hld00044-0000-4000-8000-000000000044",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00048-0000-4000-8000-000000000048"
+      ],
+      "balances": [
+        "acc00048-0000-4000-8000-000000000048"
+      ],
+      "transactions": [
+        "acc00048-0000-4000-8000-000000000048"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-04-20T11:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00045-0000-4000-8000-000000000045",
+    "bankConsentAccountHolderInstanceReference": "hld00045-0000-4000-8000-000000000045",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00049-0000-4000-8000-000000000049"
+      ],
+      "balances": [
+        "acc00049-0000-4000-8000-000000000049"
+      ],
+      "transactions": [
+        "acc00049-0000-4000-8000-000000000049"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-08-08T15:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00046-0000-4000-8000-000000000046",
+    "bankConsentAccountHolderInstanceReference": "hld00046-0000-4000-8000-000000000046",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00050-0000-4000-8000-000000000050"
+      ],
+      "balances": [
+        "acc00050-0000-4000-8000-000000000050"
+      ],
+      "transactions": [
+        "acc00050-0000-4000-8000-000000000050"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-11T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00047-0000-4000-8000-000000000047",
+    "bankConsentAccountHolderInstanceReference": "hld00047-0000-4000-8000-000000000047",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00051-0000-4000-8000-000000000051"
+      ],
+      "balances": [
+        "acc00051-0000-4000-8000-000000000051"
+      ],
+      "transactions": [
+        "acc00051-0000-4000-8000-000000000051"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-09-25T16:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00048-0000-4000-8000-000000000048",
+    "bankConsentAccountHolderInstanceReference": "hld00048-0000-4000-8000-000000000048",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00052-0000-4000-8000-000000000052"
+      ],
+      "balances": [
+        "acc00052-0000-4000-8000-000000000052"
+      ],
+      "transactions": [
+        "acc00052-0000-4000-8000-000000000052"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-11-27T18:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00049-0000-4000-8000-000000000049",
+    "bankConsentAccountHolderInstanceReference": "hld00049-0000-4000-8000-000000000049",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00053-0000-4000-8000-000000000053"
+      ],
+      "balances": [
+        "acc00053-0000-4000-8000-000000000053"
+      ],
+      "transactions": [
+        "acc00053-0000-4000-8000-000000000053"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-08-04T15:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00050-0000-4000-8000-000000000050",
+    "bankConsentAccountHolderInstanceReference": "hld00050-0000-4000-8000-000000000050",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00054-0000-4000-8000-000000000054"
+      ],
+      "balances": [
+        "acc00054-0000-4000-8000-000000000054"
+      ],
+      "transactions": [
+        "acc00054-0000-4000-8000-000000000054"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-04-16T11:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00061-0000-4000-8000-000000000061",
+    "bankConsentAccountHolderInstanceReference": "hld00061-0000-4000-8000-000000000061",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00055-0000-4000-8000-000000000055"
+      ],
+      "balances": [
+        "acc00055-0000-4000-8000-000000000055"
+      ],
+      "transactions": [
+        "acc00055-0000-4000-8000-000000000055"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-10-22T17:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00071-0000-4000-8000-000000000071",
+    "bankConsentAccountHolderInstanceReference": "hld00071-0000-4000-8000-000000000071",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00056-0000-4000-8000-000000000056"
+      ],
+      "balances": [
+        "acc00056-0000-4000-8000-000000000056"
+      ],
+      "transactions": [
+        "acc00056-0000-4000-8000-000000000056"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-08-28T15:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00072-0000-4000-8000-000000000072",
+    "bankConsentAccountHolderInstanceReference": "hld00072-0000-4000-8000-000000000072",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00057-0000-4000-8000-000000000057"
+      ],
+      "balances": [
+        "acc00057-0000-4000-8000-000000000057"
+      ],
+      "transactions": [
+        "acc00057-0000-4000-8000-000000000057"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2025-09-09T16:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00058-0000-4000-8000-000000000058",
+    "bankConsentAccountHolderInstanceReference": "hld00058-0000-4000-8000-000000000058",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00061-0000-4000-8000-000000000061",
+        "acc00062-0000-4000-8000-000000000062"
+      ],
+      "balances": [
+        "acc00061-0000-4000-8000-000000000061",
+        "acc00062-0000-4000-8000-000000000062"
+      ],
+      "transactions": [
+        "acc00061-0000-4000-8000-000000000061",
+        "acc00062-0000-4000-8000-000000000062"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2026-07-07T00:00:00.000Z"
+  }
+]

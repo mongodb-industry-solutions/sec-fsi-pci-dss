@@ -13,13 +13,21 @@ export interface BankDeks {
   accountHolderEmail: Binary;
 }
 
-// QE:none, retrieval only. Nothing queries an account by IBAN on this side: the bank looks accounts up
-// by their reference, and the routing derivation uses the IBAN bank code the caller supplies.
+// `accountIban` carries an EQUALITY query type, the holder's fields do not (retrieval only).
+//
+// The IBAN needs it because the standard addresses accounts by IBAN in the places where the caller
+// cannot know a bank's internal reference yet: Berlin Group's consent access object names IBANs, and so
+// does the routing derivation for an account a user has just typed in. Without the index the driver
+// rejects the lookup outright ("Can only execute encrypted equality queries with an encrypted equality
+// index"), which is how this was found, and the only alternative would have been a non standard
+// endpoint that takes the bank's own reference instead.
+// A name or an email is only ever displayed, never searched from this side, so neither gets an index it
+// would not use.
 export function buildEncryptedFieldsMaps(deks: BankDeks): Record<string, { fields: unknown[] }> {
   return {
     [ACCOUNT_ARRANGEMENT_COLLECTION]: {
       fields: [
-        { keyId: deks.accountIban, path: 'accountIban', bsonType: 'string' },
+        { keyId: deks.accountIban, path: 'accountIban', bsonType: 'string', queries: { queryType: 'equality' } },
       ],
     },
     [ACCOUNT_HOLDER_COLLECTION]: {

@@ -6,6 +6,7 @@ import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHol
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
+import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -95,6 +96,29 @@ const INDEXES: IndexPlan[] = [
     collection: TPP_REGISTRATION_COLLECTION,
     keys: { tppRegistrationInstanceReference: 1 },
     options: { unique: true, name: 'tppRegistration_ref_unique' },
+  },
+  // Every consent-bearing call resolves the consent by its id AND its owner, so that pair is the index
+  // the enforcement path rides on.
+  {
+    collection: BANK_CONSENT_AGREEMENT_COLLECTION,
+    keys: { bankConsentAgreementInstanceReference: 1 },
+    options: { unique: true, name: 'bankConsent_ref_unique' },
+  },
+  {
+    collection: BANK_CONSENT_AGREEMENT_COLLECTION,
+    keys: { bankConsentTppClientId: 1, bankConsentAccountHolderInstanceReference: 1, bankConsentStatus: 1 },
+    options: { name: 'bankConsent_tpp_holder_status' },
+  },
+  // The evidence query is "what did this TPP do under this consent", newest first.
+  {
+    collection: BANK_CONSENT_ACCESS_LOG_COLLECTION,
+    keys: { bankConsentAgreementInstanceReference: 1, recordCreatedDateTime: -1 },
+    options: { name: 'bankConsentAccessLog_consent_time' },
+  },
+  {
+    collection: BANK_CONSENT_ACCESS_LOG_COLLECTION,
+    keys: { accessCorrelationId: 1 },
+    options: { name: 'bankConsentAccessLog_correlation' },
   },
   {
     collection: COUNTERS_COLLECTION,

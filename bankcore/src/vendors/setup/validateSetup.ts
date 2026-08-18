@@ -6,12 +6,16 @@ import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHol
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
 import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanceCreditLog.model';
 import { TPP_REGISTRATION_COLLECTION, TppRegistrationControlRecord } from '../../modules/tpp-trust/models/tppRegistration.model';
+import {
+  BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION, BankConsentAgreementControlRecord,
+} from '../../modules/consent/models/bankConsent.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
 import { findOrphanedDeks } from '../encryption/keyVault';
 import { validateCrossSide } from './validateCrossSide';
 import { assertLinks, resolvePlatformLinks } from '@leafypay/platform-links';
+import { readSeedFile } from '../seed/readSeedFile';
 import { config, keyVaultNamespaceParts } from '../../config';
 
 export interface ValidationResult {
@@ -26,6 +30,8 @@ const REQUIRED_COLLECTIONS = [
   ACCOUNT_MOVEMENT_COLLECTION,
   BALANCE_CREDIT_LOG_COLLECTION,
   TPP_REGISTRATION_COLLECTION,
+  BANK_CONSENT_AGREEMENT_COLLECTION,
+  BANK_CONSENT_ACCESS_LOG_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,
@@ -114,6 +120,33 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
     add(`TPP ${registration.tppRegistrationClientId} can authenticate`, Boolean(usable),
       usable ? undefined : 'needs a bcrypt secret hash, at least one role and at least one scope');
   }
+
+  // The SEEDED consents must be usable, or every read fails closed and the demo shows stale balances
+  // with no obvious cause.
+  //
+  // Scoped to the fixture on purpose: a consent created at RUNTIME may legitimately be terminated,
+  // revoked or expired, and judging every record in the collection would make this check fail as soon as
+  // someone exercises the lifecycle. Found exactly that way, by terminating one while testing.
+  const seededConsentRefs = new Set(
+    readSeedFile<Array<{ bankConsentAgreementInstanceReference: string }>>('consents.json')
+      .map((record) => record.bankConsentAgreementInstanceReference),
+  );
+  const consents = (await db.collection<BankConsentAgreementControlRecord>(BANK_CONSENT_AGREEMENT_COLLECTION)
+    .find({}, { projection: { _id: 0, bankConsentAgreementInstanceReference: 1, bankConsentStatus: 1, bankConsentAccess: 1, bankConsentValidUntil: 1 } })
+    .toArray()
+    .catch(() => []))
+    .filter((consent) => seededConsentRefs.has(consent.bankConsentAgreementInstanceReference));
+
+  const valid = consents.filter((consent) => consent.bankConsentStatus === 'valid');
+  add('every seeded consent is present and valid',
+    consents.length === seededConsentRefs.size && valid.length === consents.length,
+    `${valid.length} valid of ${seededConsentRefs.size} seeded`);
+  const notYetLapsed = valid.every((consent) => new Date(`${consent.bankConsentValidUntil.slice(0, 10)}T23:59:59Z`) > new Date());
+  add('every seeded consent is still within its validity', consents.length === 0 || notYetLapsed,
+    notYetLapsed ? undefined : 'a seeded consent has already expired, so reads fail closed');
+  const covering = valid.filter((consent) => (consent.bankConsentAccess?.accounts ?? []).length > 0);
+  add('every seeded consent covers at least one account', valid.length === covering.length,
+    valid.length === covering.length ? undefined : 'a consent granting nothing is unusable');
 
   // Cross side: the PSP's linked accounts must resolve to real accounts here, and every seeded IBAN
   // must be one this bank actually owns.

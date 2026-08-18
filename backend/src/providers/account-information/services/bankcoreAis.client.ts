@@ -82,7 +82,17 @@ export async function readAccountBalance(
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (!response.ok) {
-      return { error: `AIS balance read failed: HTTP ${response.status}` };
+      // The bank answers a standard error body, so carry ITS reason rather than only the status code:
+      // "the consent is revokedByPsu" and "the bank is broken" are the same 401 otherwise.
+      const refusal = await response.json().catch(() => ({})) as {
+        tppMessages?: Array<{ code?: string; text?: string }>;
+      };
+      const message = refusal.tppMessages?.[0];
+      return {
+        error: message?.code
+          ? `AIS balance read refused: ${message.code} (${message.text ?? `HTTP ${response.status}`})`
+          : `AIS balance read failed: HTTP ${response.status}`,
+      };
     }
     const body = await response.json() as BerlinGroupBalancesResponse;
     const byType = new Map(
