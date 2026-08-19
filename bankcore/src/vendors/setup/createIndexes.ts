@@ -15,6 +15,9 @@ import {
 import {
   COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION,
 } from '../../modules/payment-hub/models/counterpartyBank.model';
+import {
+  CARD_ISSUER_VAULT_COLLECTION, PAYMENT_CARD_REGISTRY_COLLECTION,
+} from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -210,6 +213,29 @@ const INDEXES: IndexPlan[] = [
     collection: INTERBANK_MESSAGE_LOG_COLLECTION,
     keys: { interbankEndToEndIdentification: 1 },
     options: { name: 'interbankMessageLog_end_to_end' },
+  },
+  // The issuer vault is addressed by the PSP's surrogate token, never by the PAN: an index on the
+  // encrypted field itself is what QE already builds, and nothing here needs to scan by number.
+  {
+    collection: CARD_ISSUER_VAULT_COLLECTION,
+    keys: { paymentCardReference: 1 },
+    options: { unique: true, name: 'cardIssuerVault_card_reference_unique' },
+  },
+  {
+    collection: CARD_ISSUER_VAULT_COLLECTION,
+    keys: { issuedCardInstanceReference: 1 },
+    options: { unique: true, name: 'cardIssuerVault_ref_unique' },
+  },
+  // The registry answers "this card" and "the cards of this holder", which is every display read.
+  {
+    collection: PAYMENT_CARD_REGISTRY_COLLECTION,
+    keys: { paymentCardReference: 1 },
+    options: { unique: true, name: 'paymentCardRegistry_card_reference_unique' },
+  },
+  {
+    collection: PAYMENT_CARD_REGISTRY_COLLECTION,
+    keys: { accountHolderInstanceReference: 1, issuedCardStatus: 1 },
+    options: { name: 'paymentCardRegistry_holder_status' },
   },
   {
     collection: COUNTERS_COLLECTION,

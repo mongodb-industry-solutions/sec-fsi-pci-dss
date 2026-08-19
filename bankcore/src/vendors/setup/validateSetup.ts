@@ -20,6 +20,9 @@ import {
   COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION, CounterpartyBankControlRecord,
 } from '../../modules/payment-hub/models/counterpartyBank.model';
 import { assertLinks as assertSubscriptionLinks } from '@leafypay/platform-links';
+import {
+  CARD_ISSUER_VAULT_COLLECTION, PAYMENT_CARD_REGISTRY_COLLECTION,
+} from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -49,6 +52,8 @@ const REQUIRED_COLLECTIONS = [
   TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
   COUNTERPARTY_BANK_COLLECTION,
   INTERBANK_MESSAGE_LOG_COLLECTION,
+  CARD_ISSUER_VAULT_COLLECTION,
+  PAYMENT_CARD_REGISTRY_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,

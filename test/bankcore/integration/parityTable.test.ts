@@ -48,7 +48,8 @@ const PARITY: ParityRow[] = [
   // the ledger is here: its stored balance is a projection, so a local hold decides on stale data.
   { capability: 'card authorisation and decline', method: 'post', path: '/v1/cards/authorisations', phase: 'done' },
   { capability: 'release or settle an authorisation hold', method: 'delete', path: '/v1/cards/authorisations/{authorisationReference}', phase: 'done' },
-  { capability: 'card token resolution and masking', method: 'get', path: '/v1/cards/{cardToken}', phase: 'P7' },
+  { capability: 'card token resolution and masking', method: 'get', path: '/v1/cards/{cardToken}', phase: 'done' },
+  { capability: 'card validation (format, network, expiry, CVV)', method: 'post', path: '/v1/cards/validations', phase: 'done' },
   { capability: 'credit assessment', method: 'post', path: '/v1/credit-assessments', phase: 'P8' },
 ];
 

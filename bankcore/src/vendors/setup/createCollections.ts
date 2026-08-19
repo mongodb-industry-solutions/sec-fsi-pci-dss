@@ -14,6 +14,9 @@ import {
 import {
   COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION,
 } from '../../modules/payment-hub/models/counterpartyBank.model';
+import {
+  CARD_ISSUER_VAULT_COLLECTION, PAYMENT_CARD_REGISTRY_COLLECTION,
+} from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -47,6 +50,9 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   { name: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION, purpose: 'one row per delivery attempt, so a silent failure is visible' },
   { name: COUNTERPARTY_BANK_COLLECTION, purpose: 'reachable institutions: BIC, schemes, correspondent, cut-off' },
   { name: INTERBANK_MESSAGE_LOG_COLLECTION, purpose: 'pacs.008 sent, pacs.002 and pacs.004 received, for reconciliation' },
+  // The issuer's registry. No PAN by design, which is why it is here and not among the QE collections:
+  // a display lookup must not open the collection that holds cardholder data.
+  { name: PAYMENT_CARD_REGISTRY_COLLECTION, purpose: 'cards this bank issued: network, BIN, last four, lifecycle' },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];
@@ -56,6 +62,7 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
 const QE_COLLECTIONS: Record<string, string> = {
   [ACCOUNT_ARRANGEMENT_COLLECTION]: 'the real account and its balance (IBAN encrypted)',
   [ACCOUNT_HOLDER_COLLECTION]: "the bank's own account holder (name and contact encrypted)",
+  [CARD_ISSUER_VAULT_COLLECTION]: 'the issuer CDE: the only full PAN on this platform (PAN and service code encrypted)',
 };
 
 export async function createCollections(db: Db, deks: BankDeks, reset = false): Promise<void> {

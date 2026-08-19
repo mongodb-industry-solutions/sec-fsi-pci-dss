@@ -25,14 +25,61 @@
       "enforceLuhn": true,
       "verifyCardholderName": false,
       "networks": [
-        { "name": "VISA", "prefixes": ["4"], "lengths": [13, 16, 19], "cvvLength": 3, "enabled": true },
-        { "name": "MASTERCARD", "prefixes": ["51-55", "2221-2720"], "lengths": [16], "cvvLength": 3, "enabled": true },
-        { "name": "AMEX", "prefixes": ["34", "37"], "lengths": [15], "cvvLength": 4, "enabled": true },
-        { "name": "DISCOVER", "prefixes": ["6011", "644-649", "65"], "lengths": [16, 19], "cvvLength": 3, "enabled": true }
+        {
+          "name": "VISA",
+          "prefixes": [
+            "4"
+          ],
+          "lengths": [
+            13,
+            16,
+            19
+          ],
+          "cvvLength": 3,
+          "enabled": true
+        },
+        {
+          "name": "MASTERCARD",
+          "prefixes": [
+            "51-55",
+            "2221-2720"
+          ],
+          "lengths": [
+            16
+          ],
+          "cvvLength": 3,
+          "enabled": true
+        },
+        {
+          "name": "AMEX",
+          "prefixes": [
+            "34",
+            "37"
+          ],
+          "lengths": [
+            15
+          ],
+          "cvvLength": 4,
+          "enabled": true
+        },
+        {
+          "name": "DISCOVER",
+          "prefixes": [
+            "6011",
+            "644-649",
+            "65"
+          ],
+          "lengths": [
+            16,
+            19
+          ],
+          "cvvLength": 3,
+          "enabled": true
+        }
       ]
     },
     "bankModuleConfigurationStatus": "active",
-    "bankModuleConfigurationConsumed": false,
+    "bankModuleConfigurationConsumed": true,
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "BankModuleConfiguration",
     "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",

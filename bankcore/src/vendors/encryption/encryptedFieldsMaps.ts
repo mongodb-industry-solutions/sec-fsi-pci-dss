@@ -1,6 +1,7 @@
 import type { Binary } from 'mongodb';
 import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accountArrangement.model';
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
+import { CARD_ISSUER_VAULT_COLLECTION } from '../../modules/card-issuer/models/cardIssuerVault.model';
 
 // Queryable Encryption map of the bank database, using the DEKs the PSP already provisioned. The key
 // vault is shared, so no new key material and no rotation story is introduced.
@@ -11,6 +12,10 @@ export interface BankDeks {
   accountIban: Binary;
   accountHolderName: Binary;
   accountHolderEmail: Binary;
+  // The issuer CDE (v37 P7): the only full PAN on this platform, and the service code that feeds the CVV
+  // derivation. Their own keys, so the card data and the account data are never under one.
+  vaultPan: Binary;
+  vaultServiceCode: Binary;
 }
 
 // `accountIban` carries an EQUALITY query type, the holder's fields do not (retrieval only).
@@ -34,6 +39,15 @@ export function buildEncryptedFieldsMaps(deks: BankDeks): Record<string, { field
       fields: [
         { keyId: deks.accountHolderName, path: 'accountHolderName', bsonType: 'string' },
         { keyId: deks.accountHolderEmail, path: 'accountHolderEmailAddress', bsonType: 'string' },
+      ],
+    },
+    // The issuer vault. EQUALITY on both, so a card can be located or de-duplicated by its exact PAN over
+    // CIPHERTEXT with no client-side decryption: that is the reason to hold it this way rather than as an
+    // opaque blob. Contention 8 because a hot BIN would otherwise concentrate writes on few index entries.
+    [CARD_ISSUER_VAULT_COLLECTION]: {
+      fields: [
+        { keyId: deks.vaultPan, path: 'paymentCardNumber', bsonType: 'string', queries: { queryType: 'equality', contention: 8 } },
+        { keyId: deks.vaultServiceCode, path: 'cardServiceCode', bsonType: 'string', queries: { queryType: 'equality', contention: 8 } },
       ],
     },
   };

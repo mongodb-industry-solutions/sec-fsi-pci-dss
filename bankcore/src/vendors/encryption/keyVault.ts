@@ -43,6 +43,8 @@ export async function provisionBankDeks(client: MongoClient): Promise<BankDeks> 
     accountIban: await getOrCreate('DEK-bank-account-iban'),
     accountHolderName: await getOrCreate('DEK-bank-holder-name'),
     accountHolderEmail: await getOrCreate('DEK-bank-holder-email'),
+    vaultPan: await getOrCreate('DEK-bank-vault-pan'),
+    vaultServiceCode: await getOrCreate('DEK-bank-vault-service-code'),
   };
 }
 

@@ -7,6 +7,7 @@ import { seedConsents } from './seedConsents';
 import { seedModuleConfigurations } from './seedModuleConfigurations';
 import { seedEventSubscriptions } from './seedEventSubscriptions';
 import { seedCounterpartyBanks } from './seedCounterpartyBanks';
+import { seedCardIssuer } from './seedCardIssuer';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -33,6 +34,8 @@ export async function runSeed(): Promise<void> {
     await seedEventSubscriptions(db);
     // Who this bank can reach, which is what makes an external payment routable.
     await seedCounterpartyBanks(db);
+    // The cards this bank issues. After the profile, since the BIN comes from its own declared ranges.
+    await seedCardIssuer(db);
     console.log('\nbankcore seed complete.');
   } finally {
     await closeQEClient();
