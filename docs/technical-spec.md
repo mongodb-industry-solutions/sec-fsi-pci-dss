@@ -2989,9 +2989,9 @@ PSP_BANKCORE_CRYPT_SHARED_LIB_PATH=
 
 # Where each side reaches the other. BASE_URL is what the PSP calls; PUBLIC_URL is what the bank puts in a
 # notification it sends. The browser never calls the bank directly.
-PSP_BANKCORE_BASE_URL=http://localhost:8082
+PSP_BANKCORE_BASE_URL=http://localhost:8083
 PSP_BANKCORE_PUBLIC_URL=
-PSP_BANKCORE_PORT=8082
+PSP_BANKCORE_PORT=8083
 
 # The bank's own token signing key. It must NOT be the shared platform secret: a token minted elsewhere on
 # the platform must not open the banking API. Unset derives a distinct key from JWT_SECRET, so a deployment

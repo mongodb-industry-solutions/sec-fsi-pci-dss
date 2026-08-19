@@ -242,10 +242,15 @@ export async function transferController(fastify: FastifyInstance) {
       currency: from.payoutAccountCurrency,
       destination: {
         countryCode: to.payoutAccountCountryCode,
+        // The rail engine derives SEPA from currency PLUS an IBAN in a SEPA country. Omitting the currency
+        // here made every same-owner transfer fall through to SWIFT and be charged its fee, including a
+        // domestic euro one, which is what P11 found: the cast below silenced the missing field.
+        currency: from.payoutAccountCurrency,
         iban: to.payoutAccountIban,
         bic: to.payoutAccountBicSwift,
+        correspondentBic: to.payoutAccountCorrespondentBic,
         beneficiaryName: to.payoutAccountHolderName ?? to.payoutAccountAlias,
-      } as RailDestination,
+      } satisfies RailDestination,
       reference: body.reference ?? `Transfer to ${to.payoutAccountAlias ?? 'my account'}`,
       fromAccountRef: body.fromAccountRef,
       // Proven above by resolving both accounts against the caller's own party, which is why the service
