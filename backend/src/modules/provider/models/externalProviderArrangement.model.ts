@@ -252,6 +252,11 @@ export interface RetryPolicy {
 export interface ProviderEventOutboundConfig {
   url?: string;                          // outbound endpoint the PSP calls for THIS event
   httpMethod?: 'POST' | 'GET' | 'PUT' | 'PATCH' | 'DELETE';
+  // v37 P6.2d: declared headers, templated from the payload the same way the url is. Berlin Group carries
+  // the consent in `Consent-ID` and the trace in `X-Request-ID`, so a standard bank API cannot be driven by
+  // configuration alone without this: the path templating got the request to the bank and it refused for a
+  // missing header, which is how this gap was found.
+  headers?: Record<string, string>;
   mapping?: FieldMapping[];              // outbound attribute mapping for this event
   auth?: IntegrationAuthConfig;          // per-event auth (e.g. API key / bearer / hmacOutbound)
   retryPolicy?: RetryPolicy;

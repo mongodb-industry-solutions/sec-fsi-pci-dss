@@ -220,28 +220,43 @@ async function dispatchExternal(
 
   const fieldMappingApplied = mappedPayload !== payload;
 
+  // Payload keys spent on headers, so they are not also sent in the body.
+  const consumedByHeaders: string[] = [];
+
   // Declared outside try so the catch branch can include the request in its audit capture.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(await buildAuthHeaders(wire.auth, provider.externalProviderArrangementType)),
   };
 
+  // Declared headers, templated from the payload exactly as the url is. A placeholder with nothing to fill it
+  // is DROPPED rather than sent literally: `Consent-ID: {consentId}` reaching a bank as that text would be
+  // refused as an invalid consent, which reads as a consent problem instead of a configuration one.
+  for (const [name, template] of Object.entries(wire.headers ?? {})) {
+    const { url: value, consumed: used } = applyPathTemplate(template, mappedPayload);
+    if (value.includes('{')) continue;
+    headers[name] = value;
+    consumedByHeaders.push(...used);
+  }
+
   // v37 P6.2d: a REST RESOURCE api addresses things in the PATH, so a configured url may be a template
   // (`/v1/accounts/{accountId}/balances`). Substituting from the payload is what lets a standard bank API be
   // dispatched through the same pipeline as a single-endpoint connector, instead of needing its own client.
   const { url: templatedUrl, consumed } = applyPathTemplate(wire.url ?? '', mappedPayload);
 
-  // Resolve a host-less internal path (seeded config) to an absolute URL via PSP_BASE_URL; absolute
-  // external URLs pass through unchanged.
-  const targetUrl = resolveServiceUrl(templatedUrl);
+  // A host-less path resolves against the provider's own base URL when it has one (a real ASPSP), and
+  // against the PSP's otherwise (the built-in loopback engines). Absolute URLs pass through unchanged.
+  const targetUrl = resolveServiceUrl(templatedUrl, provider.externalProviderBaseUrl);
 
   // A GET or DELETE with a JSON body is not a request most servers will read, and some reject it outright.
   // The fields that went INTO the path are dropped from the body either way: sending them twice invites a
   // mismatch between the two, which is the kind of bug that only shows up on the one that is ignored.
   const method = (wire.httpMethod ?? 'POST').toUpperCase();
   const sendsBody = method !== 'GET' && method !== 'DELETE';
-  const bodyPayload = consumed.length
-    ? Object.fromEntries(Object.entries(mappedPayload).filter(([key]) => !consumed.includes(key)))
+  // Keys spent on the path OR on a header are not repeated in the body.
+  const spent = [...consumed, ...consumedByHeaders];
+  const bodyPayload = spent.length
+    ? Object.fromEntries(Object.entries(mappedPayload).filter(([key]) => !spent.includes(key)))
     : mappedPayload;
 
   try {
@@ -460,9 +475,15 @@ export async function testMapping(
 // (default http://127.0.0.1:8081). Seeded configs MUST be host-less paths so they work unchanged across
 // environments/deployments; only this resolver knows the runtime host. Absolute URLs (real external
 // providers) are returned untouched.
-export function resolveServiceUrl(url: string): string {
+export function resolveServiceUrl(url: string, providerBaseUrl?: string): string {
   if (/^https?:\/\//i.test(url)) return url;
-  const raw = process.env.PSP_BASE_URL ?? '127.0.0.1:8081';
+  // v37 P6.2d: the PROVIDER's own base URL wins for a host-less path, and only then the PSP's own.
+  //
+  // Without this a configured standard path (`/v1/accounts/{accountId}/balances`) resolved against
+  // PSP_BASE_URL and was sent to the PSP itself, so a real ASPSP could not be reached through this pipeline
+  // at all and needed a bespoke client instead. The bank's base URL lives on the same record as its
+  // credential precisely so the two cannot be picked from different records.
+  const raw = providerBaseUrl?.trim() || process.env.PSP_BASE_URL || '127.0.0.1:8081';
   const base = (/^https?:\/\//i.test(raw) ? raw : `http://${raw}`).replace(/\/$/, '');
   return base + (url.startsWith('/') ? url : `/${url}`);
 }

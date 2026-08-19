@@ -1,3 +1,5 @@
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { absoluteEndpoint, resolvePlatformLinks } from '@leafypay/platform-links';
 import { ExternalProviderArrangement } from '../../modules/provider/models/externalProviderArrangement.model';
 
@@ -34,4 +36,38 @@ export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
   // still holds the loopback path the built-in engine answers on, and the kill switch decides which of the
   // two is used. Flipping it would break the built-in path the moment the records are seeded.
   record.externalProviderBaseUrl = bankcoreBaseUrl;
+
+  declareWhatItServes(record);
+}
+
+interface BankProfileFixture {
+  bankProfileInstanceReference?: string;
+  bankProfileIbanBankCodes?: string[];
+}
+
+// Read from the BANK's own fixture rather than restated here, so the two cannot disagree about which
+// institution this credential belongs to. Same reasoning as the card seeder reading its BIN ranges.
+function bankProfile(): BankProfileFixture | undefined {
+  const path = join(__dirname, '../../../../bankcore/data/bankProfile.json');
+  if (!existsSync(path)) return undefined;
+  const profiles = JSON.parse(readFileSync(path, 'utf8')) as BankProfileFixture[];
+  return profiles[0];
+}
+
+/**
+ * States which institution this provider serves, which is what makes it resolvable.
+ *
+ * v37 P6.2d: the entity-bound resolver matches an account's ASPSP against `externalProviderAspspReference`,
+ * and a freshly typed IBAN's bank code against `externalProviderIbanBankCodes`. Without both, the resolver
+ * refuses every route with "no active provider serves ASPSP ...", which is correct behaviour on an
+ * undeclared record and exactly why the declaration belongs in the seed rather than in a runtime default:
+ * guessing the institution is the one thing the resolver must never do.
+ */
+function declareWhatItServes(record: ExternalProviderArrangement): void {
+  const profile = bankProfile();
+  if (!profile?.bankProfileInstanceReference) return;
+  record.externalProviderAspspReference = profile.bankProfileInstanceReference;
+  if (profile.bankProfileIbanBankCodes?.length) {
+    record.externalProviderIbanBankCodes = [...profile.bankProfileIbanBankCodes];
+  }
 }

@@ -523,6 +523,20 @@
     "externalProviderTriggerEvents": [
       "payout.ais.validation.requested"
     ],
+    "externalProviderEvents": [
+      {
+        "event": "bank.balance.read.requested",
+        "outbound": {
+          "url": "/v1/accounts/{accountId}/balances",
+          "httpMethod": "GET",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
+      }
+    ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 500,
     "externalProviderRetryPolicy": {
@@ -577,6 +591,19 @@
       "payout.transfer.requested",
       "bank.transfer.settled",
       "bank.transfer.failed"
+    ],
+    "externalProviderEvents": [
+      {
+        "event": "bank.payment.status.read.requested",
+        "outbound": {
+          "url": "/v1/payments/{paymentProduct}/{paymentId}/status",
+          "httpMethod": "GET",
+          "headers": {
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
+      }
     ],
     "externalProviderMode": "async",
     "externalProviderTimeoutMs": 10000,

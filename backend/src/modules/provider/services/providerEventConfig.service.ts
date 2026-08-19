@@ -17,6 +17,8 @@ const DEFAULT_HTTP_METHOD = 'POST';
 const DEFAULT_REFERENCE_FIELD = 'clientReference'; // = correlationId echoed on the wire (§7.7)
 
 export interface ResolvedOutbound {
+  // Declared per event, templated from the payload at dispatch time.
+  headers: Record<string, string>;
   url?: string;
   httpMethod: string;
   mapping: FieldMapping[];
@@ -45,6 +47,7 @@ export function resolveEventOutbound(vendor: ExternalProviderArrangement, event:
   return {
     url: ev?.url ?? vendor.externalProviderApiEndpoint,
     httpMethod: ev?.httpMethod ?? DEFAULT_HTTP_METHOD,
+    headers: ev?.headers ?? {},
     mapping: ev?.mapping ?? vendor.fieldMappingConfig?.outbound ?? [],
     auth: ev?.auth ?? vendor.authConfig,
     retryPolicy: ev?.retryPolicy ?? vendor.externalProviderRetryPolicy ?? DEFAULT_RETRY,
