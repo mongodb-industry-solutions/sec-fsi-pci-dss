@@ -29,7 +29,6 @@ const OWNED_BY_BANKCORE: Record<string, BankcoreOwned> = {
   balanceCreditLog: { phase: 'P2.5', moved: false },
   cardIssuerVault: { phase: 'P7', moved: true },
   cardAuthorizationRecord: { phase: 'P7', moved: false },
-  customerCreditRatingState: { phase: 'P8', moved: false },
   recurringMandateProcedure: { phase: 'P3.9', moved: false },
 };
 
@@ -44,6 +43,9 @@ const OWNED_BY_PSP = new Set([
   // Stays: it dedupes ACCEPTED card instruments to feed the shared-card fraud signal, which is a PSP
   // concern. The bank's issuedCardRegistry is a different record: what this issuer put in customers' hands.
   'paymentCardRegistry',
+  // Stays despite the name: it holds transaction-monitoring risk FLAGS, not a credit score, and the fraud
+  // investigation reads them. The bank's creditAssessmentState is the actual assessment.
+  'customerCreditRatingState',
   'paymentRequestProcedure', 'paymentRequestEvent', 'qrPaymentRepresentation', 'rtpAliasDirectoryCache',
   'party', 'customerAuthenticationAssessment', 'authenticationDomain', 'role',
   'partyAuthenticationKey', 'partyAuthorizationCode', 'partyIssuedToken',
@@ -137,6 +139,14 @@ describe('v37 P0.7: documented ownership', () => {
     for (const name of ['balanceCreditLog', 'cardIssuerVault', 'cardAuthorizationRecord']) {
       expect(OWNED_BY_BANKCORE[name], `${name} must be bank owned`).toBeTruthy();
     }
+  });
+
+  it('the PSP keeps its risk-flag store, which is not a credit assessment', () => {
+    // The plan said customerCreditRatingState moves in P8. It must not: the record holds
+    // transaction-monitoring classification flags that the fraud case detail reads, and fraud stays at the
+    // PSP. What moved is the ASSESSMENT, which the bank can make because it holds the evidence.
+    expect(OWNED_BY_PSP.has('customerCreditRatingState')).toBe(true);
+    expect('customerCreditRatingState' in OWNED_BY_BANKCORE).toBe(false);
   });
 
   it('the PSP keeps its own card registry, which is not the issuer registry', () => {

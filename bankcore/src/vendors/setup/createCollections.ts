@@ -17,6 +17,7 @@ import {
 import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
+import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -53,6 +54,9 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   // The issuer's registry. No PAN by design, which is why it is here and not among the QE collections:
   // a display lookup must not open the collection that holds cardholder data.
   { name: ISSUED_CARD_REGISTRY_COLLECTION, purpose: 'cards this bank issued: network, BIN, last four, lifecycle' },
+  // No encrypted fields: a score and its factors are the bank's assessment, not personal data it holds
+  // about a third party, and the party is named by reference rather than by identity.
+  { name: CREDIT_ASSESSMENT_COLLECTION, purpose: "the bank's credit assessment per party, with its factors" },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

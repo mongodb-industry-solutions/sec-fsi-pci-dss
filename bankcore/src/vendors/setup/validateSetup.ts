@@ -23,6 +23,7 @@ import { assertLinks as assertSubscriptionLinks } from '@leafypay/platform-links
 import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
+import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -54,6 +55,7 @@ const REQUIRED_COLLECTIONS = [
   INTERBANK_MESSAGE_LOG_COLLECTION,
   CARD_ISSUER_VAULT_COLLECTION,
   ISSUED_CARD_REGISTRY_COLLECTION,
+  CREDIT_ASSESSMENT_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,

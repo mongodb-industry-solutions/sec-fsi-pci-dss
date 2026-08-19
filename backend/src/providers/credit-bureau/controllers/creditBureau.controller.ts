@@ -14,22 +14,27 @@ export async function creditBureauController(fastify: FastifyInstance) {
     schema: {
       tags: ['modules:credit-bureau'],
       summary: 'Credit bureau engine invocation (internal loopback)',
-      description: 'Internal credit-bureau scoring engine. Called by the integration router (ADR-029) '
-        + 'when no external credit-bureau vendor is active. Returns a credit score and risk rating for the subject. '
+      description: 'Credit bureau capability. Called by the integration router when no external bureau vendor '
+        + 'is active, and answered by the bank that holds the accounts, since that is where the balances and the '
+        + 'payment history an assessment is made of live. Returns the score with the factors that produced it. '
         + 'Not JWT-authenticated; requires `X-Integration-Source` header.',
       headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string', description: 'Caller identity header.' } } },
       body: { type: 'object', additionalProperties: true, description: 'Customer or business identity payload forwarded by the integration router.' },
       response: {
         200: {
           type: 'object',
-          description: 'Credit bureau scoring result.',
+          additionalProperties: true,
+          description: 'Credit bureau scoring result, with the factors that produced it.',
           properties: {
-            creditScore:        { type: 'number', description: 'Credit score (e.g. 300–850 scale).' },
-            creditRating:       { type: 'string', description: 'Letter rating (e.g. A, B, C).' },
-            defaultProbability: { type: 'number', description: 'Estimated probability of default (0–1).' },
+            creditScore:        { type: 'number', description: 'Credit score, 300 to 850.' },
+            creditRating:       { type: 'string', description: 'Letter rating, A to E.' },
+            defaultProbability: { type: 'number', description: 'Estimated probability of default, 0 to 1.' },
+            assessmentFactors:  { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'What produced the score.' },
+            assessmentAsOfDateTime: { type: 'string' },
           },
         },
         401: { type: 'object', properties: { error: { type: 'string' } }, description: 'Missing X-Integration-Source header.' },
+        502: { type: 'object', additionalProperties: true, properties: { error: { type: 'string' } }, description: 'The bureau could not be reached or refused. Never answered with a default score.' },
       },
     },
     config: { skipAuth: true },
@@ -37,7 +42,10 @@ export async function creditBureauController(fastify: FastifyInstance) {
     if (!request.headers['x-integration-source']) {
       return reply.code(401).send({ error: 'X-Integration-Source header required' });
     }
-    return reply.send(scoreCreditBureau(request.body as Record<string, unknown>));
+    const result = await scoreCreditBureau(request.body as Record<string, unknown>, request.id);
+    // Reported, not substituted: a decision taken on an invented score is worse than one that waits.
+    if (result.error) return reply.code(502).send({ error: result.error });
+    return reply.send(result);
   });
 
   fastify.get('/config', {

@@ -57,7 +57,8 @@ const PARITY: ParityRow[] = [
   { capability: 'exact-PAN search for an investigation', method: 'post', path: '/v1/cards/searches', phase: 'done' },
   { capability: 'ephemeral PAN reveal', method: 'post', path: '/v1/cards/{cardToken}/pan-reveals', phase: 'done' },
   { capability: 'per-card verification value derivation', method: 'post', path: '/v1/cards/{cardToken}/verification-values', phase: 'done' },
-  { capability: 'credit assessment', method: 'post', path: '/v1/credit-assessments', phase: 'P8' },
+  { capability: 'credit assessment', method: 'post', path: '/v1/credit-assessments', phase: 'done' },
+  { capability: 'the assessment on file', method: 'get', path: '/v1/credit-assessments/{accountHolderReference}', phase: 'done' },
 ];
 
 describe('v37 P3.11: parity with what the PSP does today', () => {
@@ -101,7 +102,8 @@ describe('v37 P3.11: parity with what the PSP does today', () => {
     // Printed rather than asserted: the remaining phases are the plan's, not this test's, to complete.
     expect(outstanding.map((row) => row.phase)).toEqual(
       // P7 left this list when the card endpoints landed, which is what "done" is supposed to mean.
-      expect.arrayContaining(['P3.9', 'P8']),
+      // P8 left this list when the assessment landed at the bank.
+      expect.arrayContaining(['P3.9']),
     );
   });
 

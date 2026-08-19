@@ -18,6 +18,7 @@ import {
 import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
+import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -236,6 +237,12 @@ const INDEXES: IndexPlan[] = [
     collection: ISSUED_CARD_REGISTRY_COLLECTION,
     keys: { accountHolderInstanceReference: 1, issuedCardStatus: 1 },
     options: { name: 'issuedCardRegistry_holder_status' },
+  },
+  // One current assessment per party, which is also how it is read and replaced.
+  {
+    collection: CREDIT_ASSESSMENT_COLLECTION,
+    keys: { accountHolderInstanceReference: 1 },
+    options: { unique: true, name: 'creditAssessment_holder_unique' },
   },
   {
     collection: COUNTERS_COLLECTION,

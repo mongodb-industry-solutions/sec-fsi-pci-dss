@@ -28,12 +28,27 @@ describe('capability module engines (ADR-029)', () => {
     expect(r.riskRating).toBe('low');
   });
 
-  it('aml/kyc/kyb/credit-bureau/card engines return well-formed payloads', () => {
+  it('aml/kyc/kyb/card engines return well-formed payloads', () => {
     expect(screenAml({}).requiresReview).toBe(false);
     expect(verifyKyc({}).verificationStatus).toBe('pass');
     expect(verifyKyb({}).sanctionsMatch).toBe(false);
-    expect(scoreCreditBureau({}).creditScore).toBeGreaterThan(0);
     expect(authorizeCard({}).authorizationStatus).toBe('approved');
+  });
+
+  it('credit-bureau: refuses with no subject rather than inventing a score', async () => {
+    // v37 P8: the assessment is the bank's, since the bank holds the accounts it is made from. The engine
+    // used to answer 720 for an empty payload, which is exactly what it should not do: a score with no
+    // subject and no evidence would be acted on as if it meant something.
+    const result = await scoreCreditBureau({});
+    expect(result.error).toBeTruthy();
+    expect(result.creditScore).toBeUndefined();
+  });
+
+  it('credit-bureau: reports an unreachable bureau instead of substituting a default', async () => {
+    const unreachable = (async () => { throw new Error('connect ECONNREFUSED'); }) as unknown as typeof fetch;
+    const result = await scoreCreditBureau({ accountHolderReference: 'holder-1' }, 'corr-1', unreachable);
+    expect(result.error).toBeTruthy();
+    expect(result.creditScore).toBeUndefined();
   });
 
   describe('card issuer validation (configurable simulator)', () => {

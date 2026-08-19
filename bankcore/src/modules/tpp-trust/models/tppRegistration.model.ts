@@ -24,6 +24,9 @@ export type TppScope =
   // folded into the one above, because a token that can place a hold must not thereby be able to read a
   // card number. That separation is the point of granting it apart.
   | 'card-data'
+  // A credit assessment: also not a Berlin Group scope, and granted apart because reading someone's
+  // creditworthiness is a different permission from moving their money.
+  | 'credit-assessments'
   | 'demo-credits';
 
 export interface TppRegistrationControlRecord {

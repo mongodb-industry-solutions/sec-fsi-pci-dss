@@ -18,6 +18,7 @@ import { pispModule } from '../src/modules/pisp';
 import { paymentHubModule } from '../src/modules/payment-hub';
 import { cardAuthorizationModule } from '../src/modules/card-authorization';
 import { cardIssuerModule } from '../src/modules/card-issuer';
+import { creditBureauModule } from '../src/modules/credit-bureau';
 import { config } from '../src/config';
 
 export async function buildApp(): Promise<FastifyInstance> {
@@ -157,6 +158,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(paymentHubModule);
   await fastify.register(cardAuthorizationModule);
   await fastify.register(cardIssuerModule);
+  await fastify.register(creditBureauModule);
   // Diagnostics and administration, explicitly NOT part of the bank's Open Banking API.
   await fastify.register(systemModule, { prefix: '/api/v1' });
   await fastify.register(adminModule, { prefix: '/api/v1' });

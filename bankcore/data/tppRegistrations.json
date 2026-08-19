@@ -10,6 +10,7 @@
       "funds-confirmations",
       "card-authorisations",
       "card-data",
+      "credit-assessments",
       "demo-credits"
     ],
     "tppRegistrationRoles": [

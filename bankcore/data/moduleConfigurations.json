@@ -133,5 +133,69 @@
     "bianControlRecordType": "BankModuleConfiguration",
     "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "bankModuleConfigurationInstanceReference": "credit-bureau",
+    "bankModuleCapability": "credit-bureau",
+    "bankModuleDescription": "How this bank scores the parties it banks: base score, rating bands, and the points its own records earn or cost. Retune here rather than in code.",
+    "bankModuleConfiguration": {
+      "baseScore": 600,
+      "minimumScore": 300,
+      "maximumScore": 850,
+      "ratingBands": [
+        {
+          "rating": "A",
+          "minimumScore": 760
+        },
+        {
+          "rating": "B",
+          "minimumScore": 700
+        },
+        {
+          "rating": "C",
+          "minimumScore": 640
+        },
+        {
+          "rating": "D",
+          "minimumScore": 560
+        },
+        {
+          "rating": "E",
+          "minimumScore": 0
+        }
+      ],
+      "pointsPerRelationshipYear": 12,
+      "maximumRelationshipPoints": 60,
+      "balanceBands": [
+        {
+          "minimumBalance": 10000,
+          "points": 90
+        },
+        {
+          "minimumBalance": 5000,
+          "points": 60
+        },
+        {
+          "minimumBalance": 1000,
+          "points": 35
+        },
+        {
+          "minimumBalance": 100,
+          "points": 10
+        },
+        {
+          "minimumBalance": 0,
+          "points": 0
+        }
+      ],
+      "pointsPerReturnedPayment": 45,
+      "historyDays": 365
+    },
+    "bankModuleConfigurationStatus": "active",
+    "bankModuleConfigurationConsumed": true,
+    "bianServiceDomain": "Customer Credit Rating",
+    "bianControlRecordType": "BankModuleConfiguration",
+    "recordCreatedDateTime": "2026-08-19T00:00:00.000Z",
+    "schemaVersion": 1
   }
 ]
