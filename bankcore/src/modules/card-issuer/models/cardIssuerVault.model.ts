@@ -9,6 +9,14 @@ export const ISSUED_CARD_REGISTRY_COLLECTION = 'issuedCardRegistry';
 
 export type IssuedCardStatus = 'issued' | 'active' | 'suspended' | 'revoked';
 
+// Set by the issuer per card, and judged on every authorisation. Only the per-transaction ceiling is
+// enforced: a daily one needs a per-card tally of the day's authorisations, which nothing here keeps yet,
+// and a limit that silently does nothing is worse than an absent one.
+export interface IssuedCardLimits {
+  perTransactionAmount?: number;
+  limitCurrency?: string;
+}
+
 export interface CardIssuerVaultRecord {
   issuedCardInstanceReference: string;
   // The PSP's surrogate token, which is how a request arrives here without carrying a PAN.
@@ -44,6 +52,9 @@ export interface IssuedCardRegistryRecord {
   paymentCardExpiryMonth?: string;
   paymentCardExpiryYear?: string;
   issuedCardStatus: IssuedCardStatus;
+  issuedCardLimits?: IssuedCardLimits;
+  // Set on a replacement, pointing at the card it superseded, so a lost card's history stays followable.
+  replacesPaymentCardReference?: string;
   bianServiceDomain: string;
   bianControlRecordType: 'IssuedCardRegistry';
   recordCreatedDateTime: string;

@@ -3,6 +3,7 @@ import { requireTpp } from '../../../vendors/middleware/tppAuth';
 import { resolveConsent, recordAccess } from '../../consent/services/consent.service';
 import { findAccount } from '../../aisp/services/accountInformation.service';
 import { reserve, release, settleReservation } from '../../aspsp/services/ledger.service';
+import { findIssuedCard, judgeCardForAuthorisation } from '../../card-issuer/services/cardLifecycle.service';
 
 // The issuer's authorisation hold: the operation a card authorisation actually is.
 //
@@ -37,7 +38,7 @@ const AUTHORISATION_RESPONSE = {
   type: 'object',
   additionalProperties: true,
   properties: {
-    responseCode: { type: 'string', description: 'ISO 8583: 00 approved, 51 insufficient funds, 14 invalid account, 12 invalid transaction.' },
+    responseCode: { type: 'string', description: 'ISO 8583: 00 approved, 51 insufficient funds, 14 invalid account, 12 invalid transaction, 54 expired card, 61 exceeds limit, 62 restricted card.' },
     approved: { type: 'boolean' },
     authorisationReference: { type: 'string', description: 'The hold, quoted when it is released or settled.' },
     heldAmount: { type: 'string', description: 'Decimal string per ISO 20022.' },
@@ -140,6 +141,16 @@ export async function cardAuthorisationController(fastify: FastifyInstance) {
     if (!resolution.ok) {
       const { status, code, text } = resolution.refusal;
       return reply.status(status).send(messages(code, text));
+    }
+
+    // The card first, and only then the money: a blocked card, an expired one or one over its limit is a
+    // refusal about the CARD, and reserving funds before finding that out would hold money for nothing.
+    // An unknown token is not refused here, so a card this bank never issued is judged on the account alone.
+    if (body.cardToken) {
+      const refusal = judgeCardForAuthorisation(
+        await findIssuedCard(fastify.db, body.cardToken), amount, currency,
+      );
+      if (refusal) return reply.status(200).send(declined(refusal.code));
     }
 
     const account = await findAccount(fastify.db, accountRef);

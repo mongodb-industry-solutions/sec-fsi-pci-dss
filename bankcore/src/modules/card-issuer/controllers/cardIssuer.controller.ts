@@ -6,6 +6,9 @@ import {
 } from '../models/cardIssuerVault.model';
 import { cardIssuerConfig, detectNetwork, validateCard } from '../services/cardValidation.service';
 import { deriveCvvForCard } from '../services/cardCvv.service';
+import {
+  issueCard, changeCardStatus, renewCard, replaceCard, setCardLimits, findIssuedCard,
+} from '../services/cardLifecycle.service';
 
 // The issuer's card API. A CVV is compared and discarded; a PAN leaves only through the reveal endpoint.
 const ERROR_RESPONSE = {
@@ -20,6 +23,34 @@ const ERROR_RESPONSE = {
         properties: { category: { type: 'string' }, code: { type: 'string' }, text: { type: 'string' } },
       },
     },
+  },
+} as const;
+
+const CARD_RESPONSE = {
+  type: 'object',
+  additionalProperties: true,
+  properties: {
+    cardToken: { type: 'string' },
+    network: { type: 'string' },
+    bin: { type: 'string' },
+    lastFour: { type: 'string' },
+    maskedDisplay: { type: 'string' },
+    status: { type: 'string', description: 'issued, active, suspended or revoked.' },
+    expiryMonth: { type: 'string' },
+    expiryYear: { type: 'string' },
+    limits: {
+      type: 'object',
+      additionalProperties: true,
+      properties: { perTransactionAmount: { type: 'number' }, limitCurrency: { type: 'string' } },
+    },
+  },
+} as const;
+
+const EXPIRY = {
+  type: 'object',
+  properties: {
+    expiryMonth: { type: 'string', description: 'MM.' },
+    expiryYear: { type: 'string', description: 'YY or YYYY.' },
   },
 } as const;
 
@@ -133,18 +164,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
       security: [{ tppToken: [] }],
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       response: {
-        200: {
-          type: 'object',
-          additionalProperties: true,
-          properties: {
-            cardToken: { type: 'string' },
-            network: { type: 'string' },
-            bin: { type: 'string' },
-            lastFour: { type: 'string' },
-            maskedDisplay: { type: 'string' },
-            status: { type: 'string' },
-          },
-        },
+        200: CARD_RESPONSE,
         401: ERROR_RESPONSE,
         403: ERROR_RESPONSE,
         404: ERROR_RESPONSE,
@@ -152,17 +172,9 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const { cardToken } = request.params as { cardToken: string };
-    const card = await fastify.db.collection<IssuedCardRegistryRecord>(ISSUED_CARD_REGISTRY_COLLECTION)
-      .findOne({ paymentCardReference: cardToken }, { projection: { _id: 0 } });
+    const card = await findIssuedCard(fastify.db, cardToken);
     if (!card) return reply.status(404).send(messages('RESOURCE_UNKNOWN', 'No such card at this issuer'));
-    return {
-      cardToken: card.paymentCardReference,
-      network: card.paymentCardNetwork,
-      bin: card.paymentCardBin,
-      lastFour: card.paymentCardLastFour,
-      maskedDisplay: card.paymentCardMaskedDisplay,
-      status: card.issuedCardStatus,
-    };
+    return card;
   });
 
   // ── POST /v1/cards/searches ──────────────────────────────────────────────────────────────────
@@ -333,5 +345,186 @@ export async function cardIssuerController(fastify: FastifyInstance) {
       return reply.status(503).send(messages('SERVICE_BLOCKED', 'The issuer key is not available, so no value could be derived'));
     }
     return { cardToken, verificationValue, expiry };
+  });
+  // ── POST /v1/cards ───────────────────────────────────────────────────────────────────────────
+  fastify.post('/cards', {
+    preValidation: requireTpp('card-data', 'CBPII'),
+    schema: {
+      tags: ['cards'],
+      summary: 'Issue a card',
+      description:
+        'Mints a card: a number inside one of this bank\'s declared BIN ranges with a valid check digit, so '
+        + 'the card it issues is routable back to it, plus the registry entry everything else reads.\n\n'
+        + 'It lands `issued`, not `active`: a card is activated by whoever receives it, which is what the two '
+        + 'states are for. The number is never returned, here or anywhere but the reveal endpoint.',
+      security: [{ tppToken: [] }],
+      body: {
+        type: 'object',
+        required: ['network', 'expiryMonth', 'expiryYear'],
+        properties: {
+          network: { type: 'string', description: 'Must have a BIN range declared by this bank.' },
+          expiryMonth: { type: 'string' },
+          expiryYear: { type: 'string' },
+          accountHolderReference: { type: 'string' },
+          fundingAccountReference: { type: 'string', description: 'The account an authorisation is held against.' },
+          cardToken: { type: 'string', description: 'Supply one to keep a reference in step with a caller.' },
+          limits: {
+            type: 'object',
+            properties: { perTransactionAmount: { type: 'number' }, limitCurrency: { type: 'string' } },
+          },
+        },
+      },
+      response: {
+        201: CARD_RESPONSE, 400: ERROR_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 409: ERROR_RESPONSE,
+      },
+    },
+  }, async (request, reply) => {
+    const body = request.body as {
+      network: string; expiryMonth: string; expiryYear: string;
+      accountHolderReference?: string; fundingAccountReference?: string; cardToken?: string;
+      limits?: { perTransactionAmount?: number; limitCurrency?: string };
+    };
+    const result = await issueCard(fastify.db, body);
+    if (!result.ok) {
+      if (result.refusal === 'card_token_in_use') {
+        return reply.status(409).send(messages('RESOURCE_BLOCKED', 'That card token already names a card here'));
+      }
+      const text = result.refusal === 'no_bin_range'
+        ? 'This bank declares no BIN range for that network, so the card would be unroutable'
+        : 'That network is not one this bank issues';
+      return reply.status(400).send(messages('FORMAT_ERROR', text));
+    }
+    return reply.status(201).send(result.card);
+  });
+
+  // ── PUT /v1/cards/{cardToken}/status ─────────────────────────────────────────────────────────
+  fastify.put('/cards/:cardToken/status', {
+    preValidation: requireTpp('card-data', 'CBPII'),
+    schema: {
+      tags: ['cards'],
+      summary: 'Activate, block or revoke a card',
+      description:
+        'The lifecycle transition. Only legal moves are accepted, and `revoked` is terminal: a revoked card '
+        + 'is replaced, not un-revoked, so one token never means two different cards over time.\n\n'
+        + 'A blocked card is refused by the authorisation and the validation before any other check, since '
+        + 'there is nothing to judge on a card that is not usable.',
+      security: [{ tppToken: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      body: {
+        type: 'object',
+        required: ['status'],
+        properties: { status: { type: 'string', enum: ['issued', 'active', 'suspended', 'revoked'] } },
+      },
+      response: { 200: CARD_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE, 409: ERROR_RESPONSE },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const { status } = request.body as { status: 'issued' | 'active' | 'suspended' | 'revoked' };
+    const result = await changeCardStatus(fastify.db, cardToken, status);
+    if (!result.ok) {
+      if (result.refusal === 'unknown_card') {
+        return reply.status(404).send(messages('RESOURCE_UNKNOWN', 'No such card at this issuer'));
+      }
+      return reply.status(409).send(messages('STATUS_INVALID', `A card cannot go from ${result.from} to ${status}`));
+    }
+    return result.card;
+  });
+
+  // ── POST /v1/cards/{cardToken}/renewals ──────────────────────────────────────────────────────
+  fastify.post('/cards/:cardToken/renewals', {
+    preValidation: requireTpp('card-data', 'CBPII'),
+    schema: {
+      tags: ['cards'],
+      summary: 'Renew a card to a later expiry',
+      description:
+        'Same token, same number, later expiry, which is what makes a renewal invisible to everything '
+        + 'holding the token. The verification value does change, since the expiry feeds its derivation.',
+      security: [{ tppToken: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      body: { type: 'object', required: ['expiryMonth', 'expiryYear'], properties: EXPIRY.properties },
+      response: { 200: CARD_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE, 409: ERROR_RESPONSE },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const { expiryMonth, expiryYear } = request.body as { expiryMonth: string; expiryYear: string };
+    const result = await renewCard(fastify.db, cardToken, { month: expiryMonth, year: expiryYear });
+    if (!result.ok) {
+      if (result.refusal === 'unknown_card') {
+        return reply.status(404).send(messages('RESOURCE_UNKNOWN', 'No such card at this issuer'));
+      }
+      return reply.status(409).send(messages('STATUS_INVALID', 'A revoked card is replaced, not renewed'));
+    }
+    return result.card;
+  });
+
+  // ── POST /v1/cards/{cardToken}/replacements ──────────────────────────────────────────────────
+  fastify.post('/cards/:cardToken/replacements', {
+    preValidation: requireTpp('card-data', 'CBPII'),
+    schema: {
+      tags: ['cards'],
+      summary: 'Replace a card, revoking the old one',
+      description:
+        'A new card, deliberately not a renewal: a lost card\'s number has to stop working, so the '
+        + 'replacement gets its own token, its own number and its own verification value, and the old card '
+        + 'is revoked.\n\n'
+        + 'The new card is issued BEFORE the old one is revoked, so a failure at that point leaves the holder '
+        + 'with a card that still works rather than none.',
+      security: [{ tppToken: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      body: { type: 'object', properties: EXPIRY.properties },
+      response: {
+        201: {
+          type: 'object',
+          additionalProperties: true,
+          properties: { replacement: CARD_RESPONSE, replaced: { type: 'string' } },
+        },
+        400: ERROR_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE,
+      },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const body = (request.body ?? {}) as { expiryMonth?: string; expiryYear?: string };
+    const expiry = body.expiryMonth && body.expiryYear
+      ? { month: body.expiryMonth, year: body.expiryYear }
+      : undefined;
+    const result = await replaceCard(fastify.db, cardToken, expiry);
+    if (!result.ok) {
+      if (result.refusal === 'unknown_card') {
+        return reply.status(404).send(messages('RESOURCE_UNKNOWN', 'No such card at this issuer'));
+      }
+      return reply.status(400).send(messages('FORMAT_ERROR', `The replacement could not be issued: ${result.refusal}`));
+    }
+    return reply.status(201).send({ replacement: result.replacement, replaced: result.replaced });
+  });
+
+  // ── PUT /v1/cards/{cardToken}/limits ─────────────────────────────────────────────────────────
+  fastify.put('/cards/:cardToken/limits', {
+    preValidation: requireTpp('card-data', 'CBPII'),
+    schema: {
+      tags: ['cards'],
+      summary: 'Set the limits an authorisation is judged against',
+      description:
+        'The per-transaction ceiling this issuer applies to the card. An authorisation above it is declined '
+        + 'with `61`, exceeds withdrawal amount limit.\n\n'
+        + 'Only a per-transaction ceiling is offered. A daily limit needs a per-card tally of the day\'s '
+        + 'authorisations, which nothing here keeps yet, and a limit that silently does nothing would be '
+        + 'worse than an absent one.',
+      security: [{ tppToken: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      body: {
+        type: 'object',
+        properties: {
+          perTransactionAmount: { type: 'number' },
+          limitCurrency: { type: 'string', description: 'An authorisation in another currency is refused.' },
+        },
+      },
+      response: { 200: CARD_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const limits = (request.body ?? {}) as { perTransactionAmount?: number; limitCurrency?: string };
+    const result = await setCardLimits(fastify.db, cardToken, limits);
+    if (!result.ok) return reply.status(404).send(messages('RESOURCE_UNKNOWN', 'No such card at this issuer'));
+    return result.card;
   });
 }
