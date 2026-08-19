@@ -9,6 +9,7 @@ import correlationPlugin from '../src/plugins/correlation';
 import swaggerPlugin from '../src/plugins/swagger';
 import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from '../src/shared/services/logBuffer';
 import { configurationReport, readinessReport, formatReport } from '../src/shared/services/startupReport';
+import auditTrailPlugin from '../src/plugins/auditTrail';
 import { systemModule } from '../src/modules/system';
 import { adminModule } from '../src/modules/admin';
 import { aispModule } from '../src/modules/aisp';
@@ -48,6 +49,8 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // Fault tolerant like the PSP's: the process still starts so /health can report why it is degraded.
   await fastify.register(mongodbPlugin);
+  // After mongodb: the hook needs a database, and it records the requests that follow.
+  await fastify.register(auditTrailPlugin);
 
   // No CORS plugin at all: bankcore is private and server to server. Registering a permissive origin
   // would create the browser-reachable surface the design deliberately avoids.

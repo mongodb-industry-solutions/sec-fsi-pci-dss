@@ -4790,6 +4790,7 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `cardIssuerVault` | `card-issuer` | The issuer CDE: the only full PAN on this platform. PAN and service code under QE with equality indexes |
 | `issuedCardRegistry` | `card-issuer` | Cards this bank issued: network, BIN, last four, lifecycle, limits. No PAN by design |
 | `creditAssessmentState` | `credit-bureau` | One current assessment per party, with the factors that produced it |
+| `bankAuditLog` | `audit` | Every request the bank answered: actor, route, consent, resource, outcome. No request bodies and no cardholder data by design |
 | `bankModuleConfiguration` | `admin` | Configuration of the bank's own engines, edited over its admin API |
 | `domainEvent` | `system` | The bank's own event store, separate instance |
 | `counters` | `system` | Sequence counters, bank instance |

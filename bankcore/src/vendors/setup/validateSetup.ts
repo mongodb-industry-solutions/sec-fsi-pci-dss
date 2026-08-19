@@ -24,6 +24,7 @@ import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
+import { BANK_AUDIT_LOG_COLLECTION } from '../../modules/audit/models/bankAuditLog.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
@@ -56,6 +57,7 @@ const REQUIRED_COLLECTIONS = [
   CARD_ISSUER_VAULT_COLLECTION,
   ISSUED_CARD_REGISTRY_COLLECTION,
   CREDIT_ASSESSMENT_COLLECTION,
+  BANK_AUDIT_LOG_COLLECTION,
   DOMAIN_EVENT_COLLECTION,
   COUNTERS_COLLECTION,
   IDEMPOTENCY_COLLECTION,

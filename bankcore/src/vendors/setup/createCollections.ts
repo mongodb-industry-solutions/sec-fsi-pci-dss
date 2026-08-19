@@ -18,6 +18,7 @@ import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
+import { BANK_AUDIT_LOG_COLLECTION } from '../../modules/audit/models/bankAuditLog.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
 import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
 
@@ -57,6 +58,9 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   // No encrypted fields: a score and its factors are the bank's assessment, not personal data it holds
   // about a third party, and the party is named by reference rather than by identity.
   { name: CREDIT_ASSESSMENT_COLLECTION, purpose: "the bank's credit assessment per party, with its factors" },
+  // No encrypted fields: it holds references and outcomes, never a body, so there is nothing in it to
+  // encrypt. That is a property of the design rather than an omission.
+  { name: BANK_AUDIT_LOG_COLLECTION, purpose: 'every request the bank answered: actor, resource, consent, outcome' },
   { name: COUNTERS_COLLECTION, purpose: 'sequence counters, own instance' },
   { name: IDEMPOTENCY_COLLECTION, purpose: 'idempotency keys, own instance' },
 ];

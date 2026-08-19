@@ -1,6 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { requireAdmin } from '../../../vendors/middleware/adminAuth';
 import {
+  BANK_AUDIT_LOG_COLLECTION, BankAuditLogRecord,
+} from '../../audit/models/bankAuditLog.model';
+import {
   BANK_CAPABILITY_KEYS, BankCapabilityKey,
 } from '../models/bankModuleConfiguration.model';
 import {
@@ -295,6 +298,68 @@ export async function bankAdminController(fastify: FastifyInstance) {
       .find(filter, { projection: { _id: 0 } })
       .sort({ recordCreatedDateTime: -1 })
       .limit(limit ?? 50)
+      .toArray();
+    return { results };
+  });
+
+
+  // ── The bank's own audit trail ────────────────────────────────────────────────────────────────
+  fastify.get('/audit', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: "Read the bank's audit trail",
+      description:
+        'Every request this bank answered, newest first: who asked, what they asked of, under which consent, '
+        + 'and what it answered. Filter by actor to see one third party, by outcome to see only refusals, or '
+        + 'by any resource reference to follow one account, payment or card.\n\n'
+        + 'It carries no request bodies and no cardholder data by design. An audit trail that copies the '
+        + 'payload becomes a second place the sensitive data lives, and then the log is the thing that has to '
+        + 'be protected. References and outcomes reconstruct what happened, which is what a reviewer reads.\n\n'
+        + 'The consent access log is narrower and still separate: it records consent DECISIONS, so a call that '
+        + 'needed no consent never appears in it.',
+      security: [{ adminAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          actor: { type: 'string', description: 'The third party client id, or an operator subject.' },
+          outcome: { type: 'string', description: 'granted, refused or failed.' },
+          channel: { type: 'string', description: 'open_banking, admin or internal.' },
+          resource: { type: 'string', description: 'Any consent, account, payment, card or authentication reference.' },
+          correlationId: { type: 'string', description: 'Follows one journey across both services.' },
+          limit: { type: 'integer', minimum: 1, maximum: 500 },
+        },
+      },
+      response: {
+        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
+        401: ERROR,
+        403: ERROR,
+      },
+    },
+  }, async (request) => {
+    const query = request.query as {
+      actor?: string; outcome?: string; channel?: string; resource?: string; correlationId?: string; limit?: number;
+    };
+    const filter: Record<string, unknown> = {};
+    if (query.actor) filter.auditActorReference = query.actor;
+    if (query.outcome) filter.auditOutcome = query.outcome;
+    if (query.channel) filter.auditChannel = query.channel;
+    if (query.correlationId) filter.auditCorrelationId = query.correlationId;
+    // One reference, whichever kind it is: a reviewer holding an identifier should not have to know which
+    // sort of thing it names before they can look it up.
+    if (query.resource) {
+      filter.$or = [
+        { auditConsentReference: query.resource },
+        { auditAccountReference: query.resource },
+        { auditPaymentReference: query.resource },
+        { auditCardReference: query.resource },
+        { auditAuthenticationReference: query.resource },
+      ];
+    }
+    const results = await fastify.db.collection<BankAuditLogRecord>(BANK_AUDIT_LOG_COLLECTION)
+      .find(filter, { projection: { _id: 0 } })
+      .sort({ recordCreatedDateTime: -1 })
+      .limit(query.limit ?? 100)
       .toArray();
     return { results };
   });

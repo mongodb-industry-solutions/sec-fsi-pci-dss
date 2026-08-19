@@ -19,6 +19,7 @@ import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
+import { BANK_AUDIT_LOG_COLLECTION } from '../../modules/audit/models/bankAuditLog.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
 interface IndexPlan {
@@ -243,6 +244,27 @@ const INDEXES: IndexPlan[] = [
     collection: CREDIT_ASSESSMENT_COLLECTION,
     keys: { accountHolderInstanceReference: 1 },
     options: { unique: true, name: 'creditAssessment_holder_unique' },
+  },
+  // The trail is read newest-first, per actor, and by the reference someone is holding.
+  {
+    collection: BANK_AUDIT_LOG_COLLECTION,
+    keys: { recordCreatedDateTime: -1 },
+    options: { name: 'bankAuditLog_time' },
+  },
+  {
+    collection: BANK_AUDIT_LOG_COLLECTION,
+    keys: { auditActorReference: 1, recordCreatedDateTime: -1 },
+    options: { name: 'bankAuditLog_actor_time' },
+  },
+  {
+    collection: BANK_AUDIT_LOG_COLLECTION,
+    keys: { auditOutcome: 1, recordCreatedDateTime: -1 },
+    options: { name: 'bankAuditLog_outcome_time' },
+  },
+  {
+    collection: BANK_AUDIT_LOG_COLLECTION,
+    keys: { auditCorrelationId: 1 },
+    options: { name: 'bankAuditLog_correlation' },
   },
   {
     collection: COUNTERS_COLLECTION,
