@@ -18,6 +18,7 @@ import {
 import { applyMappings } from './fieldMapping.service';
 import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
 import { resolveProvider, resolverKindFor, type ResolutionContext } from './resolverStrategy';
+import { getProviderAccessToken } from './providerAccessToken.service';
 import { sanitizeDeep } from './businessProcessEvent.service';
 import { resolveEventOutbound } from './providerEventConfig.service';
 
@@ -32,6 +33,29 @@ export interface DispatchResult {
   // a card issuer that approves/declines), not just on transport success. Undefined for stub
   // providers with no endpoint, or when the call errored/timed out before a body was read.
   responseBody?: unknown;
+}
+
+/**
+ * Substitutes `{placeholder}` segments in a configured URL from the payload.
+ *
+ * Returns which keys were consumed so the caller can keep them out of the body. A placeholder with no
+ * matching field is left as-is rather than blanked: a URL with a visible `{accountId}` in it fails loudly at
+ * the provider, whereas silently producing `/v1/accounts//balances` would read as a routing bug for hours.
+ */
+export function applyPathTemplate(
+  url: string,
+  payload: Record<string, unknown>,
+): { url: string; consumed: string[] } {
+  if (!url.includes('{')) return { url, consumed: [] };
+  const consumed: string[] = [];
+  const substituted = url.replace(/\{([A-Za-z0-9_]+)\}/g, (match, key: string) => {
+    const value = payload[key];
+    if (value === undefined || value === null || value === '') return match;
+    consumed.push(key);
+    // Encoded: an identifier with a slash in it would otherwise silently change the path it addresses.
+    return encodeURIComponent(String(value));
+  });
+  return { url: substituted, consumed };
 }
 
 export async function dispatchProvider(
@@ -121,12 +145,31 @@ export async function dispatchProvider(
   });
 }
 
-function buildAuthHeaders(authConfig?: IntegrationAuthConfig): Record<string, string> {
+// v37 P6.2d: `oauth2_cc` had no branch here at all, so a Hub dispatch with client credentials carried NO
+// token and the provider answered 401. Nothing used the scheme until the bank arrived, which is why it had
+// never failed: the gap was invisible precisely because it was unreachable.
+//
+// Async because obtaining a token is a network call. The token is cached per provider and scope by the
+// service below, so this is one exchange per lifetime rather than one per dispatch.
+async function buildAuthHeaders(
+  authConfig?: IntegrationAuthConfig,
+  providerType?: IntegrationProviderType,
+): Promise<Record<string, string>> {
   if (!authConfig) {
     return { 'X-Integration-Source': 'psp-demo' };
   }
 
   const { scheme, bearer, apiKey } = authConfig;
+
+  if (scheme === 'oauth2_cc' && providerType) {
+    const { accessToken, error } = await getProviderAccessToken(providerType);
+    if (!accessToken) {
+      // No header rather than a bogus one: the provider's 401 then says what actually happened, and the
+      // dispatch log carries the reason instead of an unexplained rejection.
+      return { 'X-Integration-Source': 'psp-demo', 'X-Integration-Auth-Error': String(error ?? 'no token') };
+    }
+    return { Authorization: `Bearer ${accessToken}`, 'X-Integration-Source': 'psp-demo' };
+  }
 
   if (scheme === 'bearer' && bearer) {
     // API key is bcrypt-hashed: we can't recover the plaintext in a demo.
@@ -180,12 +223,26 @@ async function dispatchExternal(
   // Declared outside try so the catch branch can include the request in its audit capture.
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...buildAuthHeaders(wire.auth),
+    ...(await buildAuthHeaders(wire.auth, provider.externalProviderArrangementType)),
   };
+
+  // v37 P6.2d: a REST RESOURCE api addresses things in the PATH, so a configured url may be a template
+  // (`/v1/accounts/{accountId}/balances`). Substituting from the payload is what lets a standard bank API be
+  // dispatched through the same pipeline as a single-endpoint connector, instead of needing its own client.
+  const { url: templatedUrl, consumed } = applyPathTemplate(wire.url ?? '', mappedPayload);
 
   // Resolve a host-less internal path (seeded config) to an absolute URL via PSP_BASE_URL; absolute
   // external URLs pass through unchanged.
-  const targetUrl = resolveServiceUrl(wire.url ?? '');
+  const targetUrl = resolveServiceUrl(templatedUrl);
+
+  // A GET or DELETE with a JSON body is not a request most servers will read, and some reject it outright.
+  // The fields that went INTO the path are dropped from the body either way: sending them twice invites a
+  // mismatch between the two, which is the kind of bug that only shows up on the one that is ignored.
+  const method = (wire.httpMethod ?? 'POST').toUpperCase();
+  const sendsBody = method !== 'GET' && method !== 'DELETE';
+  const bodyPayload = consumed.length
+    ? Object.fromEntries(Object.entries(mappedPayload).filter(([key]) => !consumed.includes(key)))
+    : mappedPayload;
 
   try {
 
@@ -200,7 +257,7 @@ async function dispatchExternal(
     const res = await fetch(targetUrl, {
       method: wire.httpMethod,
       headers,
-      body: JSON.stringify(mappedPayload),
+      ...(sendsBody ? { body: JSON.stringify(bodyPayload) } : {}),
       signal: controller.signal,
     });
     clearTimeout(timeout);
@@ -479,7 +536,11 @@ export async function runIntegrationTest(
     const timeout = setTimeout(() => controller.abort(), provider.externalProviderTimeoutMs ?? 5000);
     const res = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true', ...buildAuthHeaders(provider.authConfig) },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Integration-Test': 'true',
+        ...(await buildAuthHeaders(provider.authConfig, provider.externalProviderArrangementType)),
+      },
       body: JSON.stringify(transformed),
       signal: controller.signal,
     });
