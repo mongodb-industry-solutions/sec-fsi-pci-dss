@@ -2,8 +2,33 @@
 
 export const AUTHENTICATION_DOMAIN_COLLECTION = 'authenticationDomain';
 
+// The PROTOCOL a domain authenticates with. `local` here means a password this platform holds, as opposed
+// to a federated one, and it is deliberately NOT renamed: it names the mechanism, not the realm.
 export type AuthDomainType = 'local' | 'oidc' | 'saml';
-export type AuthDomainName = 'local' | 'msentra' | 'bigid';
+
+// The REALM a user belongs to. Customers and employees are both Leafy Pay users, so this is the platform
+// realm rather than a staff one, and v37 renamed it from `local` to say so: a realm called `local` reads as
+// "wherever this is deployed" instead of naming the institution whose users these are.
+export type AuthDomainName = 'leafypay' | 'msentra' | 'bigid';
+
+/** The platform realm. Referenced rather than spelled out, so it cannot drift between call sites. */
+export const PLATFORM_AUTH_DOMAIN: AuthDomainName = 'leafypay';
+
+// What `local` still means on the wire. External clients, saved bookmarks and anything integrated before
+// the rename may still send it, and login compares the request against the stored domain, so an unmapped
+// alias would reject a correct password with "invalid credentials". Kept as an alias rather than a second
+// realm: there is one realm, under two names.
+const WIRE_ALIASES: Record<string, AuthDomainName> = { local: PLATFORM_AUTH_DOMAIN };
+
+/**
+ * Resolves whatever a caller sent to the realm it means. An unknown value is returned untouched, so it
+ * fails the domain comparison the same way it did before rather than being silently coerced to the
+ * platform realm.
+ */
+export function resolveAuthDomainName(sent: string | undefined | null): string | undefined {
+  if (sent === undefined || sent === null || sent === '') return undefined;
+  return WIRE_ALIASES[sent] ?? sent;
+}
 /** OAuth/SSO flow type: determines whether the UI shows a credential form or redirects */
 export type AuthDomainFlowType = 'client_credentials' | 'authorization_code' | 'saml' | 'oidc';
 

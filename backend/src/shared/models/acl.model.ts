@@ -161,14 +161,16 @@ export const BUILTIN_ROLES: Array<Omit<RoleRecord, 'recordCreatedDateTime' | 're
     },
   },
   {
-    // v29: global operations of cardholder cards and payout accounts through the
-    // built-in modules (card-issuer / account-information). BIAN has no staff "Card/Account
-    // Administrator" role for (data domains), so we follow the project's established
-    // "<area>_officer" bank-employee convention (precedent: merchant_officer →). SoD (PCI DSS):
-    // distinct from `manager` (no CHD) and from `customer` (scope own, self-service).
+    // Global operations of cardholder cards and payout accounts, through the card issuer and account
+    // information capabilities. A PAYMENT SERVICE PROVIDER staff role, not a bank employee one: acquiring
+    // and card-on-file administration are the provider's functions, and `merchant_officer` alongside it is
+    // the same, since onboarding merchants is acquiring. v37 changed which API these roles call, not which
+    // institution they belong to: the cards and accounts moved to the bank, so this role now operates
+    // against the bank through the provider rather than against a local collection.
+    // Separation of duties: distinct from `manager` (no cardholder data) and from `customer` (own scope).
     roleName: 'operations_officer',
     roleLabel: 'Operations Officer',
-    roleDescription: 'Operations: administers cardholder cards (SD-88) and payout accounts (SD-66) via the built-in modules, plus KYC (SD-53) and KYB (SD-89) data administration (review/correct records and beneficial owners). KYB decision (approve/reject) stays with merchant_officer (SoD, PCI Req 7).',
+    roleDescription: 'Operations: administers cardholder cards and payout accounts through the platform capabilities, plus customer and business identity data administration (reviewing and correcting records and beneficial owners). The decision to approve or reject a business stays with the merchant officer, kept apart on purpose.',
     roleScope: 'all',
     roleIsBuiltin: true,
     bianServiceDomain: 'Payment Card / Payout Account Arrangement',

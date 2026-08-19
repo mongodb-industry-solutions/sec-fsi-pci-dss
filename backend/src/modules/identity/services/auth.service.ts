@@ -6,6 +6,7 @@ import { AUTHENTICATION_DOMAIN_COLLECTION, AuthenticationDomainRecord } from '..
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../gateway/models/merchantAgreement.model';
 import { createUser } from './user.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { resolveAuthDomainName, PLATFORM_AUTH_DOMAIN } from '../models/authenticationDomain.model';
 
 // Deterministic role ordering for the demo roster (login picker + simulator share this order).
 const ROLE_RANK: Record<string, number> = {
@@ -42,7 +43,10 @@ export async function loginUser(
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
-  if (user.customerAuthenticationLoginDomain !== domain) {
+  // BOTH sides are resolved through the alias, not just the request. A caller integrated before the rename
+  // may send `local`, and a record written before it may STORE `local`; normalising one side only would tell
+  // one of the two that its correct password was wrong.
+  if (resolveAuthDomainName(user.customerAuthenticationLoginDomain) !== resolveAuthDomainName(domain)) {
     throw Object.assign(new Error('Invalid credentials'), { statusCode: 401 });
   }
 
@@ -182,7 +186,7 @@ export async function changeOwnPassword(
   if (!user) {
     throw Object.assign(new Error('Account not found'), { statusCode: 404 });
   }
-  if (user.customerAuthenticationLoginDomain !== 'local') {
+  if (resolveAuthDomainName(user.customerAuthenticationLoginDomain) !== PLATFORM_AUTH_DOMAIN) {
     throw Object.assign(new Error('Password is managed by your identity provider and cannot be changed here'), { statusCode: 400 });
   }
 

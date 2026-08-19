@@ -1,8 +1,8 @@
 [
   {
     "partyAuthenticationDomainInstanceReference": "d1a2b3c4-0001-0001-0001-000000000001",
-    "partyAuthenticationDomainName": "local",
-    "partyAuthenticationDomainDisplayName": "Local (Demo Users)",
+    "partyAuthenticationDomainName": "leafypay",
+    "partyAuthenticationDomainDisplayName": "Leafy Pay",
     "partyAuthenticationDomainType": "local",
     "partyAuthenticationDomainFlowType": "client_credentials",
     "partyAuthenticationDomainEnabled": true,
@@ -25,7 +25,11 @@
     "partyAuthenticationDomainConfiguration": {
       "tenantId": "",
       "clientId": "",
-      "scopes": ["openid", "profile", "email"]
+      "scopes": [
+        "openid",
+        "profile",
+        "email"
+      ]
     },
     "bianServiceDomain": "PartyAuthentication",
     "bianControlRecordType": "AuthenticationDomain",

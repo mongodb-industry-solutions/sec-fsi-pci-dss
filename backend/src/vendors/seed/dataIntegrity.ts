@@ -154,7 +154,7 @@ export function deriveCustomerLogins(
       customerAuthenticationCredentialHash: credentialHash,
       customerAuthenticationUserRole: 'customer',
       customerAuthenticationUserName: party.partyName as string,
-      customerAuthenticationLoginDomain: 'local',
+      customerAuthenticationLoginDomain: 'leafypay',
       customerAuthenticationAccountStatus: 'active',
       customerAuthenticationDemoFeatured: false,
       bianServiceDomain: 'Customer Authentication',

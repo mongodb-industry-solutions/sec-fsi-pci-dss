@@ -803,7 +803,7 @@ export default function ProfilePage() {
       )}
 
       {/* Change password: local accounts only (remote IdP accounts manage their own credentials) */}
-      {profile.domain === 'local' && (
+      {(profile.domain === 'leafypay' || profile.domain === 'local') && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">

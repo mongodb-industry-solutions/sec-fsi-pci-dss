@@ -8,7 +8,7 @@ export const PARTY_AUTHENTICATION_COLLECTION = 'partyAuthenticationAssessment';
 export interface PartyAuthenticationAssessmentRecord {
   partyAuthenticationInstanceReference: string;        // PK, UUID
   partyInstanceReference: string;                      // FK to party 
-  partyAuthenticationLoginDomain: 'local' | 'msentra';
+  partyAuthenticationLoginDomain: 'leafypay' | 'msentra';
   partyAuthenticationAccountStatus: 'active' | 'suspended';
   bianServiceDomain: 'Party Authentication';
   bianControlRecordType: 'PartyAuthenticationAssessment';

@@ -144,7 +144,7 @@ export default function OAuthConsentForm({
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, domain: 'local' }),
+        body: JSON.stringify({ email, password, domain: 'leafypay' }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Login failed');

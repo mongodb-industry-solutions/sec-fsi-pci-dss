@@ -3,6 +3,7 @@ import { loginUser, getEnabledDomains, registerSelfServiceUser, updateAuthProfil
 import { getSelfProfile, updateSelfProfile } from '../../customer/services/customerAgreement.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
+import { PLATFORM_AUTH_DOMAIN } from '../models/authenticationDomain.model';
 
 export async function authController(fastify: FastifyInstance) {
   fastify.post('/login', {
@@ -47,8 +48,9 @@ Password for all demo users: \`demo-password\``,
           },
           domain: {
             type: 'string',
-            enum: ['local', 'msentra', 'bigid'],
-            default: 'local',
+            // `local` stays accepted as an alias of `leafypay`, for clients integrated before the rename.
+            enum: ['leafypay', 'local', 'msentra', 'bigid'],
+            default: 'leafypay',
             description: '`local` for seeded demo users. `msentra` for Microsoft Entra ID delegation (v2). `bigid` for BigID integration (v2).',
           },
         },
@@ -103,7 +105,7 @@ Password for all demo users: \`demo-password\``,
     }
 
     try {
-      const { token, user } = await loginUser(fastify.db, email, password, domain ?? 'local');
+      const { token, user } = await loginUser(fastify.db, email, password, domain ?? PLATFORM_AUTH_DOMAIN);
       return reply.status(200).send({
         token,
         user: {
@@ -142,7 +144,7 @@ Password for all demo users: \`demo-password\``,
           name:     { type: 'string', description: 'Display name.' },
           password: { type: 'string', minLength: 8, description: 'Password (policy: min 8 chars, at least one letter and one number; enforced server-side).' },
           phone:    { type: 'string', description: 'Optional mobile phone (PII); enables beneficiary lookup.' },
-          domain:   { type: 'string', default: 'local', description: 'Target local domain slug.' },
+          domain:   { type: 'string', default: 'leafypay', description: 'Target realm slug. `local` is accepted as an alias.' },
         },
       },
       response: {
@@ -163,7 +165,7 @@ Password for all demo users: \`demo-password\``,
     };
     try {
       const { status } = await registerSelfServiceUser(fastify.db, {
-        email, name, password, phone, domain: domain ?? 'local',
+        email, name, password, phone, domain: domain ?? PLATFORM_AUTH_DOMAIN,
       });
       return reply.status(201).send({
         status,

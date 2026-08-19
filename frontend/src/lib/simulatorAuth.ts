@@ -20,7 +20,7 @@ export async function getSimToken(email: string): Promise<string> {
   const { token } = await api.auth.login({
     email,
     password: DEMO_PASSWORD,
-    domain: 'local',
+    domain: 'leafypay',
   });
   tokenByEmail.set(email, token);
   return token;

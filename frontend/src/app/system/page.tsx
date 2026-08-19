@@ -125,7 +125,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   const showPulse = pulsing && !debugMode;
   const [users, setUsers]       = useState<AuthUser[]>([]);
   const [domains, setDomains]   = useState<AuthDomain[]>([]);
-  const [selectedDomain, setSelectedDomain] = useState('local');
+  const [selectedDomain, setSelectedDomain] = useState('leafypay');
   const [selectedEmail, setSelectedEmail]   = useState('');
   const [password, setPassword]             = useState('');
   const [showPassword, setShowPassword]     = useState(false);
@@ -147,7 +147,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
     api.system.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() => {});
     api.auth.domains()
       .then((r) => { setDomains(r.domains); if (r.domains.length > 0) setSelectedDomain(r.domains[0].name); })
-      .catch(() => setDomains([{ name: 'local', displayName: 'Local (Demo Users)', type: 'local', flowType: 'client_credentials' }]));
+      .catch(() => setDomains([{ name: 'leafypay', displayName: 'Leafy Pay', type: 'local', flowType: 'client_credentials' }]));
   }, []);
 
   function handleDomainChange(name: string) {
@@ -175,7 +175,9 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   const currentDomain  = domains.find((d) => d.name === selectedDomain);
   const flowType       = currentDomain?.flowType ?? (currentDomain?.type === 'local' ? 'client_credentials' : currentDomain?.type);
   const isCredentialFlow = !flowType || flowType === 'client_credentials';
-  const isLocalDomain    = selectedDomain === 'local';
+  // The platform realm, by name. `local` is still accepted so a session started before the rename keeps
+  // showing the credential form rather than a redirect button.
+  const isLocalDomain    = selectedDomain === 'leafypay' || selectedDomain === 'local';
 
   return (
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">

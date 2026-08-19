@@ -13,7 +13,7 @@ export interface CustomerAuthenticationAssessmentRecord {
   customerAuthenticationCredentialHash: string;        // bcrypt 12-round, NOT QE-encrypted
   customerAuthenticationUserRole: CustomerAuthRole;
   customerAuthenticationUserName: string;              // denormalized display name for JWT
-  customerAuthenticationLoginDomain: 'local' | 'msentra';
+  customerAuthenticationLoginDomain: 'leafypay' | 'msentra';
   // `pending`: self-registered account awaiting manager approval (cannot log in until `active`).
   customerAuthenticationAccountStatus: 'active' | 'suspended' | 'pending';
   customerAuthenticationLastLoginDateTime?: Date;

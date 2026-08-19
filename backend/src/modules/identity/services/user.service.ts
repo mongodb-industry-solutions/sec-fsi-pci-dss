@@ -7,6 +7,7 @@ import {
 import { PARTY_COLLECTION, PartyControlRecord } from '../models/party.model';
 import { getSensitiveTierDb, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { phoneDigest } from '../../../vendors/encryption/digest';
+import { resolveAuthDomainName, PLATFORM_AUTH_DOMAIN } from '../models/authenticationDomain.model';
 
 // Account status includes `pending` for self-registered accounts awaiting manager approval
 // (see registration flow). Pending and suspended accounts cannot log in.
@@ -171,7 +172,7 @@ export async function createUser(db: Db, input: {
     customerAuthenticationCredentialHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
     customerAuthenticationUserRole: input.role as CustomerAuthRole,
     customerAuthenticationUserName: input.name.trim(),
-    customerAuthenticationLoginDomain: (input.domain ?? 'local') as 'local' | 'msentra',
+    customerAuthenticationLoginDomain: (resolveAuthDomainName(input.domain) ?? PLATFORM_AUTH_DOMAIN) as 'leafypay' | 'msentra',
     customerAuthenticationAccountStatus: input.status ?? 'active',
     bianServiceDomain: 'Customer Authentication',
     bianControlRecordType: 'CustomerAuthenticationAssessment',

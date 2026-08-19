@@ -6,6 +6,7 @@ import {
   AUTHENTICATION_DOMAIN_COLLECTION,
   AuthenticationDomainRecord,
 } from '../../identity/models/authenticationDomain.model';
+import { resolveAuthDomainName, PLATFORM_AUTH_DOMAIN } from '../../identity/models/authenticationDomain.model';
 
 export interface ListParams { q?: string; page?: number; limit?: number }
 export interface ListResult {
@@ -55,7 +56,7 @@ export async function createAuthDomain(
 ): Promise<AuthenticationDomainRecord> {
   const record: AuthenticationDomainRecord = {
     partyAuthenticationDomainInstanceReference: input.partyAuthenticationDomainInstanceReference ?? `authdom-${randomUUID()}`,
-    partyAuthenticationDomainName: (input.partyAuthenticationDomainName ?? 'local') as AuthenticationDomainRecord['partyAuthenticationDomainName'],
+    partyAuthenticationDomainName: (resolveAuthDomainName(input.partyAuthenticationDomainName) ?? PLATFORM_AUTH_DOMAIN) as AuthenticationDomainRecord['partyAuthenticationDomainName'],
     partyAuthenticationDomainDisplayName: input.partyAuthenticationDomainDisplayName ?? '',
     partyAuthenticationDomainType: (input.partyAuthenticationDomainType ?? 'local') as AuthenticationDomainRecord['partyAuthenticationDomainType'],
     partyAuthenticationDomainFlowType: input.partyAuthenticationDomainFlowType,
