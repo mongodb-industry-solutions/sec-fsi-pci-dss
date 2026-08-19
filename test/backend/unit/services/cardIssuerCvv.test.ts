@@ -4,7 +4,9 @@
  * no DB, no KMS.
  */
 import { describe, it, expect } from 'vitest';
-import { derivePerCardCvv, normalizeExpiry, DEFAULT_SERVICE_CODE } from '../../../../backend/src/providers/card-issuer/services/cardVerificationKey.service';
+import { normalizeExpiry, DEFAULT_SERVICE_CODE } from '../../../../backend/src/providers/card-issuer/services/cardVerificationKey.service';
+// v37 P7: the derivation moved to the issuer. Its own tests cover it; the PSP keeps only the formatting.
+import { derivePerCardCvv } from '../../../../bankcore/src/vendors/encryption/cardVerificationKey.service';
 import { validateCard, resolveCardIssuerConfig, DEFAULT_CARD_ISSUER_CONFIG, type CardIssuerSimulatorConfig } from '../../../../backend/src/providers/card-issuer/services/cardIssuer.service';
 
 const CVK = Buffer.from('0123456789abcdef0123456789abcdef', 'utf8'); // 32 bytes, test-only

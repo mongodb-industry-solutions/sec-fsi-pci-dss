@@ -48,9 +48,7 @@ export async function createCollections(
     { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure },
     // Payment Card Management
     { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
-    // Card Administration (issuer CDE, v30): module-owned vault with the full PAN + service code
-    // (QE:equality). The PSP core NEVER holds these; extracting the module leaves the core descoped.
-    { name: 'cardIssuerVault',                  map: maps.cardIssuerVault },
+    // v37: the issuer vault moved to the bank, so no collection here holds a PAN.
     // Customer Authentication
     { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
     // Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS)

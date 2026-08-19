@@ -16,7 +16,7 @@ import {
   COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION,
 } from '../../modules/payment-hub/models/counterpartyBank.model';
 import {
-  CARD_ISSUER_VAULT_COLLECTION, PAYMENT_CARD_REGISTRY_COLLECTION,
+  CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { COUNTERS_COLLECTION, IDEMPOTENCY_COLLECTION } from './createCollections';
 
@@ -228,14 +228,14 @@ const INDEXES: IndexPlan[] = [
   },
   // The registry answers "this card" and "the cards of this holder", which is every display read.
   {
-    collection: PAYMENT_CARD_REGISTRY_COLLECTION,
+    collection: ISSUED_CARD_REGISTRY_COLLECTION,
     keys: { paymentCardReference: 1 },
-    options: { unique: true, name: 'paymentCardRegistry_card_reference_unique' },
+    options: { unique: true, name: 'issuedCardRegistry_card_reference_unique' },
   },
   {
-    collection: PAYMENT_CARD_REGISTRY_COLLECTION,
+    collection: ISSUED_CARD_REGISTRY_COLLECTION,
     keys: { accountHolderInstanceReference: 1, issuedCardStatus: 1 },
-    options: { name: 'paymentCardRegistry_holder_status' },
+    options: { name: 'issuedCardRegistry_holder_status' },
   },
   {
     collection: COUNTERS_COLLECTION,

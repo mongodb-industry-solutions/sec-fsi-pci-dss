@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { createCollections } from './createCollections';
 import { provisionBankDeks, findOrphanedDeks } from '../encryption/keyVault';
+import { provisionCardIssuerCvk } from '../encryption/cardVerificationKey.service';
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
@@ -43,6 +44,8 @@ export async function runSetup(reset = false): Promise<void> {
 
     console.log('1. Provisioning DEKs in the shared key vault...');
     const deks = await provisionBankDeks(client);
+    // The issuer key: the bank's, since deriving a card verification value is an issuer function.
+    await provisionCardIssuerCvk(client);
     console.log('');
 
     console.log('2. Creating collections...');

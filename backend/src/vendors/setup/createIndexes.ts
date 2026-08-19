@@ -167,14 +167,6 @@ export async function createIndexes(client: MongoClient) {
     { key: { paymentCardLast4: 1 } },
   ]);
 
-  // Card Administration (issuer CDE, v30): module-owned PAN vault. Indexed by the join keys only
-  // (the PAN itself is QE-indexed by the encrypted collection metadata, not here).
-  await ensureIndexes(db, 'cardIssuerVault', [
-    { key: { issuedCardInstanceReference: 1 }, unique: true },
-    { key: { paymentCardInstanceReference: 1 }, unique: true },
-    { key: { paymentCardReference: 1 } },
-  ]);
-
   // Payment Card Registry (the physical card, one per token). Token is the unique identity;
   // the holder array is indexed so "which cards does this customer hold" and FDS shared-card lookups
   // are fast.

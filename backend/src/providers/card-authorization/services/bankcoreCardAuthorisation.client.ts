@@ -47,8 +47,9 @@ async function bankRequest(
   const host = baseUrl ?? config.bankcore.baseUrl;
   if (!host) return { error: `no bank endpoint configured: ${endpointError}` };
 
+  // Same fetch as the call it authorises, so a stubbed bank stays stubbed for its token too.
   const { accessToken, error: tokenError } = await getProviderAccessToken('account_information', {
-    scope: 'card-authorisations',
+    scope: 'card-authorisations', fetchImpl,
   });
   if (!accessToken) return { error: `card authorisation authorisation failed: ${tokenError}` };
 

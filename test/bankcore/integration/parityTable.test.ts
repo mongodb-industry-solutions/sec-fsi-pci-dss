@@ -50,6 +50,9 @@ const PARITY: ParityRow[] = [
   { capability: 'release or settle an authorisation hold', method: 'delete', path: '/v1/cards/authorisations/{authorisationReference}', phase: 'done' },
   { capability: 'card token resolution and masking', method: 'get', path: '/v1/cards/{cardToken}', phase: 'done' },
   { capability: 'card validation (format, network, expiry, CVV)', method: 'post', path: '/v1/cards/validations', phase: 'done' },
+  { capability: 'exact-PAN search for an investigation', method: 'post', path: '/v1/cards/searches', phase: 'done' },
+  { capability: 'ephemeral PAN reveal', method: 'post', path: '/v1/cards/{cardToken}/pan-reveals', phase: 'done' },
+  { capability: 'per-card verification value derivation', method: 'post', path: '/v1/cards/{cardToken}/verification-values', phase: 'done' },
   { capability: 'credit assessment', method: 'post', path: '/v1/credit-assessments', phase: 'P8' },
 ];
 

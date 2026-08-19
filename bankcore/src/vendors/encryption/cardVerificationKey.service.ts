@@ -1,20 +1,18 @@
-// The issuer's Card Verification Key, and the per-card CVV derived from it.
+// The issuer's card verification key, and the per-card CVV derived from it.
 //
-// PCI DSS: a CVV is Sensitive Authentication Data and is NEVER stored, in cleartext or encrypted. A real
-// issuer recomputes it inside an HSM from the card data plus a secret issuer key. That is reproduced here:
-// the value is derived on demand as HMAC-SHA256(CVK, cardToken | expiryMMYY | serviceCode) and never
-// persisted.
+// A CVV is sensitive authentication data and is never stored in any form. A real issuer recomputes it in an
+// HSM from the card data plus a secret key, which is reproduced here: the value is derived on demand as
+// HMAC-SHA256(key, cardToken | expiryMMYY | serviceCode).
 //
-// v37 P7: this moved from the PSP to the bank, because deriving a card verification value is an ISSUER
-// function and the issuer is now a separate institution. The derivation is byte for byte the one the PSP
-// used, and it reuses the SAME provisioned key from the shared key vault, so every card that had a working
-// CVV before still has the same one. Changing either would silently invalidate every seeded card.
+// v37 P7 moved this from the PSP to the bank, since deriving it is an issuer function. The derivation is
+// byte for byte the PSP's and it reuses the same provisioned key from the shared vault: changing either
+// would silently invalidate every seeded card's CVV.
 //
-// The CVK itself is never at rest: a random data key is wrapped by the local KMS master key and stored
-// wrapped, and the CVK is derived from that key's cleartext by HKDF. Only the wrapped form is persisted.
+// The key is never at rest. A random data key is wrapped by the local master key and only the wrapped form
+// is persisted; the verification key is derived from its cleartext by HKDF.
 import { Binary, MongoClient } from 'mongodb';
 import {
-  createHmac, hkdfSync, createDecipheriv,
+  createHmac, hkdfSync, createDecipheriv, createCipheriv, randomBytes,
 } from 'node:crypto';
 import { config } from '../../config';
 
@@ -36,8 +34,7 @@ function keyVaultParts(): { database: string; collection: string } {
   return { database, collection: rest.join('.') };
 }
 
-// The key-encrypting key, derived from the same local master key Queryable Encryption uses. Identical
-// derivation to the PSP's, which is what lets the bank unwrap a key the PSP provisioned.
+// Derived identically to the PSP's, which is what lets the bank unwrap a key the PSP provisioned.
 function keyEncryptingKey(): Buffer {
   const masterKeyBase64 = config.kms.localMasterKey;
   if (!masterKeyBase64) throw new Error('a local master key is required to resolve the card verification key');
@@ -55,11 +52,46 @@ function unwrapDataKey(wrapped: Buffer): Buffer {
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
+function wrapDataKey(dataKey: Buffer): Buffer {
+  const iv = randomBytes(GCM_IV_BYTES);
+  const cipher = createCipheriv('aes-256-gcm', keyEncryptingKey(), iv);
+  const wrapped = Buffer.concat([cipher.update(dataKey), cipher.final()]);
+  return Buffer.concat([iv, wrapped, cipher.getAuthTag()]);
+}
+
+/**
+ * Mints the key once and reuses it forever after. Idempotent, and it reuses a key an earlier version
+ * provisioned: minting a fresh one would change every card's verification value.
+ */
+export async function provisionCardIssuerCvk(client: MongoClient): Promise<string> {
+  const { database, collection } = keyVaultParts();
+  const keyVault = client.db(database).collection<CvkRecord>(collection);
+  const existing = await keyVault.findOne({ keyAltNames: CVK_KEY_ALT_NAME });
+  if (existing) {
+    console.log(`    reuse: ${CVK_KEY_ALT_NAME}`);
+    return existing.cvkKeyId;
+  }
+  if (config.kms.provider !== 'local') {
+    throw new Error(`the card verification key can only be provisioned under the local key provider, not '${config.kms.provider}'`);
+  }
+  const dataKey = randomBytes(32);
+  const cvkKeyId = `cvk-${CVK_KEY_ALT_NAME}`;
+  await keyVault.insertOne({
+    keyAltNames: [CVK_KEY_ALT_NAME],
+    cvkKeyId,
+    cvkWrapped: new Binary(wrapDataKey(dataKey)),
+    kid: 'local',
+  } as CvkRecord);
+  dataKey.fill(0);
+  console.log(`    new:   ${CVK_KEY_ALT_NAME}`);
+  return cvkKeyId;
+}
+
 let cvkCache: Buffer | null = null;
 
 /**
- * Resolves the cleartext CVK. Cached for the process lifetime, and refused rather than defaulted when the
- * key has never been provisioned: a fallback key would make every CVV check pass against the wrong value.
+ * Resolves the cleartext key, cached for the process lifetime. Refused rather than defaulted when it was
+ * never provisioned: a fallback key would check every CVV against the wrong value.
  */
 export async function getCardIssuerCvk(client: MongoClient): Promise<Buffer> {
   if (cvkCache) return cvkCache;
@@ -71,8 +103,7 @@ export async function getCardIssuerCvk(client: MongoClient): Promise<Buffer> {
     .findOne({ keyAltNames: CVK_KEY_ALT_NAME });
   if (!record) throw new Error('the card verification key is not provisioned (run setup)');
 
-  // A BSON Binary can carry more capacity than payload; slicing to the actual length is what keeps the
-  // authentication tag verifiable.
+  // A Binary can carry more capacity than payload, and the extra bytes break tag verification.
   const stored = record.cvkWrapped as unknown as { buffer: Uint8Array; length?: () => number };
   const wrapped = typeof stored?.length === 'function'
     ? Buffer.from(stored.buffer.subarray(0, stored.length()))
@@ -85,7 +116,7 @@ export async function getCardIssuerCvk(client: MongoClient): Promise<Buffer> {
   return cvk;
 }
 
-/** Clears the cached key. Used by tests, and after a rotation. */
+/** Clears the cached key: tests, and rotation. */
 export function resetCvkCache(): void {
   if (cvkCache) cvkCache.fill(0);
   cvkCache = null;
@@ -100,10 +131,7 @@ export function normalizeExpiry(expiry: string): string {
   return `${month}${year}`;
 }
 
-/**
- * The per-card verification value. Every input is non-sensitive (a surrogate token, an expiry, a service
- * code); the secret is the key, and the output is ephemeral.
- */
+/** The per-card verification value. Every input is non-sensitive; the secret is the key. */
 export function derivePerCardCvv(
   cvk: Buffer,
   args: { cardToken: string; expiryMMYY: string; serviceCode: string; cvvLength: number },
@@ -118,6 +146,5 @@ export function derivePerCardCvv(
   return digits.slice(0, args.cvvLength);
 }
 
-// The service code used when a card carries none. Three digits: international interchange, normal
-// authorisation, no restrictions.
+// Used when a card carries none: international interchange, normal authorisation, no restrictions.
 export const DEFAULT_SERVICE_CODE = '201';

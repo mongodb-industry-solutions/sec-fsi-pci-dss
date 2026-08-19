@@ -9,9 +9,14 @@
       "payments",
       "funds-confirmations",
       "card-authorisations",
+      "card-data",
       "demo-credits"
     ],
-    "tppRegistrationRoles": ["AISP", "PISP", "CBPII"],
+    "tppRegistrationRoles": [
+      "AISP",
+      "PISP",
+      "CBPII"
+    ],
     "tppRegistrationStatus": "active",
     "tppRegistrationApiVersion": "1.3.6",
     "tppRegistrationEnvironment": "sandbox",

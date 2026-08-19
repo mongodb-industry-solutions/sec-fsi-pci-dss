@@ -23,8 +23,8 @@ import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { resolveCardByToken, resolveCardById, resolveFundingAccount } from '../ports/cardReference.port';
 import { resolveOwnerNameByAgreement, searchAgreementsByOwner } from '../ports/owner.port';
 import { deriveMaskedPan } from '../../../modules/customer/models/paymentCard.model';
-import { getServiceCode, revealPan as revealVault, findByPanExact } from '../services/cardIssuerVault.service';
-import { computePerCardCvv, normalizeExpiry } from '../services/cardVerificationKey.service';
+import { revealPanAtIssuer, findByPanAtIssuer, deriveCvvAtIssuer } from '../services/bankcoreCardIssuer.client';
+import { normalizeExpiry } from '../services/cardVerificationKey.service';
 import type { CardValidationOptions } from '../services/cardIssuer.service';
 
 // v29 §8: aggregated list-access audit is opt-in (default off) to avoid flooding the ledger.
@@ -32,6 +32,14 @@ const AUDIT_LIST_ACCESS = process.env.PSP_AUDIT_LIST_ACCESS === 'true';
 
 export async function cardIssuerController(fastify: FastifyInstance) {
   const CAP = 'card-issuer';
+
+  // A reveal is addressed by core card id, and the issuer knows the card by its token.
+  async function revealPanForCard(cardId: string, correlationId: string): Promise<string | null> {
+    const view = await resolveCardById(fastify.db, cardId);
+    if (!view?.paymentCardReference) return null;
+    const { pan } = await revealPanAtIssuer(view.paymentCardReference, correlationId);
+    return pan ?? null;
+  }
   // v29 admin gate: cards* routes require the operations_officer permission AND the card-issuer
   // capability resolving to its internal built-in provider (else 409 managed_externally).
   const gate = requireInternalProvider('card_issuer');
@@ -99,10 +107,10 @@ export async function cardIssuerController(fastify: FastifyInstance) {
           const netName = (view.paymentCardNetwork ?? (body.network as string | undefined) ?? '').toUpperCase();
           const rule = config.networks.find((n) => n.name.toUpperCase() === netName);
           const cvvLength = rule?.cvvLength ?? 3;
-          const serviceCode = await getServiceCode(fastify.db, view.paymentCardInstanceReference);
-          try {
-            opts.perCardCvv = await computePerCardCvv({ cardToken, expiryMMYY: normalizeExpiry(expiry), serviceCode, cvvLength });
-          } catch { /* CVK not provisioned: fall back to global-only acceptance */ }
+          // Only the issuer holds the key, so only the issuer can derive the value. Unavailable falls back
+          // to global-only acceptance rather than declining a card the issuer never got to judge.
+          const derived = await deriveCvvAtIssuer({ cardToken, expiry: normalizeExpiry(expiry), cvvLength });
+          if (derived.cvv) opts.perCardCvv = derived.cvv;
         }
       }
     }
@@ -227,7 +235,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
           agreement: { type: 'string', description: 'Filter by customerAgreementInstanceReference.' },
           last4: { type: 'string', description: 'Search by last 4 digits (non-CHD, plaintext).' },
           bin: { type: 'string', description: 'Search by BIN prefix (non-CHD, plaintext).' },
-          panExact: { type: 'string', description: 'Locate a card by its EXACT full PAN via QE equality on the issuer vault.' },
+          panExact: { type: 'string', description: 'Locate a card by its exact full PAN, resolved by the issuer.' },
         },
       },
       response: {
@@ -242,14 +250,16 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         },
         403: { $ref: 'Error#' },
         409: { description: 'Capability managed by an external provider.', $ref: 'Error#' },
+        502: { description: 'The issuer could not be reached for an exact-PAN search.', $ref: 'Error#' },
       },
     },
   }, async (request, reply) => {
     const q = (request.query ?? {}) as { page?: number; limit?: number; network?: string; status?: string; agreement?: string; last4?: string; bin?: string; panExact?: string };
-    // v30 QE equality search: resolve the exact PAN to core card instance refs via the vault, then
-    // list those cards from the core (the core never sees the PAN; only the resolved refs).
+    // The issuer resolves the exact PAN to card references, then the core lists those cards. The core
+    // never sees the number, only the references that came back.
     if (q.panExact) {
-      const matches = await findByPanExact(fastify.db, q.panExact.replace(/\D/g, ''));
+      const { matches, error } = await findByPanAtIssuer(q.panExact.replace(/\D/g, ''), request.id);
+      if (error) return reply.status(502).send({ error });
       const refs = matches.map((m) => m.paymentCardInstanceReference);
       const cards = (await Promise.all(refs.map((r) => getCardByIdAny(fastify.db, r)))).filter(Boolean) as Array<Record<string, unknown>>;
       const results = cards.map((c) => ({ ...c, _id: undefined, paymentCardMaskedPanDisplay: deriveMaskedPan(c as Record<string, string | undefined>) }));
@@ -541,11 +551,9 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     const netName = (view.paymentCardNetwork ?? '').toUpperCase();
     const rule = config.networks.find((n) => n.name.toUpperCase() === netName);
     const cvvLength = rule?.cvvLength ?? 3;
-    const serviceCode = await getServiceCode(fastify.db, view.paymentCardInstanceReference);
-    try {
-      const cvv = await computePerCardCvv({ cardToken: view.paymentCardReference, expiryMMYY: normalizeExpiry(expiry), serviceCode, cvvLength });
-      return { cvv, last4: view.paymentCardLast4 ?? null };
-    } catch { return null; }
+    const derived = await deriveCvvAtIssuer({ cardToken: view.paymentCardReference, expiry: normalizeExpiry(expiry), cvvLength });
+    if (!derived.cvv) return null;
+    return { cvv: derived.cvv, last4: view.paymentCardLast4 ?? null };
   }
 
   // POST /reveal (internal loopback, owner reveal flow via dispatchProvider). Derives the CVV for a
@@ -614,7 +622,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const { cardId } = request.params as { cardId: string };
-    const pan = await revealVault(fastify.db, cardId);
+    const pan = await revealPanForCard(cardId, request.id);
     if (!pan) return reply.status(404).send({ error: 'PAN not found in issuer vault' });
     const user = (request as { user?: JwtUserPayload }).user;
     emitComplianceEvent(fastify.db, {
@@ -641,7 +649,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     if (!request.headers['x-integration-source']) return reply.code(401).send({ error: 'X-Integration-Source header required' });
     const body = (request.body ?? {}) as { cardId?: string };
     if (!body.cardId) return reply.status(404).send({ error: 'cardId required' });
-    const pan = await revealVault(fastify.db, body.cardId);
+    const pan = await revealPanForCard(body.cardId, request.id);
     if (!pan) return reply.status(404).send({ error: 'PAN not found in issuer vault' });
     return reply.send({ pan, revealed: true });
   });

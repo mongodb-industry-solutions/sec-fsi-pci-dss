@@ -1,14 +1,11 @@
-// The issuer's card vault: the ONLY place a full PAN exists on this platform.
+// The issuer's card vault: the only place a full PAN exists on this platform.
 //
-// It lives here because PCI DSS assigns scope to whoever stores, processes or transmits a PAN, and that is
-// the institution that ISSUED the card. The PSP's card-on-file store keeps a surrogate token, a masked
-// display PAN and a BIN plus last four, which is what lets it operate without ever holding cardholder data.
-//
-// Two tokenisations exist on this platform and neither replaces the other: this one, the issuer's, and the
-// PSP's acceptance-side token vault. That mirrors the EMVCo split between acceptance tokens and
-// issuer/network tokens.
+// It lives here because PCI DSS assigns scope to whoever stores a PAN, and that is the institution that
+// issued the card. The PSP keeps a surrogate token plus BIN and last four, which is what descopes it.
+// Two tokenisations coexist and neither replaces the other, mirroring the EMVCo split between acceptance
+// tokens and issuer tokens.
 export const CARD_ISSUER_VAULT_COLLECTION = 'cardIssuerVault';
-export const PAYMENT_CARD_REGISTRY_COLLECTION = 'paymentCardRegistry';
+export const ISSUED_CARD_REGISTRY_COLLECTION = 'issuedCardRegistry';
 
 export type IssuedCardStatus = 'issued' | 'active' | 'suspended' | 'revoked';
 
@@ -16,15 +13,12 @@ export interface CardIssuerVaultRecord {
   issuedCardInstanceReference: string;
   // The PSP's surrogate token, which is how a request arrives here without carrying a PAN.
   paymentCardReference: string;
-  // The PSP's own card-on-file record, kept so the two sides resolve to each other.
   paymentCardInstanceReference: string;
-  // CHD: the full PAN, encrypted with an equality query type so a card can be located or de-duplicated by
-  // its exact number over ciphertext, with no client-side decryption. That is the whole point of holding it
-  // this way rather than as an opaque blob.
+  // Encrypted with an equality query type, so a card is locatable by exact number over ciphertext.
   paymentCardNumber: string;
-  // Issuer datum feeding the CVV derivation, alongside the PAN, the expiry and the card verification key.
+  // Issuer datum feeding the verification value derivation.
   cardServiceCode: string;
-  // A REFERENCE to the key, never the key: a CVK in the same record as the PAN would defeat both.
+  // A reference to the key, never the key: both would be defeated by sharing a record with the PAN.
   cardIssuerCvkKeyId?: string;
   issuedCardStatus: IssuedCardStatus;
   bianServiceDomain: string;
@@ -34,11 +28,11 @@ export interface CardIssuerVaultRecord {
   schemaVersion: number;
 }
 
-// The issuer's own registry of the cards it has issued: the lifecycle and the display data, with no PAN.
-// Separate from the vault deliberately, so reading "what cards does this holder have" never touches the
-// collection that holds cardholder data.
-export interface PaymentCardRegistryRecord {
-  paymentCardRegistryInstanceReference: string;
+// The lifecycle and display data of every card issued here, with no PAN. Named apart from the PSP's own
+// paymentCardRegistry deliberately: that one dedupes accepted card instruments for fraud signals, this one
+// is the issuer's record of what it put in customers' hands.
+export interface IssuedCardRegistryRecord {
+  issuedCardRegistryInstanceReference: string;
   paymentCardReference: string;
   accountHolderInstanceReference?: string;
   // Funding account at this bank, which is what a card authorisation is held against.
@@ -51,7 +45,7 @@ export interface PaymentCardRegistryRecord {
   paymentCardExpiryYear?: string;
   issuedCardStatus: IssuedCardStatus;
   bianServiceDomain: string;
-  bianControlRecordType: 'PaymentCardRegistry';
+  bianControlRecordType: 'IssuedCardRegistry';
   recordCreatedDateTime: string;
   recordUpdatedDateTime?: string;
   schemaVersion: number;

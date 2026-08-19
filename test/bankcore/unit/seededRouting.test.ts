@@ -102,11 +102,19 @@ describe('v37 P2.6: every seeded account routes to the bank', () => {
 
 describe('v37: every seeded card routes to the issuer', () => {
   it('the card seeder takes its BIN from the bank profile, not a bare network prefix', () => {
-    const seeder = readFileSync(resolve(ROOT, 'backend/src/vendors/seed/seedCardIssuerVault.ts'), 'utf8');
-    expect(seeder).toContain('bankcore/data/bankProfile.json');
+    // v37 P7: the seeder is the bank's now, and it reads its own profile from the database rather than a
+    // fixture, because by then it has already seeded itself.
+    const seeder = readFileSync(resolve(ROOT, 'bankcore/src/vendors/seed/seedCardIssuer.ts'), 'utf8');
+    expect(seeder).toContain('BANK_PROFILE_COLLECTION');
     expect(seeder).toContain('binRangeFrom');
     // A bare prefix would put the card outside every declared range and make it unroutable.
-    expect(seeder).not.toContain("VISA:       { prefix: '4'");
+    expect(seeder).not.toMatch(/prefix:\s*'4'/);
+  });
+
+  it('the PSP no longer derives a card number at all', () => {
+    const descoping = readFileSync(resolve(ROOT, 'backend/src/vendors/seed/seedCardDescoping.ts'), 'utf8');
+    expect(descoping).not.toContain('buildPan');
+    expect(descoping).toContain('issuedCardRegistry');
   });
 
   it('both endpoints of every declared range resolve to this issuer', () => {

@@ -3,23 +3,19 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
-  CARD_ISSUER_VAULT_COLLECTION, PAYMENT_CARD_REGISTRY_COLLECTION,
-  CardIssuerVaultRecord, PaymentCardRegistryRecord,
+  CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
+  CardIssuerVaultRecord, IssuedCardRegistryRecord,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
 import { DEFAULT_SERVICE_CODE } from '../encryption/cardVerificationKey.service';
 import { BANK_PROFILE_COLLECTION } from '../../modules/aspsp/models/bankProfile.model';
 import { seedDataDir } from './readSeedFile';
 
-// Issues this bank's cards: the vault that holds the PAN, and the registry that holds everything else.
+// Issues this bank's cards: the vault holding the PAN, and the registry holding everything else.
 //
-// The card list comes from the PSP's own fixture, because the demo's cards belong to the PSP's customers
-// and the bank is issuing THOSE cards. It is a seed-time file read, the mirror of the PSP reading this
-// bank's declared BIN ranges, and it is the reason both sides agree on which cards exist.
-//
-// The PAN is DERIVED from the surrogate token, never random, so a reseed produces the same number for the
-// same card and nothing cross-referencing it breaks. The BIN is drawn from this bank's own declared
-// ranges: a card outside every registered range is unroutable, since nothing could decide which issuer
-// owns it.
+// The card list is read from the PSP's fixture at seed time, the mirror of the PSP reading this bank's
+// declared BIN ranges, so both sides agree on which cards exist. The PAN is derived from the surrogate
+// token rather than random, so a reseed reproduces it and nothing cross-referencing it breaks. The BIN
+// comes from this bank's declared ranges: a card outside every range is unroutable.
 
 const NETWORK_LENGTH: Record<string, number> = {
   VISA: 16, MASTERCARD: 16, AMEX: 15, ELO: 16,
@@ -39,8 +35,7 @@ interface PspCardFixture {
   fundingPayoutAccountInstanceReference?: string;
 }
 
-// Stable pseudo-random digits from a token. The same input always yields the same digits, which is the
-// whole reason a reseed is safe.
+// Stable digits from a token: the same input always yields the same output, which is why a reseed is safe.
 function digitsFromToken(token: string, count: number): string {
   let out = '';
   let round = 0;
@@ -65,7 +60,7 @@ export function buildPan(
   return { pan: `${bin}${middle}${lastFour}`, bin };
 }
 
-// This bank's ranges, read from what it has already seeded about itself.
+// This bank's own ranges, from what it already seeded about itself.
 async function issuerBinRanges(db: Db): Promise<Record<string, BinRange>> {
   const profile = await db.collection<{ bankProfileBinRanges?: BinRange[] }>(BANK_PROFILE_COLLECTION).findOne({});
   const byScheme: Record<string, BinRange> = {};
@@ -75,8 +70,7 @@ async function issuerBinRanges(db: Db): Promise<Record<string, BinRange>> {
   return byScheme;
 }
 
-// The PSP's card fixture. Absent when the bank is deployed on its own, which is not an error: it just
-// means there are no customer cards to issue yet.
+// Absent when the bank is deployed alone, which just means no customer cards to issue.
 function readPspCardFixture(): PspCardFixture[] | null {
   const candidates = [
     resolve(seedDataDir(), '../../backend/data/paymentCards.json'),
@@ -114,8 +108,7 @@ export async function seedCardIssuer(db: Db): Promise<number> {
     const status = card.paymentCardStatus === 'blocked' ? 'suspended' : 'active';
     const { month, year } = expiryParts(card);
 
-    // The vault: the PAN and the service code, both encrypted. Upserted on the surrogate token, which is
-    // what every later request arrives with.
+    // PAN and service code, both encrypted, keyed by the token every later request arrives with.
     await db.collection<CardIssuerVaultRecord>(CARD_ISSUER_VAULT_COLLECTION).updateOne(
       { paymentCardReference: token },
       {
@@ -136,13 +129,12 @@ export async function seedCardIssuer(db: Db): Promise<number> {
       { upsert: true },
     );
 
-    // The registry: what a display read needs, and deliberately no PAN, so showing a card never opens
-    // the collection that holds cardholder data.
-    await db.collection<PaymentCardRegistryRecord>(PAYMENT_CARD_REGISTRY_COLLECTION).updateOne(
+    // What a display read needs, and deliberately no PAN.
+    await db.collection<IssuedCardRegistryRecord>(ISSUED_CARD_REGISTRY_COLLECTION).updateOne(
       { paymentCardReference: token },
       {
         $set: {
-          paymentCardRegistryInstanceReference: `reg_${card.paymentCardInstanceReference}`,
+          issuedCardRegistryInstanceReference: `reg_${card.paymentCardInstanceReference}`,
           paymentCardNetwork: network,
           paymentCardBin: bin,
           paymentCardLastFour: lastFour,
@@ -150,7 +142,7 @@ export async function seedCardIssuer(db: Db): Promise<number> {
           ...(month && year ? { paymentCardExpiryMonth: month, paymentCardExpiryYear: year } : {}),
           issuedCardStatus: status,
           bianServiceDomain: 'Payment Card',
-          bianControlRecordType: 'PaymentCardRegistry',
+          bianControlRecordType: 'IssuedCardRegistry',
           recordUpdatedDateTime: now,
           schemaVersion: 1,
         },

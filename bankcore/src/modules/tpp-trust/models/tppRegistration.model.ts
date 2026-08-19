@@ -20,6 +20,10 @@ export type TppScope =
   // The issuer's own operation, so not a Berlin Group scope: a card authorisation places a HOLD, which is
   // strictly more than reading a balance, and it is granted separately for that reason.
   | 'card-authorisations'
+  // Cardholder data: an exact-PAN search and an ephemeral PAN reveal. Its OWN scope, deliberately not
+  // folded into the one above, because a token that can place a hold must not thereby be able to read a
+  // card number. That separation is the point of granting it apart.
+  | 'card-data'
   | 'demo-credits';
 
 export interface TppRegistrationControlRecord {

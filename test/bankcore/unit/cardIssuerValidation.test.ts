@@ -12,10 +12,10 @@ import {
   DEFAULT_CARD_ISSUER_CONFIG, type CardIssuerConfig,
 } from '../../../bankcore/src/modules/card-issuer/services/cardValidation.service';
 import {
-  derivePerCardCvv as bankDerive, normalizeExpiry as bankNormalize,
+  derivePerCardCvv, normalizeExpiry,
 } from '../../../bankcore/src/vendors/encryption/cardVerificationKey.service';
 import {
-  derivePerCardCvv as pspDerive, normalizeExpiry as pspNormalize,
+  normalizeExpiry as pspNormalizeExpiry,
 } from '../../../backend/src/providers/card-issuer/services/cardVerificationKey.service';
 
 // A Luhn-valid VISA test number, and a Mastercard in the 2-series range.
@@ -143,29 +143,37 @@ describe('P7 did not change the per-card derivation', () => {
   const cvk = createHash('sha256').update('a fixed key for this test').digest();
   const args = { cardToken: 'pm_b577f67eb747396e469372cf0144', expiryMMYY: '12/29', serviceCode: '201', cvvLength: 3 };
 
-  it('the bank derives byte for byte what the PSP derived', () => {
-    // The engine moved; the algorithm did not. Every seeded card's CVV depends on this, so a change here
-    // would invalidate all of them at once with nothing else failing.
-    expect(bankDerive(cvk, args)).toBe(pspDerive(cvk, args));
+  it('reproduces the values the PSP derived before the engine moved', () => {
+    // Fixed vectors, captured from the PSP implementation this replaced. Every seeded card's CVV depends on
+    // this algorithm, so a change would invalidate all of them at once with nothing else failing. These
+    // outlive the PSP's copy of the code, which is why they are constants rather than a cross-comparison.
+    expect(derivePerCardCvv(cvk, args)).toBe('146');
+    expect(derivePerCardCvv(cvk, { ...args, cvvLength: 4 })).toBe('1463');
+    expect(derivePerCardCvv(cvk, { ...args, cardToken: 'pm_another_card_entirely' })).toBe('987');
   });
 
-  it('normalises an expiry the same way, so MM/YY and MM/YYYY still agree', () => {
+  it('normalises an expiry the way the PSP still does, since the PSP states the expiry it asks about', () => {
     for (const expiry of ['12/29', '12/2029', '1/29', ' 12 / 29 ', 'garbage']) {
-      expect(bankNormalize(expiry)).toBe(pspNormalize(expiry));
+      expect(normalizeExpiry(expiry)).toBe(pspNormalizeExpiry(expiry));
     }
-    expect(bankNormalize('12/2029')).toBe(bankNormalize('12/29'));
+    expect(normalizeExpiry('12/2029')).toBe(normalizeExpiry('12/29'));
   });
 
   it('produces a value of the requested length, and only digits', () => {
     for (const cvvLength of [3, 4]) {
-      const value = bankDerive(cvk, { ...args, cvvLength });
+      const value = derivePerCardCvv(cvk, { ...args, cvvLength });
       expect(value).toHaveLength(cvvLength);
       expect(value).toMatch(/^\d+$/);
     }
   });
 
   it('differs per card, which is the point of deriving it at all', () => {
-    const other = bankDerive(cvk, { ...args, cardToken: 'pm_another_card_entirely' });
-    expect(other).not.toBe(bankDerive(cvk, args));
+    expect(derivePerCardCvv(cvk, { ...args, cardToken: 'pm_another_card_entirely' }))
+      .not.toBe(derivePerCardCvv(cvk, args));
+  });
+
+  it('differs when the key differs, so the key is what makes it a secret', () => {
+    const otherKey = createHash('sha256').update('a different key').digest();
+    expect(derivePerCardCvv(otherKey, args)).not.toBe(derivePerCardCvv(cvk, args));
   });
 });

@@ -11,7 +11,7 @@ import { seedMerchants } from './seedMerchants';
 import { seedAuthDomains } from './seedAuthDomains';
 import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
-import { seedCardIssuerVault } from './seedCardIssuerVault';
+import { seedCardDescoping } from './seedCardDescoping';
 import { seedTransactions } from './seedTransactions';
 import { seedCases } from './seedCases';
 import { seedCustomerQuestions } from './seedCustomerQuestions';
@@ -101,8 +101,8 @@ export async function runSeed() {
     console.log('Seeding paymentCardManagement...');
     await seedCards(db);
 
-    console.log('Seeding cardIssuerVault (issuer CDE: full PAN QE + core BIN/last4)...');
-    await seedCardIssuerVault(db);
+    console.log('Descoping paymentCardManagement (BIN and last four from the issuer)...');
+    await seedCardDescoping(db);
 
     console.log('Seeding cardTransactionLog (v2: sensitive fields inline)...');
     await seedTransactions(db);

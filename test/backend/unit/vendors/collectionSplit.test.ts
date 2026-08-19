@@ -27,8 +27,7 @@ interface BankcoreOwned {
 const OWNED_BY_BANKCORE: Record<string, BankcoreOwned> = {
   // The bank already creates it, and the PSP copy goes when its credit endpoint does.
   balanceCreditLog: { phase: 'P2.5', moved: false },
-  cardIssuerVault: { phase: 'P7', moved: false },
-  paymentCardRegistry: { phase: 'P7', moved: false },
+  cardIssuerVault: { phase: 'P7', moved: true },
   cardAuthorizationRecord: { phase: 'P7', moved: false },
   customerCreditRatingState: { phase: 'P8', moved: false },
   recurringMandateProcedure: { phase: 'P3.9', moved: false },
@@ -42,6 +41,9 @@ const OWNED_BY_PSP = new Set([
   // Stays as a linked account record: it loses the stored balance, not its home.
   'payoutAccountArrangement', 'counterpartyArrangement',
   'paymentCardManagement', 'cardEtokenProcedure',
+  // Stays: it dedupes ACCEPTED card instruments to feed the shared-card fraud signal, which is a PSP
+  // concern. The bank's issuedCardRegistry is a different record: what this issuer put in customers' hands.
+  'paymentCardRegistry',
   'paymentRequestProcedure', 'paymentRequestEvent', 'qrPaymentRepresentation', 'rtpAliasDirectoryCache',
   'party', 'customerAuthenticationAssessment', 'authenticationDomain', 'role',
   'partyAuthenticationKey', 'partyAuthorizationCode', 'partyIssuedToken',
@@ -123,8 +125,11 @@ describe('v37 P0.7: documented ownership', () => {
   });
 
   it('the split declares no collection the sources do not', () => {
+    // A collection whose move is done no longer has a PSP constant, which is the point of moving it. Only
+    // the ones still expected here have to be found.
     const declared = declaredCollections();
-    const stale = [...Object.keys(OWNED_BY_BANKCORE), ...OWNED_BY_PSP].filter((name) => !declared.has(name));
+    const stillHere = Object.entries(OWNED_BY_BANKCORE).filter(([, o]) => !o.moved).map(([name]) => name);
+    const stale = [...stillHere, ...OWNED_BY_PSP].filter((name) => !declared.has(name));
     expect(stale, 'split entries with no constant in the sources').toEqual([]);
   });
 
@@ -132,6 +137,14 @@ describe('v37 P0.7: documented ownership', () => {
     for (const name of ['balanceCreditLog', 'cardIssuerVault', 'cardAuthorizationRecord']) {
       expect(OWNED_BY_BANKCORE[name], `${name} must be bank owned`).toBeTruthy();
     }
+  });
+
+  it('the PSP keeps its own card registry, which is not the issuer registry', () => {
+    // The plan said paymentCardRegistry moves in P7. It must not: the PSP's copy carries the holder count
+    // that the fraud engine reads as a shared-card signal, and fraud detection stays at the PSP. The bank's
+    // equivalent is a separate collection under a separate name, so neither shadows the other.
+    expect(OWNED_BY_PSP.has('paymentCardRegistry')).toBe(true);
+    expect('paymentCardRegistry' in OWNED_BY_BANKCORE).toBe(false);
   });
 
   it('payoutAccountArrangement stays, as a linked account record without a balance', () => {

@@ -278,28 +278,6 @@ export function buildEncryptedFieldsMaps(
       ],
     },
 
-    // -- Card Administration (issuer CDE): cardIssuerVault -------------------─
-    // Module-owned issuer vault (v30). Holds the FULL PAN (CHD) and the card service code, which
-    // never exist in the PSP core (core stays descoped: token + BIN + last4 only). QE:equality lets
-    // MongoDB locate/dedup a card by its exact PAN over ciphertext without client-side decryption
-    // (the differentiator). Lookup tier so setup succeeds on 8.0 (no substring/suffix showcase).
-    cardIssuerVault: {
-      fields: [
-        {
-          keyId: deks.vaultPan,
-          path: 'paymentCardNumber',
-          bsonType: 'string',
-          queries: { queryType: 'equality', contention: 8 },
-        },
-        {
-          keyId: deks.vaultServiceCode,
-          path: 'cardServiceCode',
-          bsonType: 'string',
-          queries: { queryType: 'equality', contention: 8 },
-        },
-      ],
-    },
-
     // -- Customer Authentication --------------------------------------─
     customerAuthenticationAssessment: {
       fields: [
