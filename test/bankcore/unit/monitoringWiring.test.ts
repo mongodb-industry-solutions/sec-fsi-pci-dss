@@ -62,7 +62,19 @@ describe('v37 P1.9: bankcore in the admin monitoring panel', () => {
         if (statSync(full).isDirectory()) { walk(full); continue; }
         if (!/\.(ts|tsx|js|jsx)$/.test(entry)) continue;
         const text = readFileSync(full, 'utf8');
-        for (const match of text.matchAll(/fetch\([^)]*bankcore[^)]*\)/gi)) offenders.push(`${full}: ${match[0]}`);
+        // What matters is the TARGET, not the word. A PSP path that happens to mention the bank
+        // (`/api/v1/system/services/bankcore/admin/...`) is the correct way to reach it, and flagging that
+        // would push someone to misname an endpoint to pass this test rather than to fix anything. So: an
+        // absolute URL naming the bank or its port is an offence, and so is a relative fetch that does not
+        // go to the PSP's own API.
+        for (const match of text.matchAll(/fetch\(\s*[`'"]([^`'"]+)/g)) {
+          const target = match[1];
+          const absolute = /^https?:\/\//i.test(target);
+          if (absolute && /bankcore|:8083/i.test(target)) offenders.push(`${full}: ${target}`);
+          if (!absolute && /bankcore/i.test(target) && !target.startsWith('/api/')) {
+            offenders.push(`${full}: ${target} does not go through the PSP API`);
+          }
+        }
         if (/https?:\/\/[^'"`\s]*bankcore/i.test(text)) offenders.push(`${full}: absolute bankcore URL`);
       }
     };
