@@ -10,6 +10,7 @@ import {
   BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION, BankConsentAgreementControlRecord,
 } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
+import { PERIODIC_PAYMENT_COLLECTION } from '../../modules/pisp/models/periodicPayment.model';
 import {
   BANK_MODULE_CONFIGURATION_COLLECTION, BANK_CAPABILITY_KEYS, BankModuleConfigurationControlRecord,
 } from '../../modules/admin/models/bankModuleConfiguration.model';
@@ -49,6 +50,7 @@ const REQUIRED_COLLECTIONS = [
   BANK_CONSENT_AGREEMENT_COLLECTION,
   BANK_CONSENT_ACCESS_LOG_COLLECTION,
   PAYMENT_INITIATION_COLLECTION,
+  PERIODIC_PAYMENT_COLLECTION,
   BANK_MODULE_CONFIGURATION_COLLECTION,
   TPP_EVENT_SUBSCRIPTION_COLLECTION,
   TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,

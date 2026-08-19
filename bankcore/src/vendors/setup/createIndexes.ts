@@ -8,6 +8,7 @@ import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanc
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
+import { PERIODIC_PAYMENT_COLLECTION } from '../../modules/pisp/models/periodicPayment.model';
 import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models/bankModuleConfiguration.model';
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
@@ -156,6 +157,25 @@ const INDEXES: IndexPlan[] = [
     keys: { 'paymentDebtor.accountReference': 1, recordCreatedDateTime: -1 },
     options: { name: 'paymentInitiation_debtor_time' },
   },
+  // A standing order is read by its id plus the TPP that created it, which is also how it is scoped.
+  {
+    collection: PERIODIC_PAYMENT_COLLECTION,
+    keys: { periodicPaymentInstanceReference: 1 },
+    options: { unique: true, name: 'periodicPayment_ref_unique' },
+  },
+  {
+    collection: PERIODIC_PAYMENT_COLLECTION,
+    keys: { paymentInitiatingTppClientId: 1, periodicPaymentStatus: 1 },
+    options: { name: 'periodicPayment_tpp_status' },
+  },
+  // The scheduler's own query: which active orders are due. Without this it is a collection scan on every
+  // tick, which is the one query guaranteed to run forever.
+  {
+    collection: PERIODIC_PAYMENT_COLLECTION,
+    keys: { periodicPaymentStatus: 1, periodicNextExecutionDate: 1 },
+    options: { name: 'periodicPayment_due' },
+  },
+
   // One configuration document per capability, resolved on every call that needs it.
   {
     collection: BANK_MODULE_CONFIGURATION_COLLECTION,

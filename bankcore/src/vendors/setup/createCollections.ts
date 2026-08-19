@@ -7,6 +7,7 @@ import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/aspsp/models/balanc
 import { TPP_REGISTRATION_COLLECTION } from '../../modules/tpp-trust/models/tppRegistration.model';
 import { BANK_CONSENT_AGREEMENT_COLLECTION, BANK_CONSENT_ACCESS_LOG_COLLECTION } from '../../modules/consent/models/bankConsent.model';
 import { PAYMENT_INITIATION_COLLECTION } from '../../modules/pisp/models/paymentInitiation.model';
+import { PERIODIC_PAYMENT_COLLECTION } from '../../modules/pisp/models/periodicPayment.model';
 import { BANK_MODULE_CONFIGURATION_COLLECTION } from '../../modules/admin/models/bankModuleConfiguration.model';
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
@@ -47,6 +48,9 @@ const PLAIN_COLLECTIONS: PlainCollection[] = [
   // The bank's own payment record. It holds the creditor IBAN a caller supplied, which is third party
   // personal data the bank has no basis to make searchable, so it is stored as sent and never queried by.
   { name: PAYMENT_INITIATION_COLLECTION, purpose: 'payments initiated by a third party, through their lifecycle' },
+  // Same reasoning as the single payment: it holds the creditor IBAN a caller supplied, which is third
+  // party personal data the bank has no basis to make searchable.
+  { name: PERIODIC_PAYMENT_COLLECTION, purpose: 'standing orders: one authorisation, many scheduled executions' },
   { name: BANK_MODULE_CONFIGURATION_COLLECTION, purpose: "configuration of the bank's own engines, edited over its admin API" },
   { name: TPP_EVENT_SUBSCRIPTION_COLLECTION, purpose: 'where the bank delivers notifications, and how it signs them' },
   { name: TPP_WEBHOOK_DELIVERY_LOG_COLLECTION, purpose: 'one row per delivery attempt, so a silent failure is visible' },

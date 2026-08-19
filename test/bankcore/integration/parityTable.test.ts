@@ -42,7 +42,10 @@ const PARITY: ParityRow[] = [
   { capability: 'cancel a payment where applicable', method: 'delete', path: '/v1/payments/{paymentProduct}/{paymentId}', phase: 'done' },
   // Not yet delivered. Each names the phase that owns it, so this list is the remaining work rather than
   // a wish: the notification path needs a subscription to deliver to, the rest are their own phases.
-  { capability: 'recurring mandate (periodic payments)', method: 'post', path: '/v1/periodic-payments/{paymentProduct}', phase: 'P3.9' },
+  { capability: 'recurring mandate (periodic payments)', method: 'post', path: '/v1/periodic-payments/{paymentProduct}', phase: 'done' },
+  { capability: 'read a standing order', method: 'get', path: '/v1/periodic-payments/{paymentProduct}/{paymentId}', phase: 'done' },
+  { capability: 'standing order status', method: 'get', path: '/v1/periodic-payments/{paymentProduct}/{paymentId}/status', phase: 'done' },
+  { capability: 'cancel a standing order', method: 'delete', path: '/v1/periodic-payments/{paymentProduct}/{paymentId}', phase: 'done' },
   { capability: 'card issuance and lifecycle', method: 'post', path: '/v1/cards', phase: 'done' },
   { capability: 'activate, block or revoke a card', method: 'put', path: '/v1/cards/{cardToken}/status', phase: 'done' },
   { capability: 'renew a card to a later expiry', method: 'post', path: '/v1/cards/{cardToken}/renewals', phase: 'done' },
@@ -99,12 +102,10 @@ describe('v37 P3.11: parity with what the PSP does today', () => {
       unexpectedlyPresent.map((row) => `${row.path} (${row.phase})`),
       'these are implemented but still marked as pending: move them to done',
     ).toEqual([]);
-    // Printed rather than asserted: the remaining phases are the plan's, not this test's, to complete.
-    expect(outstanding.map((row) => row.phase)).toEqual(
-      // P7 left this list when the card endpoints landed, which is what "done" is supposed to mean.
-      // P8 left this list when the assessment landed at the bank.
-      expect.arrayContaining(['P3.9']),
-    );
+    // Every row is `done` now: P7's card endpoints, P8's assessment and P3.9's standing orders all landed.
+    // The assertion is that the table owes nothing, which is a stronger and simpler statement than listing
+    // which phases still do, and it will fail the moment a new pending row is added without being finished.
+    expect(outstanding.map((row) => `${row.path} (${row.phase})`)).toEqual([]);
   });
 
   it('every served Open Banking route appears in the table, so nothing arrives unlisted', () => {

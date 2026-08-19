@@ -4785,6 +4785,7 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `bankConsentAgreement` | `consent` | Account access consent per third party and account set |
 | `bankConsentAccessLog` | `consent` | Evidence of every consent-checked access, granted and refused |
 | `paymentInitiationProcedure` | `pisp` | Payments initiated by a third party, through their lifecycle |
+| `periodicPaymentProcedure` | `pisp` | Standing orders: one authorisation, many scheduled executions, each with its own outcome |
 | `counterpartyBank` | `payment-hub` | Reachable institutions: BIC, schemes, correspondent, cut-off |
 | `interbankMessageLog` | `payment-hub` | Interbank messages sent and received, for reconciliation |
 | `cardIssuerVault` | `card-issuer` | The issuer CDE: the only full PAN on this platform. PAN and service code under QE with equality indexes |
