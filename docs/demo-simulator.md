@@ -1790,8 +1790,13 @@ After login, David accesses the standard merchant portal (Ch-04 §10.4):
 ## Bank transfer UX (/system/transfer/bank): add-on (dev plan v17)
 
 Two tabs:
-- Registered account: send to an own account or a saved contact; no bank details required. Executes as
-  an external bank transfer (async): funds are held on submit and settle after T+N ("pending settlement").
+- Registered account: send to an own account or a saved contact; no bank details required.
+  - An own account goes to `POST /api/v1/gateway/transfers/own`, added in v37: the destination is sent as
+    its REFERENCE, never its IBAN, and the bank holding the source account moves the money over the same
+    rails as any other credit transfer. Before v37 this path was a dead end, which earlier revisions of
+    this document described as working.
+  - A saved contact executes as an external bank transfer (async): funds are held on submit and settle
+    after T+N ("pending settlement").
 - New bank account: enter destination country, IBAN/routing/account and BIC. The rail (SEPA/ACH/SWIFT) is
   auto-detected and shown as a badge with the quoted fee; details validate live (preview endpoint). "Send
   wire" submits and the success screen polls live status (pending -> settled/failed). A "recurring (Direct
@@ -1804,9 +1809,11 @@ Two tabs:
 **Real system (`/system/**`):** RTP is "a transfer that needs the payer's approval", so it lives inside
 the Transfer area (no separate silo). Transfer hub gains a **Request to Pay** card → `/system/transfer/rtp`
 (payee creates a request; on create it is presented to the payer and a shared QR is offered). The payer sees
-**"Requests awaiting your approval"** directly on the Transfer hub (`RtpPendingInbox`): approve (with a
-funding-account selector) runs funds check + FDS/HRP/AML + VoP then creates the linked P2P transfer, or
-reject. Notifications fire on delivery (payer) and approval/settlement (payee); the alert clears on approve/reject.
+**"Requests awaiting your approval"** in payment history (`/system/payment/history`), NOT on the transfer
+hub: approve (with a funding-account selector) runs funds check + FDS/HRP/AML + VoP then creates the linked
+P2P transfer, or reject. Earlier revisions of this document placed the panel on the transfer hub and named a
+component `RtpPendingInbox` that has never existed; history is where the code puts it, and where a payer
+looking for something they have to act on would reasonably look. Notifications fire on delivery (payer) and approval/settlement (payee); the alert clears on approve/reject.
 
 **VoP admin (`/system/admin/modules/vop`):** dedicated data-driven config dashboard (match thresholds,
 matching strategy toggles, decision policy, market gating), editable by admin/manager like FDS. VoP also

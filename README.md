@@ -62,14 +62,53 @@ This answers the most common FSI prospect question:
 
 ## 🚀 Quick Start
 
-
 To begin the process of testing, installation, and execution, please follow the instructions in [the installation guide](https://github.com/mongodb-industry-solutions/sec-fsi-pci-dss/wiki/installation).
+
+### Running both services locally
+
+One `.env` at the repository root configures both. Every bank variable is `PSP_BANKCORE_`-prefixed and
+defaults to "same cluster, own database", so the only value you normally have to set is the connection
+string you already have.
+
+```bash
+npm run setup        # installs every workspace, including bankcore
+
+npm run setup:db     # both databases: collections, Queryable Encryption, indexes, keys
+npm run setup:seed   # both, in order
+npm run setup:check  # verifies what was just built, on both
+
+npm run dev          # every service at once, or use dev:bankcore / dev:backend / dev:frontend
+```
+
+One command covers **both** services. The provider's entry points orchestrate every registered bank from
+`backend/data/bankInstances.json`, in the order the data requires: the bank is seeded BEFORE the provider,
+because the provider's records point at the bank's and not the reverse, and dropped before it too, because
+dropping the provider takes the shared key vault with it. Adding a second bank is a record in that file plus
+its own database, not a change to any script.
+
+Rebuilding from nothing is `npm run setup:reset`, which rebuilds both. Reach for it after any change to a
+collection, an index, an encrypted field or a data encryption key: setup SKIPS a collection that already
+exists, so an encryption change to one already there will not otherwise take effect.
+
+If you do reset one side by hand, note that the bank's collections reference data encryption keys in the
+shared vault: a provider reset that drops the vault leaves the bank pointing at keys that no longer exist.
+Setup detects exactly that and tells you to rebuild, rather than letting it surface later as a driver error on
+the first encrypted read.
+
+`PSP_BANKCORE_ENABLED=false` turns the bank off and restores the provider's built-in engines, which is what
+makes a regression one variable away from being isolated.
+
+**Two things that will cost you an hour if you meet them cold.** The bank must load the SAME `crypt_shared`
+version the provider does, or the whole database connection fails and reports itself as plain connectivity
+trouble. And the bank persists its notification signing key on disk with the `kid` derived from the key, so a
+deployment pins one replica: two would each mint their own key, and a receiver holding one JWKS would reject
+the other's notifications.
 
 ---
 
 ## 🗄️ Data Architecture
 
-The data model follows **BIAN Service Domain** naming conventions across 8 collections:
+The data model follows **BIAN Service Domain** naming conventions. The provider's principal collections:
 
 | Collection | BIAN Service Domain | QE Protection |
 |---|---|---|
@@ -82,7 +121,14 @@ The data model follows **BIAN Service Domain** naming conventions across 8 colle
 | `party` | Party (SD-13) | equality: PII identifiers |
 | `customerAuthenticationAssessment` | Customer Authentication (SD-91) | equality: credential hash |
 
-> Full schema definitions, field-level QE modes, index strategy, and collection relationships are in [docs/technical-spec.md](docs/technical-spec.md).
+The bank holds its own: `accountArrangement` (the real balance, IBAN encrypted), `accountMovement` (every
+mutation, so the ledger reconciles), `cardIssuerVault` (the only full card numbers here, encrypted with an
+equality index so a card is findable by its exact number over ciphertext), `issuedCardRegistry`,
+`creditAssessmentState`, and the consent and third-party records its API is authorised by.
+
+> Full schema definitions, field-level QE modes, index strategy, collection relationships and the ownership
+> matrix covering every collection either service creates are in
+> [docs/technical-spec.md](docs/technical-spec.md).
 
 ---
 
@@ -105,9 +151,16 @@ Key PCI DSS v4.0 requirements addressed:
 ```
 sec-fsi-pci-dss/
 ├── 💻 frontend/        # Next.js 14 App Router + TypeScript
-├── ⚙️ backend/         # Fastify 4 + TypeScript + NPM Tools (setup + seed)
+├── ⚙️ backend/         # The payment service provider: Fastify 4 + TypeScript (setup + seed)
+├── 🏦 bankcore/        # The bank (ASPSP): its own service, its own database, Open Banking API
+├── 📦 packages/        # Shared workspaces (event bus, platform links)
 └── 📚 docs/            # Engineering documentation
 ```
+
+**Two institutions, two databases.** The provider does not hold customer funds: the bank owns the account
+ledger, the account balances and the only full card numbers on the platform. They talk over HTTP, the
+provider authenticating as a registered third party, and the bank notifying back with a signed event token.
+Nothing is shared between the two databases except the encryption key vault.
 
 ---
 

@@ -257,7 +257,7 @@ function AuditEventsView() {
         title="Audit Events"
         description="Unified, searchable audit trail across the whole platform."
         info="Combines business process events, compliance events, and integration (inbound/outbound test) events into one stream. Filter by source, event type, outcome, date range, or free text."
-        debugInfo="ADR-025 · businessProcessEvent + complianceProcessEvent + integrationEvents · PCI DSS"
+        debugInfo="businessProcessEvent + complianceProcessEvent + externalProviderArrangementActionLog"
         actions={
           <button onClick={downloadJson} disabled={downloading || loading}
             className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-[#001E2B] text-[#001E2B] hover:bg-[#001E2B] hover:text-[#00ED64] transition-colors font-medium disabled:opacity-50"

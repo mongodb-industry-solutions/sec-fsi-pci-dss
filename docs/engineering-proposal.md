@@ -2683,3 +2683,174 @@ surface: add a normalizer, not a branch in a caller.
 detail and the dashboard stat pin themselves to `kind=card` to keep the card document shape. Response
 schemas gained the movement fields as additive optional properties (they are strict, so an undeclared
 field would be stripped). No collection, index, DEK or seed change.
+
+---
+
+## ADR-064: bankcore as a physically separate institution, and the ledger boundary (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** The PSP owned the account ledger. Balances, holds and settlements were rows in
+`payoutAccountArrangement`, and every money movement was a local atomic update. Three consequences made this
+untenable for a demo that claims to show Open Banking. A payment service provider does not hold customer
+funds, so the architecture asserted something no regulator would accept. Peer to peer transfers CREDITED the
+recipient locally, which is to say they invented money that no institution had moved. And an account to
+account transfer had no path at all: the endpoint existed, the UI called it, and it was a dead end.
+
+**Decision:**
+
+1. **A separate service with its own database.** `bankcore/` is an ASPSP with its own Fastify app, its own
+   Mongo database and its own event bus instance. It is not a module of the PSP and it shares no collection
+   with it. The only shared thing is the Queryable Encryption key vault, so no new key material and no second
+   rotation story is introduced.
+2. **The bank owns the ledger.** `accountArrangement` holds the authoritative balance; `accountMovement`
+   records every mutation explicitly so the ledger is reconcilable rather than inferred from a running total.
+   The PSP's `payoutAccountArrangement` survives as a LINKED ACCOUNT record: it keeps the reference every
+   consumer already reads, and its balance becomes a projection.
+3. **The PSP stops moving money.** A delegated execution records that it was delegated BEFORE dispatch, and
+   the payout orchestration returns before any local balance movement when it was. The decision is on the
+   record, not re-derived later from a runtime flag, because a flag that changes between the write and the
+   read produces two different histories of the same payment.
+4. **Fail closed at the boundary.** An unreachable bank declines. A funds gate that fails open authorises a
+   payment nobody checked, and after this change the thing that could not be reached is precisely the
+   authoritative balance.
+
+**Consequences.** The PSP can no longer answer "what is the balance" from its own database, which is correct
+and is the point. Anything that needs a real balance calls the bank. A funds CONFIRMATION cannot substitute
+for a hold, because a yes or no is not a reservation and two concurrent authorisations would both pass it, so
+the hold moved to the bank as its own operation (ADR-065's boundary carries the answer back).
+
+**Rejected: keeping the ledger at the PSP behind an interface.** It would have preserved every one of the
+three defects while adding indirection, and the demo's claim is precisely that the institution holding the
+money is a different institution.
+
+---
+
+## ADR-065: the service boundary is a webhook carrying a security event token (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** Two services with two event buses cannot subscribe to each other. The bank changes things the
+PSP is not watching for: a consent becomes valid, a payment reaches a settled status. The PSP needs to know
+without polling, and the notification has to be verifiable, because a message that changes a payment's state
+on the strength of an unauthenticated POST is a state machine anyone can drive.
+
+**Decision:**
+
+1. **Push, signed, over HTTP.** The bank delivers a Security Event Token (RFC 8417) by push (RFC 8935),
+   signed RS256 with the bank's own key, published at a JWKS endpoint (RFC 7517).
+2. **The receiver pins what it accepts.** RS256 only, the key matched by `kid`, issuer and audience checked.
+   A verification failure caused by OUR side answers 400, not 401: telling the sender it was unauthorised
+   when the fault is local sends whoever is debugging in the wrong direction.
+3. **Delivery is evidence.** Every attempt is a row in `tppWebhookDeliveryLog`, outcome included. A silent
+   failure is the worst case for a notification channel, and the log is what makes it visible.
+4. **Notification never throws.** A failed delivery must not roll back the state change it was reporting.
+   The same `jti` is reused across retries so a receiver can deduplicate.
+
+**Consequences.** The boundary is auditable from both sides: the bank has the attempt log, the PSP has the
+compliance events. A field name mismatch between the two halves is NOT caught by unit tests on either side,
+which is exactly how one was found in P5.2: the payload said `paymentReference` and the subscriber read
+`paymentExecutionInstanceReference`, both individually correct and tested, and the transfer stayed in flight.
+Contract tests across the boundary earn their place because of that class of defect.
+
+---
+
+## ADR-066: routing resolvers are declared per capability, not assumed (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** With one bank, "which provider serves this capability" had one answer, so the router could pick
+the active provider for a type. With a real ASPSP the question changes: which bank serves THIS account. Some
+capabilities are bound to an entity (an account belongs to one bank; a card was issued by one issuer) and
+others are not (fraud scoring, sanctions screening: any configured provider will do).
+
+**Decision:**
+
+1. **Each capability declares its resolution kind.** Entity-bound capabilities name the key they resolve on;
+   strategy-bound ones keep the existing group behaviour. The kind is DECLARED in a table, not inferred from
+   the payload, so a new capability cannot silently inherit the wrong one.
+2. **The debtor decides, never the creditor.** An account-bound resolution reads the party being debited. A
+   creditor at another institution must not select the provider that moves the payer's money.
+3. **A registered issuer beats a BIN guess.** Card issuer resolution prefers an explicitly registered issuer
+   and falls back to BIN range matching. A card outside every declared range is REFUSED rather than routed to
+   a default: nothing could say which issuer owns it, and picking one would be fabricating a routing decision.
+4. **One dispatch pipeline.** The resolver is injected before any strategy runs, so provider selection cannot
+   fork into a second code path that is not audited.
+
+**Consequences.** The concurrent risk gates stay separate. Once the funds gate became "one hop to the bank"
+it looked collapsible into a single composite call with the issuer check, the fraud score and the sanctions
+screen, and a test now forbids it: a fused call has one verdict, so a decline stops saying WHICH control
+declined, and the compliance narrative an investigator reads is built from the separate verdicts.
+
+---
+
+## ADR-067: TPP registration is the authorisation model at the bank (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** The bank needed to authorise the PSP without inheriting the PSP's identity system. A token
+minted by the platform must not open the banking API, or the boundary between the two institutions is
+decorative.
+
+**Decision:**
+
+1. **Registered third parties, client credentials.** `tppRegistration` holds the client id, a bcrypt secret
+   hash, the granted scopes and the roles. Tokens are the bank's own, signed with the bank's own key, with
+   `iss` and `aud` naming the bank.
+2. **Scopes are per operation group, and separately granted.** Berlin Group's own access names for the
+   account surface (`accounts`, `balances`, `transactions`), plus scopes for what no standard covers:
+   `card-authorisations` places a hold, `card-data` reads a card number, `credit-assessments` reads
+   creditworthiness. `card-data` is deliberately not folded into `card-authorisations`, because a token that
+   can hold funds must not thereby be able to read a PAN.
+3. **Refuse identically on unknown client and wrong secret.** Both answer the same refusal, so the endpoint
+   cannot be used to enumerate which client ids exist.
+4. **Authorise before reporting availability.** A 503 is returned only AFTER the caller has been
+   authorised. An unauthenticated caller learning the state of the bank's database is a free reconnaissance
+   signal.
+5. **Consent is a separate gate from the token.** `resolveConsent` is the single place an account access is
+   judged, and "created" is not "authorised": a consent must reach a usable status before it opens anything.
+
+**Consequences.** Every bank endpoint is authorised the same way, and the middleware distinguishes 401 (no
+token) from 403 (wrong scope or role) so an integrator can tell a missing grant from a missing token. The
+scopes are granted in the seeded registration, so adding a capability means granting its scope explicitly.
+
+---
+
+## ADR-068: two tokenisation owners, and neither replaces the other (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** The platform now has two institutions that both hold something called a card token. The obvious
+reading is that one is redundant. It is not, and the confusion is expensive: deleting either one breaks a
+different guarantee.
+
+**Decision:**
+
+1. **The issuer vault is at the bank.** `cardIssuerVault` holds the full PAN, encrypted with an equality
+   query type so a card can be located by its exact number over ciphertext with no client-side decryption.
+   PCI DSS assigns scope to whoever stores a PAN, and that is the institution that ISSUED the card.
+2. **The acceptance token vault stays at the PSP.** `cardEtokenProcedure` and the surrogate token on
+   `paymentCardManagement` are acceptance-side: they let the provider operate a card on file while holding
+   BIN plus last four and no cardholder data. This mirrors the EMVCo split between acceptance tokens and
+   issuer or network tokens.
+3. **The PSP reaches cardholder data only by asking.** Reveal, exact-PAN search and verification value
+   derivation are calls to the issuer. The reveal is modelled as creating a reveal, not reading a resource,
+   because each call is an act of disclosure to be authorised and recorded; the search is a POST because a
+   PAN in a query string lands in access logs and browser history.
+4. **The verification key derivation did not change.** It moved with the vault byte for byte and reuses the
+   same provisioned key, since every seeded card's CVV depends on it. Fixed vectors in a test pin the
+   algorithm now that the PSP's copy is gone.
+5. **De-scoping is asserted, not claimed.** A test proves no PAN field, no vault reference, no PAN data
+   encryption key and no seeder writing a number remains anywhere in `backend/src`.
+
+**Two naming corrections, recorded because both are traps.** `paymentCardRegistry` at the PSP dedupes
+ACCEPTED card instruments and carries the holder count the fraud engine reads as a shared-card signal; the
+bank's record of what it issued is a different thing and is called `issuedCardRegistry`. `customerCreditRatingState`
+at the PSP holds transaction-monitoring risk flags and no score at all, despite the BIAN name; the bank's
+assessment is `creditAssessmentState`. In both cases the v37 plan said the PSP collection moves, and in both
+cases it must not, because the PSP reads it for fraud investigation, which does not move.
+
+**Consequences.** A demo can show a PAN search over ciphertext at the institution that is meant to be in
+scope for it, and show the provider operating a full card flow without ever holding one. The cost is a network
+hop for three operations that used to be local reads, and one more place where a misconfigured provider
+endpoint produces a 502 instead of a value.

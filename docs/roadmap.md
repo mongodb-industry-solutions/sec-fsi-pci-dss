@@ -695,7 +695,7 @@ These requirements apply to all versions from v1 onward:
 | FR-v17.1-01 | Rail engine | Rail auto-derived from country/currency/data with user override; IBAN/BIC/routing validated per ISO 13616 / ISO 9362 / NACHA; per-rail fees and standard return-code maps (ACH R-codes, SEPA reject, SWIFT) | ✅ |
 | FR-v17.1-02 | Provider dispatch | All transfers (bank, P2P, merchant payout) and account validation execute via `dispatchProvider` (`payment_initiation` / `account_information`); no direct builtin import; builtin replaceable by external without flow change | ✅ |
 | FR-v17.1-03 | API | `POST /gateway/transfers/preview` (rail+fee+validation), `POST /gateway/transfers/bank` (execute, `Idempotency-Key`), `GET /gateway/transfers/:ref/status` (real-time) | ✅ |
-| FR-v17.1-04 | Frontend | `/system/transfer/bank`: live rail detection, validation, fee, submit; live status polling; recurring Direct Debit option | ✅ |
+| FR-v17.1-04 | Frontend | `/system/transfer/bank`: live rail detection, validation, fee, submit; live status polling; recurring Direct Debit option | ✅ (corrected in v37: this was marked done while the tab's DEFAULT path, "send to an own account", errored. The rail detection and the new-account path always worked; the own-account path became real in v37 P5.2 via `POST /gateway/transfers/own` and the page now calls it) |
 | FR-v17.1-05 | Async lifecycle | Transfers are external and async: funds held on submit, credited/cleared on settlement (`bank.transfer.settled`), released on `failed` | ✅ |
 | FR-v17.1-06 | Risk gate | Pre-initiation FDS + HRP + AML screening blocks before funds move and opens an L1-reviewable fraud case (status `open`) on a negative evaluation | ✅ |
 | FR-v17.1-07 | Recurring mandates | ACH Direct Debit / SEPA SDD mandates: create/list/cancel + background scheduler (`runDueMandates`) reusing the transfer flow | ✅ |
@@ -1143,3 +1143,32 @@ surface becomes one collection with one merge.
       held beneficiary transfer + its `p2p` case so the non-card investigation path is demonstrable.
 
 *Added 2026-08-13 (v36).*
+
+---
+
+## v37: The bank as a separate institution
+
+The PSP owned the account ledger, which meant a payment service provider held customer funds, peer to peer
+transfers credited the recipient locally (inventing money nobody moved), and an account to account transfer
+had no working path. v37 extracts `bankcore/`, an ASPSP with its own database, and moves what belongs to a
+bank into it. See ADR-064 to ADR-068.
+
+| FR | Area | Requirement | Acceptance criteria | Status |
+|---|---|---|---|---|
+| FR-v37-01 | Service | `bankcore/` runs as its own Fastify service with its own Mongo database and its own event bus instance; only the Queryable Encryption key vault is shared | `setup:check` passes on both databases independently; no collection is created by both services | ✅ |
+| FR-v37-02 | Ledger | The bank owns `accountArrangement` balances and records every mutation in `accountMovement`; the PSP's `payoutAccountArrangement` becomes a linked account record whose balance is a projection | A balance read reflects the bank's figure; no PSP code path mutates a balance for a delegated execution | ✅ |
+| FR-v37-03 | Open Banking API | Consent, accounts, balances, transactions, payment initiation and funds confirmation on `/v1/*`, Berlin Group shaped, with consent enforced as a single gate | Every `/v1` route is documented with a summary, a tag and a response; a read without a usable consent is refused | ✅ |
+| FR-v37-04 | Notifications | The bank pushes a signed security event token per state change; the PSP verifies it against the bank's JWKS and every attempt is logged | RS256 pinned and `kid` matched; a local verification failure answers 400, not 401; a failed delivery never rolls back the state change | ✅ |
+| FR-v37-05 | Money movement | Same-owner transfers execute at the bank over `POST /gateway/transfers/own`; no local credit is invented; an unreachable bank declines rather than falling back | A same-owner transfer moves money at the bank and settles through the notification; the recipient credit has an institution behind it | ✅ |
+| FR-v37-06 | Routing | Each capability declares whether it resolves by entity or by strategy; account-bound resolution reads the debtor; a card outside every declared BIN range is refused | The risk gates stay four separate dispatches with four verdicts; no composite call | ✅ |
+| FR-v37-07 | Card issuer | The PAN vault and the issued-card registry are the bank's, with the lifecycle (issue, activate, block, renew, replace), per-transaction limits and ISO 8583 responses | `revoked` is terminal; a replacement issues before it revokes; an authorisation over the limit answers `61` | ✅ |
+| FR-v37-08 | De-scoping | No full PAN is reachable from any PSP collection; BIN plus last four remain the display source of truth | A test proves no vault reference, no `paymentCardNumber` path, no PAN data encryption key and no seeder writing a number anywhere in `backend/src` | ✅ |
+| FR-v37-09 | Credit bureau | The assessment is the bank's, derived from its own records, and returns the factors that produced the score | Two customers with different histories score differently; an unreachable bureau reports a failure rather than a default score | ✅ |
+| FR-v37-10 | Auth realm | The platform realm is `leafypay`; `local` remains accepted as an alias on both the request and the stored record | Login succeeds for all four combinations of sent and stored realm; the `sub` claim is unchanged | ✅ |
+| FR-v37-11 | Documentation | ADRs, the bankcore environment variables, and an ownership matrix covering every collection either service creates | A test parses the matrix and fails when a declared collection is unclaimed | ✅ |
+| FR-v37-12 | Compatibility | Leafy Wallet and the merchant app work against the extracted system, verified at the END of the phase rather than maintained through it | Full rebuild from nothing, then both external consumers exercised for real | ⏳ P11 |
+
+**Definition of done.** The system is equal to or better than before v37 started. Judged at P11, not per
+commit: breaking things mid-phase was explicitly allowed, and a full database reset is permitted.
+
+*Added 2026-08-19 (v37).*

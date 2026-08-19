@@ -1035,7 +1035,7 @@ export const PAYOUT_ACCOUNT_COLLECTION = 'payoutAccountArrangement';
 
 export type PayoutAccountType   = 'bank_account' | 'wallet' | 'internal_ledger';
 export type PayoutAccountStatus = 'active' | 'pending_validation' | 'suspended' | 'closed';
-export type PayoutRail          = 'sepa' | 'ach' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
+export type PayoutRail          = 'sepa' | 'ach' | 'swift' | 'local_bank' | 'internal_wallet' | 'internal_ledger';
 
 export interface PayoutAccountBalance {
   pendingAmount:   number;   // authorized, awaiting settlement
@@ -2970,7 +2970,54 @@ PSP_ADMIN_ENFORCE=false
 # INSECURE by design (URLs leak passwords into history, proxy logs, Referer). ALLOWED by default in
 # ANY environment; set this flag to 'false' to disable both params entirely and harden a deployment.
 NEXT_PUBLIC_PSP_OIDC_AUTO=true
+
+# ── bankcore: the bank as a separate service (v37) ─────────────────
+# Everything the bank reads is PSP_-prefixed, from the same .env, so one file configures both services.
+# Unset means "same cluster, own database": the bank never shares a collection with the PSP.
+
+# Turns the bank on. Default TRUE since v37 P4.7. Setting it false restores the PSP's built-in engines,
+# which is what makes a regression one variable away from being isolated. staging and production keep it
+# false until the phase is complete.
+PSP_BANKCORE_ENABLED=true
+
+# Connection. The URI defaults to MONGODB_URI, the database name does not default to the PSP's.
+PSP_BANKCORE_DB_URI=
+PSP_BANKCORE_DB_NAME=bankcoredb
+# Must be the SAME crypt_shared version the PSP loads. A mismatch fails the whole connection and reads as
+# a plain connectivity error, which is a long way from the real cause.
+PSP_BANKCORE_CRYPT_SHARED_LIB_PATH=
+
+# Where each side reaches the other. BASE_URL is what the PSP calls; PUBLIC_URL is what the bank puts in a
+# notification it sends. The browser never calls the bank directly.
+PSP_BANKCORE_BASE_URL=http://localhost:8082
+PSP_BANKCORE_PUBLIC_URL=
+PSP_BANKCORE_PORT=8082
+
+# The bank's own token signing key. It must NOT be the shared platform secret: a token minted elsewhere on
+# the platform must not open the banking API. Unset derives a distinct key from JWT_SECRET, so a deployment
+# is secure without extra configuration while still being able to set a genuinely independent one.
+PSP_BANKCORE_ACCESS_TOKEN_SECRET=
+
+# The registered third party the PSP authenticates as. Read at SEED time to write the bank's verifier and
+# the PSP's credential; at runtime the bank reads the hash from its registration record.
+PSP_BANKCORE_TPP_CLIENT_ID=leafypay-psp
+PSP_BANKCORE_TPP_CLIENT_SECRET=
+
+# 'automatic' lands a new consent valid; 'manual' leaves it received for an operator to authorise.
+PSP_BANKCORE_CONSENT_MODE=automatic
+
+# The bank's own event bus instance and its own key vault namespace. The vault is SHARED with the PSP by
+# default, so no new key material and no second rotation story is introduced.
+PSP_BANKCORE_EVENT_BUS_ENGINE=
+PSP_BANKCORE_EVENT_BUS_TOPIC_PREFIX=
+PSP_BANKCORE_KEY_VAULT_NAMESPACE=
+PSP_BANKCORE_SEED_DATA_DIR=
 ```
+
+**Signing keys on disk.** The bank persists its notification signing key under `bankcore/keys/`, explicitly
+git-ignored, with the `kid` derived from the key itself. A deployment therefore pins `replicaCount=1`: two
+replicas would each mint their own key, and a receiver that fetched the JWKS from one would reject
+notifications signed by the other.
 
 ---
 
@@ -4657,6 +4704,98 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 - Q2 (extract module to microservice): stateless engines own no collections, a code-only move; the
   microservice calls back through the port. For kyc/kyb the re-home set is empty (clean extraction).
 - Q3 (detect orphans): a collection is a decommission candidate iff no module lists it under Owns/Reads.
+
+### §10.1 Every collection and its owner (v37)
+
+The table above answers the lifecycle questions per module. This one answers the completeness question:
+which service and which module owns each collection that setup creates. It exists because "every collection
+appears in at least one row" was a rule someone had to remember, and it is now a test:
+`test/backend/unit/vendors/matrixCompleteness.test.ts` parses this table and fails when a collection declared
+in either `createCollections.ts` is missing from it. A collection nobody claims here is undocumented
+ownership, which is the state the rule exists to prevent.
+
+**Two services, two databases.** The PSP owns the payment service provider's records; bankcore owns the
+bank's. Nothing is shared except the key vault. `domainEvent`, `counters` and `idempotencyKey` appear on both
+sides because each service keeps its OWN instance, not because either reaches into the other.
+
+#### Payment service provider (`backend/`)
+
+| Collection | Owning module | Notes |
+|---|---|---|
+| `party` | `identity` | PII owner surface, QE tiers |
+| `customerAuthenticationAssessment` | `identity` | Credentials and the login realm (`leafypay` from v37) |
+| `partyAuthenticationAssessment` | `identity` | Identity verification stubs |
+| `authenticationDomain` | `domain` | Realm configuration: name, protocol, flow |
+| `role` | `identity` | Permission matrix |
+| `partyAuthenticationKey` | `identity` | Enrolled authenticator keys |
+| `partyEnrolledCredential` | `identity` | Enrolment records |
+| `partyBackchannelAuthentication` | `identity` | Backchannel authentication requests |
+| `partyAuthorizationCode` | `identity` | Authorisation codes, short lived |
+| `partyIssuedToken` | `identity` | Issued tokens, for revocation |
+| `partyAuthConsent` | `identity` | Consent to an authorisation request |
+| `consentAgreement` | `identity` | Granted scopes per client |
+| `consentAccessLog` | `identity` | Evidence of consent-checked access |
+| `customerAgreementProcedure` | `customer` | KYC, QE identity fields |
+| `merchantAgreementProcedure` | `gateway` | KYB and beneficial owners |
+| `merchantAgreementEvents` | `gateway` | KYB decision history |
+| `paymentCardManagement` | `customer` | Card-on-file. BIN plus last four, never a PAN |
+| `cardEtokenProcedure` | `customer` | Acceptance-side surrogate tokens |
+| `paymentCardRegistry` | `customer` | Dedupes accepted card INSTRUMENTS; holder count is the shared-card fraud signal. Distinct from the bank's `issuedCardRegistry` |
+| `cardTransactionLog` | `transaction` | Card transactions, sensitive fields inline under QE |
+| `cardAuthorizationRecord` | `gateway` | Authorisation records. The HOLD itself is the bank's from v37 |
+| `paymentExecutionProcedure` | `gateway` | Executions. Delegated ones record that fact before dispatch |
+| `paymentOrderProcedure` | `gateway` | Payment orders |
+| `payoutAccountArrangement` | `gateway` | Linked account record. Balance is a PROJECTION from v37; the bank owns the ledger |
+| `counterpartyArrangement` | `identity` | Beneficiaries |
+| `checkoutSessionLog` | `gateway` | Checkout sessions |
+| `paymentLinkRecord` | `gateway` | Payment links |
+| `paymentRequestProcedure` | `gateway` | Request to Pay |
+| `paymentRequestEvent` | `gateway` | Request to Pay lifecycle |
+| `qrPaymentRepresentation` | `gateway` | QR payloads, encrypted from v35 |
+| `rtpAliasDirectoryCache` | `gateway` | Alias directory cache, hashed aliases only |
+| `customerCreditRatingState` | `fraud` | Transaction-monitoring risk FLAGS, despite the BIAN name. Holds no score; the bank's `creditAssessmentState` is the assessment |
+| `fraudDiagnosisCase` | `fraud` | Investigation cases |
+| `fraudDiagnosisCaseEvents` | `fraud` | Case history |
+| `fraudDiagnosisCustomerQuestion` | `fraud` | Customer questions on a case |
+| `externalProviderArrangement` | `provider` | Registered providers and their routing |
+| `externalProviderArrangementPortfolio` | `provider` | Routing groups |
+| `externalProviderArrangementActionLog` | `provider` | Every dispatch, for audit |
+| `capabilityModuleConfiguration` | `provider` | Built-in engine configuration |
+| `businessProcessEvent` | `provider` | Business process trail |
+| `complianceProcessEvent` | `provider` | Compliance ledger |
+| `domainEvent` | `provider` | The PSP's own event store |
+| `merchantWebhookDeliveryLog` | `gateway` | Merchant webhook attempts |
+| `notification` | `system` | User notifications |
+| `demoTeamContact` | `system` | Demo metadata for `/about` |
+| `counters` | `system` | Sequence counters, PSP instance |
+| `idempotencyKey` | `system` | Idempotency keys, PSP instance |
+
+#### Bank (`bankcore/`)
+
+| Collection | Owning module | Notes |
+|---|---|---|
+| `bankProfile` | `aspsp` | Bank identity and routing keys: BIC, IBAN bank codes, BIN ranges |
+| `accountArrangement` | `aspsp` | The real account and its balance. IBAN under QE with an equality index |
+| `accountHolder` | `aspsp` | The bank's own holder. Name and contact under QE |
+| `accountMovement` | `aspsp` | Explicit ledger movements, so the ledger is reconcilable |
+| `balanceCreditLog` | `aspsp` | Audit trail of every balance credit |
+| `tppRegistration` | `tpp-trust` | Registered third parties: client id, secret hash, scopes, roles |
+| `tppEventSubscription` | `tpp-trust` | Where notifications are delivered and how they are signed |
+| `tppWebhookDeliveryLog` | `tpp-trust` | One row per delivery attempt, so a silent failure is visible |
+| `bankConsentAgreement` | `consent` | Account access consent per third party and account set |
+| `bankConsentAccessLog` | `consent` | Evidence of every consent-checked access, granted and refused |
+| `paymentInitiationProcedure` | `pisp` | Payments initiated by a third party, through their lifecycle |
+| `counterpartyBank` | `payment-hub` | Reachable institutions: BIC, schemes, correspondent, cut-off |
+| `interbankMessageLog` | `payment-hub` | Interbank messages sent and received, for reconciliation |
+| `cardIssuerVault` | `card-issuer` | The issuer CDE: the only full PAN on this platform. PAN and service code under QE with equality indexes |
+| `issuedCardRegistry` | `card-issuer` | Cards this bank issued: network, BIN, last four, lifecycle, limits. No PAN by design |
+| `creditAssessmentState` | `credit-bureau` | One current assessment per party, with the factors that produced it |
+| `bankModuleConfiguration` | `admin` | Configuration of the bank's own engines, edited over its admin API |
+| `domainEvent` | `system` | The bank's own event store, separate instance |
+| `counters` | `system` | Sequence counters, bank instance |
+| `idempotencyKey` | `system` | Idempotency keys, bank instance |
+
+*Added 2026-08-19 (v37 P10.2).*
 
 *Added 2026-07-24 (v31). Version 2.5.0.*
 
