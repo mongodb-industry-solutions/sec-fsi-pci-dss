@@ -83,8 +83,22 @@ export function applyTransform(value: unknown, transform: FieldTransform): unkno
       return value;
 
     default:
+      // An unrecognised transform used to pass the value through in silence. For a platform whose claim is
+      // that a bank is integrated by CONFIGURATION, that is a trap: the integration looks configured, the
+      // wire payload is wrong, and the bank refuses for something that reads as a data problem. Warned once
+      // per type so it reaches the admin log buffer without flooding it, and still passed through, because
+      // throwing would take down a working dispatch over a cosmetic error in one rule.
+      warnUnknownTransform(String((transform as { type?: unknown }).type));
       return value;
   }
+}
+
+const warnedTransforms = new Set<string>();
+
+function warnUnknownTransform(type: string): void {
+  if (warnedTransforms.has(type)) return;
+  warnedTransforms.add(type);
+  console.warn(`[fieldMapping] unknown transform "${type}": the rule was applied without it, so the payload may not match what the provider expects`);
 }
 
 export function applyMappings(
