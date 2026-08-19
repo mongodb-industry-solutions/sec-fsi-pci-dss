@@ -33,7 +33,7 @@ const ROLE_USER: Record<DemoRole, { sub: string; email: string; name: string }> 
 export function mintJwt(payload: Record<string, unknown>): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const now = Math.floor(Date.now() / 1000);
-  return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ iat: now, exp: now + 86400, domain: 'local', ...payload })}.fake-signature`;
+  return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ iat: now, exp: now + 86400, domain: 'leafypay', ...payload })}.fake-signature`;
 }
 
 /** Mint a JWT for a known demo role. `extra` overrides/augments claims (e.g. partyRef). */
