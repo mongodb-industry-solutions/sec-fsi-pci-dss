@@ -103,12 +103,12 @@ To ensure flexibility and scalability, the PSP system adopts a **Hexagonal Archi
 
 | Directory | Purpose |
 |---|---|
-| `backend/src/modules/` | PSP core: business domains and process orchestration |
-| `backend/src/providers/` | Built-in provider modules: replaceable adapters (see §2.6) |
-| `backend/src/shared/` | Shared business resources reused by both `modules/` and `providers/` |
-| `backend/src/vendors/` | System-level libraries with no business logic (event bus, encryption, middleware, seed, setup) |
+| `psp/backend/src/modules/` | PSP core: business domains and process orchestration |
+| `psp/backend/src/providers/` | Built-in provider modules: replaceable adapters (see §2.6) |
+| `psp/backend/src/shared/` | Shared business resources reused by both `modules/` and `providers/` |
+| `psp/backend/src/vendors/` | System-level libraries with no business logic (event bus, encryption, middleware, seed, setup) |
 
-**Shared resources (`backend/src/shared/`).** Any business type, interface, utility, or constant needed by more than one module or provider must live in `shared/`, never duplicated across consumers. Both `modules/` and `providers/` import from `shared/`; neither imports from the other. `vendors/` is imported by all layers but never imports from `modules/`, `providers/`, or `shared/`.
+**Shared resources (`psp/backend/src/shared/`).** Any business type, interface, utility, or constant needed by more than one module or provider must live in `shared/`, never duplicated across consumers. Both `modules/` and `providers/` import from `shared/`; neither imports from the other. `vendors/` is imported by all layers but never imports from `modules/`, `providers/`, or `shared/`.
 
 **Internal structure convention.** Every directory under `modules/`, `providers/`, and `shared/` follows the same standard layout. Only the subdirectories actually required by that unit are created: do not invent new names:
 

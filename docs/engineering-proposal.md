@@ -26,7 +26,7 @@ Full business context, problem statement, and storyline are in [PRD.md](PRD.md).
 - Specify the dual-mode frontend: Simulator Mode (presenter-controlled, no login) and Application Mode (JWT login, role-based routing).
 - Define the JWT authentication design (local HS256 domain, pre-seeded demo users, extensible to MS Entra ID).
 - Specify the Fastify REST API surface and request/response contracts.
-- Define the `backend/bin/setup.ts` and `backend/bin/seed.ts` scripts so the demo is installable in one sequence of commands.
+- Define the `psp/backend/bin/setup.ts` and `psp/backend/bin/seed.ts` scripts so the demo is installable in one sequence of commands.
 - Identify the risks specific to QE implementation and specify mitigations.
 - Break the work into five independently deliverable phases aligned with v1, v2, v3, v4, and v5.
 
@@ -67,20 +67,28 @@ AWS KMS
 
 ### 3.2 Repository structure decision
 
-Two named top-level folders per IST Engineering Standards:
+One folder per institution, each holding its own applications:
 
 ```
-frontend/     ← Next.js 14 App Router
-backend/      ← Fastify 4 (controllers / services / models / encryption)
-  bin/        ← setup.ts + seed.ts (owned by backend; invoked via npm --prefix backend)
-  data/       ← JSON seed files (one per collection; consumed only by backend/bin/seed.ts)
-test/         ← All automated tests (Vitest unit + integration, Playwright E2E)
-  backend/    ←   mirrors backend/src/: unit/services/ + integration/routes/
-  frontend/   ←   mirrors frontend/src/: unit/lib/ + unit/components/ + e2e/
-docs/         ← PRD, roadmap, technical-spec, this EP
+psp/               ← Leafy Pay, the payment service provider
+  frontend/        ← Next.js 14 App Router
+  backend/         ← Fastify 4 (controllers / services / models / encryption)
+    bin/           ← setup.ts + seed.ts (owned by the backend; invoked via npm --prefix psp/backend)
+    data/          ← JSON seed files (one per collection; consumed only by psp/backend/bin/seed.ts)
+bank/              ← the bank (ASPSP)
+  backend/         ← Fastify 4, its own database, Open Banking API
+merchant/          ← external merchant demo (Next.js, no database)
+packages/          ← shared workspaces (event bus, platform links)
+test/              ← All automated tests (Vitest unit + integration, Playwright E2E)
+  psp/backend/     ←   mirrors psp/backend/src/: unit/services/ + integration/routes/
+  psp/frontend/    ←   mirrors psp/frontend/src/: unit/lib/ + unit/components/ + e2e/
+  bank/backend/    ←   mirrors bank/backend/src/
+docs/              ← PRD, roadmap, technical-spec, this EP
 ```
 
-`bin/` and `data/` live inside `backend/` because they call `backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix backend` and `npm run setup:seed --prefix backend`.
+The test tree mirrors the source tree, so an application's suites move with it.
+
+`bin/` and `data/` live inside `psp/backend/` because they call `psp/backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix psp/backend` and `npm run setup:seed --prefix psp/backend`.
 
 No `packages/` shared workspace. The backend owns all MongoDB access and all encryption logic. The frontend is a pure HTTP consumer. Shared TypeScript base config lives in `tsconfig.base.json`.
 
@@ -198,13 +206,18 @@ All tests live in `test/` at the repository root, organised by layer and type (I
 ```
 test/
 ├── setup.ts                          ← global Vitest setup
-├── backend/
-│   ├── unit/services/                ← mirrors backend/src/services/
-│   └── integration/routes/           ← mirrors backend/src/controllers/
-└── frontend/
-    ├── unit/lib/                     ← mirrors frontend/src/lib/
-    ├── unit/components/              ← mirrors frontend/src/app/components/
-    └── e2e/                          ← Playwright flow specs
+├── psp/
+│   ├── backend/
+│   │   ├── unit/services/            ← mirrors psp/backend/src/services/
+│   │   └── integration/routes/       ← mirrors psp/backend/src/controllers/
+│   └── frontend/
+│       ├── unit/lib/                 ← mirrors psp/frontend/src/lib/
+│       ├── unit/components/          ← mirrors psp/frontend/src/app/components/
+│       └── e2e/                      ← Playwright flow specs
+└── bank/
+    └── backend/
+        ├── unit/                     ← mirrors bank/backend/src/
+        └── integration/              ← Open Banking route + contract suites
 ```
 
 | Level | Scope | Tool | Location |
@@ -298,7 +311,7 @@ PCI CDE boundary at code level: modules `customer`, `transactions`, and `gateway
 #### 3.8.5 Backend source structure
 
 ```
-backend/src/
+psp/backend/src/
 ├── shared/
 │   ├── models/
 │   │   ├── risk.model.ts             RiskSeverity · FraudTriggerInput
@@ -405,8 +418,8 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 
 | Phase | Scope | Dependency | Version |
 |---|---|---|---|
-| **P1** | `backend/bin/setup.ts`: 7 collections, DEK provisioning, indexes | None | v1 |
-| **P2** | `backend/bin/seed.ts`: synthetic data for all 7 collections (incl. 5 demo users) | P1 | v1 |
+| **P1** | `psp/backend/bin/setup.ts`: 7 collections, DEK provisioning, indexes | None | v1 |
+| **P2** | `psp/backend/bin/seed.ts`: synthetic data for all 7 collections (incl. 5 demo users) | P1 | v1 |
 | **P3** | Backend: QE client, KMS provider factory, `encryptedFieldsMap` | P1 | v1 |
 | **P3a** | Backend: JWT auth middleware + `POST /api/v1/auth/login` endpoint | P3 | v1 |
 | **P4** | Backend: payment API (`POST /transactions`, `POST /cards`) | P3 | v1 |
@@ -956,7 +969,7 @@ Debug Mode is a **demo-only feature** and must not be enabled in any production 
 #### Architecture
 
 ```
-frontend/src/
+psp/frontend/src/
   context/
     DebugContext.tsx: React context + useDebugMode() hook
   components/debug/
@@ -1250,7 +1263,7 @@ Adopt the **Internal-First integration pattern** for all six compliance integrat
 
 ### Context
 
-The existing codebase has a devops `admin` controller (`backend/src/modules/admin/controllers/admin.controller.ts`) with 7 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
+The existing codebase has a devops `admin` controller (`psp/backend/src/modules/admin/controllers/admin.controller.ts`) with 7 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
 
 The Integration Hub (v6) requires a business role that can:
 - Register, configure, and suspend external compliance providers
@@ -1689,7 +1702,7 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 **Context.** Event handling was scattered: a per-case in-process `EventEmitter` (`caseEventBus`) plus direct writes to three event collections (`businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog`). Following the real-PSP model, a card payment must wait for the issuer's decision (and other real-time risk checks) from providers with asynchronous flows, while the client waits for the outcome, and an investigation must be able to follow the whole journey across subsystems, not chase scattered logs.
 
 **Decision.**
-1. **EventBus vendor (port/adapter), one instance for ALL events** (`backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus`, no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
+1. **EventBus vendor (port/adapter), one instance for ALL events** (`psp/backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus`, no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
 2. **`DomainEvent` envelope + correlated event store** (`domainEvent` collection). Every event carries `eventId` (idempotency), `eventType` (dotted, module-prefixed), `correlationId` (= the journey, the `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey` (Kafka-ready). CHD is stripped on publish (`sanitizeDeep`, single CHD blocklist owned by the vendor). The legacy `emitProcessEvent`/`emitComplianceEvent`/`logEvent` also mirror to the store with correlation. `GET /api/v1/events/trail/:correlationId` returns the ordered journey.
 3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them, any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. Only eligibility gates hard-decline (`card-issuer`, `funds`, and `hrp` sanctions as a regulatory block); `fds` is a risk gate whose `review`/`decline` recommendation authorizes the payment and opens a fraud case for L1/L2 instead of declining it. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
 4. **Backward compatibility.** `createTransaction` is kept as a synchronous wrapper (initiate + await the terminal event) so the gateway (checkout / payment-link) is unchanged.
@@ -2237,7 +2250,7 @@ least-privilege regression (PCI DSS 7.2.2, EBA §31(a)) introduced for a UI conv
 
 ### ADR-054: the data generator is additive and refuses to clobber
 
-**Decision.** `bin/seed-generate.ts` reads the existing `backend/data/*.json`, keeps every record it
+**Decision.** `bin/seed-generate.ts` reads the existing `psp/backend/data/*.json`, keeps every record it
 finds byte-for-byte, and only appends what is needed to reach its target floors. `write()` refuses to
 reduce any collection's record count and fails the run unless `--force` is passed. A second run over
 its own output is a no-op, so the generator is safe to invoke at any point in the lifecycle.
@@ -2841,7 +2854,7 @@ different guarantee.
    same provisioned key, since every seeded card's CVV depends on it. Fixed vectors in a test pin the
    algorithm now that the PSP's copy is gone.
 5. **De-scoping is asserted, not claimed.** A test proves no PAN field, no vault reference, no PAN data
-   encryption key and no seeder writing a number remains anywhere in `backend/src`.
+   encryption key and no seeder writing a number remains anywhere in `psp/backend/src`.
 
 **Two naming corrections, recorded because both are traps.** `paymentCardRegistry` at the PSP dedupes
 ACCEPTED card instruments and carries the holder count the fraud engine reads as a shared-card signal; the

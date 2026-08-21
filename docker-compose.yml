@@ -9,8 +9,8 @@
 # Prerequisites:
 #   1. Copy .env.example to .env and fill in MONGODB_URI, JWT_SECRET, KMS_PROVIDER.
 #   2. For offline/local KMS: run `npm run setup:key:master` and set KMS_LOCAL_MASTER_KEY.
-#   3. For OAuth/OIDC signing keys: run `npm run setup:key:rsa` (generates backend/keys/private.pem).
-#      The backend/keys/ directory is mounted into the container via the volume below.
+#   3. For OAuth/OIDC signing keys: run `npm run setup:key:rsa` (generates psp/backend/keys/private.pem).
+#      The psp/backend/keys/ directory is mounted into the container via the volume below.
 #      In production use PSP_OAUTH_KEY_PROVIDER=aws instead (no file needed).
 #   4. For QE shared library: set MONGODB_CRYPT_SHARED_LIB_PATH in .env.
 #      The path must be accessible INSIDE the container — mount it via volumes if needed.
@@ -20,14 +20,14 @@ services:
   backend:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: psp/backend/Dockerfile
     ports:
       - "8081:8080"  # host:container — Dockerfile sets PORT=8080; host exposes 8081
     env_file:
       - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      PSP_SEED_DATA_DIR: /app/backend/data
+      PSP_SEED_DATA_DIR: /app/psp/backend/data
       PSP_PROJECT_ROOT: /app
       PSP_CORS_ORIGIN: "http://localhost:8080,http://127.0.0.1:8080"
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
@@ -39,7 +39,7 @@ services:
       bankcore:
         condition: service_started
     volumes:
-      - ./backend/keys:/app/backend/keys:ro
+      - ./psp/backend/keys:/app/psp/backend/keys:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
@@ -52,12 +52,12 @@ services:
   bankcore:
     build:
       context: .
-      dockerfile: bankcore/Dockerfile
+      dockerfile: bank/backend/Dockerfile
     env_file:
       - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      PSP_BANKCORE_SEED_DATA_DIR: /app/bankcore/data
+      PSP_BANKCORE_SEED_DATA_DIR: /app/bank/backend/data
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       PSP_BANKCORE_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       # In-network PSP host, for the consent status callbacks bankcore delivers to its TPP.
@@ -71,7 +71,7 @@ services:
 
   frontend:
     build:
-      context: ./frontend
+      context: ./psp/frontend
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: ${NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC:-http://localhost:8081}

@@ -1,0 +1,8 @@
+[
+  {
+    "bankInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "bankInstanceName": "Verdant Bank",
+    "bankInstanceWorkspace": "bank/backend",
+    "bankInstanceDbNameVariable": "PSP_BANKCORE_DB_NAME"
+  }
+]

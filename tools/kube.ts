@@ -906,9 +906,9 @@ async function preDeployChecklist() {
   check(".drone.yml exists", existsSync(join(PROJECT_ROOT, ".drone.yml")));
   check("environments/staging.yaml", existsSync(join(PROJECT_ROOT, "environments", "staging.yaml")));
   check("environments/production.yaml", existsSync(join(PROJECT_ROOT, "environments", "production.yaml")));
-  check("backend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "backend", "Dockerfile")));
-  check("frontend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "frontend", "Dockerfile")));
-  check("bankcore/Dockerfile exists", existsSync(join(PROJECT_ROOT, "bankcore", "Dockerfile")));
+  check("psp/backend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "psp/backend", "Dockerfile")));
+  check("psp/frontend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "psp/frontend", "Dockerfile")));
+  check("bank/backend/Dockerfile exists", existsSync(join(PROJECT_ROOT, "bank/backend", "Dockerfile")));
 
   const color = failed === 0 ? GREEN : YELLOW;
   console.log(`\n  ${color}Result: ${passed} passed, ${failed} failed${NC}`);
@@ -1071,8 +1071,8 @@ async function deployEnvSetup() {
 
   step(".drone.yml", existsSync(join(PROJECT_ROOT, ".drone.yml")));
   step(`environments/${envLabel}.yaml`, existsSync(envYaml));
-  step("backend/Dockerfile", existsSync(join(PROJECT_ROOT, "backend", "Dockerfile")));
-  step("frontend/Dockerfile", existsSync(join(PROJECT_ROOT, "frontend", "Dockerfile")));
+  step("psp/backend/Dockerfile", existsSync(join(PROJECT_ROOT, "psp/backend", "Dockerfile")));
+  step("psp/frontend/Dockerfile", existsSync(join(PROJECT_ROOT, "psp/frontend", "Dockerfile")));
 
   // ── Summary ───────────────────────────────────────────────
   const total = passed + failed;
@@ -1096,20 +1096,20 @@ const BACKEND_SVC_URL = `http://${RELEASE_BACKEND}-web-app:80`;
 
 async function applyApiProxy() {
   const dronePath = join(PROJECT_ROOT, ".drone.yml");
-  const nextConfigPath = join(PROJECT_ROOT, "frontend", "next.config.js");
-  const dockerfilePath = join(PROJECT_ROOT, "frontend", "Dockerfile");
+  const nextConfigPath = join(PROJECT_ROOT, "psp/frontend", "next.config.js");
+  const dockerfilePath = join(PROJECT_ROOT, "psp/frontend", "Dockerfile");
 
   if (!existsSync(dronePath)) { fail(".drone.yml not found"); return; }
-  if (!existsSync(nextConfigPath)) { fail("frontend/next.config.js not found"); return; }
+  if (!existsSync(nextConfigPath)) { fail("psp/frontend/next.config.js not found"); return; }
 
   console.log(`\n${CYAN}=== Next.js API Proxy ===${NC}\n`);
   console.log("  Kanopy mesh enforces OIDC/SSO on every ingress host.");
   console.log("  Disabling mesh causes ERR_CONNECTION_CLOSE (ingress depends on it).");
   console.log("  Solution: proxy all /api/* through the frontend (same-origin).\n");
   console.log(`${CYAN}Changes to apply:${NC}\n`);
-  console.log(`  1. ${GREEN}frontend/next.config.js${NC}`);
+  console.log(`  1. ${GREEN}psp/frontend/next.config.js${NC}`);
   console.log(`     Add rewrites() proxying /api/* and /health → backend pod\n`);
-  console.log(`  2. ${GREEN}frontend/Dockerfile${NC}`);
+  console.log(`  2. ${GREEN}psp/frontend/Dockerfile${NC}`);
   console.log(`     Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE build arg\n`);
   console.log(`  3. ${GREEN}.drone.yml${NC}`);
   console.log(`     Rename build args to _PUBLIC / _PRIVATE\n`);
@@ -1136,7 +1136,7 @@ const nextConfig = {
 module.exports = nextConfig;
 `;
   writeFileSync(nextConfigPath, nextConfig, "utf-8");
-  ok("frontend/next.config.js updated with API proxy rewrites");
+  ok("psp/frontend/next.config.js updated with API proxy rewrites");
 
   // 2. Add NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV to Dockerfile if missing
   if (existsSync(dockerfilePath)) {
@@ -1147,7 +1147,7 @@ module.exports = nextConfig;
         `$1\n\nARG NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE\nENV NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=$NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE`,
       );
       writeFileSync(dockerfilePath, df, "utf-8");
-      ok("frontend/Dockerfile: added NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV");
+      ok("psp/frontend/Dockerfile: added NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ARG/ENV");
     } else {
       console.log(`  ${DIM}[skip]${NC} Dockerfile: NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE already present`);
     }

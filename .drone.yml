@@ -16,7 +16,7 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-backend
-      dockerfile: backend/Dockerfile
+      dockerfile: psp/backend/Dockerfile
       context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
@@ -32,8 +32,8 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-frontend
-      dockerfile: frontend/Dockerfile
-      context: frontend/
+      dockerfile: psp/frontend/Dockerfile
+      context: psp/frontend/
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
@@ -71,7 +71,7 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-bankcore
-      dockerfile: bankcore/Dockerfile
+      dockerfile: bank/backend/Dockerfile
       context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
@@ -207,7 +207,7 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-backend
-      dockerfile: backend/Dockerfile
+      dockerfile: psp/backend/Dockerfile
       context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
@@ -223,8 +223,8 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-frontend
-      dockerfile: frontend/Dockerfile
-      context: frontend/
+      dockerfile: psp/frontend/Dockerfile
+      context: psp/frontend/
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
@@ -262,7 +262,7 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-bankcore
-      dockerfile: bankcore/Dockerfile
+      dockerfile: bank/backend/Dockerfile
       context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}

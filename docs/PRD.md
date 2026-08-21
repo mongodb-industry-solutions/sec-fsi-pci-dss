@@ -622,7 +622,7 @@ const cmkOptions = {
 **Local KMS fallback for development (docker-compose only):**
 
 ```typescript
-// backend/src/encryption/kms.ts
+// psp/backend/src/encryption/kms.ts
 const kmsProviders = process.env.KMS_PROVIDER === 'local'
   ? { local: { key: Buffer.from(process.env.KMS_LOCAL_MASTER_KEY!, 'base64') } }
   : { aws: { accessKeyId: ..., secretAccessKey: ... } };
@@ -651,7 +651,7 @@ Follows the [IST Engineering Standards](../references/engineering-standards.md):
 
 ```
 sec-fsi-pci-dss/
-├── frontend/                       # Next.js 14 App Router + TypeScript
+├── psp/frontend/                   # Next.js 14 App Router + TypeScript
 │   ├── src/
 │   │   ├── app/
 │   │   │   ├── simulator/          # Story-driven: no login, presenter-controlled
@@ -670,7 +670,7 @@ sec-fsi-pci-dss/
 │   ├── public/
 │   └── package.json
 │
-├── backend/                        # Fastify 4 + TypeScript
+├── psp/backend/                    # Fastify 4 + TypeScript
 │   ├── bin/                        # Thin wrappers: entry points for setup and seed
 │   │   ├── setup.ts                # Calls src/vendors/setup/
 │   │   └── seed.ts                 # Calls src/vendors/seed/
@@ -742,14 +742,14 @@ All commands are accessible from the repository root. No need to navigate into s
   "name": "fsi-pci-dss-demo",
   "private": true,
   "scripts": {
-    "setup":            "npm install && npm install --prefix frontend && npm install --prefix backend",
+    "setup":            "npm install && npm install --prefix psp/frontend && npm install --prefix psp/backend",
     "dev":              "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:frontend":     "npm run dev --prefix frontend",
-    "dev:backend":      "npm run dev --prefix backend",
-    "build":            "npm run build --prefix frontend && npm run build --prefix backend",
+    "dev:frontend":     "npm run dev --prefix psp/frontend",
+    "dev:backend":      "npm run dev --prefix psp/backend",
+    "build":            "npm run build --prefix psp/frontend && npm run build --prefix psp/backend",
 
-    "setup:db":         "npm run setup:db --prefix backend",
-    "setup:seed":       "npm run seed --prefix backend",
+    "setup:db":         "npm run setup:db --prefix psp/backend",
+    "setup:seed":       "npm run seed --prefix psp/backend",
 
     "test":             "npm run test:unit && npm run test:integration",
     "test:unit":        "vitest run test/backend/unit test/frontend/unit",
@@ -1125,9 +1125,9 @@ npm run dev
 | `npm run test:watch` | Vitest watch mode (development) |
 | `npm run type-check` | TypeScript type check without emitting |
 
-### `backend/bin/setup.ts` Responsibilities
+### `psp/backend/bin/setup.ts` Responsibilities
 
-`backend/bin/setup.ts` is a thin wrapper. All logic lives in `backend/src/vendors/setup/`:
+`psp/backend/bin/setup.ts` is a thin wrapper. All logic lives in `psp/backend/src/vendors/setup/`:
 
 1. Validate environment variables (fail fast with helpful error if missing)
 2. Connect to MongoDB Atlas (plain client for DEK provisioning)
@@ -1138,9 +1138,9 @@ npm run dev
 7. Apply JSON Schema validation on `fraudDiagnosisCase` (plaintext collection)
 8. Print setup summary: collections created, DEKs provisioned, indexes applied
 
-### `backend/bin/seed.ts` Responsibilities
+### `psp/backend/bin/seed.ts` Responsibilities
 
-`backend/bin/seed.ts` is a thin wrapper. All logic lives in `backend/src/vendors/seed/`:
+`psp/backend/bin/seed.ts` is a thin wrapper. All logic lives in `psp/backend/src/vendors/seed/`:
 
 1. Upsert demo users into `customerAuthenticationAssessment` (SD-91, hashed passwords, roles) and their corresponding `party` records (SD-13)
 2. Upsert synthetic BIAN-compliant data (no real PII: Faker.js)
@@ -1195,7 +1195,7 @@ npm run dev
 | 14 | Raw Atlas document toggle | Real ciphertext fetched from Atlas via plain MongoClient endpoint | 2026-05-27 |
 | 15 | Authentication model | Local JWT (HS256) stored in `customerAuthenticationAssessment` (SD-91); `partyAuthenticationAssessment` (SD-16) holds verification events; extensible to MS Entra ID | 2026-05-27 |
 | 16 | Seeder user selection UX | Username dropdown auto-fills password on selection; dev-friendly | 2026-05-27 |
-| 17 | Bin/ vs backend/vendors/ | Setup/seed logic lives in `backend/src/vendors/`; `bin/` are thin wrappers | 2026-05-27 |
+| 17 | Bin/ vs psp/backend/vendors/ | Setup/seed logic lives in `psp/backend/src/vendors/`; `bin/` are thin wrappers | 2026-05-27 |
 | 18 | Version reorder | Agentic fraud investigation moved to v5 (last); old v4 Advanced Capabilities → new v3; old v5 Payment Gateway → new v4 | 2026-06-08 |
 
 ---

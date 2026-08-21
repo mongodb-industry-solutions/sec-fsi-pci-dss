@@ -25,7 +25,7 @@ This document covers the implementation-level detail that the PRD deliberately o
 
 ## 1. BIAN TypeScript Models
 
-All models live in `backend/src/modules/*/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant. All collections follow strict BIAN Service Domain (SD) naming.
+All models live in `psp/backend/src/modules/*/models/`. Each file exports the TypeScript interface for the collection document and the collection name constant. All collections follow strict BIAN Service Domain (SD) naming.
 
 ### `party.model.ts` (SD-13: new)
 
@@ -525,7 +525,7 @@ export interface AuthenticationDomainRecord {
 ```
 
 **Collection:** `authenticationDomain`, plaintext, no QE (domain config contains no CHD or PII).
-**Seed file:** `backend/data/authDomains.json`, 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
+**Seed file:** `psp/backend/data/authDomains.json`, 3 pre-seeded domains: `local` (enabled), `msentra` (disabled), `bigid` (disabled).
 **API:** `GET /api/v1/auth/domains` (public), returns only domains with `partyAuthenticationDomainEnabled: true` (each item includes `selfRegistration` for local domains).
 
 **Self-registration (local domains).** When `partyAuthenticationDomainSelfRegistrationEnabled` is true, the login screen shows a Register link and `POST /api/v1/auth/register` (public) accepts `{ name, email, password, phone?, domain }`. The account is always created with role `customer` (server-enforced, never client-selectable) and a linked SD-13 party (name/email, plus phone when given). Status is `active` when the domain auto-approves, otherwise `pending`; a manager approves (`pending → active`) or rejects (`→ suspended`) it from the domain's Users panel. Non-active accounts are blocked at login with a 403. Registration is orchestrated by `registerSelfServiceUser` (service, not controller) which publishes a `auth.register` compliance event (EDA, PCI DSS Req 10; no PII in the event summary). This gates login only and does NOT perform or imply KYC (a separate process).
@@ -584,7 +584,7 @@ export interface CustomerCreditRatingStateControlRecord {
 ```
 
 **Collection:** `customerCreditRatingState`, plaintext, no QE. Contains compliance classification metadata only; no PII, no CHD.
-**Seed file:** `backend/data/customerCreditRatings.json`, 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
+**Seed file:** `psp/backend/data/customerCreditRatings.json`, 5 pre-seeded HRPC profiles covering accounts ACC-003, ACC-007, ACC-012, ACC-019, ACC-025.
 **API:** `GET /api/v1/fraud/hrpc/check?accountRef=<ref>`, see §6.6.
 **Link key:** `customerAgreementReference` (a QE:equality field in `customerAgreementProcedure`) is used as the join key. The API looks up the fraud case's `customerAgreementInstanceReference`, resolves the account reference, then queries this collection. This avoids a cross-QE-collection `$lookup` (per ADR-001).
 
@@ -739,7 +739,7 @@ export interface IntegrationEvent {
 - `integrationEvents`: **timeseries** (ADR-025), no QE. Append-only audit log; timeField=`recordCreatedDateTime`, TTL 90 days.
 
 **Seed files:**
-- `backend/data/integrationRegistry.json`: 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
+- `psp/backend/data/integrationRegistry.json`: 6 pre-seeded internal providers (FDS, HRP, AML, KYC, KYB, CreditBureau) at `routingPriority=999`.
 - Default routing groups seeded programmatically by `seedRoutingGroups.ts` (called from `seedIntegrations`).
 
 **Default group invariant:**
@@ -973,7 +973,7 @@ void db.collection(BUSINESS_PROCESS_EVENTS_COLLECTION).insertOne(event).catch(()
 
 ### 1.15 RBAC/ACL: data-driven permission model (ADR-030, SD-16)
 
-Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission **catalog** (resource × action) is static code (`backend/src/shared/models/acl.model.ts`, mirrored in `frontend/src/config/acl.ts`); the role→permission **assignment** is data in the **`role`** collection (CRUD by the `manager`).
+Authorization is **data-driven, default-deny** (PCI DSS Req 7). The permission **catalog** (resource × action) is static code (`psp/backend/src/shared/models/acl.model.ts`, mirrored in `psp/frontend/src/config/acl.ts`); the role→permission **assignment** is data in the **`role`** collection (CRUD by the `manager`).
 
 **Resources** (→ BIAN SD): `transactions`(SD-254) · `customers`(SD-53) · `cards`(SD-88) · `accounts`(SD-66) · `fraudCases`(SD-83) · `merchants`(SD-89) · `providers`(SD-193) · `modules`(ADR-029) · `authDomains`(SD-16) · `roles` · `auditEvents`(ADR-025) · `consents`.
 **Actions** (PCI levels): `view` · `viewSensitive` (CHD/PII, Req 3/7, bound to the escalation flow) · `manage` · `investigate`. Scope `own` for `customer`.
@@ -1030,7 +1030,7 @@ Three new collections added in v17 to support the end-to-end payout pipeline.
 PSP-internal bank account record for each party. IBAN and routing number are encrypted at rest with `QE:none` (PCI DSS Req 3.3). Balance sub-document is updated atomically via `$inc`.
 
 ```typescript
-// backend/src/modules/gateway/models/payoutAccount.model.ts
+// psp/backend/src/modules/gateway/models/payoutAccount.model.ts
 export const PAYOUT_ACCOUNT_COLLECTION = 'payoutAccountArrangement';
 
 export type PayoutAccountType   = 'bank_account' | 'wallet' | 'internal_ledger';
@@ -1084,7 +1084,7 @@ export interface PayoutAccountArrangement {
 Lifecycle record for each payout. Created after card authorization; tracks the full journey from beneficiary resolution to final settlement. `resolutionLog` is append-only (PCI DSS Req 10).
 
 ```typescript
-// backend/src/modules/gateway/models/paymentExecution.model.ts
+// psp/backend/src/modules/gateway/models/paymentExecution.model.ts
 export const PAYMENT_EXECUTION_COLLECTION = 'paymentExecutionProcedure';
 
 export type PaymentExecutionStatus =
@@ -1246,7 +1246,7 @@ acquiring counterpart (`cardTransactionInstanceReference` absent). Otherwise the
 Beneficiary registry entry. Raw phone/email is **never stored**, only the resolved `partyInstanceReference` and a masked display hint. The opaque `counterpartyArrangementReference` is the "beneficiary token" shared with merchants for payment initiation.
 
 ```typescript
-// backend/src/modules/identity/models/counterpartyArrangement.model.ts
+// psp/backend/src/modules/identity/models/counterpartyArrangement.model.ts
 export const COUNTERPARTY_COLLECTION = 'counterpartyArrangement';
 
 // Max beneficiaries per user: configurable via PSP_BENEFICIARY_MAX_PER_USER (default: 100)
@@ -1281,7 +1281,7 @@ export interface CounterpartyArrangement {
 
 ## 2. QE encryptedFieldsMaps
 
-All maps live in `backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.
+All maps live in `psp/backend/src/vendors/encryption/encryptedFieldsMaps.ts`. The `keyId` values are per-field BSON Binary UUIDs resolved at runtime from the provisioned DEKs via `provisionDEKs.ts`.
 
 **DEK naming (as of v3 BIAN compliance update):**
 
@@ -1401,7 +1401,7 @@ reference, status, email), progressively hidden below `lg` / `md`; segment, phon
 fields (address, risk notes) belong to the customer detail, where the disclosure is audited.
 
 ```typescript
-// backend/src/vendors/encryption/encryptedFieldsMaps.ts
+// psp/backend/src/vendors/encryption/encryptedFieldsMaps.ts
 // v2: tier parameter selects which QE:none fields are included in the map.
 // Level 1 map omits QE:none fields → driver returns Binary for those fields.
 // Level 2 map includes all fields → driver auto-decrypts everything.
@@ -1498,7 +1498,7 @@ export function buildEncryptedFieldsMaps(deks: DEKs, tier: QETier = 'level2') {
 ## 3. Key Management Setup
 
 ```typescript
-// backend/src/encryption/kms.ts
+// psp/backend/src/encryption/kms.ts
 
 import { KMSProviders } from 'mongodb';
 
@@ -1540,7 +1540,7 @@ export function buildCmkOptions() {
 ```
 
 ```typescript
-// backend/src/encryption/keyVault.ts
+// psp/backend/src/encryption/keyVault.ts
 
 import { MongoClient, ClientEncryption } from 'mongodb';
 import { buildKmsProviders, buildCmkOptions } from './kms';
@@ -1589,7 +1589,7 @@ export async function provisionDataEncryptionKeys(client: MongoClient) {
 > **v2**: Two MongoClient pools replace the single client. `getDbForRole(role, hasToken)` in `roleClients.ts` selects the correct pool.
 
 ```typescript
-// backend/src/vendors/encryption/roleClients.ts (v2)
+// psp/backend/src/vendors/encryption/roleClients.ts (v2)
 
 import { MongoClient, Db } from 'mongodb';
 import { buildEncryptedFieldsMaps, QETier } from './encryptedFieldsMaps';
@@ -2180,7 +2180,7 @@ The `escalationToken` is a short-lived UUID (TTL 4 hours) stored in an in-memory
 **Client-side resume (`useCaseEscalation`).** The token lives in `sessionStorage` under `esc:<caseId>`,
 which is per tab, so a deep link into a case, its transaction or its customer opened in a new tab
 arrives without it and the server correctly returns no sensitive data. Every page that renders
-sensitive case data uses the shared `frontend/src/lib/useCaseEscalation.ts` hook: it reuses the token
+sensitive case data uses the shared `psp/frontend/src/lib/useCaseEscalation.ts` hook: it reuses the token
 from this tab and, failing that, re-derives it for a `level2_investigator` when the case is
 `escalated` **and** already has `escalationAcceptedAt`. Re-deriving calls this same endpoint, which
 is idempotent for an accepted escalation, so it adds no audit noise and never approves an escalation
@@ -2442,7 +2442,7 @@ Server-side logout for the session JWT. The PSP session token is a stateless HS2
 
 #### `GET /system/users`
 
-Returns the list of local domain demo users for the login screen dropdown. Data is read from `backend/data/customerAuthentications.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
+Returns the list of local domain demo users for the login screen dropdown. Data is read from `psp/backend/data/customerAuthentications.json` (seed file) rather than the QE-encrypted collection to avoid decryption overhead on this helper endpoint. Passwords are never included.
 
 Pass `?featured=true` to return only the curated demo roster (`customerAuthenticationDemoFeatured: true`) surfaced in the debug-mode user picker (application mode) and used by the simulator. The full set of seeded users remains available without the filter for ad-hoc testing.
 
@@ -2901,7 +2901,7 @@ Global listings sort by `recordCreatedDateTime` (demo-scale collscan; no support
 ## 7. Environment Variables Reference
 
 ```bash
-# .env  (see backend/src/vendors/setup/env.example for full reference)
+# .env  (see psp/backend/src/vendors/setup/env.example for full reference)
 
 # ── MongoDB connection ─────────────────────────────────────────────
 MONGODB_URI=mongodb+srv://<user>:<pass>@<cluster>.mongodb.net/?retryWrites=true&w=majority
@@ -2944,7 +2944,7 @@ RISK_MCC_LIST=5812,6011,7995
 ESCALATION_TOKEN_TTL_SECONDS=3600
 
 # ── Payout Orchestration (v17: PSP_ prefix) ───────────────────────
-# All read via pspEnv('NAME', 'default') helper in backend/src/config.ts
+# All read via pspEnv('NAME', 'default') helper in psp/backend/src/config.ts
 PSP_BENEFICIARY_MAX_PER_USER=100          # Max beneficiaries per user (SD-54)
 PSP_BENEFICIARY_RATE_LIMIT_RPM=20        # Max lookups/min per merchant+user pair
 PSP_PAYOUT_SETTLEMENT_DELAY_T1_MS=3000  # Simulated T+1 delay in ms (builtin PISP)
@@ -3014,7 +3014,7 @@ PSP_BANKCORE_KEY_VAULT_NAMESPACE=
 PSP_BANKCORE_SEED_DATA_DIR=
 ```
 
-**Signing keys on disk.** The bank persists its notification signing key under `bankcore/keys/`, explicitly
+**Signing keys on disk.** The bank persists its notification signing key under `bank/backend/keys/`, explicitly
 git-ignored, with the `kid` derived from the key itself. A deployment therefore pins `replicaCount=1`: two
 replicas would each mint their own key, and a receiver that fetched the JWKS from one would reject
 notifications signed by the other.
@@ -3023,7 +3023,7 @@ notifications signed by the other.
 
 ## 8. Seed Data Schema
 
-Seed files live in `backend/data/`. The seed script (`backend/bin/seed.ts`) reads each file and performs upsert operations using the collection's primary key as the filter.
+Seed files live in `psp/backend/data/`. The seed script (`psp/backend/bin/seed.ts`) reads each file and performs upsert operations using the collection's primary key as the filter.
 
 ### Seed volumes
 
@@ -3031,18 +3031,18 @@ Counts are the v33 population.
 
 | File | Collection (BIAN SD) | Documents | Generator |
 |---|---|---|---|
-| `backend/data/parties.json` | `party` (SD-13) | 68 (57 customers + 11 employees) | `bin/seed-generate.ts` (additive) |
-| `backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 68 (one per party; 14 `customerAuthenticationDemoFeatured`) | `bin/seed-generate.ts` (additive) |
-| `backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual (the `local` domain ships with self-registration on, manual approval) |
-| `backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 57 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
-| `backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
-| `backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
-| `backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
-| `backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 21 | `bin/seed-generate.ts` + 1 curated non-card case (`transactionKind: 'p2p'`, linked to the held execution seeded in `seedPaymentExecutions`) |
-| `backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
-| `backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
+| `psp/backend/data/parties.json` | `party` (SD-13) | 68 (57 customers + 11 employees) | `bin/seed-generate.ts` (additive) |
+| `psp/backend/data/customerAuthentications.json` | `customerAuthenticationAssessment` (SD-91) | 68 (one per party; 14 `customerAuthenticationDemoFeatured`) | `bin/seed-generate.ts` (additive) |
+| `psp/backend/data/authDomains.json` | `authenticationDomain` (SD-16) | 3 | manual (the `local` domain ships with self-registration on, manual approval) |
+| `psp/backend/data/customerAgreements.json` | `customerAgreementProcedure` (SD-53) | 57 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
+| `psp/backend/data/paymentCards.json` | `paymentCardManagement` (SD-88) | 205 | `bin/seed-generate.ts` (additive) |
+| `psp/backend/data/payoutAccounts.json` | `payoutAccountArrangement` (SD-66) | 65 | `bin/seed-generate.ts` (additive; curated records are never rewritten) |
+| `psp/backend/data/cardTransactions.json` | `cardTransactionLog` (SD-254) | 230 | `bin/seed-generate.ts`: includes inline QE:none fields (v2) |
+| `psp/backend/data/fraudCases.json` | `fraudDiagnosisCase` (SD-83) | 21 | `bin/seed-generate.ts` + 1 curated non-card case (`transactionKind: 'p2p'`, linked to the held execution seeded in `seedPaymentExecutions`) |
+| `psp/backend/data/fraudCaseEvents.json` | `fraudDiagnosisCaseEvents` (SD-83) | 20 | `bin/seed-generate.ts` |
+| `psp/backend/data/customerCreditRatings.json` | `customerCreditRatingState` (SD-60) | 5 | manual (HRPC profiles) |
 
-**Regenerating synthetic data:** run `npm run generate:data --prefix backend` (executes `bin/seed-generate.ts`).
+**Regenerating synthetic data:** run `npm run generate:data --prefix psp/backend` (executes `bin/seed-generate.ts`).
 
 Since v33 (ADR-054) the generator is **additive and refuses to clobber**: it loads the existing
 fixtures, keeps every curated record byte-for-byte, and only tops the synthetic population up to the
@@ -3057,8 +3057,8 @@ integrity test uses it to exercise the generator without touching the real fixtu
 ### Fixture integrity invariants (v33)
 
 The fixtures, not the runtime, are the source of truth for the demo population, so the invariants are
-asserted against `backend/data/*.json` in `test/backend/unit/services/seedDataIntegrity.test.ts` and
-`seedGeneratorAdditive.test.ts`. The shared repairs live in `backend/src/vendors/seed/dataIntegrity.ts`
+asserted against `psp/backend/data/*.json` in `test/backend/unit/services/seedDataIntegrity.test.ts` and
+`seedGeneratorAdditive.test.ts`. The shared repairs live in `psp/backend/src/vendors/seed/dataIntegrity.ts`
 and are applied by **both** halves of the pipeline (the generator and the runtime seeders), so neither
 can drift from the other.
 
@@ -3139,11 +3139,11 @@ could not sign in was the single largest coherence gap in the demo (v33 F1).
 The backend uses a **domain-module layout** aligned with BIAN Service Domains. See [engineering-proposal.md §3.8](engineering-proposal.md#38-backend-module-architecture-and-bian-map) for the full BIAN module map, shared/vendors boundary rules, and dependency graph.
 
 ```
-backend/
+psp/backend/
 ├── bin/
 │   ├── setup.ts                    # thin wrapper → src/vendors/setup/runSetup()
 │   ├── seed.ts                     # thin wrapper → src/vendors/seed/runSeed()
-│   └── seed-generate.ts            # synthetic data generator → writes backend/data/*.json
+│   └── seed-generate.ts            # synthetic data generator → writes psp/backend/data/*.json
 │
 ├── data/                           # JSON seed files (consumed by bin/seed.ts only)
 │   ├── parties.json                # generated → party (SD-13): 53 party records
@@ -3269,22 +3269,22 @@ backend/
 
 **API URL semantics follow REST nesting.** Cards (SD-88) are a sub-resource of Customer Agreement (SD-53): `/api/v1/customer/:id/cards`. Other resources are top-level: `/api/v1/transactions` (SD-254), `/api/v1/fraud` (SD-83), `/api/v1/auth` (SD-16).
 
-`backend/bin/setup.ts` and `backend/bin/seed.ts` are thin wrappers inside the backend package:
+`psp/backend/bin/setup.ts` and `psp/backend/bin/seed.ts` are thin wrappers inside the backend package:
 
 ```typescript
-// backend/bin/setup.ts
+// psp/backend/bin/setup.ts
 import { runSetup } from '../src/vendors/setup';
 runSetup().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
 
-// backend/bin/seed.ts
+// psp/backend/bin/seed.ts
 import { runSeed } from '../src/vendors/seed';
 runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });
 ```
 
-`backend/package.json` exposes the scripts; the root delegates to them:
+`psp/backend/package.json` exposes the scripts; the root delegates to them:
 
 ```json
-// backend/package.json
+// psp/backend/package.json
 {
   "scripts": {
     "setup:db": "ts-node bin/setup.ts",
@@ -3297,8 +3297,8 @@ runSeed().then(() => process.exit(0)).catch(err => { console.error(err); process
 // root package.json (relevant entries)
 {
   "scripts": {
-    "setup:db":   "npm run setup:db --prefix backend",
-    "setup:seed": "npm run seed --prefix backend"
+    "setup:db":   "npm run setup:db --prefix psp/backend",
+    "setup:seed": "npm run seed --prefix psp/backend"
   }
 }
 ```
@@ -3359,7 +3359,7 @@ this callback, not a checkbox in the PSP-hosted payment UI.
 #### `CheckoutSessionRecord` (SD-64: `checkoutSessionLog`)
 
 ```typescript
-// backend/src/modules/gateway/models/checkoutSession.model.ts
+// psp/backend/src/modules/gateway/models/checkoutSession.model.ts
 export const CHECKOUT_SESSION_COLLECTION = 'checkoutSessionLog';
 
 export type CheckoutSessionStatus = 'pending' | 'completed' | 'expired' | 'cancelled';
@@ -3396,7 +3396,7 @@ export interface CheckoutSessionRecord {
 #### `PaymentLinkRecord` (SD-64: `paymentLinkRecord`)
 
 ```typescript
-// backend/src/modules/gateway/models/paymentLink.model.ts
+// psp/backend/src/modules/gateway/models/paymentLink.model.ts
 export const PAYMENT_LINK_COLLECTION = 'paymentLinkRecord';
 
 export type PaymentLinkStatus = 'active' | 'completed' | 'expired' | 'deactivated';
@@ -3780,7 +3780,7 @@ Error codes: 404 merchant not found, 403 insufficient role, 400 invalid status t
 
 New seed files required for the merchant onboarding + debug mode features.
 
-#### `backend/data/parties.json`: Additional Party records
+#### `psp/backend/data/parties.json`: Additional Party records
 
 | partyInstanceReference | partyName | partyType | Notes |
 |---|---|---|---|
@@ -3791,7 +3791,7 @@ New seed files required for the merchant onboarding + debug mode features.
 
 > Note: `partyType` must be one of the defined values: `'customer' | 'employee' | 'service_account'`. The value `'individual'` does not exist in the project model, it is a BIAN term, not a project-level enum value.
 
-#### `backend/data/customerAuthentications.json`: Additional auth records
+#### `psp/backend/data/customerAuthentications.json`: Additional auth records
 
 | login | role | linkedPartyRef | Notes |
 |---|---|---|---|
@@ -3800,7 +3800,7 @@ New seed files required for the merchant onboarding + debug mode features.
 | `customer3@demo.com` / *(password redacted)* | `customer` | `PTY-058` | Customer with pending merchant app |
 | `customer4@demo.com` / *(password redacted)* | `customer` | `PTY-059` | Dual-role customer + merchant |
 
-#### `backend/data/merchants.json`: Demo merchant records (`schemaVersion: 2`)
+#### `psp/backend/data/merchants.json`: Demo merchant records (`schemaVersion: 2`)
 
 | merchantName | status | kybCheckStatus | owner | Purpose |
 |---|---|---|---|---|
@@ -3810,7 +3810,7 @@ New seed files required for the merchant onboarding + debug mode features.
 
 All merchant records include `merchantOwnerPartyReference`, `merchantCategoryCode`, `merchantLegalEntityReference`, `merchantSettlementSchedule`, and `merchantAgreementKybCheck` (Ch-06 BQ:Step).
 
-#### `backend/data/customerAgreements.json`: KYC seed distribution (`schemaVersion: 3`)
+#### `psp/backend/data/customerAgreements.json`: KYC seed distribution (`schemaVersion: 3`)
 
 | customerAgreementKycCheckStatus | Count | Notes |
 |---|---|---|
@@ -3964,7 +3964,7 @@ PCI DSS Req 3 (no PAN/CVV stored; only masked PAN + QE:none expiry + surrogate t
 
 ### 10.1.1 Tokenization, activation control & auto-registration
 - **Registration (client-side tokenization).** `POST` never receives the PAN or CVV. The browser
-  (`frontend/src/lib/cardTokenize.ts`) validates the PAN (Luhn + network), expiry (future MM/YY) and
+  (`psp/frontend/src/lib/cardTokenize.ts`) validates the PAN (Luhn + network), expiry (future MM/YY) and
   CVV (3, or 4 for AMEX), then derives the masked PAN + a surrogate token and sends only those. The
   **CVV (SAD) is validated and discarded, never transmitted or stored** at any layer (PCI DSS Req 3.2).
   UI: `/system/cards/new`.
@@ -4052,8 +4052,8 @@ Lifecycle actions emit a **compliance** event (`complianceProcessEvent`) with
 (`/system/audit-events`). `eventSummary` carries masked PAN + network only (no CHD).
 
 ### 10.4 Seed data
-`backend/data/paymentCards.json` provides 3–4 cards per real `customerAgreement` (generator:
-`backend/bin/seed-generate-cards.mjs`): valid future expiry (`MM/YY`), masked PAN, surrogate token,
+`psp/backend/data/paymentCards.json` provides 3–4 cards per real `customerAgreement` (generator:
+`psp/backend/bin/seed-generate-cards.mjs`): valid future expiry (`MM/YY`), masked PAN, surrogate token,
 unique alias per customer, one preferred card each, with a few non-active (expired/blocked) for
 list-filter realism.
 
@@ -4126,7 +4126,7 @@ fire-and-forget and never blocks the auth response (Req 10.2.1).
 
 ## 11. Event-Driven Architecture (dev.v8)
 
-**EventBus vendor** (`backend/src/vendors/eventbus`). One bus for all events behind the `EventBus` port (`publish`/`subscribe`); default adapter `EventBusInProcess` (Node `EventEmitter`). Swap to Kafka/RabbitMQ = change the adapter in `initEventBus` only. `DomainEvent` envelope: `eventId` (idempotency), `eventType` (dotted, module-prefixed), `occurredAt`, `correlationId` (the journey; = `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey`, `source`, `actor?`, `bian?`, `payload` (CHD stripped on publish), `schemaVersion`, `transient?` (delivered, not persisted).
+**EventBus vendor** (`psp/backend/src/vendors/eventbus`). One bus for all events behind the `EventBus` port (`publish`/`subscribe`); default adapter `EventBusInProcess` (Node `EventEmitter`). Swap to Kafka/RabbitMQ = change the adapter in `initEventBus` only. `DomainEvent` envelope: `eventId` (idempotency), `eventType` (dotted, module-prefixed), `occurredAt`, `correlationId` (the journey; = `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey`, `source`, `actor?`, `bian?`, `payload` (CHD stripped on publish), `schemaVersion`, `transient?` (delivered, not persisted).
 
 **Collection `domainEvent`** (regular, not time-series: carries a unique `eventId` index). Indexes: `{eventId} unique`, `{correlationId, occurredAt}`, `{businessProcess, occurredAt}`, `{eventType, occurredAt}`, `{partitionKey, occurredAt}`. Created in `createCollections`/`createIndexes`; validated in `validateSetup`. Every business/compliance/integration emit also mirrors here (correlated). Read the journey with `GET /api/v1/events/trail/:correlationId` (auditor/manager).
 
@@ -4180,7 +4180,7 @@ Implements [engineering-proposal.md ADR-038](engineering-proposal.md). Money-mov
 
 ## v17.1: Bank Transfers (ACH / SEPA / SWIFT)
 
-**Rail engine** (`backend/src/shared/services/bankTransfer/`): `RailResolver.resolve(destination, override?)`
+**Rail engine** (`psp/backend/src/shared/services/bankTransfer/`): `RailResolver.resolve(destination, override?)`
 + `.validate(rail, destination)`, `FeeCalculator`, pure validators `isValidIban` (ISO 13616 mod-97),
 `isValidBic` (ISO 9362), `isValidRoutingNumber` (NACHA ABA checksum). Standard return-code maps:
 `ACH_RETURN_CODES`, `SEPA_REJECT_CODES`, `SWIFT_ERROR_CODES`.
@@ -4291,7 +4291,7 @@ Consent detail (`GET /api/v1/auth/grants/:consentId`) adds `cibaEnabled` (client
 - `createCollections.ts` + `createIndexes.ts`: the two new collections + indexes (plaintext; no new DEK/QE).
 - `data/enrolledCredentials.json` + `seedEnrolledCredentials.ts` (registered in seed `index.ts`): the demo
   user (Luis) gets one active ES256 credential (public key). The matching private key is a test/demo fixture
-  (`backend/test/fixtures/demoAuthenticatorKey.ts`), never stored server-side.
+  (`psp/backend/test/fixtures/demoAuthenticatorKey.ts`), never stored server-side.
 - `data/merchants.json`: the Espresso client gains the ciba grant + `oauthBackchannelTokenDeliveryMode: poll`.
 
 ### 12.5 Compliance posture
@@ -4461,7 +4461,7 @@ only the token plus BIN and last 4. See ADR-043 and ADR-044 in `engineering-prop
 
 ### 15.1 CVV derivation + `cvvMode`
 
-Source: `backend/src/providers/card-issuer/services/cardVerificationKey.service.ts`.
+Source: `psp/backend/src/providers/card-issuer/services/cardVerificationKey.service.ts`.
 
 The per-card CVV is derived, never persisted (PCI DSS Req 3.2, SAD):
 
@@ -4814,7 +4814,7 @@ column (default) and two columns (choice persisted in `localStorage`, key `psp.a
 **Collection `demoTeamContact`** (plaintext, created in `createCollections.ts`, indexed in
 `createIndexes.ts`). Demo-only: it is deliberately outside the PSP business model, holds no CHD and
 no customer PII, and therefore maps to no BIAN service domain. Documents are inserted directly (no
-seeder). Model: `backend/src/modules/system/models/demoTeamContact.model.ts`.
+seeder). Model: `psp/backend/src/modules/system/models/demoTeamContact.model.ts`.
 
 | Field | Type | Notes |
 |---|---|---|
@@ -4822,7 +4822,7 @@ seeder). Model: `backend/src/modules/system/models/demoTeamContact.model.ts`.
 | `name`, `role`, `ask` | string | Display name, job title, areas of interest |
 | `area` | string? | Short track label rendered as a badge |
 | `linkedin` | string | Username only; the URL is composed in the frontend |
-| `avatarUrl`, `qrUrl` | string | Public frontend asset paths (`frontend/public/*`) |
+| `avatarUrl`, `qrUrl` | string | Public frontend asset paths (`psp/frontend/public/*`) |
 | `active` | boolean | Filter for the endpoint |
 | `displayOrder` | number | Ascending display order |
 
@@ -4830,7 +4830,7 @@ Indexes: `{ demoTeamContactInstanceReference: 1 }` unique, `{ active: 1, display
 
 **API**: `GET /api/v1/system/team` (public, no JWT) returns `{ contacts: [{ id, name, role, ask, area,
 linkedin, avatarUrl, qrUrl }] }`, active only, sorted by `displayOrder`. The frontend prefers the API
-and falls back to the bundled roster in `frontend/src/config/team.json` when the API is unreachable or
+and falls back to the bundled roster in `psp/frontend/src/config/team.json` when the API is unreachable or
 the collection is empty, so the page still works at a booth with no backend.
 
 *Added 2026-07-30.*

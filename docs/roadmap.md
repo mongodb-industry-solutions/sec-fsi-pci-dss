@@ -330,7 +330,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 
 - [ ] All v3 DoD criteria still pass
 - [ ] `npm run build` exits 0; no TypeScript errors after structural refactor
-- [ ] No file remains in `backend/src/controllers/`, `backend/src/services/`, `backend/src/models/`, `backend/src/middleware/` (all moved to modules)
+- [ ] No file remains in `psp/backend/src/controllers/`, `psp/backend/src/services/`, `psp/backend/src/models/`, `psp/backend/src/middleware/` (all moved to modules)
 - [ ] `npm run setup:db` creates `merchantAgreementProcedure`, `paymentOrderProcedure`, `cardEtokenProcedure` collections
 - [ ] Atlas Data Explorer confirms `merchantApiKeyHash` is ciphertext (QE:none)
 - [ ] `POST /api/v1/gateway/payments` creates a payment order with status `initiated`
@@ -351,7 +351,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 | P1.2 | Shared types extracted to `src/shared/models/` (`risk`, `identity`, `transaction`) | `RiskSeverity`, `AnalystRole`, `TransactionSnapshot` imported from `shared/models/` in all consuming modules |
 | P1.3 | Each module exports a single Fastify plugin via `index.ts`; `server.ts` registers modules with `prefix: '/api/v1'` | All existing routes respond with identical status codes and response shapes as before the refactor |
 | P1.4 | `middleware/auth.ts` and `rbac.ts` moved to `vendors/middleware/` | Imports updated in `server.ts`; middleware behaviour unchanged |
-| P1.5 | `models/index.ts` barrel deleted; each module imports from its own `models/` directory | `grep -r "from '../models'" backend/src/modules` returns zero results |
+| P1.5 | `models/index.ts` barrel deleted; each module imports from its own `models/` directory | `grep -r "from '../models'" psp/backend/src/modules` returns zero results |
 
 #### FR-v4-P2: Merchant Relations (SD-89)
 
@@ -403,7 +403,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 | P6.6 | Frontend: `/system/merchant` shows "Request Merchant Account" form when authenticated customer has no linked merchant | Form includes all required BIAN fields; "Load test data" dropdown with 3 presets |
 | P6.7 | Frontend: after submission, merchant portal shows "Application under review" state with application details | Status badge displayed; timestamp shown |
 | P6.8 | Frontend: `/system/merchant/review` route accessible to `merchant_officer`, shows pending applications queue | Each card has Approve / Reject buttons; review notes input field |
-| P6.9 | Seed data: `backend/data/merchants.json` contains 3 records, 1 `active`, 1 `under_review`, 1 `active` (different owner) | `npm run db:seed` inserts all 3 without error |
+| P6.9 | Seed data: `psp/backend/data/merchants.json` contains 3 records, 1 `active`, 1 `under_review`, 1 `active` (different owner) | `npm run db:seed` inserts all 3 without error |
 
 #### FR-v4-P7: Debug Mode (Ch-05)
 
@@ -438,7 +438,7 @@ v4 also finalises the external integration surface introduced in v3: OpenAPI sch
 | NFR-v4-03 | Security | `merchantApiKeyHash` is never returned in any GET response | Integration test: `GET /merchants/:id` response parsed for absence of `merchantApiKeyHash` field |
 | NFR-v4-04 | Idempotency | Duplicate `X-Idempotency-Key` on any gateway write endpoint returns 409 within P95 < 100ms | Load test with duplicate key; verify consistent 409 response |
 | NFR-v4-05 | Demo explainability | A non-technical AE can narrate the gateway flow (merchant → intent → authorization → fraud case) in ≤ 2 minutes | Validated by IST team walkthrough |
-| NFR-v4-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
+| NFR-v4-06 | Module isolation | No module imports from another module's `controllers/` or `models/` directory directly | `grep -r "from '../../[^s]" psp/backend/src/modules` returns zero cross-module direct imports (only `shared/` and `vendors/` allowed) |
 | NFR-v4-07 | Debug Mode safety | `DebugRawDoc` component is only rendered when `DEMO_DEBUG_ENABLED=true`; never in production | Build time check: component import guarded by env var; E2E test confirms panel absent when env var unset |
 | NFR-v4-08 | Onboarding realism | Merchant application flow (submit → review → approve) completes without manual DB edits | Full end-to-end test: customer submits, officer approves, merchant portal shows `agreed` status |
 | NFR-v4-09 | Seed completeness | `npm run db:seed` populates all 7 demo users and 3 merchants without error on a clean Atlas cluster | CI: seed runs against a test cluster and all collections have expected document counts |
@@ -1162,7 +1162,7 @@ bank into it. See ADR-064 to ADR-068.
 | FR-v37-05 | Money movement | Same-owner transfers execute at the bank over `POST /gateway/transfers/own`; no local credit is invented; an unreachable bank declines rather than falling back | A same-owner transfer moves money at the bank and settles through the notification; the recipient credit has an institution behind it | ✅ |
 | FR-v37-06 | Routing | Each capability declares whether it resolves by entity or by strategy; account-bound resolution reads the debtor; a card outside every declared BIN range is refused | The risk gates stay four separate dispatches with four verdicts; no composite call | ✅ |
 | FR-v37-07 | Card issuer | The PAN vault and the issued-card registry are the bank's, with the lifecycle (issue, activate, block, renew, replace), per-transaction limits and ISO 8583 responses | `revoked` is terminal; a replacement issues before it revokes; an authorisation over the limit answers `61` | ✅ |
-| FR-v37-08 | De-scoping | No full PAN is reachable from any PSP collection; BIN plus last four remain the display source of truth | A test proves no vault reference, no `paymentCardNumber` path, no PAN data encryption key and no seeder writing a number anywhere in `backend/src` | ✅ |
+| FR-v37-08 | De-scoping | No full PAN is reachable from any PSP collection; BIN plus last four remain the display source of truth | A test proves no vault reference, no `paymentCardNumber` path, no PAN data encryption key and no seeder writing a number anywhere in `psp/backend/src` | ✅ |
 | FR-v37-09 | Credit bureau | The assessment is the bank's, derived from its own records, and returns the factors that produced the score | Two customers with different histories score differently; an unreachable bureau reports a failure rather than a default score | ✅ |
 | FR-v37-10 | Auth realm | The platform realm is `leafypay`; `local` remains accepted as an alias on both the request and the stored record | Login succeeds for all four combinations of sent and stored realm; the `sub` claim is unchanged | ✅ |
 | FR-v37-11 | Documentation | ADRs, the bankcore environment variables, and an ownership matrix covering every collection either service creates | A test parses the matrix and fails when a declared collection is unclaimed | ✅ |

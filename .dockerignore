@@ -1,15 +1,16 @@
 # ── Root .dockerignore ─────────────────────────────────────────────
-# Used when the backend builds with context = repo root (. instead of ./backend).
-# Keeps the build context lean: only backend source, test infra, and root configs.
-# Frontend source (frontend/src/) is kept for frontend unit test resolution.
+# Used when the backend builds with context = repo root (. instead of ./psp/backend).
+# Keeps the build context lean: only PSP backend source, test infra, and root configs.
+# Frontend source (psp/frontend/src/) is kept for frontend unit test resolution.
 
 # Dependencies (reinstalled inside the image)
 **/node_modules/
 
 # Build artifacts (rebuilt inside the image)
-backend/dist/
-frontend/.next/
-frontend/out/
+psp/backend/dist/
+bank/backend/dist/
+psp/frontend/.next/
+psp/frontend/out/
 
 # Environment files (injected via env_file / environment in Compose)
 .env
@@ -17,7 +18,8 @@ frontend/out/
 !.env.example
 
 # OAuth / RSA private keys (never bake into image; mount via volume or use KMS)
-backend/keys/
+psp/backend/keys/
+bank/backend/keys/
 
 # Git
 .git/

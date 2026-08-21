@@ -1,6 +1,6 @@
 # 🏦 Sec4 Pay: FSI PSP + PCI DSS + MongoDB
 
-![](./frontend/public/app-logo.png)
+![](./psp/frontend/public/app-logo.png)
 
 > A Payment Service Provider (PSP) solution: a PCI DSS-aligned platform used by digital banks or card issuers to authorize card payments, detect fraud, and investigate cases. It runs the full payment lifecycle on MongoDB Atlas, from checkout and authorization, through automated transaction scoring, to multi-tier analyst investigation and resolution.
 
@@ -81,7 +81,7 @@ npm run dev          # every service at once, or use dev:bankcore / dev:backend 
 ```
 
 One command covers **both** services. The provider's entry points orchestrate every registered bank from
-`backend/data/bankInstances.json`, in the order the data requires: the bank is seeded BEFORE the provider,
+`psp/backend/data/bankInstances.json`, in the order the data requires: the bank is seeded BEFORE the provider,
 because the provider's records point at the bank's and not the reverse, and dropped before it too, because
 dropping the provider takes the shared key vault with it. Adding a second bank is a record in that file plus
 its own database, not a change to any script.
@@ -150,9 +150,12 @@ Key PCI DSS v4.0 requirements addressed:
 
 ```
 sec-fsi-pci-dss/
-├── 💻 frontend/        # Next.js 14 App Router + TypeScript
-├── ⚙️ backend/         # The payment service provider: Fastify 4 + TypeScript (setup + seed)
-├── 🏦 bankcore/        # The bank (ASPSP): its own service, its own database, Open Banking API
+├── 💳 psp/             # Leafy Pay, the payment service provider
+│   ├── backend/        # Fastify 4 + TypeScript (setup + seed)
+│   └── frontend/       # Next.js 14 App Router + TypeScript
+├── 🏦 bank/            # The bank (ASPSP): its own service, its own database, Open Banking API
+│   └── backend/        # Fastify 4 + TypeScript
+├── 🛍️ merchant/        # External merchant demo (Next.js, no database)
 ├── 📦 packages/        # Shared workspaces (event bus, platform links)
 └── 📚 docs/            # Engineering documentation
 ```

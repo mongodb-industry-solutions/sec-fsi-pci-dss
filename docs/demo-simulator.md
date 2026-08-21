@@ -137,7 +137,7 @@ Before any payment flow starts, the presenter selects **which integration patter
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Config source:** `frontend/src/config/simulator-methods.json`, controls which methods and scenarios are visible. Setting `enabled: false` hides a method; `comingSoon: true` shows a disabled card.
+**Config source:** `psp/frontend/src/config/simulator-methods.json`, controls which methods and scenarios are visible. Setting `enabled: false` hides a method; `comingSoon: true` shows a disabled card.
 
 **State persistence:** Selections are stored in `sessionStorage` (`sim_method`, `sim_scenario`) and survive navigation within the simulator. Cleared on "Restart Simulation."
 
@@ -1006,7 +1006,7 @@ interface FraudDiagnosisCase {
 ## 6. Frontend Route Structure (Next.js App Router)
 
 ```
-frontend/src/app/
+psp/frontend/src/app/
 ├── page.tsx                         # Mode selector landing
 ├── layout.tsx                       # Root layout (LeafyGreen theme)
 ├── simulator/
@@ -1085,7 +1085,7 @@ In the Simulator mode, requests include a synthetic `X-Demo-Role` header instead
 ## 8. Shared Backend Vendors Structure
 
 ```
-backend/
+psp/backend/
 ├── bin/
 │   ├── setup.ts             # Calls src/vendors/setup/runSetup()
 │   └── seed.ts              # Calls src/vendors/seed/runSeed()
@@ -1115,13 +1115,13 @@ backend/
         └── rbac.ts                  # Role-based access enforcement
 ```
 
-`backend/bin/` scripts are thin wrappers; the root `package.json` delegates to `backend/package.json`:
+`psp/backend/bin/` scripts are thin wrappers; the root `package.json` delegates to `psp/backend/package.json`:
 
 ```json
 // root package.json
-{ "setup:db": "npm run setup:db --prefix backend", "setup:seed": "npm run seed --prefix backend" }
+{ "setup:db": "npm run setup:db --prefix psp/backend", "setup:seed": "npm run seed --prefix psp/backend" }
 
-// backend/package.json
+// psp/backend/package.json
 { "setup:db": "ts-node bin/setup.ts", "seed": "ts-node bin/seed.ts" }
 ```
 
@@ -1510,7 +1510,7 @@ Adds payment method selection and scenario selection to the Simulator before the
 
 ### 14.1 Simulator Config File
 
-**Location:** `frontend/src/config/simulator-methods.json`
+**Location:** `psp/frontend/src/config/simulator-methods.json`
 
 This file is the single source of truth for which methods and scenarios are visible in the Simulator. Editing this file is the only change required to show/hide a method or scenario, no code changes needed.
 
@@ -1545,7 +1545,7 @@ All simulator selections persist across navigation with a `sim_` prefix:
 | `sim_checkout_session` | JSON | `{ sessionId, paymentPageUrl, amount, merchant }` for redirection flow |
 | `sim_payment_link` | JSON | `{ code, url, amount, merchant }` for payment link flow |
 
-**Manager:** `frontend/src/components/simulator/SimulatorStateManager.ts` provides typed `getState()`, `setState(partial)`, `clearState()` helpers.
+**Manager:** `psp/frontend/src/components/simulator/SimulatorStateManager.ts` provides typed `getState()`, `setState(partial)`, `clearState()` helpers.
 
 ### 14.3 Callback Route: `/simulator/payment/callback`
 
