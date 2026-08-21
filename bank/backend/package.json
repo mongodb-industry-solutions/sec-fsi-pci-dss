@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-bankcore",
-  "version": "2.7.3",
+  "version": "3.0.0",
   "description": "bankcore: the Open Banking bank (ASPSP) behind Leafy Pay. Owns the account ledger, the card issuer vault and the PSD2 consent records.",
   "private": true,
   "engines": {
