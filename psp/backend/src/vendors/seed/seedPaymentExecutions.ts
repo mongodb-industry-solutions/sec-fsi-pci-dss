@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../../modules/gateway/models/paymentExecution.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
-import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../../modules/gateway/models/balanceCreditLog.model';
+import { claimIdempotent } from '../../modules/gateway/services/idempotency.service';
 import {
   PSP_REVENUE_PARTY_REFERENCE,
   PSP_REVENUE_ACCOUNT_REFERENCE,
@@ -167,31 +167,18 @@ export async function seedPaymentExecutions(db: Db) {
     // mirroring what the runtime path does at settlement (commissionSettlement.service). Only fees
     // attributed to a merchant count; a bare feeAmount is a rail charge, not a commission.
     //
-    // Deliberately OUTSIDE the upsertedCount guard above: this leg has its own gate (the credit-log
-    // entry), so a reseed over a database whose executions already exist still backfills the ledger,
-    // exactly once. That is what makes plain `setup:seed` converge without a --reset.
+    // Deliberately OUTSIDE the upsertedCount guard above: this leg has its own gate, so a reseed over a
+    // database whose executions already exist still backfills the ledger exactly once. That is what makes
+    // plain `setup:seed` converge without a --reset.
+    //
+    // v37: the gate is the idempotency store, not the balance credit log. The log is the BANK's now, and
+    // using it as a lock here would have made a bank-side change silently double-credit the revenue account.
     if (exec.paymentExecutionStatus === 'completed' && exec.fee?.feeMerchantReference && (exec.feeAmount ?? 0) > 0) {
-      const entry: BalanceCreditLogEntry = {
-        creditId: `commission-${exec.paymentExecutionInstanceReference}`,
-        payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE,
-        partyInstanceReference: PSP_REVENUE_PARTY_REFERENCE,
-        amount: exec.feeAmount!,
-        currency: exec.currency,
-        creditType: 'commission',
-        description: `Merchant commission ${exec.fee.feeMerchantReference}`,
-        creditedAt: exec.fee.feeCollectedDateTime,
-        performedByPartyReference: null,
-        referenceId: exec.paymentExecutionInstanceReference,
-        bianServiceDomain: 'SD-66 Payout Account Arrangement',
-        bianControlRecordType: 'PayoutAccountBalance',
-        recordCreatedDateTime: exec.fee.feeCollectedDateTime,
-        schemaVersion: 1,
-      };
-      const logRes = await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION)
-        .updateOne({ creditId: entry.creditId }, { $setOnInsert: entry }, { upsert: true });
-      // Move the balance only when the log entry is newly written, so the credit log always explains
-      // the balance exactly (Σ commission entries == available).
-      if (logRes.upsertedCount === 1) {
+      const claimed = await claimIdempotent(
+        db, 'commission.settlement', PSP_REVENUE_ACCOUNT_REFERENCE,
+        `commission-${exec.paymentExecutionInstanceReference}`,
+      );
+      if (claimed) {
         await accountCol.updateOne(
           { payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE },
           { $inc: { 'payoutAccountBalance.availableAmount': exec.feeAmount! }, $set: { 'payoutAccountBalance.lastUpdatedDateTime': new Date() } },

@@ -32,7 +32,9 @@ const REVENUE_ACCOUNT = {
 // Minimal Db double: records every $inc on payoutAccountArrangement so both legs can be asserted.
 function makeDb(opts: { revenueAccount?: unknown; alreadyCollected?: boolean } = {}) {
   const incs: { ref: string; inc: Record<string, number> }[] = [];
-  const creditLogUpsert = vi.fn().mockResolvedValue({ upsertedCount: opts.alreadyCollected ? 0 : 1 });
+  // v37: the guard is the idempotency store, not the balance credit log. The log is the bank's, and using
+  // an audit row as a lock meant a bank-side change could silently double-collect the fee.
+  const claimUpsert = vi.fn().mockResolvedValue({ upsertedCount: opts.alreadyCollected ? 0 : 1 });
   const db = {
     collection: vi.fn((name: string) => {
       if (name === 'payoutAccountArrangement') {
@@ -50,10 +52,10 @@ function makeDb(opts: { revenueAccount?: unknown; alreadyCollected?: boolean } =
           }),
         };
       }
-      return { updateOne: creditLogUpsert }; // balanceCreditLog
+      return { updateOne: claimUpsert }; // idempotencyKey
     }),
   } as any;
-  return { db, incs, creditLogUpsert };
+  return { db, incs, claimUpsert };
 }
 
 const input = {
@@ -80,22 +82,24 @@ describe('postCommission', () => {
     expect(pspLeg?.inc['payoutAccountBalance.availableAmount']).toBe(5);
   });
 
-  it('writes an auditable credit-log entry keyed by the execution (PCI DSS Req 10)', async () => {
-    const { db, creditLogUpsert } = makeDb();
+  it('claims the execution once, atomically, keyed by the execution reference', async () => {
+    // The fee must be collected at most once. The claim is an upsert on a unique key, so the FIRST caller
+    // wins under a race; the audit of the credit itself is the bank's, because the bank owns the balance.
+    const { db, claimUpsert } = makeDb();
     await postCommission(db, input);
 
-    const [filter, update] = creditLogUpsert.mock.calls[0];
-    expect(filter).toEqual({ creditId: 'commission-e-1' });
-    expect(update.$setOnInsert.creditType).toBe('commission');
-    expect(update.$setOnInsert.referenceId).toBe('e-1');
-    expect(update.$setOnInsert.amount).toBe(5);
+    const [filter, update, options] = claimUpsert.mock.calls[0];
+    expect(filter.idempotencyKey).toContain('commission-e-1');
+    expect(filter.idempotencyKey).toContain('commission.settlement');
+    expect(update.$setOnInsert.scope).toBe('commission.settlement');
+    expect(options).toEqual({ upsert: true });
   });
 
   it('moves nothing for a zero fee (gross == net stays balanced)', async () => {
-    const { db, incs, creditLogUpsert } = makeDb();
+    const { db, incs, claimUpsert } = makeDb();
     expect(await postCommission(db, { ...input, feeAmount: 0 })).toEqual({ outcome: 'zero_fee', creditedAmount: 0 });
     expect(incs).toHaveLength(0);
-    expect(creditLogUpsert).not.toHaveBeenCalled();
+    expect(claimUpsert).not.toHaveBeenCalled();
   });
 
   it('is idempotent: a replayed settlement collects nothing more', async () => {
@@ -114,33 +118,35 @@ describe('postCommission', () => {
   });
 
   it('posts nothing when the revenue account exists but is not active', async () => {
-    const { db, incs, creditLogUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountStatus: 'suspended' } });
+    const { db, incs, claimUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountStatus: 'suspended' } });
     // creditDirect only mutates an active account, so accepting a suspended one would debit the
     // merchant hold and log a credit for a leg that never lands.
     expect(await postCommission(db, input)).toEqual({ outcome: 'no_revenue_account', creditedAmount: 0 });
     expect(incs).toHaveLength(0);
-    expect(creditLogUpsert).not.toHaveBeenCalled();
+    expect(claimUpsert).not.toHaveBeenCalled();
   });
 
   it('credits the revenue account in ITS currency when the fee is in another one', async () => {
-    const { db, incs, creditLogUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountCurrency: 'USD' } });
+    const { db, incs, claimUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountCurrency: 'USD' } });
     resolveAndConvert.mockResolvedValue({ amount: 5.4 });
 
     expect(await postCommission(db, input)).toEqual({ outcome: 'posted', creditedAmount: 5.4 });
     // The merchant leg clears the hold in the merchant's currency, the PSP leg lands in USD.
     expect(incs.find((i) => i.ref === 'pao-1')?.inc['payoutAccountBalance.pendingAmount']).toBe(-5);
     expect(incs.find((i) => i.ref === PSP_REVENUE_ACCOUNT_REFERENCE)?.inc['payoutAccountBalance.availableAmount']).toBe(5.4);
-    expect(creditLogUpsert.mock.calls[0][1].$setOnInsert).toMatchObject({ amount: 5.4, currency: 'USD' });
+    // The claim is keyed by the EXECUTION, not by the amount: a retry after a rate change must not collect
+    // a second time just because the converted figure differs.
+    expect(claimUpsert.mock.calls[0][0].idempotencyKey).toContain('commission-e-1');
   });
 
   it('posts nothing when the fee cannot be converted, rather than crediting the wrong units', async () => {
-    const { db, incs, creditLogUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountCurrency: 'USD' } });
+    const { db, incs, claimUpsert } = makeDb({ revenueAccount: { ...REVENUE_ACCOUNT, payoutAccountCurrency: 'USD' } });
     resolveAndConvert.mockRejectedValue(new Error('no rate'));
 
     // Falling back to the unconverted amount would credit 5 EUR of value as 5 USD and log it as USD.
     expect(await postCommission(db, input)).toEqual({ outcome: 'fx_unavailable', creditedAmount: 0 });
     expect(incs).toHaveLength(0);
-    expect(creditLogUpsert).not.toHaveBeenCalled();
+    expect(claimUpsert).not.toHaveBeenCalled();
   });
 });
 

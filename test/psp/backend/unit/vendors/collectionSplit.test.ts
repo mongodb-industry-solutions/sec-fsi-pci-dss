@@ -19,17 +19,23 @@ const BANK_SETUP = resolve(ROOT, 'bank/backend/src/vendors/setup');
 interface BankcoreOwned {
   // Phase that physically moves it, per the plan.
   phase: string;
+  // Set when the collection is RETIRED rather than moved: the bank has an equivalent under a different
+  // name, so no collection of this name should exist on either side. Naming the successor is what stops a
+  // reader concluding the record was simply lost.
+  replacedBy?: string;
   // True once the PSP no longer creates it and bankcore does.
   moved: boolean;
 }
 
 // Collections the BANK owns in the target design.
 const OWNED_BY_BANKCORE: Record<string, BankcoreOwned> = {
-  // The bank already creates it, and the PSP copy goes when its credit endpoint does.
-  balanceCreditLog: { phase: 'P2.5', moved: false },
+  // Moved: the audit trail of a balance mutation belongs wherever the balance does, and the PSP no longer
+  // creates it, writes it or reads it.
+  balanceCreditLog: { phase: 'P2.5', moved: true },
   cardIssuerVault: { phase: 'P7', moved: true },
-  cardAuthorizationRecord: { phase: 'P7', moved: false },
-  recurringMandateProcedure: { phase: 'P3.9', moved: false },
+  // Retired rather than moved: the bank's `periodicPaymentProcedure` is the standard's own resource for a
+  // standing order, so there is no collection of this name to create anywhere. `replacedBy` says which.
+  recurringMandateProcedure: { phase: 'P3.9', moved: false, replacedBy: 'periodicPaymentProcedure' },
 };
 
 // Collections the PSP owns. `domainEvent`, `counters` and `idempotencyKey` are here because the PSP
@@ -40,6 +46,10 @@ const OWNED_BY_PSP = new Set([
   // Stays as a linked account record: it loses the stored balance, not its home.
   'payoutAccountArrangement', 'counterpartyArrangement',
   'paymentCardManagement', 'cardEtokenProcedure',
+  // Stays: it is the ACQUIRER's record of an authorisation it requested, including the PSP-policy declines
+  // (a deactivated card-on-file) that never reach an issuer at all. The bank has no equivalent collection,
+  // so this is the only authorisation record on the platform and moving it would delete information.
+  'cardAuthorizationRecord',
   // Stays: it dedupes ACCEPTED card instruments to feed the shared-card fraud signal, which is a PSP
   // concern. The bank's issuedCardRegistry is a different record: what this issuer put in customers' hands.
   'paymentCardRegistry',
@@ -101,16 +111,39 @@ function declaredCollections(): Set<string> {
   return found;
 }
 
-// What a setup directory actually creates: the bare literal, or any constant that names it.
+// What a setup directory actually CREATES, as opposed to merely names.
+//
+// Setup also names a collection in order to DROP it: for a legacy rename, or for one that moved to the bank.
+// Counting that as creation would report a collection the PSP deletes as one it owns, which is the same
+// imprecision the ownership matrix gate had. So the name has to sit in a creating position.
+const CREATING_PREFIXES = ['createCollection(', 'name: ', 'ensureIndexes(db, '];
+
+function namedForCreation(text: string, token: string): boolean {
+  let from = 0;
+  for (;;) {
+    const at = text.indexOf(token, from);
+    if (at === -1) return false;
+    const before = text.slice(Math.max(0, at - 24), at);
+    const after = text.slice(at + token.length, at + token.length + 3);
+    if (CREATING_PREFIXES.some((prefix) => before.endsWith(prefix))) return true;
+    // A computed object key, which is how the encrypted-fields map declares its collections. The brackets
+    // have to be BOTH sides: `['balanceCreditLog', ...]` is an array of names to drop, not a declaration,
+    // and treating a bare `[` as creation is what made the drop list read as ownership.
+    if (before.endsWith('[') && after.startsWith(']:')) return true;
+    from = at + token.length;
+  }
+}
+
 function setupCreates(setupDir: string, collection: string): boolean {
   const constants = CONSTANTS.get(collection) ?? new Set<string>();
   for (const file of sourceFiles(setupDir)) {
     const text = readFileSync(file, 'utf8');
-    if (text.includes(`'${collection}'`)) return true;
-    for (const constant of constants) if (text.includes(constant)) return true;
+    if (namedForCreation(text, `'${collection}'`)) return true;
+    for (const constant of constants) if (namedForCreation(text, constant)) return true;
   }
   return false;
 }
+
 
 describe('v37 P0.7: documented ownership', () => {
   it('every declared collection has exactly one owner', () => {
@@ -130,14 +163,35 @@ describe('v37 P0.7: documented ownership', () => {
     // A collection whose move is done no longer has a PSP constant, which is the point of moving it. Only
     // the ones still expected here have to be found.
     const declared = declaredCollections();
-    const stillHere = Object.entries(OWNED_BY_BANKCORE).filter(([, o]) => !o.moved).map(([name]) => name);
+    const stillHere = Object.entries(OWNED_BY_BANKCORE)
+      .filter(([, o]) => !o.moved && !o.replacedBy)
+      .map(([name]) => name);
     const stale = [...stillHere, ...OWNED_BY_PSP].filter((name) => !declared.has(name));
     expect(stale, 'split entries with no constant in the sources').toEqual([]);
   });
 
-  it('the ledger audit log and the card collections belong to the bank', () => {
-    for (const name of ['balanceCreditLog', 'cardIssuerVault', 'cardAuthorizationRecord']) {
+  it('the ledger audit log and the issuer vault belong to the bank', () => {
+    for (const name of ['balanceCreditLog', 'cardIssuerVault']) {
       expect(OWNED_BY_BANKCORE[name], `${name} must be bank owned`).toBeTruthy();
+    }
+  });
+
+  it('the PSP keeps the acquirer\'s authorisation record, which the bank has no equivalent of', () => {
+    // The plan said cardAuthorizationRecord moves in P7. It must not. It records what the PSP ASKED and its
+    // own pre-issuer policy decisions: a decline for a deactivated card-on-file never reaches the issuer, so
+    // the bank could not hold it. The bank creates no collection of this name, which makes this the only
+    // authorisation record on the platform.
+    expect(OWNED_BY_PSP.has('cardAuthorizationRecord')).toBe(true);
+    expect('cardAuthorizationRecord' in OWNED_BY_BANKCORE).toBe(false);
+  });
+
+  it('a retired collection exists on neither side, and names its successor', () => {
+    for (const [name, owned] of Object.entries(OWNED_BY_BANKCORE)) {
+      if (!owned.replacedBy) continue;
+      expect(setupCreates(PSP_SETUP, name), `${name} is retired but the PSP still creates it`).toBe(false);
+      expect(setupCreates(BANK_SETUP, name), `${name} is retired but the bank creates it`).toBe(false);
+      // The successor must actually exist, or "retired" is just "deleted with a note".
+      expect(setupCreates(BANK_SETUP, owned.replacedBy), `${owned.replacedBy} must exist at the bank`).toBe(true);
     }
   });
 
@@ -190,8 +244,9 @@ describe('v37 P0.7: physical location matches the declared transition state', ()
     // This is the defect that prompted the check: cardAuthorizationRecord was owned by nobody's setup
     // and got created implicitly by its first insert, with no indexes and no --reset path.
     const undeclared: string[] = [];
-    for (const [name, { moved }] of Object.entries(OWNED_BY_BANKCORE)) {
-      if (moved) continue;
+    for (const [name, { moved, replacedBy }] of Object.entries(OWNED_BY_BANKCORE)) {
+      // A retired collection is created by nobody on purpose, which the check above covers instead.
+      if (moved || replacedBy) continue;
       if (!setupCreates(PSP_SETUP, name)) {
         undeclared.push(`${name}: not moved yet and no setup declares it`);
       }

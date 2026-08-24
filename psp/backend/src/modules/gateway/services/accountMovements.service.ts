@@ -8,7 +8,6 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { PAYMENT_CARD_COLLECTION, PaymentCardManagementControlRecord } from '../../customer/models/paymentCard.model';
 import { CARD_TRANSACTION_COLLECTION, CardTransactionLogControlRecord } from '../../transaction/models/cardTransaction.model';
-import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../models/balanceCreditLog.model';
 
 export interface ListMovementsOptions {
   type?: MovementType;
@@ -133,21 +132,11 @@ export async function listAccountMovements(
     });
   }
 
-  // 3b. Balance credit log entries (initial deposits, bank-in transfers, admin credits)
-  const creditLogEntries = await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION)
-    .find({ payoutAccountInstanceReference: accountRef }).toArray();
-  const creditMovements: AccountMovement[] = creditLogEntries.map((c) => ({
-    movementId: c.creditId,
-    movementType: 'balance_credit' as MovementType,
-    direction: 'credit' as MovementDirection,
-    amount: c.amount,
-    currency: c.currency,
-    description: c.description,
-    status: 'settled',
-    occurredAt: c.creditedAt instanceof Date ? c.creditedAt.toISOString() : new Date(c.creditedAt).toISOString(),
-    sourceCollection: BALANCE_CREDIT_LOG_COLLECTION,
-    sourceRef: c.creditId,
-  }));
+  // 3b. v37: credits are no longer read here. `balanceCreditLog` is the BANK's, because it is the audit
+  //     trail of a balance the bank owns, and the credit history a customer sees is the bank's own account
+  //     movements. Reading a second copy from the PSP would show whichever of the two happened to be
+  //     written, which is worse than showing one source.
+  const creditMovements: AccountMovement[] = [];
 
   // 4. Merge all movements
   let all: AccountMovement[] = [...disbursements, ...cardMovements, ...creditMovements];

@@ -24,7 +24,7 @@ import { listAccountMovements, ListMovementsOptions } from '../services/accountM
 import { getCardsByFundingAccount } from '../../customer/services/paymentCard.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
-import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry, CreditType } from '../models/balanceCreditLog.model';
+import { CreditType } from '../models/balanceCreditLog.model';
 import { creditDirect } from '../services/payoutAccountBalance.service';
 import { requestDemoCredit } from '../../../providers/account-information/services/bankcoreAis.client';
 import { config } from '../../../config';
@@ -757,24 +757,10 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     ).findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountInstanceReference: 1, partyInstanceReference: 1, payoutAccountStatus: 1 } });
     if (!account) return reply.status(404).send({ error: 'Account not found.' });
 
-    const now = new Date();
     const creditId = uuidv4();
-    const entry: BalanceCreditLogEntry = {
-      creditId,
-      payoutAccountInstanceReference: accountRef,
-      partyInstanceReference: account.partyInstanceReference,
-      amount: body.amount,
-      currency: body.currency,
-      creditType: body.creditType,
-      description: body.description ?? `${body.creditType.replace(/_/g, ' ')} credit`,
-      creditedAt: now,
-      performedByPartyReference: user?.partyRef ?? null,
-      referenceId: body.referenceId,
-      bianServiceDomain: 'SD-66 Payout Account Arrangement',
-      bianControlRecordType: 'PayoutAccountBalance',
-      recordCreatedDateTime: now,
-      schemaVersion: 1,
-    };
+    // The description the bank will record against the credit. The PSP keeps no row of its own: the bank
+    // owns the balance, so it owns the audit trail of a credit to it.
+    const creditDescription = body.description ?? `${body.creditType.replace(/_/g, ' ')} credit`;
     // v37 P2.5: the PSP no longer mints money. With the bank enabled it ASKS the institution that holds
     // the account to credit it, and the bank writes its own audit entry; with the flag off the local
     // ledger path is unchanged. The endpoint stays, because the frontend and the invariants depend on
@@ -787,7 +773,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
         bankAccountReference: linked.payoutAccountBankAccountReference,
         amount: body.amount,
         currency: body.currency,
-        reason: entry.description,
+        reason: creditDescription,
         requestedBy: user?.role ?? 'admin',
         // The PSP's own id for this operation, so the bank's movement is queryable from here.
         endToEndIdentification: creditId,
@@ -796,9 +782,12 @@ export async function payoutAccountController(fastify: FastifyInstance) {
         // No local fallback: crediting locally would be exactly the money minting this removes.
         return reply.status(502).send({ error: `The bank refused the credit: ${credited.error}` });
       }
-      await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION).insertOne(entry);
+      // v37: no local row. The bank logs the credit it made, which is the audit trail of a balance it owns.
+      // A second copy here would be the duplicate this separation removes, and it would drift the moment
+      // the bank's own record changed.
     } else {
-      await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION).insertOne(entry);
+      // The bank is off, so the PSP is running its own legacy ledger: the credit is recorded by the
+      // movement it makes, and there is no separate log to keep.
       await creditDirect(db, accountRef, body.amount);
     }
 
@@ -817,7 +806,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
       amount: body.amount,
       currency: body.currency,
       creditType: body.creditType,
-      creditedAt: now.toISOString(),
+      creditedAt: new Date().toISOString(),
     });
   });
 }

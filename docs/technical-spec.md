@@ -4691,7 +4691,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 | Module | Owns (RW) | Reads (RO) | Core-data touch (PCI/GDPR) |
 |---|---|---|---|
 | `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
-| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balances), `balanceCreditLog` | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
+| `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balance PROJECTION; the balance and its credit log are the bank's from v37) | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
 | `gateway` (SD-65 RTP + QR) | `paymentRequestProcedure`, `paymentRequestEvent`, `qrPaymentRepresentation`, `rtpAliasDirectoryCache` | `party`, `payoutAccountArrangement`, `counterpartyArrangement`, `complianceProcessEvent` | Account/alias based, NOT PCI scope (no PAN/CHD). QE:none on the request (payee name, aliases, remittance, address); the QR record holds no PII at all, its EPC form is derived on read (GDPR Art. 32 / PSD2). Aliases indexed by SHA-256 hash only |
 | `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34) |
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
@@ -4718,7 +4718,7 @@ ownership, which is the state the rule exists to prevent.
 bank's. Nothing is shared except the key vault. `domainEvent`, `counters` and `idempotencyKey` appear on both
 sides because each service keeps its OWN instance, not because either reaches into the other.
 
-#### Payment service provider (`backend/`)
+#### Payment service provider (`psp/backend/`)
 
 | Collection | Owning module | Notes |
 |---|---|---|
@@ -4742,9 +4742,10 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `cardEtokenProcedure` | `customer` | Acceptance-side surrogate tokens |
 | `paymentCardRegistry` | `customer` | Dedupes accepted card INSTRUMENTS; holder count is the shared-card fraud signal. Distinct from the bank's `issuedCardRegistry` |
 | `cardTransactionLog` | `transaction` | Card transactions, sensitive fields inline under QE |
-| `cardAuthorizationRecord` | `gateway` | Authorisation records. The HOLD itself is the bank's from v37 |
+| `cardAuthorizationRecord` | `gateway` | The ACQUIRER's record of an authorisation it requested, including the PSP-policy declines (a deactivated card-on-file) that never reach an issuer. The bank has no equivalent, so this is the only authorisation record on the platform; the HOLD itself is the bank's from v37 |
 | `paymentExecutionProcedure` | `gateway` | Executions. Delegated ones record that fact before dispatch |
 | `paymentOrderProcedure` | `gateway` | Payment orders |
+| ~~`recurringMandateProcedure`~~ | retired (v37) | Replaced by the bank's `periodicPaymentProcedure`, which is Berlin Group's own standing-order resource. Created by neither side |
 | `payoutAccountArrangement` | `gateway` | Linked account record. Balance is a PROJECTION from v37; the bank owns the ledger |
 | `counterpartyArrangement` | `identity` | Beneficiaries |
 | `checkoutSessionLog` | `gateway` | Checkout sessions |
@@ -4770,15 +4771,15 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `counters` | `system` | Sequence counters, PSP instance |
 | `idempotencyKey` | `system` | Idempotency keys, PSP instance |
 
-#### Bank (`bankcore/`)
+#### Bank (`bank/backend/`)
 
 | Collection | Owning module | Notes |
 |---|---|---|
 | `bankProfile` | `aspsp` | Bank identity and routing keys: BIC, IBAN bank codes, BIN ranges |
 | `accountArrangement` | `aspsp` | The real account and its balance. IBAN under QE with an equality index |
 | `accountHolder` | `aspsp` | The bank's own holder. Name and contact under QE |
+| `balanceCreditLog` | `aspsp` | Audit trail of every balance credit. It belongs wherever the balance does, and the PSP no longer creates, writes or reads it |
 | `accountMovement` | `aspsp` | Explicit ledger movements, so the ledger is reconcilable |
-| `balanceCreditLog` | `aspsp` | Audit trail of every balance credit |
 | `tppRegistration` | `tpp-trust` | Registered third parties: client id, secret hash, scopes, roles |
 | `tppEventSubscription` | `tpp-trust` | Where notifications are delivered and how they are signed |
 | `tppWebhookDeliveryLog` | `tpp-trust` | One row per delivery attempt, so a silent failure is visible |

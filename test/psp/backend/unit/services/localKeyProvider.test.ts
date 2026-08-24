@@ -5,7 +5,7 @@
  * Covers: active signing key, rotation with grace-period verification of the
  * previous key, JWKS key set, revoke rules, and keypair import validation.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -13,6 +13,23 @@ import * as crypto from 'crypto';
 import { LocalKeyProvider } from '../../../../../psp/backend/src/modules/identity/services/oauthKeyProviders/localKeyProvider';
 
 let storeDir: string;
+
+// RSA-2048 generation costs about a second, and the import tests only need pairs to hand to the provider,
+// not freshly minted ones. Generated once for the file instead of three times inside the tests.
+type Keypair = { privateKey: string; publicKey: string };
+const spare: Keypair[] = [];
+
+function generateKeypair(): Keypair {
+  return crypto.generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  }) as Keypair;
+}
+
+beforeAll(() => {
+  while (spare.length < 3) spare.push(generateKeypair());
+});
 
 function signVerifiable(provider: LocalKeyProvider): Promise<{ kid: string; token: string }> {
   const kid = provider.getKid();
@@ -96,29 +113,16 @@ describe('LocalKeyProvider', () => {
 
   it('importKeypair() rejects a mismatched public/private pair', async () => {
     const p = await LocalKeyProvider.create(storeDir);
-    const a = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-    const b = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-    await expect(p.importKeypair(a.privateKey as string, b.publicKey as string)).rejects.toThrow(/does not match/i);
+    const [a, b] = spare;
+    await expect(p.importKeypair(a.privateKey, b.publicKey)).rejects.toThrow(/does not match/i);
   });
 
   it('importKeypair() activates a valid external pair and deprecates the previous key', async () => {
     const p = await LocalKeyProvider.create(storeDir);
     const prev = await signVerifiable(p);
 
-    const kp = crypto.generateKeyPairSync('rsa', {
-      modulusLength: 2048,
-      publicKeyEncoding: { type: 'spki', format: 'pem' },
-      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
-    });
-    const { kid } = await p.importKeypair(kp.privateKey as string, kp.publicKey as string);
+    const kp = spare[2];
+    const { kid } = await p.importKeypair(kp.privateKey, kp.publicKey);
     expect(p.getKid()).toBe(kid);
     expect(kid).not.toBe(prev.kid);
     // Previous key still verifiable during grace

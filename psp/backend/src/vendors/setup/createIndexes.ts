@@ -4,7 +4,6 @@ import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/par
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
-import { RECURRING_MANDATE_COLLECTION } from '../../modules/gateway/models/recurringMandate.model';
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
 import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
 import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
@@ -480,12 +479,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
   ]);
 
-  // v17.1: Recurring mandates , due-run scan by status + nextRunAt.
-  await ensureIndexes(db, RECURRING_MANDATE_COLLECTION, [
-    { key: { recurringMandateInstanceReference: 1 }, unique: true },
-    { key: { ownerPartyReference: 1, recordCreatedDateTime: -1 } },
-    { key: { mandateStatus: 1, nextRunAt: 1 } },
-  ]);
+  // v37: the recurring mandate is RETIRED, not moved. A standing order is `periodicPaymentProcedure` at the
+  // bank, on Berlin Group's own resource, with its own due-date index. Indexing a collection here that
+  // nothing should write would create it empty and invite someone to write to it again.
 
   // v17.1: Idempotency store, unique composite key (first writer wins under a race).
   await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [

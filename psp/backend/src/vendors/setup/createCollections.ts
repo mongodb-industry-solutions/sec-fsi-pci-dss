@@ -8,7 +8,6 @@ import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/par
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
-import { BALANCE_CREDIT_LOG_COLLECTION } from '../../modules/gateway/models/balanceCreditLog.model';
 import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
 import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
@@ -518,15 +517,18 @@ export async function createCollections(
     console.log(`  skip:    ${COUNTERPARTY_COLLECTION} (already exists)`);
   }
 
-  if (!existingNames.has(BALANCE_CREDIT_LOG_COLLECTION) || reset) {
-    if (existingNames.has(BALANCE_CREDIT_LOG_COLLECTION) && reset) {
-      await db.collection(BALANCE_CREDIT_LOG_COLLECTION).drop();
-      console.log(`  dropped: ${BALANCE_CREDIT_LOG_COLLECTION}`);
+  // v37: collections that MOVED to the bank, or were retired in favour of a bank resource. They are
+  // dropped rather than merely left unmanaged: a collection nothing writes and nobody owns is a ghost that
+  // still answers a query, and the next person to find rows in it will reasonably believe they matter.
+  //   · balanceCreditLog       → the bank's. The audit trail of a balance mutation belongs where the
+  //                              balance does, and the balance moved in P2.
+  //   · recurringMandateProcedure → retired. A standing order is `periodicPaymentProcedure` at the bank,
+  //                              on Berlin Group's own resource.
+  for (const movedToTheBank of ['balanceCreditLog', 'recurringMandateProcedure']) {
+    if (existingNames.has(movedToTheBank)) {
+      await db.collection(movedToTheBank).drop().catch(() => {});
+      console.log(`  dropped: ${movedToTheBank} (moved to the bank)`);
     }
-    await db.createCollection(BALANCE_CREDIT_LOG_COLLECTION);
-    console.log(`  created: ${BALANCE_CREDIT_LOG_COLLECTION} (SD-66 balance credit audit log, PCI DSS Req 10)`);
-  } else {
-    console.log(`  skip:    ${BALANCE_CREDIT_LOG_COLLECTION} (already exists)`);
   }
 
   // (v28): QR Payment Representation, plaintext. No QE: TTL forbids it (v35 CH-1).

@@ -24,7 +24,6 @@ import { seedPspRevenueAccount } from './seedPspRevenueAccount';
 import { seedPaymentExecutions } from './seedPaymentExecutions';
 import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
 import { seedRtpRequests } from './seedRtpRequests';
-import { seedBalanceCredits } from './seedBalanceCredits';
 import { seedEnrolledCredentials } from './seedEnrolledCredentials';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
@@ -133,8 +132,6 @@ export async function runSeed() {
     console.log('Seeding counterpartyArrangement (SD-54, v17)...');
     await seedCounterpartyArrangements(db);
 
-    console.log('Seeding balanceCreditLog (SD-66 initial deposits, PCI DSS Req 10)...');
-    await seedBalanceCredits(db);
 
     // After opening deposits are logged (pre-transfer balances), so the demo executions can
     // apply their balance movements and the ledger reconciles: opening − Σ(settled sent) + Σ(received).

@@ -12,7 +12,7 @@
 
 import { Db } from 'mongodb';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
-import { BALANCE_CREDIT_LOG_COLLECTION, BalanceCreditLogEntry } from '../models/balanceCreditLog.model';
+import { claimIdempotent } from './idempotency.service';
 import { creditDirect, settleReservedDebit } from './payoutAccountBalance.service';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 
@@ -84,29 +84,13 @@ export async function postCommission(db: Db, input: PostCommissionInput): Promis
     }
   }
 
-  const now = new Date();
-  // Deterministic id → the upsert below is the idempotency gate for the whole posting.
+  // Deterministic id, so the claim below is the same key on every retry of the same execution.
   const creditId = `commission-${input.executionRef}`;
-  const entry: BalanceCreditLogEntry = {
-    creditId,
-    payoutAccountInstanceReference: PSP_REVENUE_ACCOUNT_REFERENCE,
-    partyInstanceReference: PSP_REVENUE_PARTY_REFERENCE,
-    amount: creditAmount,
-    currency: revenueAccount.payoutAccountCurrency,
-    creditType: 'commission',
-    description: `Merchant commission ${input.merchantReference}`,
-    creditedAt: now,
-    performedByPartyReference: null,
-    referenceId: input.executionRef,
-    bianServiceDomain: 'SD-66 Payout Account Arrangement',
-    bianControlRecordType: 'PayoutAccountBalance',
-    recordCreatedDateTime: now,
-    schemaVersion: 1,
-  };
-  const res = await db.collection<BalanceCreditLogEntry>(BALANCE_CREDIT_LOG_COLLECTION)
-    .updateOne({ creditId }, { $setOnInsert: entry }, { upsert: true });
-  // Already collected for this execution: a previous run withheld it, so the hold is already correct.
-  if (res.upsertedCount !== 1) return { outcome: 'already_collected', creditedAmount: 0 };
+  // At most once per execution, claimed atomically. The credit itself is recorded by the bank, which is
+  // where the balance lives; what the PSP needs here is only the guarantee that it collects the fee once.
+  const claimed = await claimIdempotent(db, 'commission.settlement', PSP_REVENUE_ACCOUNT_REFERENCE, creditId);
+  // A previous run already withheld it, so the hold is already correct.
+  if (!claimed) return { outcome: 'already_collected', creditedAmount: 0 };
 
   // Withhold from the merchant hold, then credit the PSP. Order matters only for readability: both
   // legs are single-document $inc operations on payoutAccountArrangement.

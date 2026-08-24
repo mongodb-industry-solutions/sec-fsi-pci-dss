@@ -2,7 +2,15 @@
  * Unit tests: internal capability Module engines (ADR-029, dev.v7 Fase 4).
  * Pure functions, no DB. Validates the engines that back /api/v1/modules/<cap>/{score|screen}.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// The credit bureau asks the bank, and resolving the bank reads the provider arrangement record. Stubbed,
+// so this file stays what its header claims: engines, no DB.
+vi.mock('../../../../../psp/backend/src/modules/provider/services/providerAccessToken.service', async () => {
+  const { stubProviderResolution } = await import('../support/providerResolution');
+  return stubProviderResolution();
+});
+
 import { scoreFds } from '../../../../../psp/backend/src/providers/fds/services/fds.service';
 import { screenHrp } from '../../../../../psp/backend/src/providers/hrp/services/hrp.service';
 import { screenAml } from '../../../../../psp/backend/src/providers/aml/services/aml.service';

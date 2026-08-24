@@ -3,7 +3,15 @@
 // The property that matters: a funds gate that fails open authorises a payment nobody checked. With the
 // ledger at the bank, the thing we could not reach is precisely the authoritative balance, so an
 // unreachable bank must decline. A local hold is no longer a fallback: it would mutate a projection.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// The endpoint lookup and the token exchange read the provider arrangement record, which would open a QE
+// client here. Stubbed, so this file stays a unit test of the request the client builds.
+vi.mock('../../../../../psp/backend/src/modules/provider/services/providerAccessToken.service', async () => {
+  const { stubProviderResolution } = await import('../support/providerResolution');
+  return stubProviderResolution();
+});
+
 import {
   isBankLinked, holdFundsAtBank, disposeHoldAtBank,
 } from '../../../../../psp/backend/src/providers/card-authorization/services/bankcoreCardAuthorisation.client';
@@ -29,9 +37,8 @@ describe('v37 P4.5: which accounts are the bank\'s to authorise', () => {
 });
 
 describe('v37 P4.5: the hold', () => {
-  // The token exchange and the endpoint lookup both go through the provider record, which needs a
-  // database. Here the fetch is stubbed for BOTH, so the test exercises the request shape rather than the
-  // plumbing: the token call is the first fetch, the authorisation the second.
+  // The endpoint and the token come from the stubbed provider port, so the only fetch left is the
+  // authorisation itself. Calls are matched by URL, never by position.
   function stubbedBank(authorisationResponse: unknown, status = 200) {
     const calls: Array<{ url: string; method?: string; headers: Record<string, string>; body?: string }> = [];
     const impl = (async (url: string, init: Record<string, unknown> = {}) => {
