@@ -5,6 +5,9 @@ import { callBankAdmin } from '../../../lib/bankApi';
 import { ConfigEditor } from '../../../components/ConfigEditor';
 import { PageTitle } from '../../../components/Tiles';
 import { BankError, Empty } from '../../../components/States';
+import { ModuleTabs, type Tab } from '../../../components/ModuleTabs';
+import { CardsAdmin } from '../../../components/CardsAdmin';
+import { AccountsAdmin } from '../../../components/AccountsAdmin';
 
 // One capability's live rules, read from and written to the bank's own configuration record.
 //
@@ -44,6 +47,13 @@ const KNOWN: Record<string, { title: string; description: string }> = {
   },
 };
 
+// The capabilities that own records as well as rules. An operator fixing the issuer needs both halves in one
+// place, which is how the provider's module pages worked and why they were usable.
+const DATA_PANEL: Record<string, { label: string; render: () => React.ReactNode }> = {
+  'card-issuer': { label: 'Cards', render: () => <CardsAdmin /> },
+  aisp: { label: 'Accounts', render: () => <AccountsAdmin /> },
+};
+
 interface ConfigRecord {
   bankModuleCapability?: string;
   bankModuleDescription?: string;
@@ -77,16 +87,29 @@ export default async function CapabilityPage({ params }: { params: Promise<{ cap
       )}
 
       {record?.bankModuleConfiguration && (
-        <>
-          {record.bankModuleConfigurationConsumed === false && (
-            // Worth saying plainly: a record nothing reads is a setting that looks live and is not.
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300">
-              This record exists but no engine reads it yet, so editing it changes nothing until one does.
-            </div>
-          )}
-          <ConfigEditor capability={capability} initial={record.bankModuleConfiguration} />
-        </>
+        <ModuleTabs tabs={tabsFor(capability, record)} initial={DATA_PANEL[capability] ? 'data' : 'rules'} />
       )}
     </div>
   );
+}
+
+function tabsFor(capability: string, record: ConfigRecord): Tab[] {
+  const data = DATA_PANEL[capability];
+  const rules: Tab = {
+    key: 'rules',
+    label: 'Rules and policies',
+    content: (
+      <div className="space-y-4">
+        {record.bankModuleConfigurationConsumed === false && (
+          // Worth saying plainly: a record nothing reads is a setting that looks live and is not.
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-300">
+            This record exists but no engine reads it yet, so editing it changes nothing until one does.
+          </div>
+        )}
+        <ConfigEditor capability={capability} initial={record.bankModuleConfiguration ?? {}} />
+      </div>
+    ),
+  };
+  // Data first when there is any: an operator arrives looking for a record far more often than for a rule.
+  return data ? [{ key: 'data', label: data.label, content: data.render() }, rules] : [rules];
 }

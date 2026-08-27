@@ -46,6 +46,9 @@ const ADMIN_RESOURCES = [
   'tpp/deliveries',
   'consents',
   'audit',
+  // The bank's own data: the cards it issued and the accounts it holds, with their lifecycle actions.
+  'cards',
+  'accounts',
 ];
 
 export function isAdminResource(resource: string): boolean {

@@ -2,8 +2,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { CreditCard, Search, Store, ArrowRight, Home, LayoutDashboard, QrCode, X } from 'lucide-react';
-import { MERCHANT_PUBLIC_URL, demoPublicUrl } from '../../lib/constants';
+import { CreditCard, Search, Store, ArrowRight, Home, LayoutDashboard, QrCode, X, Landmark, BookOpen } from 'lucide-react';
+import {
+  MERCHANT_PUBLIC_URL, demoPublicUrl, BANKCORE_UI_PUBLIC_URL,
+  PSP_API_DOC_PATH, BANKCORE_API_DOC_PATH,
+} from '../../lib/constants';
 import { QrRepresentation } from '../../components/QrRepresentation';
 
 interface HubCard {
@@ -13,6 +16,9 @@ interface HubCard {
   icon: typeof CreditCard;
   cta: string;
   onSelect: () => void;
+  // Set when the card cannot act in this environment, which is how a missing public URL is surfaced instead
+  // of becoming a link that fails.
+  unavailable?: string;
 }
 
 export default function SimulatorHubPage() {
@@ -50,6 +56,44 @@ export default function SimulatorHubPage() {
       },
     },
     {
+      key: 'bankcore',
+      title: 'Open the Bank',
+      description:
+        'Open the bank\'s own administration app. It is a separate institution with its own service, its own '
+        + 'database and its own Open Banking API: the cards it issued, the accounts it holds, its third-party '
+        + 'registrations and its audit trail are administered there, not here.',
+      icon: Landmark,
+      cta: 'Open bank admin',
+      onSelect: () => {
+        window.location.href = BANKCORE_UI_PUBLIC_URL;
+      },
+      // A private-only deployment publishes no address for it, and the card says so.
+      unavailable: BANKCORE_UI_PUBLIC_URL
+        ? undefined
+        : 'This environment does not publish the bank app. Set PSP_URL_BANKCORE_FRONTEND_PUBLIC to reach it.',
+    },
+    {
+      key: 'psp-api',
+      title: 'Payment provider API',
+      description:
+        'The provider\'s own API reference: payments, checkout, cards on file, beneficiaries and the '
+        + 'capability router that dispatches to whoever serves each capability.',
+      icon: BookOpen,
+      cta: 'Open API reference',
+      onSelect: () => router.push(PSP_API_DOC_PATH),
+    },
+    {
+      key: 'bank-api',
+      title: 'Bank Open Banking API',
+      description:
+        'The bank\'s API reference: consents, accounts, balances, transactions, payment initiation, standing '
+        + 'orders and card authorisation, as the standard defines them. Served through this origin, so it '
+        + 'works without publishing the bank itself.',
+      icon: BookOpen,
+      cta: 'Open API reference',
+      onSelect: () => router.push(BANKCORE_API_DOC_PATH),
+    },
+    {
       key: 'share',
       title: 'Share with QR code',
       description:
@@ -77,7 +121,9 @@ export default function SimulatorHubPage() {
             <button
               key={c.key}
               onClick={c.onSelect}
-              className="group text-left bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-lg hover:border-[#001E2B] hover:bg-[#001E2B] hover:-translate-y-0.5 transition-all flex flex-col"
+              disabled={Boolean(c.unavailable)}
+              title={c.unavailable}
+              className="group text-left bg-white rounded-xl border border-gray-200 p-6 shadow-sm transition-all flex flex-col enabled:hover:shadow-lg enabled:hover:border-[#001E2B] enabled:hover:bg-[#001E2B] enabled:hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {/* On the dark hover state the icon chip inverts to green-on-dark for contrast. */}
               <div className="w-11 h-11 rounded-lg bg-[#001E2B] text-[#00ED64] flex items-center justify-center mb-4 transition-colors group-hover:bg-[#00ED64] group-hover:text-[#001E2B]">
@@ -85,7 +131,10 @@ export default function SimulatorHubPage() {
               </div>
               <h2 className="font-semibold text-[#001E2B] mb-2 transition-colors group-hover:text-white">{c.title}</h2>
               <p className="text-sm text-gray-500 flex-1 transition-colors group-hover:text-gray-300">{c.description}</p>
-              <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#001E2B] transition-colors group-hover:text-[#00ED64]">
+              {c.unavailable && (
+                <span className="mt-4 text-xs text-amber-700">{c.unavailable}</span>
+              )}
+              <span className={`mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#001E2B] transition-colors group-hover:text-[#00ED64] ${c.unavailable ? 'hidden' : ''}`}>
                 {c.cta}
                 <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
               </span>

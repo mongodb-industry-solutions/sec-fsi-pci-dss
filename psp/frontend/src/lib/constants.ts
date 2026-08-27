@@ -23,6 +23,22 @@ export const API_BASE_URL =
 export const MERCHANT_PUBLIC_URL =
   process.env.NEXT_PUBLIC_PSP_URL_MERCHANT || 'http://localhost:8082';
 
+// The bank's administration app. A browser NAVIGATES here, so it needs a genuinely public address: a private
+// in-cluster host works for a server-side probe and is unreachable from a laptop, and a same-origin rewrite
+// cannot serve a whole app that owns its own routes. That is why this is the one bank URL that must be
+// public, while the bank's API stays private and proxied.
+//
+// Unset in an environment that does not publish it, and the card then says so rather than offering a link
+// that fails: a dead link in a demo is worse than an absent one.
+export const BANKCORE_UI_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC
+  || (process.env.NODE_ENV === 'development' ? 'http://localhost:8084' : '');
+
+// The two API references. Both are served SAME ORIGIN through this app's rewrites, so they work in every
+// deployment model without a public host of their own and without a cross-origin fetch.
+export const PSP_API_DOC_PATH = '/doc';
+export const BANKCORE_API_DOC_PATH = '/doc/bankcore';
+
 // Shareable URL of this demo: runtime browser origin (correct in any environment),
 // with NEXT_PUBLIC_PSP_URL_FRONTEND as optional override when the origin is not shareable.
 export function demoPublicUrl(path = ''): string {

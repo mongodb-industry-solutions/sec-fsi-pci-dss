@@ -2,7 +2,9 @@
 // its `payoutAccountArrangement` keeps the link and the display metadata, the money lives here.
 export const ACCOUNT_ARRANGEMENT_COLLECTION = 'accountArrangement';
 
-export type AccountStatus = 'active' | 'blocked' | 'closed';
+// `pending_approval` is where a newly opened account waits for an operator. Without it an approval step
+// would be a button that always succeeds, which is not an approval.
+export type AccountStatus = 'pending_approval' | 'active' | 'blocked' | 'closed';
 export type AccountKind = 'current' | 'savings';
 
 export interface AccountBalance {

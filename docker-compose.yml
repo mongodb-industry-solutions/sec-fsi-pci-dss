@@ -69,6 +69,26 @@ services:
       retries: 6
       start_period: 10s
 
+  # The bank's own administration app. A separate institution gets a separate app: it talks to the bank's
+  # API over the compose network and needs no PSP anything.
+  bank-frontend:
+    build:
+      context: ./bank/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8084:8080"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # Server side only: this app calls the bank from its own route handlers, so the address never reaches
+      # the browser and the private in-network one is the right one to use.
+      PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+      PSP_JWT_SECRET: ${PSP_JWT_SECRET:-dev-secret-change-me}
+    depends_on:
+      bankcore:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./psp/frontend
@@ -81,9 +101,12 @@ services:
         # compose-network service address, which is exactly the "private" URL an in-VPC integrator uses.
         NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE: ${NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE:-http://backend:8080}
         NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
-        # Private only: the admin monitoring page probes bankcore through the Next.js proxy, so the
-        # browser never leaves the frontend origin and bankcore needs no published port.
+        # Private only for the API: the admin monitoring page probes bankcore through the Next.js proxy, so
+        # the browser never leaves the frontend origin and the bank's API needs no published port.
         NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+        # PUBLIC, and it has to be: the simulator LINKS to the bank's own app, so a browser navigates there.
+        # A private in-cluster host would work for a server-side probe and be unreachable from a laptop.
+        NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
     ports:
       - "8080:8080"
     env_file:

@@ -57,6 +57,10 @@ const nextConfig = {
             // needs a registered TPP's credentials, so publishing the docs opens nothing.
             { source: '/doc/bankcore', destination: `${bankcoreUrl}/doc` },
             { source: '/doc/bankcore/:path*', destination: `${bankcoreUrl}/doc/:path*` },
+            // The PROVIDER's own reference, same origin for the same reason. Declared AFTER the bank's, since
+            // Next matches in order and `/doc/:path*` would otherwise swallow `/doc/bankcore`.
+            { source: '/doc', destination: `${backendUrl}/doc` },
+            { source: '/doc/:path*', destination: `${backendUrl}/doc/:path*` },
         ];
     },
 };

@@ -4,7 +4,7 @@ import { Landmark } from 'lucide-react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Verdant Bank — Administration',
+  title: 'BankCore — Administration',
   description: "The bank's own administration: its capabilities, its records, its Open Banking API.",
 };
 
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
             <Landmark size={20} className="shrink-0 text-accent" aria-hidden />
             <Link href="/" className="font-semibold tracking-tight hover:underline">
-              Verdant&nbsp;Bank
+              BankCore
             </Link>
             {/* The subtitle is the first thing to go on a narrow screen: the name and the way home are not. */}
             <span className="hidden text-xs text-bank-ink/60 sm:inline">Administration</span>
