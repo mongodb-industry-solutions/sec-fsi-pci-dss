@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { Boxes, KeyRound, ChevronRight, Landmark } from 'lucide-react';
+import { Boxes, KeyRound, ChevronRight } from 'lucide-react';
 import { SectionHeader } from '../../../../components/SectionHeader';
 import { CAPABILITY_LIST } from '../../../../config/capabilities';
 import { CORE_ADMIN_MODULES, MODULE_TYPE_LABEL, type ModuleType } from '../../../../config/adminModules';
@@ -83,31 +83,6 @@ export default function ModulesIndexPage() {
         ))}
       </div>
       )}
-
-      {/* The bank is ONE entry, not a set of capabilities alongside the provider's. Its capabilities are its
-          own, administered inside its panel, because a bank that exposes an admin surface is a subsystem of
-          this demo rather than a generic node. Routing to a bank names none of this. */}
-      <div className="space-y-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400">Subsystems</h3>
-        <Link
-          href="/system/admin/modules/bankcore"
-          className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-[#001E2B]/30 hover:shadow-md transition-all"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Landmark size={18} className="text-[#001E2B]" />
-              <div>
-                <p className="font-semibold text-gray-800 text-sm">Bankcore</p>
-                <p className="text-xs text-gray-500">
-                  The bank: its own service and database. Card issuing, authorisation, accounts, credit
-                  assessment, and its own third-party and consent administration.
-                </p>
-              </div>
-            </div>
-            <ChevronRight size={16} className="text-gray-400" />
-          </div>
-        </Link>
-      </div>
 
       {byDomain.map(({ domain, items }) => (
         <div key={domain} className="space-y-2">

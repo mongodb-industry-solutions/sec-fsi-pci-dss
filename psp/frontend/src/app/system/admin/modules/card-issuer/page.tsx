@@ -250,28 +250,27 @@ function CardIssuerConfigPanel() {
   );
 }
 
+// v37: the configuration tab is gone. The rules an issuer validates a card against are the BANK's, and they
+// are administered in the bank's own app against its own API. What is left here is what the provider actually
+// owns: the cards its customers have on file.
 const TABS: ModuleTab[] = [
-  { key: 'config', label: 'Configuration' },
   { key: 'cards', label: 'Cards' },
 ];
 
 function CardIssuerModule() {
-  const [tab, setTab] = useActiveTab(TABS, 'config');
+  const [tab, setTab] = useActiveTab(TABS, 'cards');
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
-      <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'Card Issuer' }]} />
+      <Breadcrumb items={[{ label: 'Home', href: '/system' }, { label: 'Modules', href: '/system/admin/modules' }, { label: 'Cards on file' }]} />
       <SectionHeader
         icon={CreditCard}
-        title="Card Issuer; Internal Module"
-        description="Card validation policies plus global card administration, unified in one module surface."
-        debugInfo="capability=card-issuer Payment Card · PCI DSS (no SAD stored)"
+        title="Cards on file"
+        description="The cards this provider's customers have saved: their surrogate token, their masked display and their funding account. No card number is held here, and the issuer's rules are administered at the bank."
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />
-      {tab === 'config' ? <CardIssuerConfigPanel /> : (
-        <RequirePermission resource="cards" action="view">
-          <CardsAdminPanel />
-        </RequirePermission>
-      )}
+      <RequirePermission resource="cards" action="view">
+        <CardsAdminPanel />
+      </RequirePermission>
     </div>
   );
 }

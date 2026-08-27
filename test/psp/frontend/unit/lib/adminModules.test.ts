@@ -16,13 +16,29 @@ describe('admin module-type labels (§2.6)', () => {
     for (const m of CORE_ADMIN_MODULES) expect(m.moduleType).toBe('core');
   });
 
-  it('labels every built-in provider engine as built-in-provider (the 11 capabilities incl. VoP)', () => {
+  it('offers a module screen only for the capabilities the PROVIDER administers', () => {
+    // v37: five capabilities left this list. The bank owns the card issuer, card authorisation, account
+    // information, payment initiation and credit assessment, and their engine rules are administered in the
+    // bank's own app against the bank's own API. The provider offering a second screen for them would be two
+    // places to change one setting, with no way to tell which one the engine had read.
     const providers = builtInProviderModules();
-    expect(providers).toHaveLength(11); // v28: + Verification of Payee (vop)
+    const keys = providers.map((m) => m.key);
     for (const m of providers) expect(m.moduleType).toBe('built-in-provider');
-    expect(providers.map((m) => m.key)).toContain('card-issuer');
-    expect(providers.map((m) => m.key)).toContain('fds');
-    expect(providers.map((m) => m.key)).toContain('vop');
+
+    // What the provider still owns: its own risk and due-diligence engines.
+    for (const own of ['fds', 'aml', 'hrp', 'vop', 'kyc', 'kyb']) {
+      expect(keys, `${own} is the provider's own engine`).toContain(own);
+    }
+    // Purely the bank's: nothing but engine rules, so the provider offers no screen at all. A screen
+    // reappearing here is the duplication this asserts against.
+    for (const banks of ['card-authorization', 'payment-initiation', 'credit-bureau']) {
+      expect(keys, `${banks} is administered at the bank now`).not.toContain(banks);
+    }
+    // These two keep a screen, but for the provider's OWN records rather than the bank's rules: the cards its
+    // customers have on file, and its linked account records. Their configuration tab is what moved.
+    for (const shared of ['card-issuer', 'account-information']) {
+      expect(keys, `${shared} still administers the provider's own records`).toContain(shared);
+    }
   });
 
   it('every entry in the combined list has a renderable type label', () => {

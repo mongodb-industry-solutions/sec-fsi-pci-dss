@@ -157,13 +157,14 @@ function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: st
   );
 }
 
+// v37: the configuration tab is gone. What a third party may read from an account is the BANK's rule, set in
+// the bank's own app. What is left here is the provider's own linked account records.
 const TABS: ModuleTab[] = [
-  { key: 'config', label: 'Configuration' },
   { key: 'accounts', label: 'Accounts' },
 ];
 
 function AccountInfoModule() {
-  const [tab, setTab] = useActiveTab(TABS, 'config');
+  const [tab, setTab] = useActiveTab(TABS, 'accounts');
   const descriptor = byCapability(CAP);
   return (
     <div className="w-full px-5 sm:px-8 lg:px-12 py-6 space-y-5">
@@ -175,11 +176,9 @@ function AccountInfoModule() {
         debugInfo="capability=account-information Payout Account Arrangement · GDPR/PSD2 · PCI DSS"
       />
       <ModuleTabsBar tabs={TABS} active={tab} onChange={setTab} />
-      {tab === 'config' ? <AccountInfoConfigPanel /> : (
-        <RequirePermission resource="accounts" action="view">
-          <AccountsAdminPanel />
-        </RequirePermission>
-      )}
+      <RequirePermission resource="accounts" action="view">
+        <AccountsAdminPanel />
+      </RequirePermission>
     </div>
   );
 }

@@ -21,6 +21,9 @@ export type CapabilityKey =
 
 export type ModuleDomain = 'fraud' | 'customer' | 'gateway';
 
+// v37: `hasModule: false` on a capability the BANK owns. Its engine configuration is administered in the
+// bank's own app against the bank's own API, so the provider offers no screen for it. This is not the
+// capability being absent: routing still resolves it, and the provider still dispatches to whoever serves it.
 export interface CapabilityDescriptor {
   capability: CapabilityKey;
   providerType: string;          // legacy externalProviderArrangementType value
@@ -67,7 +70,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   'credit-bureau': {
     capability: 'credit-bureau', providerType: 'credit_bureau', label: 'Credit Bureau',
     description: 'Credit scoring and rating retrieval.',
-    callbackSegment: 'credit/bureau', frontendFolder: 'credit-bureau', moduleDomain: 'customer', hasModule: true,
+    callbackSegment: 'credit/bureau', frontendFolder: 'credit-bureau', moduleDomain: 'customer', hasModule: false,
     bianServiceDomain: 'Customer Credit Rating',
   },
   kyb: {
@@ -79,7 +82,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   'card-authorization': {
     capability: 'card-authorization', providerType: 'card_authorization', label: 'Card Authorization',
     description: 'Card authorization request/response (no CVV passed; PCI DSS).',
-    callbackSegment: 'card/authorization', frontendFolder: 'card-authorization', moduleDomain: 'gateway', hasModule: true,
+    callbackSegment: 'card/authorization', frontendFolder: 'card-authorization', moduleDomain: 'gateway', hasModule: false,
     bianServiceDomain: 'Card Authorization',
   },
   'card-issuer': {
@@ -97,7 +100,7 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   'payment-initiation': {
     capability: 'payment-initiation', providerType: 'payment_initiation', label: 'Payment Initiation (PISP)',
     description: 'Initiates bank transfers over SEPA / ACH / internal rails with configurable T+N settlement delays (PSD2 PISP). Amount and PSP account ref only, no IBAN on the wire.',
-    callbackSegment: 'payment-initiation', frontendFolder: 'payment-initiation', moduleDomain: 'gateway', hasModule: true,
+    callbackSegment: 'payment-initiation', frontendFolder: 'payment-initiation', moduleDomain: 'gateway', hasModule: false,
     bianServiceDomain: 'Payment Execution',
   },
   generic: {

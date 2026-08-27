@@ -4,7 +4,7 @@
   "version": "3.0.0",
   "private": true,
   "scripts": {
-    "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --prefix merchant",
+    "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --prefix merchant && npm install --prefix bank/frontend",
     "build:packages": "npm run build --prefix packages/eventbus && npm run build --prefix packages/platform-links",
     "setup:key:master": "npm run setup:key:master --prefix psp/backend",
     "setup:key:rsa": "npm run setup:key:rsa --prefix psp/backend",
@@ -19,7 +19,7 @@
     "setup:tools": "npx playwright install chromium",
     "setup:corp:stg": "node tools/corp.mjs --env staging",
     "setup:corp:prd": "node tools/corp.mjs --env prod",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:bankcore\" \"npm run dev:frontend\" \"npm run dev:merchant\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:bankcore\" \"npm run dev:frontend\" \"npm run dev:bank-frontend\" \"npm run dev:merchant\"",
     "dev:frontend": "npm run dev --prefix psp/frontend",
     "dev:backend": "npm run dev --prefix psp/backend",
     "dev:bankcore": "npm run dev --prefix bank/backend",
@@ -39,7 +39,8 @@
     "deploy": "npm run deploy:kube",
     "deploy:docker": "docker compose up --build",
     "deploy:kube": "tsx tools/kube.ts",
-    "type-check": "tsc --noEmit --project packages/eventbus/tsconfig.json && tsc --noEmit --project packages/platform-links/tsconfig.json && tsc --noEmit --project psp/backend/tsconfig.json && tsc --noEmit --project bank/backend/tsconfig.json && tsc --noEmit --project psp/frontend/tsconfig.json"
+    "type-check": "tsc --noEmit --project packages/eventbus/tsconfig.json && tsc --noEmit --project packages/platform-links/tsconfig.json && tsc --noEmit --project psp/backend/tsconfig.json && tsc --noEmit --project bank/backend/tsconfig.json && tsc --noEmit --project psp/frontend/tsconfig.json",
+    "dev:bank-frontend": "npm run dev --prefix bank/frontend"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",
