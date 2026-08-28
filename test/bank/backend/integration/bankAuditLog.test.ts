@@ -17,7 +17,7 @@ import {
   BANK_AUDIT_LOG_COLLECTION, BankAuditLogRecord,
 } from '../../../../bank/backend/src/modules/audit/models/bankAuditLog.model';
 
-const ADMIN = () => jwt.sign({ role: 'admin', sub: 'p38-ops' }, config.app.jwtSecret, { expiresIn: 300 });
+const ADMIN = () => jwt.sign({ role: 'admin', sub: 'p38-ops' }, config.app.adminSecret, { expiresIn: 300 });
 const TPP = (scopes: string[]) => issueAccessToken(
   { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never,
   scopes as never,

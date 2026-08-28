@@ -115,12 +115,12 @@ describe('v37 P3.7b: only a token the bank issued opens the bank', () => {
   it('REJECTS a JWT signed with the shared platform secret, which is the hole this closes', () => {
     const platformToken = jwt.sign(
       { client_id: 'leafypay-psp', scope: 'accounts balances transactions' },
-      config.app.jwtSecret,
+      config.app.adminSecret,
       { expiresIn: 120 },
     );
     expect(verifyAccessToken(platformToken)).toBeNull();
     // And the two keys are genuinely different, so the rejection is not an accident of configuration.
-    expect(config.bank.accessTokenSecret).not.toBe(config.app.jwtSecret);
+    expect(config.bank.accessTokenSecret).not.toBe(config.app.adminSecret);
   });
 
   it('rejects a token issued for another audience or by another issuer', () => {

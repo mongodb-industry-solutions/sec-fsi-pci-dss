@@ -64,10 +64,16 @@ describe('v37 P3.7b: the Open Banking surface requires a token this bank issued'
     expect(response.json().tppMessages[0].code).toBe('TOKEN_INVALID');
   });
 
-  it('refuses a JWT signed with the shared platform secret, which used to be accepted', async () => {
+  // v39 P4: this used to sign with the SHARED platform secret, and the bank accepted it. There is
+  // no shared secret left to sign with, so the nearest remaining credential is the bank own
+  // administrative key, and the Open Banking surface refuses that too: an operator credential is
+  // not a TPP token, and a TPP operation carries a consent obligation an operator session does not
+  // satisfy. The platform-secret case is now unreachable and is asserted at the key level in
+  // test/bank/backend/unit/institutionalBoundary.test.ts.
+  it('refuses a JWT signed with a credential the Open Banking surface does not issue', async () => {
     const platformToken = jwt.sign(
       { client_id: 'leafypay-psp', scope: 'accounts balances transactions' },
-      config.app.jwtSecret,
+      config.app.adminSecret,
       { expiresIn: 120 },
     );
     const response = await app.inject({

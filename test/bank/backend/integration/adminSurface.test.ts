@@ -11,8 +11,8 @@ import { buildApp } from '../../../../bank/backend/bin/server';
 import { config } from '../../../../bank/backend/src/config';
 import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
 
-const ADMIN = () => jwt.sign({ role: 'admin', sub: 'ops' }, config.app.jwtSecret, { expiresIn: 120 });
-const NOT_ADMIN = () => jwt.sign({ role: 'level1_analyst', sub: 'someone' }, config.app.jwtSecret, { expiresIn: 120 });
+const ADMIN = () => jwt.sign({ role: 'admin', sub: 'ops' }, config.app.adminSecret, { expiresIn: 120 });
+const NOT_ADMIN = () => jwt.sign({ role: 'level1_analyst', sub: 'someone' }, config.app.adminSecret, { expiresIn: 120 });
 const TPP = () => issueAccessToken(
   { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never,
   ['accounts', 'balances', 'transactions', 'payments'] as never,
