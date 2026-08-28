@@ -68,6 +68,25 @@ async function firstCardHref(page: Page): Promise<string> {
   return (await link.getAttribute('href')) ?? '';
 }
 
+/**
+ * Opens the filter panel, retrying the click.
+ *
+ * A click that lands before React has hydrated is DISCARDED: the button exists in the server HTML, Playwright
+ * sees it as actionable, and the handler is not attached yet. The old version of this test waited 1200ms first,
+ * which hid the problem behind a delay rather than solving it, and removing that delay is what exposed it.
+ *
+ * Retrying is the honest fix: it succeeds as soon as the handler exists, without assuming how long that takes
+ * on a development server that compiles on demand.
+ */
+async function openFilterPanel(page: Page): Promise<void> {
+  const filters = page.getByRole('button', { name: /^Filters/ });
+  await expect(filters).toBeVisible({ timeout: 20000 });
+  await expect(async () => {
+    await filters.click();
+    await expect(page.getByLabel('When')).toBeVisible({ timeout: 1500 });
+  }).toPass({ timeout: 25000 });
+}
+
 test.describe('the bank administration app', () => {
   test.beforeAll(async ({ request }) => {
     const response = await request.get(`${BANK_UI}/`).catch(() => null);
@@ -272,21 +291,31 @@ test.describe('the bank administration app', () => {
       expect(body).not.toMatch(new RegExp(`${allCards}\s*cards`));
 
       // And the pinned filter is not offered as an empty control an operator could type into.
-      const filters = page.getByRole('button', { name: /^Filters/ });
-      if (await filters.first().isVisible()) {
-        await filters.first().click();
-        await page.waitForTimeout(400);
-        await expect(page.getByLabel('Holder reference')).toHaveCount(0);
-      }
+      //
+      // The panel is opened properly first, and a filter that SHOULD be there is asserted before the one that
+      // should not. Without that, a click discarded before hydration leaves the panel shut and the absence
+      // assertion passes for the wrong reason, which is a green test proving nothing.
+      const filters = page.getByRole('button', { name: /^Filters/ }).first();
+      await expect(filters).toBeVisible({ timeout: 20000 });
+      await expect(async () => {
+        await filters.click();
+        await expect(page.getByLabel('Status').first()).toBeVisible({ timeout: 1500 });
+      }).toPass({ timeout: 25000 });
+
+      await expect(
+        page.getByLabel('Holder reference'),
+        'the holder is pinned by the page, so it must not appear as an editable filter',
+      ).toHaveCount(0);
     });
   });
 
   test.describe('choosing when, without typing a date', () => {
     test('a log offers presets, a single whole day, and two moments', async ({ page }) => {
+      // Waits on STATE rather than on the clock throughout. Against a development server that compiles on
+      // demand, a fixed delay is a coin flip under load: this test passed alone and failed inside the full
+      // suite, which is the signature of a timing assumption rather than a defect.
       await page.goto(`${BANK_UI}/records/audit`, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(1200);
-      await page.getByRole('button', { name: /^Filters/ }).click();
-      await page.waitForTimeout(400);
+      await openFilterPanel(page);
 
       const when = page.getByLabel('When');
       await expect(when, 'a date window is one question, so it is one control').toBeVisible();
@@ -295,7 +324,11 @@ test.describe('the bank administration app', () => {
 
       // The commonest question costs one interaction and writes both bounds to the same day.
       await when.selectOption('today');
-      await page.waitForTimeout(900);
+      await page.waitForFunction(
+        () => new URLSearchParams(window.location.search).has('from'),
+        undefined,
+        { timeout: 15000 },
+      );
       const url = new URL(page.url());
       expect(url.searchParams.get('from'), 'today is a single day, so both bounds are that day')
         .toBe(url.searchParams.get('to'));
@@ -303,12 +336,11 @@ test.describe('the bank administration app', () => {
 
       // A single chosen day is its own mode, with one date field rather than two.
       await when.selectOption('day');
-      await page.waitForTimeout(500);
-      await expect(page.locator('input[type="date"]')).toHaveCount(1);
+      await expect(page.locator('input[type="date"]')).toHaveCount(1, { timeout: 15000 });
 
       // A real window offers the time as well as the date.
       await when.selectOption('between');
-      await expect(page.locator('input[type="datetime-local"]')).toHaveCount(2);
+      await expect(page.locator('input[type="datetime-local"]')).toHaveCount(2, { timeout: 15000 });
       // Waits for the address to actually carry the window before clearing it. Asserting on a fixed delay let
       // a slow render turn a real ordering bug into an intermittent one.
       await page.waitForFunction(() => new URLSearchParams(window.location.search).has('from'));

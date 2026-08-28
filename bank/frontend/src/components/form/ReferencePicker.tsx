@@ -28,8 +28,15 @@ export function ReferencePicker<T extends Record<string, unknown>>({
   required?: boolean;
 }) {
   const id = useId();
+  // Same reason as in `DataList`: this control renders in the server tree AND depends on a list it fetches from
+  // an effect. The initial values agree, but the fetch can resolve while React is still hydrating, and then the
+  // `disabled` attribute and the placeholder text are built from state the server never had. Gating on this
+  // makes the first client render identical to the server's whatever the fetch does.
+  const [hydrated, setHydrated] = useState(false);
   const [rows, setRows] = useState<T[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { setHydrated(true); }, []);
 
   // The full ceiling in one call: this is a picker, and a paged one would hide the record being looked for
   // behind a control the operator cannot see.
@@ -46,6 +53,9 @@ export function ReferencePicker<T extends Record<string, unknown>>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resource, key]);
 
+  // Not usable yet: either the browser has not taken over, or the list has not arrived.
+  const pending = !hydrated || rows === null;
+
   return (
     <div className="grid grid-cols-1 gap-1 py-2.5 sm:grid-cols-[minmax(0,14rem)_1fr] sm:items-center sm:gap-4">
       <label htmlFor={id} className="min-w-0">
@@ -58,16 +68,16 @@ export function ReferencePicker<T extends Record<string, unknown>>({
             id={id}
             value={value}
             required={required}
-            disabled={rows === null}
+            disabled={pending}
             onChange={(event) => onChange(event.target.value)}
             className="h-11 w-full rounded-lg border border-line bg-canvas px-3 text-sm outline-none transition focus:border-accent disabled:opacity-60 sm:h-10"
           >
-            <option value="">{rows === null ? 'Reading the list…' : 'Not chosen'}</option>
+            <option value="">{pending ? 'Reading the list…' : 'Not chosen'}</option>
             {(rows ?? []).map((row) => (
               <option key={optionValue(row)} value={optionValue(row)}>{optionLabel(row)}</option>
             ))}
           </select>
-          {rows === null && (
+          {pending && (
             <Loader2 size={14} className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 animate-spin text-ink-soft" aria-hidden />
           )}
         </div>

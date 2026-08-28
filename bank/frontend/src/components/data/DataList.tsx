@@ -90,6 +90,49 @@ function humanise(key: string): string {
     .replace(/^./, (character) => character.toUpperCase());
 }
 
+/**
+ * One filter control, with its label ATTACHED to it.
+ *
+ * The label used to be a bare `<label>` beside an `<input>` with no `id`, which means it labelled nothing: a
+ * screen reader announced an unnamed combo box, and nothing could find the control by its visible name. It was
+ * a test unable to locate "Status" that exposed it, which is the useful side of writing tests the way a person
+ * uses the screen.
+ */
+function FilterControl({
+  filter, value, onChange,
+}: {
+  filter: FilterSpec;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const id = useId();
+  const className = 'h-10 w-full rounded-lg border border-line bg-canvas px-2 text-sm outline-none focus:border-accent';
+
+  return (
+    <div className="min-w-0">
+      <label htmlFor={id} className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
+        {filter.label}
+      </label>
+      {filter.options ? (
+        <select id={id} value={value} onChange={(event) => onChange(event.target.value)} className={className}>
+          <option value="">Any</option>
+          {filter.options.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={filter.placeholder}
+          className={className}
+        />
+      )}
+    </div>
+  );
+}
+
 export function DataList<T extends Row>({
   resource, noun, searchHint, columns, filters = [], fixed, rowHref, rowKey,
   statusFilterKey, emptyMessage, expand, toolbar, refreshToken,
@@ -118,6 +161,17 @@ export function DataList<T extends Row>({
     return values;
   }, [filters, searchParams]);
 
+  // Whether the browser has taken over from the server-rendered HTML.
+  //
+  // Two attributes on this toolbar render in BOTH trees and depend on data that only exists after a fetch: the
+  // export button's `disabled` and the refresh icon's spin. The initial values agree, but the fetch is started
+  // from an effect and can resolve WHILE React is still hydrating, and then React compares a tree built from
+  // the new state against HTML built from the old. The result is the mismatch React reports on `disabled`, and
+  // it is a race, so it appears intermittently and on a fast machine mostly not at all.
+  //
+  // Gating on this makes the first client render identical to the server's by construction, whatever the fetch
+  // does, and everything becomes live one tick later. The same flag exists in `JsonView` for the same reason.
+  const [hydrated, setHydrated] = useState(false);
   const [result, setResult] = useState<PagedResult<T> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,6 +182,8 @@ export function DataList<T extends Row>({
   // keystroke would put a history entry behind every letter.
   const [draftQuery, setDraftQuery] = useState(query);
   const draftRef = useRef(query);
+
+  useEffect(() => { setHydrated(true); }, []);
 
   useEffect(() => {
     // A change arriving from outside (the back button, a cleared filter) has to reach the box.
@@ -308,7 +364,8 @@ export function DataList<T extends Row>({
             <button
               type="button"
               onClick={exportJson}
-              disabled={exporting || rows.length === 0}
+              // Disabled until hydrated, matching the server, which has no rows to export either.
+              disabled={!hydrated || exporting || rows.length === 0}
               title="Download the records matching the current filters as JSON"
               className="inline-flex h-11 items-center gap-2 rounded-lg border border-line px-3 text-sm text-ink-soft transition hover:border-accent hover:text-ink disabled:opacity-40 sm:h-9"
             >
@@ -322,7 +379,7 @@ export function DataList<T extends Row>({
               aria-label="Refresh"
               className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-line text-ink-soft transition hover:border-accent hover:text-ink sm:h-9 sm:w-9"
             >
-              <RotateCw size={14} className={loading ? 'animate-spin' : ''} aria-hidden />
+              <RotateCw size={14} className={hydrated && loading ? 'animate-spin' : ''} aria-hidden />
             </button>
             {toolbar}
           </div>
@@ -346,30 +403,12 @@ export function DataList<T extends Row>({
                 })}
               />
             ) : (
-              <div key={filter.key} className="min-w-0">
-                <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
-                  {filter.label}
-                </label>
-                {filter.options ? (
-                  <select
-                    value={filterValues[filter.key] ?? ''}
-                    onChange={(event) => writeParams({ [filter.key]: event.target.value })}
-                    className="h-10 w-full rounded-lg border border-line bg-canvas px-2 text-sm outline-none focus:border-accent"
-                  >
-                    <option value="">Any</option>
-                    {filter.options.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    value={filterValues[filter.key] ?? ''}
-                    onChange={(event) => writeParams({ [filter.key]: event.target.value })}
-                    placeholder={filter.placeholder}
-                    className="h-10 w-full rounded-lg border border-line bg-canvas px-2 text-sm outline-none focus:border-accent"
-                  />
-                )}
-              </div>
+              <FilterControl
+                key={filter.key}
+                filter={filter}
+                value={filterValues[filter.key] ?? ''}
+                onChange={(next) => writeParams({ [filter.key]: next })}
+              />
             )))}
             {appliedCount > 0 && (
               <div className="flex items-end">
