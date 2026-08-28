@@ -58,9 +58,12 @@ async function mongodbPlugin(fastify: FastifyInstance) {
   } catch (err) {
     const { server, database } = sanitizeUri(config.mongodb.uri);
     const reason = err instanceof Error ? err.message : String(err);
+    // The full reason goes to the log, which is behind the administrative credential. What the health
+    // response carries is the host and the database and nothing else, in every deployment alike: a
+    // driver message can name an internal host or a replica set, and whether that is safe to publish
+    // does not depend on which environment this happens to be.
     console.error(`[giam/mongodb] Connection failed: server=${server} database=${database}. ${reason}`);
-    const base = `Connection failed: server=${server} database=${database}`;
-    fastify.dbError = config.nodeEnv === 'production' ? base : `${base}. ${reason}`;
+    fastify.dbError = `Connection failed: server=${server} database=${database}`;
   }
 }
 

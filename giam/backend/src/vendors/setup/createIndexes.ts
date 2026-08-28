@@ -80,8 +80,8 @@ export function plannedIndexes(): IndexPlan[] {
     // OAuth.
     { collection: CLIENT_COLLECTION, keys: { realmId: 1, clientId: 1 }, options: { name: 'realm_clientId_unique', unique: true } },
     { collection: CLIENT_COLLECTION, keys: { realmId: 1, tenantId: 1, status: 1 }, options: { name: 'realm_tenant_status' } },
-    // Resolving a client from the merchant or application record that owns it.
-    { collection: CLIENT_COLLECTION, keys: { 'owner.kind': 1, 'owner.ref': 1 }, options: { name: 'owner', sparse: true } },
+    // Resolving a client from the record that owns it, in the consuming application.
+    { collection: CLIENT_COLLECTION, keys: { realmId: 1, 'owner.kind': 1, 'owner.ref': 1 }, options: { name: 'realm_owner', sparse: true } },
     // RFC 8705: locating the client bound to a presented certificate.
     { collection: CLIENT_COLLECTION, keys: { 'mtls.certificateThumbprint': 1 }, options: { name: 'mtls_thumbprint', sparse: true } },
 
@@ -122,7 +122,7 @@ export function plannedIndexes(): IndexPlan[] {
     { collection: RESOURCE_SERVER_COLLECTION, keys: { realmId: 1, audience: 1 }, options: { name: 'realm_audience_unique', unique: true } },
 
     { collection: PERMISSION_COLLECTION, keys: { permissionId: 1 }, options: { name: 'permissionId_unique', unique: true } },
-    { collection: PERMISSION_COLLECTION, keys: { resourceServerId: 1, resource: 1, action: 1 }, options: { name: 'server_resource_action_unique', unique: true } },
+    { collection: PERMISSION_COLLECTION, keys: { realmId: 1, resourceServerId: 1, resource: 1, action: 1 }, options: { name: 'realm_server_resource_action_unique', unique: true } },
 
     { collection: ROLE_COLLECTION, keys: { roleId: 1 }, options: { name: 'roleId_unique', unique: true } },
     { collection: ROLE_COLLECTION, keys: { realmId: 1, name: 1 }, options: { name: 'realm_name_unique', unique: true } },
