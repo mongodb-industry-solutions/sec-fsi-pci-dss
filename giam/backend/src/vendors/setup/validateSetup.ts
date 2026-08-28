@@ -63,6 +63,10 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
   const known = new Set(GIAM_COLLECTIONS.map((s) => s.name));
   const unregistered = info
     .map((c) => c.name)
+    // The storage engine's own: Queryable Encryption's metadata collections and the buckets and view
+    // behind a time series. They are not schema anyone owns, and listing them would turn a real
+    // ownership check into noise a reader learns to skip.
+    .filter((name) => !name.startsWith('enxcol_.') && !name.startsWith('system.'))
     .filter((name) => name !== config.mongodb.keyVaultCollection && !known.has(name));
   add('every collection is registered with an owning module', unregistered.length === 0,
     unregistered.length === 0 ? undefined : `unregistered: ${unregistered.join(', ')}`);
