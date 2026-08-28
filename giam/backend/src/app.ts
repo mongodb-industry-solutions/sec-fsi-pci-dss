@@ -11,7 +11,7 @@ import mongodbPlugin from './plugins/mongodb';
 import swaggerPlugin from './plugins/swagger';
 import { appendLog, appendLogEntry, levelLabel, mirrorConsoleToLogBuffer } from './shared/services/logBuffer';
 import { configurationReport, readinessReport, formatReport } from './shared/services/startupReport';
-import { PROBLEM_SCHEMA, problem, isOAuthSurface, oauthError } from './shared/models/problem';
+import { PROBLEM_SCHEMA, OAUTH_ERROR_SCHEMA, problem, isOAuthSurface, oauthError } from './shared/models/problem';
 import { realmModule } from './modules/realm';
 import { directoryModule } from './modules/directory';
 import { provisioningModule } from './modules/provisioning';
@@ -76,6 +76,22 @@ export async function buildApp(options: BuildOptions = {}): Promise<FastifyInsta
 
   // Referenced by every route that can fail on the REST surface, so the shape is declared once.
   fastify.addSchema(PROBLEM_SCHEMA);
+  fastify.addSchema(OAUTH_ERROR_SCHEMA);
+
+  // RFC 6749 requires form encoding on the token endpoint, and the specification is not offering a
+  // choice: a JSON body there is a non-conforming server that happens to work with one client.
+  fastify.addContentTypeParser(
+    'application/x-www-form-urlencoded',
+    { parseAs: 'string' },
+    (_request, body, done) => {
+      try {
+        const params = new URLSearchParams(body as string);
+        done(null, Object.fromEntries(params.entries()));
+      } catch (err) {
+        done(err as Error, undefined);
+      }
+    },
+  );
 
   await fastify.register(correlationPlugin);
   await fastify.register(corsPlugin);

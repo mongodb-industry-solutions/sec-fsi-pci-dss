@@ -1,8 +1,10 @@
-import { keyProviders } from './index';
+import { keyProviders, authenticationMethods, credentialStores } from './index';
 import { InstanceLocalKeyProvider } from '../../modules/keys/providers/instanceLocal.provider';
 import { FilesystemKeyProvider } from '../../modules/keys/providers/filesystem.provider';
 import { SharedStoreKeyProvider } from '../../modules/keys/providers/sharedStore.provider';
 import { KmsKeyProvider } from '../../modules/keys/providers/kms.provider';
+import { bcryptPasswordStore, publicKeyStore } from '../../modules/directory/services/credentialStores';
+import { passwordMethod, publicKeyMethod, clientSecretMethod } from '../../modules/authentication/services/authenticationMethods';
 
 /**
  * Registers the implementations GIAM ships with.
@@ -16,14 +18,30 @@ import { KmsKeyProvider } from '../../modules/keys/providers/kms.provider';
  * owns it. It is absent rather than faked: resolving it refuses and says what is missing.
  */
 export function registerBuiltinPorts(): void {
-  // Idempotent: the application may be built more than once in a process, and registering twice is
-  // a duplicate-name error rather than a no-op, deliberately, so the guard is here instead.
-  if (keyProviders.has('instance-local')) return;
+  // Idempotent PER REGISTRY, because a test may clear one and leave the others alone. Guarding on a
+  // single registry would leave the rest registered and then fail on a duplicate name, which reads
+  // as a defect in the port under test rather than in the guard.
+  if (!keyProviders.has('instance-local')) {
+    // All four in every deployment. Which one is used is configuration, and every one of them is
+    // multi-replica capable, so scaling is never the reason to change custody.
+    keyProviders.register(new InstanceLocalKeyProvider());
+    keyProviders.register(new FilesystemKeyProvider());
+    keyProviders.register(new SharedStoreKeyProvider());
+    keyProviders.register(new KmsKeyProvider());
+  }
 
-  // All four are registered in every deployment. Which one is used is configuration, and every one
-  // of them is multi-replica capable, so scaling is never the reason to change it.
-  keyProviders.register(new InstanceLocalKeyProvider());
-  keyProviders.register(new FilesystemKeyProvider());
-  keyProviders.register(new SharedStoreKeyProvider());
-  keyProviders.register(new KmsKeyProvider());
+  // Where credential material lives and how it is verified. Two from the start, because a port only
+  // proves itself when something other than the obvious implementation goes through it.
+  if (!credentialStores.has('bcrypt-password')) {
+    credentialStores.register(bcryptPasswordStore);
+    credentialStores.register(publicKeyStore);
+  }
+
+  // How a principal proves identity. A person with a password, a person with a device and a machine
+  // with a secret all resolve a principal and return the same shape, through the same pipeline.
+  if (!authenticationMethods.has('password')) {
+    authenticationMethods.register(passwordMethod);
+    authenticationMethods.register(publicKeyMethod);
+    authenticationMethods.register(clientSecretMethod);
+  }
 }

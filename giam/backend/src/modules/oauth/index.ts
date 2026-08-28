@@ -1,7 +1,11 @@
 import { FastifyInstance } from 'fastify';
+import { discoveryController } from './controllers/discovery.controller';
+import { tokenController } from './controllers/token.controller';
 
-// The authorization server: discovery, authorize, token, refresh, introspection, revocation,
-// userinfo and exchange, plus the client registry those operate against.
-export async function oauthModule(_fastify: FastifyInstance) {
-  // Routes arrive with the module's own phase.
+// The authorization server: discovery, the published key set, and the token endpoint. Every route
+// here implements a specification verbatim, so the paths carry the standard's own shape rather than
+// this project's.
+export async function oauthModule(fastify: FastifyInstance) {
+  await fastify.register(discoveryController);
+  await fastify.register(tokenController);
 }

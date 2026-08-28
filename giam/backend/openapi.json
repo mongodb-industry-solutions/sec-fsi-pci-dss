@@ -61,6 +61,34 @@
           "title": "Not Found",
           "status": 404
         }
+      },
+      "def-1": {
+        "type": "object",
+        "description": "RFC 6749 section 5.2 error response.",
+        "required": [
+          "error"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "The RFC 6749 error code.",
+            "example": "invalid_request"
+          },
+          "error_description": {
+            "type": "string",
+            "description": "Human-readable detail."
+          },
+          "error_uri": {
+            "type": "string",
+            "description": "A page describing the error."
+          }
+        },
+        "title": "OAuthError",
+        "example": {
+          "error": "invalid_request",
+          "error_description": "grant_type is required"
+        }
       }
     }
   },
@@ -121,6 +149,573 @@
                   "status": "fail",
                   "serviceId": "giam",
                   "checks": {}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realms/{realm}/.well-known/openid-configuration": {
+      "get": {
+        "operationId": "getOpenIdConfiguration",
+        "summary": "Authorization server metadata",
+        "tags": [
+          "discovery"
+        ],
+        "description": "Standard-defined: OpenID Connect Discovery 1.0. Path, document and member names follow the specification verbatim. Public by specification: it names endpoints, it discloses nothing.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Authorization server metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Authorization server metadata.",
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "issuer",
+                    "jwks_uri"
+                  ],
+                  "properties": {
+                    "issuer": {
+                      "type": "string"
+                    },
+                    "authorization_endpoint": {
+                      "type": "string"
+                    },
+                    "token_endpoint": {
+                      "type": "string"
+                    },
+                    "userinfo_endpoint": {
+                      "type": "string"
+                    },
+                    "jwks_uri": {
+                      "type": "string"
+                    },
+                    "introspection_endpoint": {
+                      "type": "string"
+                    },
+                    "revocation_endpoint": {
+                      "type": "string"
+                    },
+                    "end_session_endpoint": {
+                      "type": "string"
+                    },
+                    "backchannel_authentication_endpoint": {
+                      "type": "string"
+                    },
+                    "scopes_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "response_types_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "grant_types_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "subject_types_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "id_token_signing_alg_values_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "token_endpoint_auth_methods_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "code_challenge_methods_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "issuer": "https://giam.example/realms/acme",
+                  "jwks_uri": "https://giam.example/realms/acme/protocol/openid-connect/certs"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such realm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realms/{realm}/.well-known/oauth-authorization-server": {
+      "get": {
+        "operationId": "getAuthorizationServerMetadata",
+        "summary": "Authorization server metadata",
+        "tags": [
+          "discovery"
+        ],
+        "description": "Standard-defined: RFC 8414. Path, document and member names follow the specification verbatim. Public by specification: it names endpoints, it discloses nothing.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Authorization server metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Authorization server metadata.",
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "issuer",
+                    "jwks_uri"
+                  ],
+                  "properties": {
+                    "issuer": {
+                      "type": "string"
+                    },
+                    "authorization_endpoint": {
+                      "type": "string"
+                    },
+                    "token_endpoint": {
+                      "type": "string"
+                    },
+                    "userinfo_endpoint": {
+                      "type": "string"
+                    },
+                    "jwks_uri": {
+                      "type": "string"
+                    },
+                    "introspection_endpoint": {
+                      "type": "string"
+                    },
+                    "revocation_endpoint": {
+                      "type": "string"
+                    },
+                    "end_session_endpoint": {
+                      "type": "string"
+                    },
+                    "backchannel_authentication_endpoint": {
+                      "type": "string"
+                    },
+                    "scopes_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "response_types_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "grant_types_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "subject_types_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "id_token_signing_alg_values_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "token_endpoint_auth_methods_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "code_challenge_methods_supported": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "issuer": "https://giam.example/realms/acme",
+                  "jwks_uri": "https://giam.example/realms/acme/protocol/openid-connect/certs"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such realm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realms/{realm}/protocol/openid-connect/certs": {
+      "get": {
+        "operationId": "getRealmKeySet",
+        "summary": "JSON Web Key Set",
+        "tags": [
+          "discovery"
+        ],
+        "description": "Standard-defined: RFC 7517. The realm's PUBLIC keys, which is what a resource server caches to verify locally. Every active key in the realm appears, including those held by other replicas, so a token signed by one verifies at all of them. Nothing private is here and nothing private ever will be.",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The realm key set.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The realm key set.",
+                  "type": "object",
+                  "required": [
+                    "keys"
+                  ],
+                  "properties": {
+                    "keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "keys": [
+                    {
+                      "kty": "RSA",
+                      "kid": "abc",
+                      "use": "sig",
+                      "alg": "RS256",
+                      "n": "…",
+                      "e": "AQAB"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such realm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realms/{realm}/protocol/openid-connect/token": {
+      "post": {
+        "operationId": "issueToken",
+        "summary": "Token endpoint",
+        "tags": [
+          "oauth"
+        ],
+        "description": "Standard-defined: RFC 6749 sections 4.1.3, 4.4 and 6, with PKCE per RFC 7636 and the access token in the RFC 9068 JWT profile. Requests are `application/x-www-form-urlencoded` and errors use the RFC 6749 section 5.2 object, never a house envelope. Client authentication is HTTP Basic or the form body, per RFC 6749 section 2.3.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grant_type"
+                ],
+                "additionalProperties": true,
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "description": "authorization_code, client_credentials or refresh_token.",
+                    "example": "client_credentials"
+                  },
+                  "code": {
+                    "type": "string"
+                  },
+                  "redirect_uri": {
+                    "type": "string"
+                  },
+                  "code_verifier": {
+                    "type": "string"
+                  },
+                  "refresh_token": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "client_secret": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "clientBasic": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "The issued tokens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The issued tokens.",
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in"
+                  ],
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string"
+                    },
+                    "expires_in": {
+                      "type": "integer"
+                    },
+                    "scope": {
+                      "type": "string"
+                    },
+                    "refresh_token": {
+                      "type": "string"
+                    },
+                    "id_token": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "access_token": "eyJ…",
+                  "token_type": "Bearer",
+                  "expires_in": 900,
+                  "scope": "openid profile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The grant is invalid or unsupported.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Client authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/realms/{realm}/login": {
+      "post": {
+        "operationId": "signIn",
+        "summary": "Sign in and establish a session",
+        "tags": [
+          "authentication"
+        ],
+        "description": "No applicable standard. Credential entry belongs at the authority, so this is its own page posting to its own endpoint rather than a grant an application could use. It establishes a session; the standard flows run on top of it. A failure never distinguishes an unknown principal from a wrong credential.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "login",
+                  "password"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "login": {
+                    "type": "string",
+                    "description": "User name or email.",
+                    "example": "ada@example.com"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Authenticated. A session now exists.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "Authenticated. A session now exists.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "subjectId",
+                    "sessionId",
+                    "assuranceLevel"
+                  ],
+                  "properties": {
+                    "subjectId": {
+                      "type": "string"
+                    },
+                    "sessionId": {
+                      "type": "string"
+                    },
+                    "userName": {
+                      "type": "string"
+                    },
+                    "assuranceLevel": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "sessionEpoch": {
+                      "type": "integer"
+                    }
+                  }
+                },
+                "example": {
+                  "subjectId": "ec06cbfa-96e2-4867-892b-b74987e78d7a",
+                  "sessionId": "a3f1…",
+                  "userName": "Ada Lovelace",
+                  "assuranceLevel": "aal1",
+                  "method": "password",
+                  "sessionEpoch": 0
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "The attempt failed. Deliberately no further detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such realm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
                 }
               }
             }
