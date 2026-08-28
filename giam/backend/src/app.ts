@@ -25,6 +25,7 @@ import { keysModule } from './modules/keys';
 import { auditModule } from './modules/audit';
 import { adminModule } from './modules/admin';
 import { systemModule } from './modules/system';
+import { registerBuiltinPorts } from './shared/ports/builtins';
 import { config } from './config';
 
 declare module 'fastify' {
@@ -48,6 +49,8 @@ export interface BuildOptions {
 
 export async function buildApp(options: BuildOptions = {}): Promise<FastifyInstance> {
   mirrorConsoleToLogBuffer();
+  // Every shipped implementation, registered by name. Which one is used is configuration.
+  registerBuiltinPorts();
 
   const fastify = Fastify({
     logger: {

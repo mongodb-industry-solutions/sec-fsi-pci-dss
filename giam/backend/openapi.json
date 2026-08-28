@@ -128,6 +128,136 @@
         }
       }
     },
+    "/admin/posture": {
+      "get": {
+        "operationId": "getAdminPosture",
+        "summary": "Effective security posture",
+        "tags": [
+          "admin"
+        ],
+        "description": "No applicable standard. Reports the security properties actually in force: key custody and whether it is external, replica awareness, the token validation models available, proof of possession support, whether attestation is required, and storage health. This exists INSTEAD of gating capabilities by environment: GIAM does not decide what an operator may run, it makes what is running impossible to misread. A weaker configuration is reported as `degraded` with a machine-readable code and a remedy, and the service keeps serving.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The posture in force. `degraded` still means serving.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The posture in force. `degraded` still means serving.",
+                  "type": "object",
+                  "additionalProperties": true,
+                  "required": [
+                    "status",
+                    "findings"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "degraded"
+                      ]
+                    },
+                    "instanceId": {
+                      "type": "string"
+                    },
+                    "keyCustody": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "tokenValidation": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "proofOfPossession": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "attestation": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "storage": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "administration": {
+                      "type": "object",
+                      "additionalProperties": true
+                    },
+                    "findings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "code",
+                          "level",
+                          "detail",
+                          "remedy"
+                        ],
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": [
+                              "ok",
+                              "degraded"
+                            ]
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "remedy": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "status": "ok",
+                  "instanceId": "giam-0",
+                  "keyCustody": {
+                    "provider": "instance-local",
+                    "externalCustody": false,
+                    "multiReplicaCapable": true,
+                    "declaredReplicas": 3
+                  },
+                  "findings": []
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid administrative token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No administrative credential is configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/logs": {
       "get": {
         "operationId": "getAdminLogs",

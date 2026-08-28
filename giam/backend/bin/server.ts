@@ -7,6 +7,7 @@ dotenv.config({ path: resolve(__dirname, '../../../.env') });
 import { buildApp } from '../src/app';
 import { appendLog } from '../src/shared/services/logBuffer';
 import { configurationReport, readinessReport, formatReport } from '../src/shared/services/startupReport';
+import { buildPostureReport, postureBanner } from '../src/modules/admin/services/posture.service';
 import { config } from '../src/config';
 
 // Async errors thrown outside a request never reach the onError hook, so mirror them too.
@@ -40,9 +41,16 @@ async function start() {
       console.log(line);
       appendLog(`[${new Date().toISOString()}] STARTUP ${line.trim()}`);
     }
-    if (app.dbError !== null) {
-      console.warn(`[giam/mongodb] Running in degraded mode: ${app.dbError}`);
-      console.warn('[giam/mongodb] Protected routes answer 503 until the database becomes reachable.');
+    // The posture, in the startup log and as a console banner. Two of the four places a weaker
+    // configuration has to surface; the endpoint and the runbook are the other two. A warning nobody
+    // sees is the same as no warning.
+    const posture = buildPostureReport({ databaseReachable: app.dbError === null, databaseError: app.dbError });
+    for (const line of postureBanner(posture)) {
+      console.warn(line);
+      appendLog(`[${new Date().toISOString()}] POSTURE ${line.trim()}`);
+    }
+    if (posture.status === 'ok') {
+      appendLog(`[${new Date().toISOString()}] POSTURE ok, key custody ${posture.keyCustody.provider}`);
     }
   } catch (err) {
     app.log.error(err);

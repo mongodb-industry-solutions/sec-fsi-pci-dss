@@ -16,6 +16,10 @@ import { KmsKeyProvider } from '../../modules/keys/providers/kms.provider';
  * owns it. It is absent rather than faked: resolving it refuses and says what is missing.
  */
 export function registerBuiltinPorts(): void {
+  // Idempotent: the application may be built more than once in a process, and registering twice is
+  // a duplicate-name error rather than a no-op, deliberately, so the guard is here instead.
+  if (keyProviders.has('instance-local')) return;
+
   // All four are registered in every deployment. Which one is used is configuration, and every one
   // of them is multi-replica capable, so scaling is never the reason to change it.
   keyProviders.register(new InstanceLocalKeyProvider());
