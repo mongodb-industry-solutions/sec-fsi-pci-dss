@@ -276,7 +276,7 @@ export async function createCollections(
     console.log('  skip:    consentAccessLog (already exists)');
   }
 
-  // Merchant Agreement Procedure  -  plaintext (API key stored as bcrypt hash)
+  // Merchant Agreement Procedure  -  plaintext, and no longer a credential store
   if (!existingNames.has('merchantAgreementProcedure') || reset) {
     if (existingNames.has('merchantAgreementProcedure') && reset) {
       await db.collection('merchantAgreementProcedure').drop();
@@ -286,6 +286,23 @@ export async function createCollections(
     console.log('  created: merchantAgreementProcedure');
   } else {
     console.log('  skip:    merchantAgreementProcedure (already exists)');
+  }
+
+  // v39 P2: the OAuth client registry and the integration keys, out of the commercial record and
+  // into collections of their own. A credential the authorization server verifies on every token
+  // request has no business living inside a document the gateway module owns, and an unbounded array
+  // of keys inside a record read on every merchant lookup is the other half of the same mistake.
+  for (const name of ['oauthClient', 'apiKey']) {
+    if (!existingNames.has(name) || reset) {
+      if (existingNames.has(name) && reset) {
+        await db.collection(name).drop();
+        console.log(`  dropped: ${name}`);
+      }
+      await db.createCollection(name);
+      console.log(`  created: ${name}`);
+    } else {
+      console.log(`  skip:    ${name} (already exists)`);
+    }
   }
 
   // Checkout Session Log  -  plaintext (TTL-indexed, 30-min session lifecycle)

@@ -11,7 +11,7 @@ import * as crypto from 'crypto';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { redactSecrets } from '../../../vendors/eventbus';
 import { ProcessEventOutcome } from '../../provider/models/externalProviderArrangement.model';
-import { MERCHANT_AGREEMENT_COLLECTION } from '../../gateway/models/merchantAgreement.model';
+import { findClientById } from '../../gateway/services/oauthClientRegistry.service';
 import { PARTY_AUTHORIZATION_CODE_COLLECTION } from '../models/partyAuthorizationCode.model';
 
 export type OAuthAuditAction =
@@ -122,11 +122,11 @@ export async function stateForCode(db: Db, code?: string): Promise<string | unde
 export async function auditOAuthWithMerchantLookup(db: Db, action: OAuthAuditAction, opts: OAuthAuditOpts): Promise<void> {
   try {
     if (opts.clientId && !opts.merchantName) {
-      const m = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOne(
-        { 'merchantOAuthClient.oauthClientId': opts.clientId },
-        { projection: { merchantName: 1 } },
-      );
-      opts = { ...opts, merchantName: (m as { merchantName?: string } | null)?.merchantName };
+      // The owner's display name is denormalized onto the client record, so this no longer reads a
+      // commercial collection at all. That is what makes the audit code portable: it is the last
+      // dependency the identity module had on the gateway's schema.
+      const client = await findClientById(db, opts.clientId);
+      opts = { ...opts, merchantName: client?.merchantName };
     }
   } catch { /* best-effort */ }
   auditOAuth(db, action, opts);

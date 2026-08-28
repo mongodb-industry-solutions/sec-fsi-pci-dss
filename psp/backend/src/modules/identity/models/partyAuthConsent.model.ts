@@ -13,7 +13,7 @@ export interface PartyAuthConsentRecord {
   partyAuthenticationInstanceReference: string;       // FK → customerAuthenticationAssessment.sub
 
   // OAuth client that was granted consent
-  oauthClientId: string;                              // FK → merchantAgreement.merchantOAuthClient.oauthClientId
+  oauthClientId: string;                              // FK → the oauthClient collection
   merchantAgreementInstanceReference: string;         // FK → merchantAgreementProcedure (denormalized for reads)
   merchantName: string;                               // Denormalized for display without a join
 

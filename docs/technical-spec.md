@@ -4736,8 +4736,10 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `consentAgreement` | `identity` | Granted scopes per client |
 | `consentAccessLog` | `identity` | Evidence of consent-checked access |
 | `customerAgreementProcedure` | `customer` | KYC, QE identity fields |
-| `merchantAgreementProcedure` | `gateway` | KYB and beneficial owners |
+| `merchantAgreementProcedure` | `gateway` | KYB and beneficial owners. No credential lives here from v39 P2 |
 | `merchantAgreementEvents` | `gateway` | KYB decision history |
+| `oauthClient` | `gateway` | OAuth client registry (v39 P2), out of the commercial record. Owned by `gateway` only until the registry moves to the identity authority |
+| `apiKey` | `gateway` | Integration keys, one document per key (v39 P2), replacing an unbounded array inside the merchant record |
 | `paymentCardManagement` | `customer` | Card-on-file. BIN plus last four, never a PAN |
 | `cardEtokenProcedure` | `customer` | Acceptance-side surrogate tokens |
 | `paymentCardRegistry` | `customer` | Dedupes accepted card INSTRUMENTS; holder count is the shared-card fraud signal. Distinct from the bank's `issuedCardRegistry` |

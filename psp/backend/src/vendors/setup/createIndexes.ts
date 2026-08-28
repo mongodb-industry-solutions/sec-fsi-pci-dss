@@ -413,13 +413,24 @@ export async function createIndexes(client: MongoClient) {
     { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
   ]);
 
-  // v16 (ADR-037): OAuth client lookup on merchantAgreementProcedure
-  await ensureIndex(
-    db,
-    'merchantAgreementProcedure',
-    { 'merchantOAuthClient.oauthClientId': 1 },
-    { sparse: true },
-  );
+  // v39 P2: the OAuth client registry, now a collection of its own.
+  //
+  // The client id is unique globally rather than per owner: it is the identity a presented token
+  // resolves back to, and it is resolved without an owner in hand, so a duplicate would make that
+  // resolution ambiguous rather than merely untidy.
+  await ensureIndexes(db, 'oauthClient', [
+    { key: { oauthClientId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { merchantAgreementInstanceReference: 1, oauthClientStatus: 1 } },
+  ]);
+
+  // Integration keys. Verification loads an owner's active keys and compares, because bcrypt is
+  // salted and a presented key cannot be looked up by its hash, so the owner-and-status pair is the
+  // index that matters.
+  await ensureIndexes(db, 'apiKey', [
+    { key: { keyId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1, keyStatus: 1 } },
+  ]);
 
   // v16 (ADR-038): PartyAuthentication, ConsentGrant, unique per-user+client pair, sub lookup, revocation
   await ensureIndexes(db, PARTY_AUTH_CONSENT_COLLECTION, [

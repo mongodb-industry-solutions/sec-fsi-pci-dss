@@ -8,10 +8,14 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   MERCHANT_AGREEMENT_COLLECTION,
   MerchantAgreementControlRecord,
-  MerchantOAuthClientConfig,
-  OAuthGrantType,
-  OAuthBackchannelDeliveryMode,
 } from '../models/merchantAgreement.model';
+import {
+  OAuthClientRecord, OAuthClientPublic, OAuthGrantType, OAuthBackchannelDeliveryMode, toPublicClient,
+} from '../models/oauthClient.model';
+import {
+  findClientById, findClientByOwner, findActiveClientByOwner,
+  insertClient, updateClient, revokeClientByOwner,
+} from './oauthClientRegistry.service';
 
 // ── Scope Catalog (v18 E-01) ────────────────────────────────────────────────
 // Single source of truth for OAuth scope metadata: human-readable description +
@@ -98,7 +102,7 @@ export async function issueMerchantOAuthClient(
   if (merchant.merchantAgreementStatus !== 'active') {
     throw Object.assign(new Error('Merchant must be in active status to issue OAuth credentials'), { statusCode: 400 });
   }
-  if (merchant.merchantOAuthClient?.oauthClientStatus === 'active') {
+  if ((await findActiveClientByOwner(db, merchantAgreementInstanceReference))?.oauthClientStatus === 'active') {
     throw Object.assign(new Error('OAuth client already active: revoke existing client first'), { statusCode: 409 });
   }
 
@@ -107,7 +111,8 @@ export async function issueMerchantOAuthClient(
   const secretHash = await bcrypt.hash(plainSecret, 12);
   const secretPrefix = plainSecret.slice(0, 8);
 
-  const cfg: MerchantOAuthClientConfig = {
+  const now = new Date();
+  const cfg: OAuthClientRecord = {
     oauthClientId: clientId,
     oauthClientSecretHash: secretHash,
     oauthClientSecretPrefix: secretPrefix,
@@ -119,12 +124,15 @@ export async function issueMerchantOAuthClient(
     oauthTokenLifetimeSeconds: input.token_lifetime_seconds ?? 3600,
     oauthRefreshTokenLifetimeDays: input.refresh_token_lifetime_days ?? 30,
     oauthRequirePkce: input.require_pkce ?? true,
+    merchantAgreementInstanceReference,
+    // Denormalized at registration, so the audit trail can name the owner without a second read.
+    merchantName: merchant.merchantName,
+    recordCreatedDateTime: now,
+    recordUpdatedDateTime: now,
+    schemaVersion: 1,
   };
 
-  await col.updateOne(
-    { merchantAgreementInstanceReference },
-    { $set: { merchantOAuthClient: cfg, recordUpdatedDateTime: new Date() } },
-  );
+  await insertClient(db, cfg);
 
   return {
     client_id: clientId,
@@ -140,12 +148,8 @@ export async function revokeMerchantOAuthClient(
   db: Db,
   merchantAgreementInstanceReference: string,
 ): Promise<void> {
-  const col = db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION);
-  const result = await col.updateOne(
-    { merchantAgreementInstanceReference, 'merchantOAuthClient.oauthClientStatus': { $ne: 'revoked' } },
-    { $set: { 'merchantOAuthClient.oauthClientStatus': 'revoked', recordUpdatedDateTime: new Date() } },
-  );
-  if (result.matchedCount === 0) {
+  const revoked = await revokeClientByOwner(db, merchantAgreementInstanceReference);
+  if (!revoked) {
     throw Object.assign(new Error('Merchant not found or OAuth client already revoked'), { statusCode: 404 });
   }
 }
@@ -189,7 +193,7 @@ function assertHttpsOrEmpty(value: string | undefined, label: string): void {
   if (!ok) throw Object.assign(new Error(`${label} must be a valid https URL (http allowed only for localhost)`), { statusCode: 400 });
 }
 
-export type MerchantOAuthClientConfigPublic = Omit<MerchantOAuthClientConfig, 'oauthClientSecretHash'>;
+export type MerchantOAuthClientConfigPublic = OAuthClientPublic;
 
 export async function updateMerchantOAuthClient(
   db: Db,
@@ -202,7 +206,8 @@ export async function updateMerchantOAuthClient(
   if (!merchant) {
     throw Object.assign(new Error('Merchant not found'), { statusCode: 404 });
   }
-  if (!merchant.merchantOAuthClient) {
+  const existingClient = await findClientByOwner(db, merchantId);
+  if (!existingClient) {
     throw Object.assign(new Error('No OAuth client configured for this merchant: issue one first'), { statusCode: 400 });
   }
 
@@ -211,11 +216,11 @@ export async function updateMerchantOAuthClient(
 
   // CIBA: resolve the effective delivery mode + notification endpoint (patch overlaid on existing),
   // then enforce HTTPS + presence for ping/push (PCI DSS + CIBA spec).
-  const effectiveGrants = patch.grant_types ?? merchant.merchantOAuthClient.oauthGrantTypes;
+  const effectiveGrants = patch.grant_types ?? existingClient.oauthGrantTypes;
   const effectiveDeliveryMode = patch.backchannel_token_delivery_mode
-    ?? merchant.merchantOAuthClient.oauthBackchannelTokenDeliveryMode;
+    ?? existingClient.oauthBackchannelTokenDeliveryMode;
   const effectiveNotifyEndpoint = patch.backchannel_client_notification_endpoint
-    ?? merchant.merchantOAuthClient.oauthBackchannelClientNotificationEndpoint;
+    ?? existingClient.oauthBackchannelClientNotificationEndpoint;
   if (effectiveGrants.includes('urn:openid:params:grant-type:ciba')
     && (effectiveDeliveryMode === 'ping' || effectiveDeliveryMode === 'push')) {
     if (!effectiveNotifyEndpoint) {
@@ -225,17 +230,17 @@ export async function updateMerchantOAuthClient(
   }
 
   // Credential rotation from the admin UI.
-  let credentialPatch: Partial<MerchantOAuthClientConfig> = {};
+  const credentialPatch: Partial<OAuthClientRecord> = {};
   if (patch.client_id !== undefined) {
     const newId = patch.client_id.trim();
     if (!newId) throw Object.assign(new Error('client_id cannot be empty'), { statusCode: 400 });
-    if (newId !== merchant.merchantOAuthClient.oauthClientId) {
-      // Enforce global uniqueness: the client_id is the OAuth identity used to resolve the merchant.
-      const clash = await col.findOne({
-        'merchantOAuthClient.oauthClientId': newId,
-        merchantAgreementInstanceReference: { $ne: merchantId },
-      }, { projection: { _id: 1 } });
-      if (clash) throw Object.assign(new Error('client_id already in use by another merchant'), { statusCode: 409 });
+    if (newId !== existingClient.oauthClientId) {
+      // Global uniqueness: the client_id is the OAuth identity a token resolves back to. A plain
+      // lookup on the registry now, rather than a nested query across commercial records.
+      const clash = await findClientById(db, newId);
+      if (clash && clash.merchantAgreementInstanceReference !== merchantId) {
+        throw Object.assign(new Error('client_id already in use by another merchant'), { statusCode: 409 });
+      }
     }
     credentialPatch.oauthClientId = newId;
   }
@@ -255,9 +260,8 @@ export async function updateMerchantOAuthClient(
     credentialPatch.oauthClientSecretPrefix = prefix; // independent display/identification label
   }
 
-  const existing = merchant.merchantOAuthClient;
-  const updated: MerchantOAuthClientConfig = {
-    ...existing,
+  const updated: OAuthClientRecord = {
+    ...existingClient,
     ...credentialPatch,
     ...(patch.redirect_uris !== undefined && { oauthRedirectUris: patch.redirect_uris }),
     ...(patch.logo_uri !== undefined && { oauthLogoUri: patch.logo_uri }),
@@ -273,23 +277,17 @@ export async function updateMerchantOAuthClient(
     ...(patch.backchannel_client_notification_endpoint !== undefined && { oauthBackchannelClientNotificationEndpoint: patch.backchannel_client_notification_endpoint }),
   };
 
-  await col.updateOne(
-    { merchantAgreementInstanceReference: merchantId },
-    { $set: { merchantOAuthClient: updated, recordUpdatedDateTime: new Date() } },
-  );
+  await updateClient(db, existingClient.oauthClientId, updated);
 
-  const { oauthClientSecretHash: _omit, ...publicConfig } = updated;
-  return publicConfig;
+  return toPublicClient(updated);
 }
 
 export async function rotateMerchantOAuthClientSecret(
   db: Db,
   merchantAgreementInstanceReference: string,
 ): Promise<{ client_id: string; client_secret: string; client_secret_prefix: string }> {
-  const col = db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION);
-  const merchant = await col.findOne({ merchantAgreementInstanceReference });
-
-  if (!merchant?.merchantOAuthClient || merchant.merchantOAuthClient.oauthClientStatus !== 'active') {
+  const client = await findActiveClientByOwner(db, merchantAgreementInstanceReference);
+  if (!client || client.oauthClientStatus !== 'active') {
     throw Object.assign(new Error('No active OAuth client found for this merchant'), { statusCode: 404 });
   }
 
@@ -297,19 +295,13 @@ export async function rotateMerchantOAuthClientSecret(
   const secretHash = await bcrypt.hash(plainSecret, 12);
   const secretPrefix = plainSecret.slice(0, 8);
 
-  await col.updateOne(
-    { merchantAgreementInstanceReference },
-    {
-      $set: {
-        'merchantOAuthClient.oauthClientSecretHash': secretHash,
-        'merchantOAuthClient.oauthClientSecretPrefix': secretPrefix,
-        recordUpdatedDateTime: new Date(),
-      },
-    },
-  );
+  await updateClient(db, client.oauthClientId, {
+    oauthClientSecretHash: secretHash,
+    oauthClientSecretPrefix: secretPrefix,
+  });
 
   return {
-    client_id: merchant.merchantOAuthClient.oauthClientId,
+    client_id: client.oauthClientId,
     client_secret: plainSecret,
     client_secret_prefix: secretPrefix,
   };

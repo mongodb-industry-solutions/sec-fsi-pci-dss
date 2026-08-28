@@ -44,7 +44,7 @@ export type KybEditableField = (typeof KYB_EDITABLE_FIELDS)[number];
 async function getMerchantRaw(db: Db, id: string): Promise<MerchantAgreementControlRecord | null> {
   return db
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ merchantAgreementInstanceReference: id } as never, { projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } });
+    .findOne({ merchantAgreementInstanceReference: id } as never, { projection: { merchantWebhookSecret: 0 } });
 }
 
 export interface OwnerPartySummary {
@@ -203,7 +203,7 @@ export async function patchKybData(
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOneAndUpdate({ merchantAgreementInstanceReference: id } as never, { $set: set }, {
       returnDocument: 'after',
-      projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 },
+      projection: { merchantWebhookSecret: 0 },
     });
   if (!updated) return { status: 'not_found' };
 

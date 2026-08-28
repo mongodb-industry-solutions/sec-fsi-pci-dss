@@ -5,6 +5,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { verifyAccessToken } from '../../modules/identity/services/oauth.service';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../modules/gateway/models/merchantAgreement.model';
+import { findClientById } from '../../modules/gateway/services/oauthClientRegistry.service';
 
 export interface MerchantTokenContext {
   merchantId: string;
@@ -57,17 +58,21 @@ export async function validateMerchantToken(
     }) as any;
   }
 
-  const merchant = await (db as any)
-    .collection(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ 'merchantOAuthClient.oauthClientId': clientId }) as MerchantAgreementControlRecord | null;
-
-  if (!merchant || !merchant.merchantOAuthClient) {
+  const client = await findClientById(db, clientId);
+  if (!client) {
     return reply.status(401).send({ error: 'invalid_token', error_description: 'Unknown OAuth client' }) as any;
   }
-  if (merchant.merchantOAuthClient.oauthClientStatus !== 'active') {
+  if (client.oauthClientStatus !== 'active') {
     return reply.status(401).send({ error: 'invalid_token', error_description: 'OAuth client is not active' }) as any;
   }
-  if (merchant.merchantAgreementStatus !== 'active') {
+
+  // The owner's commercial standing is still checked, so a suspended merchant's live token stops
+  // working rather than running until it expires. Two reads until the registry moves out and the
+  // client's own status becomes authoritative.
+  const merchant = await (db as any)
+    .collection(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne({ merchantAgreementInstanceReference: client.merchantAgreementInstanceReference }) as MerchantAgreementControlRecord | null;
+  if (!merchant || merchant.merchantAgreementStatus !== 'active') {
     return reply.status(403).send({ error: 'access_denied', error_description: 'Merchant account is not active' }) as any;
   }
 
@@ -93,14 +98,15 @@ export async function tryMerchantContext(request: FastifyRequest): Promise<Merch
     const db = (request.server as any).db;
     const clientId = Array.isArray(payload.aud) ? payload.aud[0] : (payload.aud as string);
     const scopes = ((payload.scope as string) ?? '').split(' ').filter(Boolean);
-    const merchant = await (db as any)
-      .collection(MERCHANT_AGREEMENT_COLLECTION)
-      .findOne({ 'merchantOAuthClient.oauthClientId': clientId }) as MerchantAgreementControlRecord | null;
-    if (!merchant || !merchant.merchantOAuthClient) return undefined;
+    const client = await findClientById(db, clientId);
+    if (!client) return undefined;
     // Same eligibility as validateMerchantToken: never attribute actions to an inactive client or a
     // non-active merchant (would pollute audit/activity data with suspended/revoked principals).
-    if (merchant.merchantOAuthClient.oauthClientStatus !== 'active') return undefined;
-    if (merchant.merchantAgreementStatus !== 'active') return undefined;
+    if (client.oauthClientStatus !== 'active') return undefined;
+    const merchant = await (db as any)
+      .collection(MERCHANT_AGREEMENT_COLLECTION)
+      .findOne({ merchantAgreementInstanceReference: client.merchantAgreementInstanceReference }) as MerchantAgreementControlRecord | null;
+    if (!merchant || merchant.merchantAgreementStatus !== 'active') return undefined;
     return {
       merchantId: merchant.merchantAgreementInstanceReference,
       merchantName: merchant.merchantName,

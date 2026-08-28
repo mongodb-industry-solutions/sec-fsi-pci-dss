@@ -8,7 +8,9 @@ import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
-import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord, OAuthGrantType } from '../../gateway/models/merchantAgreement.model';
+import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../gateway/models/merchantAgreement.model';
+import { OAuthGrantType } from '../../gateway/models/oauthClient.model';
+import { findClientById, findClientsByIds } from '../../gateway/services/oauthClientRegistry.service';
 import { describeScope, requiredScopesIn, ScopeDescriptor } from '../../gateway/services/merchantOAuth.service';
 import { emitProcessEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
 import { auditOAuth } from './oauthAudit.service';
@@ -50,19 +52,26 @@ export async function resolveOAuthClient(
   clientSecret?: string,
   opts?: { requireClientAuthentication?: boolean },
 ): Promise<OAuthClientInfo> {
-  const merchant = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ 'merchantOAuthClient.oauthClientId': clientId });
-
-  if (!merchant || !merchant.merchantOAuthClient) {
+  const cfg = await findClientById(db, clientId);
+  if (!cfg) {
     throw oauth401('invalid_client', 'Unknown client_id');
   }
-
-  const cfg = merchant.merchantOAuthClient;
   if (cfg.oauthClientStatus !== 'active') {
     throw oauth401('invalid_client', 'Client is not active');
   }
-  if (merchant.merchantAgreementStatus !== 'active') {
+
+  // The owner's commercial standing still gates the credential, so a suspended merchant cannot keep
+  // authenticating. It is a second read for now rather than a field on the client, deliberately:
+  // dropping the check would be a security regression dressed up as decoupling, and denormalising
+  // the status without a propagation path would let the copy go stale. The propagation belongs to
+  // the phase that moves the registry out, where the client's own status becomes authoritative.
+  const merchant = await db
+    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
+    .findOne(
+      { merchantAgreementInstanceReference: cfg.merchantAgreementInstanceReference },
+      { projection: { merchantAgreementStatus: 1, merchantName: 1, merchantAgreementInstanceReference: 1 } },
+    );
+  if (!merchant || merchant.merchantAgreementStatus !== 'active') {
     throw oauth401('invalid_client', 'Merchant account is not active');
   }
 
@@ -669,11 +678,8 @@ export async function listUserConsentGrants(
 
   // Batch-fetch the merchants to attach oauthLogoUri (OIDC logo_uri) without a per-grant round-trip.
   const clientIds = [...new Set(grants.map((g) => g.oauthClientId))];
-  const merchants = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .find({ 'merchantOAuthClient.oauthClientId': { $in: clientIds } }, { projection: { 'merchantOAuthClient.oauthClientId': 1, 'merchantOAuthClient.oauthLogoUri': 1 } })
-    .toArray();
-  const logoByClient = new Map(merchants.map((m) => [m.merchantOAuthClient?.oauthClientId, m.merchantOAuthClient?.oauthLogoUri]));
+  const clients = await findClientsByIds(db, clientIds);
+  const logoByClient = new Map(clients.map((c) => [c.oauthClientId, c.oauthLogoUri]));
 
   return grants.map((g) => ({ ...g, oauthLogoUri: logoByClient.get(g.oauthClientId) }));
 }
@@ -707,13 +713,7 @@ export async function getUserConsentGrantDetail(
   if (!grant) return null;
 
   // Attach the merchant's OIDC branding (logo_uri/client_uri): same source as the list view.
-  const merchant = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne(
-      { 'merchantOAuthClient.oauthClientId': grant.oauthClientId },
-      { projection: { 'merchantOAuthClient.oauthLogoUri': 1, 'merchantOAuthClient.oauthClientUri': 1, 'merchantOAuthClient.oauthGrantTypes': 1 } },
-    );
-  const cfg = merchant?.merchantOAuthClient;
+  const cfg = await findClientById(db, grant.oauthClientId);
   const cibaEnabled = (cfg?.oauthGrantTypes ?? []).includes('urn:openid:params:grant-type:ciba');
 
   return {

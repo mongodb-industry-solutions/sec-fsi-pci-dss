@@ -8,6 +8,8 @@ import { emitComplianceEvent, listMerchantActivity } from '../../provider/servic
 import { listMerchantAuthorizations } from '../../identity/services/oauth.service';
 import { getPayoutAccount } from '../services/payoutAccount.service';
 import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
+import { findClientByOwner } from '../services/oauthClientRegistry.service';
+import { toPublicClient } from '../models/oauthClient.model';
 import { WebhookService } from '../services/merchantWebhook.service';
 import type { WebhookEventType } from '../models/merchantAgreement.model';
 import { getMerchantTransactions, getMerchantTransactionById, getMerchantStats } from '../../transaction/services/cardTransaction.service';
@@ -1313,10 +1315,9 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const merchant = await getMerchantById(fastify.db, id) as Record<string, unknown> | null;
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
-    const oauthClient = merchant.merchantOAuthClient as (Record<string, unknown> & { oauthClientSecretHash?: unknown }) | undefined;
+    const oauthClient = await findClientByOwner(fastify.db, id);
     if (!oauthClient) return reply.status(404).send({ error: 'No OAuth client configured for this merchant' });
-    const { oauthClientSecretHash: _omit, ...publicConfig } = oauthClient;
-    return reply.status(200).send(publicConfig);
+    return reply.status(200).send(toPublicClient(oauthClient));
   });
 
   // PATCH /api/v1/merchants/:id/oauth-client, update OAuth client config

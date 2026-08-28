@@ -25,10 +25,7 @@ import {
   PartyEnrolledCredentialRecord,
 } from '../models/partyEnrolledCredential.model';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
-import {
-  MERCHANT_AGREEMENT_COLLECTION,
-  MerchantAgreementControlRecord,
-} from '../../gateway/models/merchantAgreement.model';
+import { findClientById } from '../../gateway/services/oauthClientRegistry.service';
 import { issueTokens, resolveOAuthClient, verifyAccessToken, oauth401, oauthError, TokenResponse } from './oauth.service';
 import { verifySignature } from './signatureVerifier';
 import { deliverWebhook } from '../../gateway/services/webhook.service';
@@ -147,10 +144,7 @@ export async function initiateBackchannelAuth(
   }
 
   // Delivery-mode config lives on the client. ping/push require a client_notification_token.
-  const merchant = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ 'merchantOAuthClient.oauthClientId': clientId });
-  const cfg = merchant?.merchantOAuthClient;
+  const cfg = await findClientById(db, clientId);
   const deliveryMode: BackchannelDeliveryMode = cfg?.oauthBackchannelTokenDeliveryMode ?? 'poll';
   if ((deliveryMode === 'ping' || deliveryMode === 'push') && !input.client_notification_token) {
     throw oauthError(400, 'invalid_request', 'client_notification_token is required for ping/push delivery');
@@ -210,15 +204,15 @@ export interface ChallengeView {
 
 export async function getChallenge(db: Db, authReqId: string): Promise<ChallengeView> {
   const req = await loadActiveRequest(db, authReqId);
-  const merchant = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ 'merchantOAuthClient.oauthClientId': req.clientId }, { projection: { merchantName: 1 } });
+  // The owner's display name travels on the client record, so the challenge screen needs no read
+  // of a commercial collection to say who is asking.
+  const client = await findClientById(db, req.clientId);
   return {
     auth_req_id: req.authReqId,
     challenge: req.challenge,
     binding_message: req.bindingMessage,
     client_id: req.clientId,
-    client_name: merchant?.merchantName ?? req.clientId,
+    client_name: client?.merchantName ?? req.clientId,
     scopes: req.scopes,
     status: req.status,
   };
@@ -380,10 +374,8 @@ export async function deliverBackchannelNotification(
   db: Db,
   req: PartyBackchannelAuthenticationRecord,
 ): Promise<void> {
-  const merchant = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ 'merchantOAuthClient.oauthClientId': req.clientId });
-  const endpoint = merchant?.merchantOAuthClient?.oauthBackchannelClientNotificationEndpoint;
+  const client = await findClientById(db, req.clientId);
+  const endpoint = client?.oauthBackchannelClientNotificationEndpoint;
   if (!endpoint || !req.clientNotificationToken) return;
 
   const data: Record<string, unknown> = { auth_req_id: req.authReqId };
