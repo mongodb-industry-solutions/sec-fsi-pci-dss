@@ -16,6 +16,7 @@ import { screenRtpRequest } from './rtpScreening.service';
 import { RISK_HOLD_STEP } from './transferReview.service';
 import { linkCaseExecution } from '../../fraud/services/fraudDiagnosis.service';
 import { createNotification, markReadByRelated } from '../../notification/notifications.service';
+import { institutionGroupFor } from '../../../providers/groups/capabilityGroup';
 
 export interface ApproveRtpInput {
   actor: string;                 // payer partyRef (authenticated)
@@ -57,9 +58,17 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
 
   // 1. Funds sufficiency (AIS). Advisory; the conditional hold below is the hard guard.
   try {
-    await dispatchProvider(db, 'account_information', 'funds.check.requested', {
-      payoutAccountInstanceReference: funding.payoutAccountInstanceReference, amount: req.amount, currency: req.currency,
-    }, { entityType: 'payment_request', entityId: ref, processType: 'payment_processing' });
+    // The PAYER's institution, which is the one that would have to release the money.
+    await institutionGroupFor(db, 'account_information').ask({
+      event: 'funds.check.requested',
+      payload: {
+        payoutAccountInstanceReference: funding.payoutAccountInstanceReference,
+        amount: req.amount,
+        currency: req.currency,
+      },
+      subject: { accountReference: funding.payoutAccountInstanceReference },
+      businessContext: { entityType: 'payment_request', entityId: ref, processType: 'payment_processing' },
+    });
   } catch { /* advisory */ }
 
   // 2. Screening (FDS/HRP/AML + VoP). Block/hold → keep the request presented, record decisions.
@@ -157,11 +166,18 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
   }
 
   // 5. Dispatch through payment_initiation (ADR-039). Settlement arrives async as bank.transfer.settled/failed.
-  const dispatch = await dispatchProvider(db, 'payment_initiation', 'provider.payment_initiation.transfer.requested', {
-    clientReference: executionRef, paymentExecutionInstanceReference: executionRef,
-    railType: rail, amount: req.amount, currency: req.currency, settlementSchedule: 'T+1',
-    paymentReference: req.purpose ?? 'Request to Pay',
-  }, { entityType: 'execution', entityId: executionRef, processType: 'payment_processing' });
+  const dispatch = await institutionGroupFor(db, 'payment_initiation').ask({
+    event: 'provider.payment_initiation.transfer.requested',
+    payload: {
+      clientReference: executionRef, paymentExecutionInstanceReference: executionRef,
+      railType: rail, amount: req.amount, currency: req.currency, settlementSchedule: 'T+1',
+      paymentReference: req.purpose ?? 'Request to Pay',
+    },
+    // The DEBTOR's institution, never the creditor's: the payer's bank executes the debit, and the provider has
+    // no relationship with the recipient's bank at all.
+    subject: { accountReference: funding.payoutAccountInstanceReference },
+    businessContext: { entityType: 'execution', entityId: executionRef, processType: 'payment_processing' },
+  });
   const submitted = dispatch.status === 'sent' || dispatch.status === 'received';
 
   if (!submitted) {

@@ -151,21 +151,37 @@ describe('businessContext persisted in integrationEvents', () => {
 // ── category routing (no hardcoded provider in domain): dev.v30 FR-30.9 ──────
 
 describe('category routing (dev.v30 FR-30.9 / R9)', () => {
+  // The categories here are all STRATEGY-bound. An entity-bound one no longer reaches
+  // `getActiveProviderForType` at all: it resolves by the data first, and is refused outright when the caller
+  // says nothing about which entity (v37 P13). That refusal has its own test below.
   it('resolves the active provider for the exact category passed by the caller', async () => {
-    h.findOne.mockResolvedValueOnce(makeProvider({ externalProviderArrangementType: 'card_issuer' }));
-    await dispatchProvider(makeDb(), 'card_issuer', 'card.issuer.validation.requested', {});
+    h.findOne.mockResolvedValueOnce(makeProvider({ externalProviderArrangementType: 'fraud_detection' }));
+    await dispatchProvider(makeDb(), 'fraud_detection', 'fds.scoring.requested', {});
     // getActiveProviderForType (mocked as h.findOne) must be called with the caller's category,
     // proving the type is data-driven and not hardcoded in the dispatch path.
-    expect(h.findOne).toHaveBeenCalledWith(expect.anything(), 'card_issuer');
+    expect(h.findOne).toHaveBeenCalledWith(expect.anything(), 'fraud_detection');
   });
 
-  it('routes each category independently (card_issuer, fraud_detection, hrp_sanctions, account_information)', async () => {
-    for (const category of ['card_issuer', 'fraud_detection', 'hrp_sanctions', 'account_information'] as const) {
+  it('routes each category independently (fraud_detection, hrp_sanctions, aml_monitoring, kyc_identity)', async () => {
+    for (const category of ['fraud_detection', 'hrp_sanctions', 'aml_monitoring', 'kyc_identity'] as const) {
       h.findOne.mockResolvedValueOnce(makeProvider({ externalProviderArrangementType: category }));
       await dispatchProvider(makeDb(), category, `${category}.test`, {});
       expect(h.findOne).toHaveBeenLastCalledWith(expect.anything(), category);
     }
   });
+
+  it.each(['card_issuer', 'card_authorization', 'account_information', 'payment_initiation'] as const)(
+    '%s is REFUSED when the caller names no entity, rather than routed by strategy',
+    async (category) => {
+      // The defect this guards: an entity-bound capability used to fall through to "any active provider",
+      // and with several banks registered that means asking one institution about another's card. It answers
+      // that it knows nothing, which arrives as an ordinary decline.
+      const result = await dispatchProvider(makeDb(), category, `${category}.test`, {});
+      expect(result.status).toBe('error');
+      expect(result.error).toContain('bound to an entity');
+      expect(h.findOne, 'no strategy lookup should even be attempted').not.toHaveBeenCalled();
+    },
+  );
 });
 
 // ── routing-group resolution: endpoint-first on the resolved member ──────────

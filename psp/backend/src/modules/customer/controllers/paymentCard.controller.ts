@@ -6,6 +6,7 @@ import { emitComplianceEvent } from '../../provider/services/businessProcessEven
 import { canStaffMutate, canStaffInvestigate } from '../../../vendors/middleware/rbac';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { institutionGroupFor } from '../../../providers/groups/capabilityGroup';
 
 const STAFF_READ_ROLES = ['level1_analyst', 'level2_investigator', 'security_auditor'];
 
@@ -504,9 +505,14 @@ audited (Req 10).`,
     const card = await getCardById(fastify.db, customerId, cardId);
     if (!card) return reply.status(404).send({ error: 'Card not found' });
     const event = kind === 'cvv' ? 'card.cvv.reveal.requested' : 'card.pan.reveal.requested';
-    const r = await dispatchProvider(fastify.db, 'card_issuer', event, {
-      cardId, cardToken: card.paymentCardReference,
-    }, { entityType: 'card', entityId: cardId, processType: 'card_management' });
+    // Only the ISSUER holds the number and can derive the verification value, so the request goes to the bank
+    // that issued THIS card rather than to whichever card-issuer provider happens to be active.
+    const r = await institutionGroupFor(fastify.db, 'card_issuer').ask({
+      event,
+      payload: { cardId, cardToken: card.paymentCardReference },
+      subject: { cardToken: card.paymentCardReference },
+      businessContext: { entityType: 'card', entityId: cardId, processType: 'card_management' },
+    });
     const body = (r.responseBody ?? {}) as { cvv?: string; pan?: string };
     const value = kind === 'cvv' ? body.cvv : body.pan;
     if (!value) return reply.status(404).send({ error: `${kind.toUpperCase()} unavailable` });

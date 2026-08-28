@@ -8,6 +8,11 @@ import { describe, it, expect, vi } from 'vitest';
 // case creation is tested in isolation and no real dispatch is attempted.
 vi.mock('../../../../../psp/backend/src/modules/provider/services/integrationDispatch.service', () => ({
   dispatchProvider: vi.fn().mockResolvedValue(undefined),
+
+  // The institution-bound door (v37 P13) delegates to the same spy, so assertions about what was
+  // dispatched are unaffected; the extra resolution argument is dropped where it is not asserted.
+  dispatchToInstitution: (db: any, type: any, event: any, payload: any, _resolution: any, context: any) =>
+    (vi.fn().mockResolvedValue(undefined))(db, type, event, payload, context),
 }));
 // emitProcessEvent is a fire-and-forget audit write (businessProcessEvent collection). Stub it so the
 // shared insertOne spy counts only the case + opening-event writes this test asserts on.

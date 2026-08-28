@@ -43,6 +43,7 @@ export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
 interface BankProfileFixture {
   bankProfileInstanceReference?: string;
   bankProfileIbanBankCodes?: string[];
+  bankProfileBinRanges?: { binRangeFrom: string; binRangeTo: string; binRangeScheme?: string }[];
 }
 
 // Read from the BANK's own fixture rather than restated here, so the two cannot disagree about which
@@ -69,5 +70,12 @@ function declareWhatItServes(record: ExternalProviderArrangement): void {
   record.externalProviderAspspReference = profile.bankProfileInstanceReference;
   if (profile.bankProfileIbanBankCodes?.length) {
     record.externalProviderIbanBankCodes = [...profile.bankProfileIbanBankCodes];
+  }
+  // The CARD capabilities route by BIN, not by IBAN bank code, so declaring only the latter left every card
+  // unroutable: "no registered issuer covers BIN 453995" for a card this very bank had issued. The ranges come
+  // from the bank's own profile, the same source the bank's card seeder mints numbers from, so an issuer
+  // cannot claim a range it does not actually issue in.
+  if (profile.bankProfileBinRanges?.length) {
+    record.externalProviderBinRanges = profile.bankProfileBinRanges.map((range) => ({ ...range }));
   }
 }

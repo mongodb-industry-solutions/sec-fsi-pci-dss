@@ -47,6 +47,12 @@ vi.mock('../../../../../psp/backend/src/modules/customer/services/paymentCard.se
 vi.mock('../../../../../psp/backend/src/modules/provider/services/integrationDispatch.service', () => ({
   // The issuer's verdict is explicit: the gate declines when none is stated, which is the point of it.
   dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } }),
+
+  // The institution-bound door (v37 P13). The reactors reach an issuer through this one; it answers the same
+  // way, because what these tests assert is the journey, not which door it went through.
+  dispatchToInstitution: vi.fn().mockResolvedValue({
+    provider: 'internal', status: 'received', responseBody: { actionConfirmed: true },
+  }),
 }));
 vi.mock('../../../../../psp/backend/src/modules/provider/services/businessProcessEvent.service', () => ({
   emitProcessEvent: vi.fn().mockResolvedValue(undefined),

@@ -13,6 +13,7 @@ import { getActiveProviderForType } from '../../provider/services/integrationReg
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { CardAuthorizationConfig } from '../../provider/models/externalProviderArrangement.model';
 import { getCardByToken } from '../../customer/services/paymentCard.service';
+import { institutionGroupFor } from '../../../providers/groups/capabilityGroup';
 
 const RESPONSE_CODE_APPROVED = '0000';
 const RESPONSE_CODE_DECLINED = '0190';
@@ -106,13 +107,23 @@ export async function authorizeCard(
   if (provider && !provider.externalProviderIsInternal) {
     // Real external provider: delegate via Integration Hub
     providerRef = provider.externalProviderArrangementInstanceReference;
-    const dispatchResult = await dispatchProvider(db, 'card_authorization', 'card.authorization.requested', {
-      cardToken: req.cardToken,
-      amount: req.amount,
-      currency: req.currency,
-      mcc: req.mcc,
-      merchantCode: req.merchantCode,
-    }, { entityType: 'transaction', entityId: req.checkoutSessionInstanceReference, processType: 'card_authorization' });
+    const dispatchResult = await institutionGroupFor(db, 'card_authorization').ask({
+      event: 'card.authorization.requested',
+      payload: {
+        cardToken: req.cardToken,
+        amount: req.amount,
+        currency: req.currency,
+        mcc: req.mcc,
+        merchantCode: req.merchantCode,
+      },
+      // The card's issuer, and no other. An authorisation is a hold against the account THAT bank holds.
+      subject: { cardToken: req.cardToken },
+      businessContext: {
+        entityType: 'transaction',
+        entityId: req.checkoutSessionInstanceReference,
+        processType: 'card_authorization',
+      },
+    });
     // The issuer's own answer, read from the BODY. A 200 means the request was understood, not that the
     // authorisation was granted: the card rails answer a decline successfully, and so does the bank, with
     // `{ approved: false, responseCode: '51' }`. Judging on the transport status alone turned every decline

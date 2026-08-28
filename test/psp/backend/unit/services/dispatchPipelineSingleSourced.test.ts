@@ -25,11 +25,43 @@ function code(path: string): string {
 }
 
 describe('v37 P6.1: one dispatch path, with the resolver injected into it', () => {
-  it('has exactly one exported dispatch entry point', () => {
+  it('has exactly one dispatch PIPELINE, however many doors lead to it', () => {
     const body = code(DISPATCH);
-    const exported = body.match(/export async function dispatch\w*/g) ?? [];
-    // `dispatchExternal` is internal to this file; a second EXPORTED dispatcher would be the fork.
-    expect(exported).toEqual(['export async function dispatchProvider']);
+    const exported = (body.match(/export async function (dispatch\w*)/g) ?? [])
+      .map((match) => match.replace('export async function ', ''));
+
+    // There is more than one exported entry point on purpose (v37 P13): an entity-bound capability and a
+    // strategy-bound one impose different contracts on the caller, and expressing that as two typed doors is
+    // what makes the required routing key impossible to omit. Counting the names was a proxy for the property
+    // that actually matters, which is that only ONE of them contains the pipeline.
+    //
+    // The pipeline is identified by what only it does: consult the resolver, fall back to the strategy
+    // registry, and hand off to the external dispatcher. A door that did any of those would be a second
+    // pipeline, whatever it was called.
+    const HALLMARKS = ['resolveProvider(', 'getActiveProviderForType(', 'dispatchExternal('];
+    const bodies = new Map<string, string>();
+    for (const name of exported) {
+      const start = body.indexOf(`export async function ${name}`);
+      const next = exported
+        .map((other) => body.indexOf(`export async function ${other}`))
+        .filter((index) => index > start)
+        .sort((a, b) => a - b)[0] ?? body.length;
+      bodies.set(name, body.slice(start, next));
+    }
+
+    const pipelines = [...bodies.entries()]
+      .filter(([, text]) => HALLMARKS.every((hallmark) => text.includes(hallmark)))
+      .map(([name]) => name);
+    expect(pipelines, 'exactly one exported function may contain the dispatch pipeline').toEqual(['dispatchProvider']);
+
+    // And every other door must be a thin delegation to it, not a copy that drifts.
+    for (const [name, text] of bodies) {
+      if (name === 'dispatchProvider') continue;
+      expect(text, `${name} must delegate to the single pipeline`).toContain('dispatchProvider(');
+      for (const hallmark of HALLMARKS.filter((h) => h !== 'dispatchExternal(')) {
+        expect(text, `${name} must not resolve providers itself`).not.toContain(hallmark);
+      }
+    }
   });
 
   it('resolves entity-bound capabilities before any strategy is considered', () => {

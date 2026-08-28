@@ -39,7 +39,12 @@ vi.mock('../../../../../psp/backend/src/modules/gateway/services/payoutAccount.s
 vi.mock('../../../../../psp/backend/src/modules/gateway/services/commissionSettlement.service', () => ({
   postCommission: h.postCommission, requiresFeeRelease: () => false,
 }));
-vi.mock('../../../../../psp/backend/src/modules/provider/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider }));
+vi.mock('../../../../../psp/backend/src/modules/provider/services/integrationDispatch.service', () => ({ dispatchProvider: h.dispatchProvider, 
+  // The institution-bound door (v37 P13) delegates to the same spy, so assertions about what was
+  // dispatched are unaffected; the extra resolution argument is dropped where it is not asserted.
+  dispatchToInstitution: (db: any, type: any, event: any, payload: any, _resolution: any, context: any) =>
+    (h.dispatchProvider)(db, type, event, payload, context),
+}));
 vi.mock('../../../../../psp/backend/src/modules/provider/services/businessProcessEvent.service', () => ({
   emitProcessEvent: h.emitProcessEvent, emitComplianceEvent: h.emitComplianceEvent,
 }));

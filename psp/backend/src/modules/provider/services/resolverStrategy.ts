@@ -22,16 +22,31 @@ export type ResolverKind = 'entity_bound' | 'strategy_bound';
 
 // Which capabilities are bound to an entity, and therefore must never be resolved by strategy. A strategy
 // resolver on any of these would pick "an" ASPSP rather than "the" ASPSP.
-const ENTITY_BOUND: Partial<Record<IntegrationProviderType, ResolverKind>> = {
+const ENTITY_BOUND = {
   aspsp: 'entity_bound',
   account_information: 'entity_bound',
   payment_initiation: 'entity_bound',
   card_issuer: 'entity_bound',
   card_authorization: 'entity_bound',
-};
+} as const satisfies Partial<Record<IntegrationProviderType, ResolverKind>>;
+
+/**
+ * A capability that must be dispatched to the institution owning the entity.
+ *
+ * Derived from the table above rather than restated, so the two cannot disagree: adding a capability there
+ * makes it impossible to dispatch by strategy, which is the property that matters.
+ */
+export type EntityBoundProviderType = keyof typeof ENTITY_BOUND;
+
+/** Everything else: any active provider can answer, and the routing strategy decides which. */
+export type StrategyBoundProviderType = Exclude<IntegrationProviderType, EntityBoundProviderType>;
+
+export function isEntityBound(type: IntegrationProviderType): type is EntityBoundProviderType {
+  return type in ENTITY_BOUND;
+}
 
 export function resolverKindFor(type: IntegrationProviderType): ResolverKind {
-  return ENTITY_BOUND[type] ?? 'strategy_bound';
+  return isEntityBound(type) ? 'entity_bound' : 'strategy_bound';
 }
 
 export interface ResolutionContext {

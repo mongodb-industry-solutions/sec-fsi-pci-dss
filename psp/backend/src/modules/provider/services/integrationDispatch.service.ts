@@ -17,7 +17,10 @@ import {
 } from './integrationRegistry.service';
 import { applyMappings } from './fieldMapping.service';
 import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
-import { resolveProvider, resolverKindFor, type ResolutionContext } from './resolverStrategy';
+import {
+  resolveProvider, resolverKindFor, isEntityBound,
+  type ResolutionContext, type EntityBoundProviderType, type StrategyBoundProviderType,
+} from './resolverStrategy';
 import { getProviderAccessToken } from './providerAccessToken.service';
 import { sanitizeDeep } from './businessProcessEvent.service';
 import { resolveEventOutbound, resolveEventInbound } from './providerEventConfig.service';
@@ -58,16 +61,77 @@ export function applyPathTemplate(
   return { url: substituted, consumed };
 }
 
+/**
+ * Dispatch to the institution that owns the entity in question.
+ *
+ * For `card_issuer`, `card_authorization`, `account_information`, `payment_initiation` and `aspsp`, the
+ * provider is not a matter of preference: it is the bank that issued THIS card or holds THIS account. The
+ * resolution is REQUIRED here rather than optional, because a capability bound to an entity cannot be
+ * dispatched without saying which entity, and making it optional is precisely how all six call sites came to
+ * omit it and route by strategy instead.
+ *
+ * It REFUSES rather than falling back. Falling back for one of these means operating a different
+ * institution's account, which is worse than not operating at all.
+ */
+export async function dispatchToInstitution(
+  db: Db,
+  type: EntityBoundProviderType,
+  triggeredBy: string,
+  payload: Record<string, unknown>,
+  resolution: ResolutionContext,
+  businessContext?: BusinessContextRef,
+): Promise<DispatchResult> {
+  return dispatchProvider(db, type, triggeredBy, payload, businessContext, resolution);
+}
+
+/**
+ * Dispatch to whichever active provider the routing strategy picks.
+ *
+ * For fraud scoring, sanctions screening, identity and business verification, currency and the credit bureau,
+ * any active provider can answer and priority, weight or round-robin decides which. There is no entity to bind
+ * to, so there is nothing to resolve.
+ */
+export async function dispatchByStrategy(
+  db: Db,
+  type: StrategyBoundProviderType,
+  triggeredBy: string,
+  payload: Record<string, unknown>,
+  businessContext?: BusinessContextRef,
+): Promise<DispatchResult> {
+  return dispatchProvider(db, type, triggeredBy, payload, businessContext);
+}
+
+/**
+ * The one dispatch pipeline, behind both doors above.
+ *
+ * Kept single deliberately. Capability-specific pipelines would fork the audit trail that carries the
+ * compliance narrative, so what varies per capability is the RESOLVER in front of it and the contract of the
+ * door, never the logging, the events or the field mapping behind it.
+ */
 export async function dispatchProvider(
   db: Db,
   type: IntegrationProviderType,
   triggeredBy: string,
   payload: Record<string, unknown>,
   businessContext?: BusinessContextRef,
-  // v37 P6.1: which ENTITY the request is about, for a capability bound to one. Absent for the assessment
-  // capabilities, where any active provider can answer and the routing strategies decide which.
   resolution?: ResolutionContext,
 ): Promise<DispatchResult> {
+  // An entity-bound capability with nothing to resolve from is REFUSED, not routed by strategy.
+  //
+  // This is the failure the two doors above exist to prevent, caught here as well because the pipeline is
+  // reachable directly and a compiler cannot see through an `as` or a dynamic capability. Falling through to
+  // "any active provider" is what it used to do, and with several banks registered that means asking the wrong
+  // institution about someone else's card, which it will correctly know nothing about.
+  if (isEntityBound(type) && !resolution) {
+    return {
+      provider: 'internal',
+      arrangementId: '',
+      status: 'error',
+      latencyMs: 0,
+      error: `${type} is bound to an entity and was dispatched without one, so no institution could be chosen`,
+    };
+  }
+
   // ── P6.1: entity-bound capabilities resolve BY THE DATA, before any strategy is considered ──────
   //
   // The pipeline below is untouched on purpose. Five capability-specific dispatchers would fork the audit

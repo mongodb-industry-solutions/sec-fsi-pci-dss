@@ -20,6 +20,7 @@ import {
   DECISION_REASON_INSUFFICIENT_FUNDS,
   DECISION_REASON_ACCOUNT_NOT_FOUND,
 } from '../../shared/models/responseCodes';
+import { institutionGroupFor } from './capabilityGroup';
 
 // Card-transaction types that DEBIT the funding account and therefore require an atomic funds hold.
 // Refunds/adjustments credit or are non-cash and pass the gate without a hold.
@@ -251,10 +252,16 @@ export class ProviderGroups {
       amountInAccountCcy = fx.amount; fxRate = fx.rate; converted = fx.converted;
     } catch { /* missing rate: fall back to same-amount, no conversion (surfaced via converted=false) */ }
 
-    // Provider-indifferent READ for audit/observability + external substitution (fail-open on error).
-    void dispatchProvider(this.db, 'account_information', 'funds.check.requested', {
-      payoutAccountInstanceReference: accountRef, clientReference: txnId, requestedFields: ['balance', 'status'],
-    }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' }).catch(() => {});
+    // Asked of the institution that HOLDS this account, never of "an" account information provider. The group
+    // owns the routing key, so this reactor states the SUBJECT and not how to find the bank from it.
+    void institutionGroupFor(this.db, 'account_information').ask({
+      event: 'funds.check.requested',
+      payload: {
+        payoutAccountInstanceReference: accountRef, clientReference: txnId, requestedFields: ['balance', 'status'],
+      },
+      subject: { accountReference: accountRef },
+      businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' },
+    }).catch(() => {});
 
     const available = account.payoutAccountBalance?.availableAmount ?? 0;
 
@@ -377,14 +384,21 @@ export class ProviderGroups {
     let decision: { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;
     let unreachable: string | undefined;
     try {
-      const r = await dispatchProvider(this.db, 'card_issuer', 'card.issuer.validation.requested', {
-        cardToken: p.cardToken, maskedPan: p.maskedPan, cardTransactionInstanceReference: txnId,
-        ...(p.cardNetwork ? { network: p.cardNetwork } : {}),
-        ...(cardData.cardNumber ? { cardNumber: cardData.cardNumber } : {}),
-        ...(cardData.cvv ? { cvv: cardData.cvv } : {}),
-        ...(cardData.expiry ? { expiry: cardData.expiry } : {}),
-        ...(p.cvvExpected ? { cvvExpected: true } : {}),
-      }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
+      const r = await institutionGroupFor(this.db, 'card_issuer').ask({
+        event: 'card.issuer.validation.requested',
+        payload: {
+          cardToken: p.cardToken, maskedPan: p.maskedPan, cardTransactionInstanceReference: txnId,
+          ...(p.cardNetwork ? { network: p.cardNetwork } : {}),
+          ...(cardData.cardNumber ? { cardNumber: cardData.cardNumber } : {}),
+          ...(cardData.cvv ? { cvv: cardData.cvv } : {}),
+          ...(cardData.expiry ? { expiry: cardData.expiry } : {}),
+          ...(p.cvvExpected ? { cvvExpected: true } : {}),
+        },
+        // The card's OWN issuer. A card issued by one bank must never be validated by another, and the group
+        // turns this token into that institution.
+        subject: { cardToken: p.cardToken },
+        businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' },
+      });
       decision = r.responseBody as typeof decision;
       if (r.status === 'error' || r.status === 'timeout') unreachable = r.error ?? `issuer ${r.status}`;
       // An answer that does not state a verdict is not an approval. The issuer's verdict is a BOOLEAN it is
