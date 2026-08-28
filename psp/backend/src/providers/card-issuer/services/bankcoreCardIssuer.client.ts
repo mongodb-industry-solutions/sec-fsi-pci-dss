@@ -90,15 +90,27 @@ export async function findByPanAtIssuer(
   };
 }
 
-/** The verification value the issuer would accept. Only the issuer can derive it. */
+/**
+ * The verification value the issuer would accept. Only the issuer can derive it.
+ *
+ * The expiry and the length are OPTIONAL, and normally omitted. The issuer holds the card's registered expiry
+ * and declares each network's value length in its own configuration, so it can answer from the token alone.
+ * Sending them meant the provider kept a second copy of both, and a second copy of a rule is a rule that can
+ * disagree with itself. They remain accepted for the case where a caller is asking about an expiry the issuer
+ * has not registered yet, such as a renewal being previewed.
+ */
 export async function deriveCvvAtIssuer(
-  input: { cardToken: string; expiry: string; cvvLength: number },
+  input: { cardToken: string; expiry?: string; cvvLength?: number },
   correlationId = uuidv4(),
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ cvv?: string; error?: string }> {
   const result = await issuerRequest(
     `/v1/cards/${encodeURIComponent(input.cardToken)}/verification-values`,
-    { expiry: input.expiry, length: input.cvvLength },
+    {
+      // Omitted rather than sent empty: the issuer distinguishes "not given, use mine" from a blank value.
+      ...(input.expiry ? { expiry: input.expiry } : {}),
+      ...(input.cvvLength ? { length: input.cvvLength } : {}),
+    },
     correlationId,
     fetchImpl,
   );

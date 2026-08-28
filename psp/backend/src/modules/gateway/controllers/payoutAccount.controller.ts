@@ -27,7 +27,6 @@ import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.mo
 import { CreditType } from '../models/balanceCreditLog.model';
 import { creditDirect } from '../services/payoutAccountBalance.service';
 import { requestDemoCredit } from '../../../providers/account-information/services/bankcoreAis.client';
-import { config } from '../../../config';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -768,7 +767,7 @@ export async function payoutAccountController(fastify: FastifyInstance) {
     const linked = await db.collection<{ payoutAccountBankAccountReference?: string }>('payoutAccountArrangement')
       .findOne({ payoutAccountInstanceReference: accountRef }, { projection: { payoutAccountBankAccountReference: 1 } });
 
-    if (config.bankcore.enabled && linked?.payoutAccountBankAccountReference) {
+    if (linked?.payoutAccountBankAccountReference) {
       const credited = await requestDemoCredit({
         bankAccountReference: linked.payoutAccountBankAccountReference,
         amount: body.amount,

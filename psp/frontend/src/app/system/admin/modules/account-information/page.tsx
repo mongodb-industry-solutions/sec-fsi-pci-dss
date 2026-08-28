@@ -13,133 +13,15 @@ import { byCapability } from '../../../../../config/capabilities';
 import { AccountsAdminPanel } from '../_components/AccountsAdminPanel';
 import { ModuleTabsBar, useActiveTab, type ModuleTab } from '../_components/ModuleTabs';
 
-// Unified Account Information (AIS) module admin (v29.1): one page with "Configuration/Policies" and
-// "Accounts" tabs. Config is a typed form over the AIS engine settings (with a read-only raw view);
+// The provider's PAYOUT ACCOUNTS: where a customer wants money sent.
+//
+// There is no configuration here any more (v37 P12). Reading an account and confirming its funds are the
+// servicing institution's answers, given over its own Open Banking endpoints, and the rules behind them are
+// administered in the bank's own app. What this page administers is the provider's own record, which points at
+// an account the bank holds rather than being one.
 // Accounts is the data plane.
 
 const CAP = 'account-information';
-
-function AccountInfoConfigPanel() {
-  const token = getToken() ?? '';
-  const notify = useNotify();
-  const { can } = useEffectivePermissions();
-  const canEdit = can('modules', 'manage'); // manager has modules:view only; only operations_officer may edit
-
-  // Known AIS engine settings (mirror of backend DEFAULT_ACCOUNT_INFORMATION_CONFIG). Any other keys
-  // present in the stored config are preserved on save (forward-compatible).
-  const KNOWN_KEYS = ['alwaysVerifyActive', 'returnInternalBalance', 'identityCheckEnabled'];
-
-  const [config, setConfig] = useState<Record<string, unknown> | null>(null);
-  const [alwaysVerifyActive, setAlwaysVerifyActive] = useState(true);
-  const [returnInternalBalance, setReturnInternalBalance] = useState(true);
-  const [identityCheckEnabled, setIdentityCheckEnabled] = useState(true);
-  const [extraKeys, setExtraKeys] = useState<Record<string, unknown>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      try {
-        const c = await api.modules.getConfig(CAP, token);
-        setConfig(c);
-        const mc = (c?.moduleConfig as Record<string, unknown>) ?? {};
-        setAlwaysVerifyActive(typeof mc.alwaysVerifyActive === 'boolean' ? mc.alwaysVerifyActive : true);
-        setReturnInternalBalance(typeof mc.returnInternalBalance === 'boolean' ? mc.returnInternalBalance : true);
-        setIdentityCheckEnabled(typeof mc.identityCheckEnabled === 'boolean' ? mc.identityCheckEnabled : true);
-        // Keep any non-standard keys so saving the form does not drop them.
-        setExtraKeys(Object.fromEntries(Object.entries(mc).filter(([k]) => !KNOWN_KEYS.includes(k))));
-      } catch {
-        setConfig(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  // The effective moduleConfig that will be persisted (form values + preserved extras).
-  const effectiveConfig: Record<string, unknown> = {
-    ...extraKeys,
-    alwaysVerifyActive,
-    returnInternalBalance,
-    identityCheckEnabled,
-  };
-
-  async function save() {
-    setSaving(true);
-    try {
-      const updated = await api.modules.updateConfig(CAP, effectiveConfig, token);
-      setConfig(updated);
-      notify('Module configuration saved', 'success');
-    } catch (e) {
-      notify(e instanceof Error ? e.message : 'Save failed', 'error');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) return <p className="text-sm text-gray-500">Loading…</p>;
-
-  return (
-    <>
-      {!canEdit && (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-sm text-gray-600">
-          Read-only: your role can view this configuration but not change it (requires <code className="font-mono text-xs">modules:manage</code>).
-        </div>
-      )}
-      <fieldset disabled={!canEdit} className="space-y-5 border-0 p-0 m-0 min-w-0">
-        {/* Verification policies (AIS engine) */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-1">
-          <h2 className="font-semibold text-gray-800 text-sm">Verification policies</h2>
-          <p className="text-xs text-gray-500 pb-2">How the built-in AIS engine verifies a PSP-registered payout account. Overrides the built-in defaults.</p>
-
-          <ToggleRow
-            label="Only active accounts pass"
-            hint="A suspended or closed account is reported as not verified (dormant / closed)."
-            checked={alwaysVerifyActive}
-            onChange={setAlwaysVerifyActive}
-          />
-          <ToggleRow
-            label="Return internal ledger balance"
-            hint="Include the PSP internal-ledger pending / available balance in the verification response."
-            checked={returnInternalBalance}
-            onChange={setReturnInternalBalance}
-          />
-          <ToggleRow
-            label="Identity check"
-            hint="Match the requested account holder against the registered party (identity assurance signal)."
-            checked={identityCheckEnabled}
-            onChange={setIdentityCheckEnabled}
-          />
-        </div>
-
-        {canEdit && (
-          <button onClick={save} disabled={saving}
-            className="flex items-center gap-2 bg-[#001E2B] hover:bg-[#001E2B]/80 text-white font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60 text-sm">
-            <Save size={15} />{saving ? 'Saving…' : 'Save configuration'}
-          </button>
-        )}
-
-        {/* Advanced: the effective moduleConfig that will be persisted (read-only, transparency). */}
-        <details className="bg-white rounded-xl border border-gray-200 p-5">
-          <summary className="text-sm font-semibold text-gray-800 cursor-pointer">Advanced: raw configuration</summary>
-          <p className="text-xs text-gray-500 my-2">The effective <code className="font-mono">moduleConfig</code> persisted for this module. Edit via the toggles above; any non-standard keys are preserved.</p>
-          <JsonView data={effectiveConfig} maxHeight="14rem" collapsed={1} />
-        </details>
-      </fieldset>
-
-      {config?.moduleCallbackEndpoints !== undefined && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
-          <h2 className="font-semibold text-gray-800 text-sm">Callback endpoints</h2>
-          <p className="text-xs text-gray-500">Routes this module calls back into the PSP after processing (the round-trip the linking vendor relies on).</p>
-          <JsonView data={config.moduleCallbackEndpoints} maxHeight="10rem" collapsed={2} />
-        </div>
-      )}
-    </>
-  );
-}
-
 // A labelled on/off row (app-style toggle) used by the AIS verification policies.
 function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (

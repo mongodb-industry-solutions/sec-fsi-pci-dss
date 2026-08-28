@@ -1,6 +1,5 @@
 import { PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { readAccountBalance, type AisReadResult } from '../../../providers/account-information/services/bankcoreAis.client';
-import { config } from '../../../config';
 
 // P2.4: the balance the PSP reports becomes a PROJECTION read from AIS, at the identical field path
 // (`payoutAccountBalance.availableAmount`) that Leafy Wallet and the frontend already parse. The money
@@ -77,8 +76,10 @@ export async function projectBalances(
   correlationId?: string,
   read?: BalanceReader,
 ): Promise<ProjectedAccount[]> {
-  if (!config.bankcore.enabled) return accounts;
   // Concurrent, because a page of accounts would otherwise cost one round trip each in sequence.
+  //
+  // No longer conditional on a flag (v37 P12): the authoritative balance is the bank's, and the alternative
+  // was showing the provider's stale copy as though it were the balance.
   return Promise.all(accounts.map((account) => projectOne(account, correlationId, read)));
 }
 
@@ -87,6 +88,5 @@ export async function projectBalance(
   correlationId?: string,
   read?: BalanceReader,
 ): Promise<ProjectedAccount> {
-  if (!config.bankcore.enabled) return account;
   return projectOne(account, correlationId, read);
 }

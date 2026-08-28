@@ -6,7 +6,6 @@ import { recordPendingCorrelation } from '../../modules/provider/services/pendin
 import { publishIssuerValidationCompleted } from '../../modules/transaction/services/cardTransaction.service';
 import { PAYMENT_CARD_COLLECTION } from '../../modules/customer/models/paymentCard.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
-import { holdAvailableFunds } from '../../modules/gateway/services/payoutAccountBalance.service';
 import { holdFundsAtBank, isBankLinked } from '../card-authorization/services/bankcoreCardAuthorisation.client';
 import { config } from '../../config';
 import { resolveAndConvert } from '../currency-exchange/services/currencyExchange.service';
@@ -258,11 +257,17 @@ export class ProviderGroups {
 
     const available = account.payoutAccountBalance?.availableAmount ?? 0;
 
-    // The hold happens where the money is (P4.5). With the bank enabled and the account linked, the PSP's
-    // stored balance is a PROJECTION, so a local hold would decide on stale data and mutate a figure that
-    // is no longer authoritative: correct-looking and wrong. The branch is on whether the account is
-    // LINKED, never on which bank it is at, so a second registered bank needs no change here.
-    if (config.bankcore.enabled && isBankLinked(account)) {
+    // The hold happens where the money is, and there is no longer an alternative (v37 P12).
+    //
+    // The PSP's stored balance is a PROJECTION of the bank's, so a local hold would decide on stale data and
+    // mutate a figure that is not authoritative: correct-looking and wrong. It used to do exactly that
+    // whenever the bank was disabled or the account was unlinked, which made the provider a place money was
+    // held. An account this provider cannot reach at a bank is now REFUSED rather than decided locally,
+    // because refusing is honest and holding funds it does not have is not.
+    //
+    // The branch is on whether the account is LINKED, never on which bank it is at, so a second registered
+    // bank needs no change here.
+    if (isBankLinked(account)) {
       const bankHold = await holdFundsAtBank({
         account, amount: amountInAccountCcy, currency: accountCurrency,
         cardToken: p.cardToken, transactionType: p.cardTransactionType, clientReference: txnId,
@@ -295,13 +300,19 @@ export class ProviderGroups {
       return;
     }
 
-    // Atomic hold ($gte-conditional): the authoritative funds decision while the ledger is still local.
-    const held = await holdAvailableFunds(this.db, accountRef, amountInAccountCcy);
-    if (!held) {
-      publish({ outcome: 'declined', responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS, decisionReason: DECISION_REASON_INSUFFICIENT_FUNDS, available, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
-      return;
-    }
-    publish({ outcome: 'approved', responseCode: RESPONSE_CODE_APPROVED, available, held: amountInAccountCcy, currency: accountCurrency, fundingPayoutAccountReference: accountRef, converted, ...(converted ? { fxRate } : {}) });
+    // An account with no institution behind it. The provider holds no balance of its own, so there is nothing
+    // here to authorise against: this FAILS CLOSED with the reason, rather than approving on a figure it
+    // cannot stand behind.
+    publish({
+      outcome: 'declined',
+      responseCode: RESPONSE_CODE_INSUFFICIENT_FUNDS,
+      decisionReason: 'funding_account_not_linked_to_a_bank',
+      available,
+      currency: accountCurrency,
+      fundingPayoutAccountReference: accountRef,
+      converted,
+      ...(converted ? { fxRate } : {}),
+    });
   }
 
   // Real-time fraud scoring. A fraud signal never declines the payment: the authorization proceeds on

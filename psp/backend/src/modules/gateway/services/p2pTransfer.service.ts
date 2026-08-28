@@ -15,7 +15,6 @@ import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../mode
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { initiatePaymentAtBank, selectPaymentProduct } from '../../../providers/payment-initiation/services/bankcorePis.client';
-import { config } from '../../../config';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
 import { RISK_HOLD_STEP } from './transferReview.service';
@@ -153,8 +152,7 @@ export async function executeP2PTransfer(
   const sourceAccount = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
     .findOne({ payoutAccountInstanceReference: fromAccountRef });
   const delegateToBank = Boolean(
-    config.bankcore.enabled
-    && sourceAccount?.payoutAccountBankAccountReference
+    sourceAccount?.payoutAccountBankAccountReference
     && sourceAccount?.payoutAccountAspspReference
     && sourceAccount?.payoutAccountConsentReference,
   );

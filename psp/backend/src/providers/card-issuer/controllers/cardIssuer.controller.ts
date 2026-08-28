@@ -1,13 +1,16 @@
-// Card Issuer capability module controller; STATIC routes (ADR-029).
+// The provider's own SAVED CARDS: the tokenised instruments a customer has on file here.
+//
+// Not the bank's issued-card registry, and not an issuer. The card-issuer ENGINE that used to live in this
+// file is gone (v37 P12): validating a card's format, network and verification value is the issuer's decision,
+// and the bank answers it over its own API. What remains administers the provider's own records, and the two
+// endpoints that expose a protected value ask the ISSUER for it rather than deriving anything here.
 import { FastifyInstance } from 'fastify';
-import { validateCardIssuer, resolveCardIssuerConfig } from '../services/cardIssuer.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
 } from '../../../modules/provider/services/capabilityModuleConfig.service';
 import { emitComplianceEvent } from '../../../modules/provider/services/businessProcessEvent.service';
 import { requirePermission } from '../../../vendors/middleware/acl';
-import { requireInternalProvider } from '../../../modules/provider/services/capabilityGate.service';
 import {
   listAllCards,
   getCardByIdAny,
@@ -24,8 +27,6 @@ import { resolveCardByToken, resolveCardById, resolveFundingAccount } from '../p
 import { resolveOwnerNameByAgreement, searchAgreementsByOwner } from '../ports/owner.port';
 import { deriveMaskedPan } from '../../../modules/customer/models/paymentCard.model';
 import { revealPanAtIssuer, findByPanAtIssuer, deriveCvvAtIssuer } from '../services/bankcoreCardIssuer.client';
-import { normalizeExpiry } from '../services/cardVerificationKey.service';
-import type { CardValidationOptions } from '../services/cardIssuer.service';
 
 // v29 §8: aggregated list-access audit is opt-in (default off) to avoid flooding the ledger.
 const AUDIT_LIST_ACCESS = process.env.PSP_AUDIT_LIST_ACCESS === 'true';
@@ -40,156 +41,18 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     const { pan } = await revealPanAtIssuer(view.paymentCardReference, correlationId);
     return pan ?? null;
   }
-  // v29 admin gate: cards* routes require the operations_officer permission AND the card-issuer
-  // capability resolving to its internal built-in provider (else 409 managed_externally).
-  const gate = requireInternalProvider('card_issuer');
+  // No capability gate on these routes, deliberately (v37 P12).
+  //
+  // They used to be gated on the capability resolving to the PSP's own built-in engine, which made sense while
+  // that engine was what they administered. What they actually administer is the PROVIDER's own record, and who
+  // issues the card or services the account has no bearing on the provider's right to manage it. The gate would
+  // now refuse every request, because the capability resolves to a bank by design.
 
-  fastify.post('/score', {
-    schema: {
-      tags: ['modules:card-issuer'],
-      summary: 'Card issuer validation engine invocation (internal loopback)',
-      description: 'Internal card-issuer (bank) validation engine. Called by the integration router (ADR-029) '
-        + 'when no external card-issuer vendor is active. Validates the card format, network, and SAD (CVV check) '
-        + 'without storing any CHD. PCI DSS Req 3.3: CVV is validated and immediately discarded. '
-        + 'Not JWT-authenticated; requires `X-Integration-Source` header.',
-      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string', description: 'Caller identity header.' } } },
-      body: {
-        type: 'object',
-        additionalProperties: true,
-        description: 'Card validation payload. May include maskedPan, network, cvv (validated and immediately discarded, never stored). Forwarded by the integration router.',
-      },
-      response: {
-        200: {
-          type: 'object',
-          description: 'Card issuer validation result.',
-          properties: {
-            actionConfirmed:     { type: 'boolean', description: 'True when the card passed all issuer checks.' },
-            responseCode:        { type: 'string', description: 'ISO 8583-style response code.' },
-            network:             { type: 'string', description: 'Resolved card network (e.g. VISA, MASTERCARD).' },
-            cvvValidationResult: { type: 'string', enum: ['match', 'mismatch', 'not_provided', 'not_supported'], description: 'CVV check outcome.' },
-            decisionReason:      { type: 'string', description: 'Human-readable reason for approval or rejection.' },
-          },
-        },
-        401: { type: 'object', properties: { error: { type: 'string' } }, description: 'Missing X-Integration-Source header.' },
-      },
-    },
-    config: { skipAuth: true },
-  }, async (request, reply) => {
-    if (!request.headers['x-integration-source']) {
-      return reply.code(401).send({ error: 'X-Integration-Source header required' });
-    }
 
-    const body = (request.body ?? {}) as Record<string, unknown>;
 
-    // Apply the admin-configured simulator rules (valid CVV, supported networks, format checks).
-    const stored = await getCapabilityModuleConfig(fastify.db, CAP);
-    const config = resolveCardIssuerConfig(stored?.moduleConfig as Record<string, unknown> | undefined);
 
-    // v30: resolve the card via the Card Reference port to enforce registration + funding-account
-    // checks and to derive the realistic per-card CVV (HMAC/CVK). The direct simulator path (full
-    // PAN, no token) carries no token and stays lenient (checks left undefined).
-    const opts: CardValidationOptions = {};
-    const cardToken = typeof body.cardToken === 'string' ? body.cardToken : undefined;
-    if (cardToken) {
-      const view = await resolveCardByToken(fastify.db, cardToken);
-      opts.cardRegistered = !!view && view.paymentCardStatus !== 'revoked';
-      opts.hasFundingAccount = !!view?.fundingPayoutAccountInstanceReference;
-      // Cardholder-name verification (only when enabled and a name is supplied; tokenized path sends
-      // no name so this is inert). Resolve the registered owner via the port (never broadens access).
-      const suppliedName = body.cardHolderName ?? body.cardholderName ?? body.nameOnCard ?? body.name;
-      if (config.verifyCardholderName && typeof suppliedName === 'string' && suppliedName.trim() && view?.customerAgreementInstanceReference) {
-        opts.expectedCardholderName = (await resolveOwnerNameByAgreement(fastify.db, view.customerAgreementInstanceReference)) ?? undefined;
-      }
-      // Derive the per-card CVV when the mode uses it and we have an expiry (from the card or body).
-      if (view && config.cvvMode !== 'global') {
-        const expiry = (view.paymentCardExpirationDate ?? (body.expiry as string | undefined)) ?? '';
-        if (expiry) {
-          const netName = (view.paymentCardNetwork ?? (body.network as string | undefined) ?? '').toUpperCase();
-          const rule = config.networks.find((n) => n.name.toUpperCase() === netName);
-          const cvvLength = rule?.cvvLength ?? 3;
-          // Only the issuer holds the key, so only the issuer can derive the value. Unavailable falls back
-          // to global-only acceptance rather than declining a card the issuer never got to judge.
-          const derived = await deriveCvvAtIssuer({ cardToken, expiry: normalizeExpiry(expiry), cvvLength });
-          if (derived.cvv) opts.perCardCvv = derived.cvv;
-        }
-      }
-    }
-    const result = validateCardIssuer(body, config, opts);
 
-    // Correlation keys for audit/monitoring (PCI DSS): link the validation to the
-    // transaction and the fraud case when the caller provides them.
-    const transactionId = (body.transactionId ?? body.cardTransactionInstanceReference) as string | undefined;
-    const caseReference = (body.caseReference ?? body.fraudDiagnosisCaseReference ?? body.fraudDiagnosisInstanceReference) as string | undefined;
 
-    // Complete, PCI-safe event log: the request and response payloads, correlated to the
-    // transaction / case. NEVER includes the PAN or CVV; only masked PAN, network and whether a
-    // CVV was supplied. The audit sanitizer also strips any CHD key as a second line of defence.
-    const requestLog = {
-      maskedPan: (body.maskedPan ?? body.cardTransactionMaskedPanDisplay) as string | undefined,
-      networkHint: (body.network ?? body.cardNetwork) as string | undefined,
-      cvvProvided: body.cvv !== undefined || body.cvv2 !== undefined || body.cvc !== undefined,
-      integrationSource: request.headers['x-integration-source'] as string,
-    };
-
-    emitComplianceEvent(fastify.db, {
-      entityType: transactionId ? 'transaction' : 'card',
-      entityId: transactionId ?? (requestLog.maskedPan ?? 'card-issuer-module'),
-      processType: 'card_management',
-      // Single closing action (§9.1): the verdict lives in processOutcome + eventSummary.response,
-      // not in the event name (no separate approved/declined names).
-      processAction: 'card.issuer.validation.completed',
-      processOutcome: result.actionConfirmed ? 'approved' : 'rejected',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: {
-        module: CAP,
-        request: requestLog,
-        response: {
-          approved: result.actionConfirmed,
-          responseCode: result.responseCode,
-          network: result.network,
-          cvvValidationResult: result.cvvValidationResult,
-          decisionReason: result.decisionReason,
-        },
-        transactionId,
-        caseReference,
-      },
-      bianServiceDomain: 'SD-88 Payment Card',
-      bianControlRecordType: 'PaymentCardValidation',
-    });
-
-    return reply.send(result);
-  });
-
-  fastify.get('/config', {
-    preHandler: requirePermission('modules', 'view'),
-    schema: {
-      tags: ['modules:card-issuer'],
-      summary: 'Get card-issuer module configuration',
-      description: 'Returns the active card-issuer validation engine configuration (valid CVV rules, supported networks, format checks).',
-      response: {
-        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
-      },
-    },
-  }, async () => {
-    return (await getCapabilityModuleConfig(fastify.db, CAP)) ?? { capability: CAP, moduleConfig: {} };
-  });
-
-  fastify.put('/config', {
-    preHandler: requirePermission('modules', 'manage'),
-    schema: {
-      tags: ['modules:card-issuer'],
-      summary: 'Update card-issuer module configuration',
-      description: 'Replaces the card-issuer engine configuration (CVV rules, network support, PAN format). Changes take effect on the next invocation.',
-      body: { type: 'object', properties: { moduleConfig: { type: 'object', additionalProperties: true } } },
-      response: {
-        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
-      },
-    },
-  }, async (request) => {
-    const body = request.body as { moduleConfig?: Record<string, unknown> };
-    return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
-  });
 
   // ── v29 GLOBAL CARD ADMINISTRATION (built-in module surface) ──────────────────────────
   // Global cross-party administration of cardholder cards, distinct from the customer/staff
@@ -217,7 +80,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // GET /cards: global paginated list (display-safe; no expiry).
   fastify.get('/cards', {
-    preHandler: [requirePermission('cards', 'view'), gate],
+    preHandler: [requirePermission('cards', 'view')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'List all payment cards (global administration)',
@@ -283,7 +146,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // GET /cards/:cardId, global per-card detail (includes QE:none expiry; audited).
   fastify.get('/cards/:cardId', {
-    preHandler: [requirePermission('cards', 'view'), gate],
+    preHandler: [requirePermission('cards', 'view')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Get one payment card (global administration detail)',
@@ -325,7 +188,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
   // GET /agreements: owner picker for card registration: search customer agreements by owner name.
   // Returns ONLY the agreement ref + owner name (need-to-know; no other PII). cards:view + gate.
   fastify.get('/agreements', {
-    preHandler: [requirePermission('cards', 'view'), gate],
+    preHandler: [requirePermission('cards', 'view')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Search customer agreements by owner name (card owner picker)',
@@ -341,7 +204,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // POST /cards: register a card for an agreement (reuses the domain service; rejects CVV/PIN by schema).
   fastify.post('/cards', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Register a payment card for an agreement (global administration)',
@@ -410,7 +273,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // PATCH /cards/:cardId, update alias/note metadata.
   fastify.patch('/cards/:cardId', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Update a card alias / note (global administration)',
@@ -453,7 +316,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // PATCH /cards/:cardId/status, activate / suspend.
   fastify.patch('/cards/:cardId/status', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Activate / deactivate a card (global administration)',
@@ -483,7 +346,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // DELETE /cards/:cardId, revoke (soft-delete; record retained for audit).
   fastify.delete('/cards/:cardId', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Revoke a card (global administration, soft-delete)',
@@ -512,7 +375,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
   // PATCH /cards/:cardId/funding, reassign the funding payout account. The card owner follows the
   // new account's party (invariant), so this is also how ownership is reassigned. Audited.
   fastify.patch('/cards/:cardId/funding', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Reassign a card funding account (and, implicitly, its owner)',
@@ -541,47 +404,30 @@ export async function cardIssuerController(fastify: FastifyInstance) {
 
   // Resolve the ephemeral per-card CVV for a card id via the ports. Returns null when the card is
   // unknown or the CVK is not provisioned. Never persists or logs the value.
+  /**
+   * The verification value for one saved card, derived BY THE ISSUER.
+   *
+   * Nothing about it is computed here: the value comes from the bank, and so does its length. The PSP used to
+   * look the length up in its own copy of the network rules and pass it along, which meant two places
+   * declared how long an American Express value is. The bank falls back to its own network configuration
+   * when none is given, and the expiry to the one it has registered, so neither is sent.
+   */
   async function deriveCvvForCardId(cardId: string): Promise<{ cvv: string; last4: string | null } | null> {
     const view = await resolveCardById(fastify.db, cardId);
     if (!view) return null;
-    const stored = await getCapabilityModuleConfig(fastify.db, CAP);
-    const config = resolveCardIssuerConfig(stored?.moduleConfig as Record<string, unknown> | undefined);
-    const expiry = view.paymentCardExpirationDate ?? '';
-    if (!expiry) return null;
-    const netName = (view.paymentCardNetwork ?? '').toUpperCase();
-    const rule = config.networks.find((n) => n.name.toUpperCase() === netName);
-    const cvvLength = rule?.cvvLength ?? 3;
-    const derived = await deriveCvvAtIssuer({ cardToken: view.paymentCardReference, expiry: normalizeExpiry(expiry), cvvLength });
+    const derived = await deriveCvvAtIssuer({ cardToken: view.paymentCardReference });
     if (!derived.cvv) return null;
     return { cvv: derived.cvv, last4: view.paymentCardLast4 ?? null };
   }
 
   // POST /reveal (internal loopback, owner reveal flow via dispatchProvider). Derives the CVV for a
   // card and returns it ephemerally. Only reachable through the provider dispatch (X-Integration-Source).
-  fastify.post('/reveal', {
-    schema: {
-      tags: ['modules:card-issuer'],
-      summary: 'Reveal per-card CVV (internal loopback)',
-      description: 'Derives the realistic per-card CVV (HMAC/CVK) for one card and returns it ephemerally. '
-        + 'Reached only via the provider dispatch (owner reveal flow). Not JWT-authenticated; requires X-Integration-Source.',
-      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string' } } },
-      body: { type: 'object', additionalProperties: true, properties: { cardId: { type: 'string' }, cardToken: { type: 'string' } } },
-      response: { 200: { type: 'object', properties: { cvv: { type: 'string' }, revealed: { type: 'boolean' } } }, 401: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
-    },
-    config: { skipAuth: true },
-  }, async (request, reply) => {
-    if (!request.headers['x-integration-source']) return reply.code(401).send({ error: 'X-Integration-Source header required' });
-    const body = (request.body ?? {}) as { cardId?: string };
-    if (!body.cardId) return reply.status(404).send({ error: 'cardId required' });
-    const r = await deriveCvvForCardId(body.cardId);
-    if (!r) return reply.status(404).send({ error: 'Card not found or CVV unavailable' });
-    return reply.send({ cvv: r.cvv, revealed: true });
-  });
+
 
   // GET /cards/:cardId/cvv (direct reveal for operations_officer, subsystem console). Gate: internal
   // provider + cards:manage. Audited (card.cvv.revealed). Step-up MFA in production.
   fastify.get('/cards/:cardId/cvv', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Reveal a card CVV (operations officer, subsystem console)',
@@ -610,7 +456,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
   // GET /cards/:cardId/pan (direct full-PAN reveal for operations_officer from the issuer vault).
   // Gate: internal provider + cards:manage. Audited (card.pan.revealed). Ephemeral, step-up in prod.
   fastify.get('/cards/:cardId/pan', {
-    preHandler: [requirePermission('cards', 'manage'), gate],
+    preHandler: [requirePermission('cards', 'manage')],
     schema: {
       tags: ['modules:card-issuer'],
       summary: 'Reveal a full PAN (operations officer, subsystem console)',
@@ -636,21 +482,5 @@ export async function cardIssuerController(fastify: FastifyInstance) {
   });
 
   // POST /reveal-pan (internal loopback, owner PAN reveal via dispatchProvider).
-  fastify.post('/reveal-pan', {
-    schema: {
-      tags: ['modules:card-issuer'],
-      summary: 'Reveal full PAN (internal loopback)',
-      headers: { type: 'object', required: ['x-integration-source'], properties: { 'x-integration-source': { type: 'string' } } },
-      body: { type: 'object', additionalProperties: true, properties: { cardId: { type: 'string' } } },
-      response: { 200: { type: 'object', properties: { pan: { type: 'string' }, revealed: { type: 'boolean' } } }, 401: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
-    },
-    config: { skipAuth: true },
-  }, async (request, reply) => {
-    if (!request.headers['x-integration-source']) return reply.code(401).send({ error: 'X-Integration-Source header required' });
-    const body = (request.body ?? {}) as { cardId?: string };
-    if (!body.cardId) return reply.status(404).send({ error: 'cardId required' });
-    const pan = await revealPanForCard(body.cardId, request.id);
-    if (!pan) return reply.status(404).send({ error: 'PAN not found in issuer vault' });
-    return reply.send({ pan, revealed: true });
-  });
+
 }

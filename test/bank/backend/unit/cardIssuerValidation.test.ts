@@ -5,6 +5,10 @@
 // change them over the admin API without a code change. Second, that moving the engine did not change the
 // per-card derivation, because every seeded card's CVV depends on it: a different algorithm would silently
 // invalidate all of them, and nothing else in the suite would notice.
+//
+// It no longer compares its expiry formatting against the provider's. The provider used to state the expiry it
+// was asking about, so the two had to agree; it now sends none, because the issuer holds the registered expiry
+// and is the only party that should decide what a card expires on (v37 P12).
 import { describe, it, expect } from 'vitest';
 import { createHash } from 'node:crypto';
 import {
@@ -14,9 +18,6 @@ import {
 import {
   derivePerCardCvv, normalizeExpiry,
 } from '../../../../bank/backend/src/vendors/encryption/cardVerificationKey.service';
-import {
-  normalizeExpiry as pspNormalizeExpiry,
-} from '../../../../psp/backend/src/providers/card-issuer/services/cardVerificationKey.service';
 
 // A Luhn-valid VISA test number, and a Mastercard in the 2-series range.
 const VISA = '4111111111111111';
@@ -152,12 +153,6 @@ describe('P7 did not change the per-card derivation', () => {
     expect(derivePerCardCvv(cvk, { ...args, cardToken: 'pm_another_card_entirely' })).toBe('987');
   });
 
-  it('normalises an expiry the way the PSP still does, since the PSP states the expiry it asks about', () => {
-    for (const expiry of ['12/29', '12/2029', '1/29', ' 12 / 29 ', 'garbage']) {
-      expect(normalizeExpiry(expiry)).toBe(pspNormalizeExpiry(expiry));
-    }
-    expect(normalizeExpiry('12/2029')).toBe(normalizeExpiry('12/29'));
-  });
 
   it('produces a value of the requested length, and only digits', () => {
     for (const cvvLength of [3, 4]) {

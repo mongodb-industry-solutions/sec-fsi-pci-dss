@@ -1,12 +1,14 @@
-// Account Information (AIS) builtin module controller (Open Banking, ADR-029).
-// POST /score: validates a payout account; called by integration router.
-// GET/PUT /config: admin configuration.
+// The provider's own PAYOUT ACCOUNTS: where a customer wants money sent.
+//
+// A payout account is the provider's record, not the bank's. It holds the link to the servicing institution,
+// the rail to reach it by and the consent under which it may be read, and it POINTS AT an account the bank
+// holds rather than being one. Administering it is the provider's job.
+//
+// The account information ENGINE that used to live here is gone (v37 P12): validating an account and
+// confirming its funds are the servicing institution's answers, and the bank now gives them over its own
+// standard endpoints. Nothing in this file decides anything about an account at a bank.
 
 import { FastifyInstance } from 'fastify';
-import {
-  resolveAccountInformationConfig,
-  validateAccount,
-} from '../services/accountInformation.service';
 import {
   getCapabilityModuleConfig,
   upsertCapabilityModuleConfig,
@@ -15,7 +17,6 @@ import { emitComplianceEvent } from '../../../modules/provider/services/business
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../../modules/gateway/models/payoutAccount.model';
 import type { PayoutAccountArrangement, PayoutAccountStatus, PayoutAccountType, PayoutRail } from '../../../modules/gateway/models/payoutAccount.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
-import { requireInternalProvider } from '../../../modules/provider/services/capabilityGate.service';
 import {
   listAllPayoutAccounts,
   getPayoutAccount,
@@ -48,113 +49,18 @@ export async function accountInformationController(fastify: FastifyInstance) {
   const CAP = 'account-information';
   // v29 admin gate: accounts* routes require operations_officer permission AND the account-information
   // capability resolving to its internal built-in provider (else 409 managed_externally).
-  const gate = requireInternalProvider('account_information');
+  // No capability gate on these routes, deliberately (v37 P12).
+  //
+  // They used to be gated on the capability resolving to the PSP's own built-in engine, which made sense while
+  // that engine was what they administered. What they actually administer is the PROVIDER's own record, and who
+  // issues the card or services the account has no bearing on the provider's right to manage it. The gate would
+  // now refuse every request, because the capability resolves to a bank by design.
 
-  fastify.post('/validate', {
-    schema: {
-      tags: ['modules:account-information'],
-      summary: 'AIS account validation (internal builtin)',
-      description: 'Validates a payout account status and returns PSP internal ledger balance. '
-        + 'Called by the integration router. Not JWT-authenticated; requires X-Integration-Source header. '
-        + 'IBAN is never present in the request: uses payoutAccountInstanceReference only.',
-      headers: {
-        type: 'object',
-        required: ['x-integration-source'],
-        properties: { 'x-integration-source': { type: 'string' } },
-      },
-      body: {
-        type: 'object',
-        required: ['payoutAccountInstanceReference', 'clientReference'],
-        additionalProperties: true,
-        properties: {
-          payoutAccountInstanceReference: { type: 'string' },
-          clientReference: { type: 'string' },
-        },
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            accountVerified:  { type: 'boolean' },
-            accountStatus:    { type: 'string' },
-            identityMatch:    { type: 'string' },
-            balancePending:   { type: 'number' },
-            balanceAvailable: { type: 'number' },
-            currency:         { type: 'string' },
-            providerReference:{ type: 'string' },
-            clientReference:  { type: 'string' },
-          },
-        },
-        401: { type: 'object', properties: { error: { type: 'string' } } },
-      },
-    },
-    config: { skipAuth: true },
-  }, async (request, reply) => {
-    if (!request.headers['x-integration-source']) {
-      return reply.code(401).send({ error: 'X-Integration-Source header required' });
-    }
 
-    const body = (request.body ?? {}) as Record<string, unknown>;
-    const payoutAccountRef = body.payoutAccountInstanceReference as string;
-    const clientReference = body.clientReference as string;
 
-    const stored = await getCapabilityModuleConfig(fastify.db, CAP);
-    const config = resolveAccountInformationConfig(stored?.moduleConfig as Record<string, unknown> | undefined);
 
-    const account = await fastify.db
-      .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
-      .findOne({ payoutAccountInstanceReference: payoutAccountRef });
 
-    const result = validateAccount({ payoutAccountInstanceReference: payoutAccountRef, clientReference }, account, config);
 
-    emitComplianceEvent(fastify.db, {
-      entityType: 'account',
-      entityId: payoutAccountRef,
-      processType: 'payment_processing',
-      processAction: 'ais.account.validation.completed',
-      processOutcome: result.accountVerified ? 'verified' : 'rejected',
-      performedByPartyReference: null,
-      performedByRole: null,
-      eventSummary: {
-        module: CAP,
-        payoutAccountRef,
-        accountStatus: result.accountStatus,
-        accountVerified: result.accountVerified,
-      },
-      bianServiceDomain: 'SD-36 Open Banking',
-      bianControlRecordType: 'AccountInformationValidation',
-    });
-
-    return reply.send({ ...result, clientReference });
-  });
-
-  fastify.get('/config', {
-    preHandler: requirePermission('modules', 'view'),
-    schema: {
-      tags: ['modules:account-information'],
-      summary: 'Get AIS module configuration',
-      response: {
-        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
-      },
-    },
-  }, async () => {
-    return (await getCapabilityModuleConfig(fastify.db, CAP)) ?? { capability: CAP, moduleConfig: {} };
-  });
-
-  fastify.put('/config', {
-    preHandler: requirePermission('modules', 'manage'),
-    schema: {
-      tags: ['modules:account-information'],
-      summary: 'Update AIS module configuration',
-      body: { type: 'object', properties: { moduleConfig: { type: 'object', additionalProperties: true } } },
-      response: {
-        200: { type: 'object', properties: { capability: { type: 'string' }, moduleConfig: { type: 'object', additionalProperties: true } } },
-      },
-    },
-  }, async (request) => {
-    const body = request.body as { moduleConfig?: Record<string, unknown> };
-    return upsertCapabilityModuleConfig(fastify.db, CAP, { moduleConfig: body.moduleConfig ?? {} });
-  });
 
   // ── v29 GLOBAL PAYOUT-ACCOUNT ADMINISTRATION (built-in module surface) ─────────────────
   // Global cross-party administration of payout accounts, distinct from the party-scoped self-service
@@ -164,7 +70,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // GET /accounts: global paginated list (QE-stripped + hints).
   fastify.get('/accounts', {
-    preHandler: [requirePermission('accounts', 'view'), gate],
+    preHandler: [requirePermission('accounts', 'view')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'List all payout accounts (global administration)',
@@ -214,7 +120,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // GET /accounts/:accountRef, global account detail (QE-stripped; audited).
   fastify.get('/accounts/:accountRef', {
-    preHandler: [requirePermission('accounts', 'view'), gate],
+    preHandler: [requirePermission('accounts', 'view')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Get one payout account (global administration detail)',
@@ -242,7 +148,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   // GET /parties: owner picker for account registration: search parties by owner name.
   // Returns ONLY the party ref + owner name (need-to-know; no other PII). accounts:view + gate.
   fastify.get('/parties', {
-    preHandler: [requirePermission('accounts', 'view'), gate],
+    preHandler: [requirePermission('accounts', 'view')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Search parties by owner name (account owner picker)',
@@ -260,7 +166,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   // account (cardAccountReference). Reuses listAllCards (funding filter) via the Card-by-account
   // port. Display-safe (no full PAN, no CVV).
   fastify.get('/accounts/:accountRef/cards', {
-    preHandler: [requirePermission('accounts', 'view'), gate],
+    preHandler: [requirePermission('accounts', 'view')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'List cards funded by a payout account (cross-linking, paginated)',
@@ -292,7 +198,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   // GET /accounts/:accountRef/iban (v30 reveal): full IBAN for operations_officer from the admin
   // console (direct, gate internal). Ephemeral, audited (account.iban.revealed). Step-up in prod.
   fastify.get('/accounts/:accountRef/iban', {
-    preHandler: [requirePermission('accounts', 'manage'), gate],
+    preHandler: [requirePermission('accounts', 'manage')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Reveal a payout account IBAN (operations officer)',
@@ -320,7 +226,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   // GET /accounts/:accountRef/routing (v30.1 reveal): full routing / national clearing number for
   // operations_officer. Ephemeral, audited (account.routing.revealed). Step-up in prod.
   fastify.get('/accounts/:accountRef/routing', {
-    preHandler: [requirePermission('accounts', 'manage'), gate],
+    preHandler: [requirePermission('accounts', 'manage')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Reveal a payout account routing number (operations officer)',
@@ -348,7 +254,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
   // PATCH /accounts/:accountRef/owner, v30.1 administrative ownership reassignment. Moves the account
   // to a different party. Sensitive (PII/fraud); audited (account.owner.reassigned). accounts:manage.
   fastify.patch('/accounts/:accountRef/owner', {
-    preHandler: [requirePermission('accounts', 'manage'), gate],
+    preHandler: [requirePermission('accounts', 'manage')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Reassign a payout account to a different owner (party)',
@@ -376,7 +282,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // POST /accounts: register a payout account for a party (IBAN/routing QE-encrypted at rest).
   fastify.post('/accounts', {
-    preHandler: [requirePermission('accounts', 'manage'), gate],
+    preHandler: [requirePermission('accounts', 'manage')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Register a payout account (global administration)',
@@ -429,7 +335,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // PATCH /accounts/:accountRef, update mutable banking metadata (IBAN/currency/type immutable).
   fastify.patch('/accounts/:accountRef', {
-    preHandler: [requirePermission('accounts', 'manage'), gate],
+    preHandler: [requirePermission('accounts', 'manage')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Update a payout account (global administration)',
@@ -468,7 +374,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
 
   // DELETE /accounts/:accountRef, close the account (soft-close; record retained).
   fastify.delete('/accounts/:accountRef', {
-    preHandler: [requirePermission('accounts', 'manage'), gate],
+    preHandler: [requirePermission('accounts', 'manage')],
     schema: {
       tags: ['modules:account-information'],
       summary: 'Close a payout account (global administration)',

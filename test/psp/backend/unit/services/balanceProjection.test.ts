@@ -63,12 +63,10 @@ afterEach(() => {
 });
 
 describe('v37 P2.4: the balance is projected from the bank', () => {
-  it('is a no-op with the kill switch off, which is what makes the migration safe', async () => {
-    const { projection } = await load(false);
-    const [account] = await projection.projectBalances([LINKED]);
-    expect(account.payoutAccountBalance.availableAmount).toBe(3500);
-    expect(account.payoutAccountBalanceSource).toBeUndefined();
-  });
+  // The "no-op with the kill switch off" case is gone with the switch itself (v37 P12). It asserted that the
+  // provider would keep serving its OWN stored balance, and that is precisely what it must not do: the figure
+  // is the bank's, and showing a stale copy as though it were the balance is the failure the projection
+  // exists to prevent. There is no second implementation left to fall back to.
 
   it('reads the bank figure at the identical field path every consumer parses', async () => {
     const { client } = await load(true);

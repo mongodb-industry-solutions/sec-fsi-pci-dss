@@ -86,7 +86,15 @@ export async function dispatchProvider(
         error: `${type} could not be routed: ${resolved.reason}`,
       };
     }
-    if (resolved.provider.externalProviderApiEndpoint) {
+    // Dispatched over the wire when there is something to call, which is a base URL or a path, not merely the
+    // legacy single-endpoint field.
+    //
+    // That field used to be the only test, and it held a LOOPBACK path back into the PSP for the capabilities
+    // the PSP served itself. Removing the loopback therefore made the bank unreachable through this pipeline:
+    // the provider looked like it had no endpoint, so the dispatch fell through to the internal branch and
+    // recorded a "sent" that went nowhere. An institution reached by declared per-event paths against its own
+    // base URL has no use for the single field, and asking the wrong question here is silent.
+    if (resolved.provider.externalProviderBaseUrl || resolved.provider.externalProviderApiEndpoint) {
       return dispatchExternal(db, resolved.provider, triggeredBy, payload, businessContext);
     }
     return logAndReturn(db, resolved.provider, triggeredBy, payload, businessContext, {

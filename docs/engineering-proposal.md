@@ -2867,3 +2867,53 @@ cases it must not, because the PSP reads it for fraud investigation, which does 
 scope for it, and show the provider operating a full card flow without ever holding one. The cost is a network
 hop for three operations that used to be local reads, and one more place where a misconfigured provider
 endpoint produces a 502 instead of a value.
+
+## ADR-069: the provider performs no banking operation, and gives up its fallback to do it (v37 P12)
+
+**Context.** The provider carried its own implementations of four bank capabilities: a card-issuer engine that
+validated a card's format, network and verification value; a card-authorisation stub that approved or declined;
+an account-information engine that judged an account and its funds; a payment-initiation engine that moved a
+transfer. Each was reachable as an INTERNAL provider, dispatched to a loopback path back into the provider's
+own API, and `PSP_BANKCORE_ENABLED=false` selected them over the bank. The funds gate did the same thing with
+the ledger: with the bank disabled or the account unlinked, it held money against the provider's own balance.
+
+That was the right shape while the provider was the only participant. It is the wrong one for a provider whose
+role is to reach SEVERAL banks: an institution's own decisions cannot be reimplemented per integration, and a
+provider that holds a balance is a provider that has become a bank.
+
+**Decision.** No banking operation is performed inside the provider. The four engines are deleted, along with
+their controllers, their loopback endpoints, their internal-handler declarations and their configuration
+screens. Each capability is reached at an institution over that institution's API: Open Banking where a
+standard exists (accounts, balances, transactions, consents, payments, periodic payments, funds confirmation),
+and the card industry's own conventions where none does (ISO/IEC 7812, Luhn, ISO 8583 response codes), which is
+stated rather than dressed up as Open Banking.
+
+Resolution is by the DATA and refuses rather than guessing: an account's servicing institution, a freshly typed
+IBAN's bank code, a card's issuer. An account the provider cannot reach at a bank is refused with
+`funding_account_not_linked_to_a_bank`, not decided locally.
+
+What the provider keeps is what it owns: the cards its customers have on file, their payout accounts, the
+consents it holds, its own audit trail, and the routing that decides which institution serves each request.
+
+**What was rejected.** Keeping the engines as a fallback behind the flag. It reads like prudence and is the
+opposite: two implementations of one decision means the demo can silently exercise the wrong one, and the
+fallback is the one nobody looks at, so it drifts. The card engine had already drifted, holding its own copy of
+each network's verification-value length while the bank held the authoritative one.
+
+Also rejected: moving the provider's cards-on-file and payout-account administration to the bank. Those are the
+provider's records. A card on file is a tokenised instrument the provider holds under its own obligations, and a
+payout account POINTS AT an account the bank services rather than being one. Moving them would have made the
+bank administer another institution's data, which is the same mistake in the other direction.
+
+**Consequences, including the one that costs something.**
+
+`PSP_BANKCORE_ENABLED=false` is no longer a fallback. Previously it restored a working provider-only mode, which
+made a regression one variable away from isolated; now it can only stop the provider talking to the bank, and
+there is nothing left to talk to instead. The safety property an earlier decision in this plan relied on is
+gone, deliberately, and the replacement is that the failure is LOUD: a capability that cannot be routed refuses
+with the reason, and the funds gate fails closed.
+
+An unlinked account can no longer be paid from. One seeded payout account is in that state, and it now declines
+rather than approving against a balance nobody stands behind. That is the correct answer to "authorise this
+against money I do not hold", and it is visible instead of silent.
+

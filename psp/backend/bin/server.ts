@@ -24,10 +24,8 @@ import { vopModule }       from '../src/providers/vop';
 import { kycModule }       from '../src/providers/kyc';
 import { kybModule }       from '../src/providers/kyb';
 import { creditBureauModule }      from '../src/providers/credit-bureau';
-import { cardAuthorizationModule }  from '../src/providers/card-authorization';
 import { cardIssuerModule }         from '../src/providers/card-issuer';
 import { accountInformationModule } from '../src/providers/account-information';
-import { paymentInitiationModule }  from '../src/providers/payment-initiation';
 import { domainModule }       from '../src/modules/domain';
 import { notificationsModule } from '../src/modules/notification';
 import { oidcDiscoveryController } from '../src/modules/identity/controllers/oidcDiscovery.controller';
@@ -213,10 +211,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(kycModule,          { prefix: '/api/v1' });
   await fastify.register(kybModule,          { prefix: '/api/v1' });
   await fastify.register(creditBureauModule, { prefix: '/api/v1' });
-  await fastify.register(cardAuthorizationModule,  { prefix: '/api/v1' });
   await fastify.register(cardIssuerModule,         { prefix: '/api/v1' });
   await fastify.register(accountInformationModule, { prefix: '/api/v1' });
-  await fastify.register(paymentInitiationModule,  { prefix: '/api/v1' });
   // Internal Module without a Provider counterpart (ADR-029).
   await fastify.register(domainModule,  { prefix: '/api/v1' });
   // Customer notifications (pending fraud-investigation questions to answer).

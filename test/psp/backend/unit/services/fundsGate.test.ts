@@ -1,6 +1,7 @@
 /**
  * Unit tests (v17): funds-availability gate correctness.
- *  - checkFunds (pure): interprets the ledger balance into a funds verdict.
+ *  - The funds VERDICT is no longer tested here: the bank holds the balance and answers the question over
+ *    its own endpoint, which returns whether the amount is available rather than the figure (v37 P12).
  *  - PaymentAuthorizationSaga: compensation, a hold made by the funds gate is released (pending ->
  *    available) whenever the journey is declined by ANY gate, including the ordering race where the
  *    hold lands AFTER an earlier decline.
@@ -24,10 +25,6 @@ import { EventBusInProcess } from '@leafypay/eventbus';
 import { makeEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 import type { Db } from 'mongodb';
 import { PaymentAuthorizationSaga } from '../../../../../psp/backend/src/modules/transaction/services/paymentAuthorization.saga';
-import {
-  checkFunds,
-  DEFAULT_ACCOUNT_INFORMATION_CONFIG,
-} from '../../../../../psp/backend/src/providers/account-information/services/accountInformation.service';
 import type { PayoutAccountArrangement } from '../../../../../psp/backend/src/modules/gateway/models/payoutAccount.model';
 
 const flush = () => new Promise((r) => setTimeout(r, 15));
@@ -43,21 +40,6 @@ function account(available: number): PayoutAccountArrangement {
     recordCreatedDateTime: new Date(), recordUpdatedDateTime: new Date(), schemaVersion: 1,
   };
 }
-
-describe('checkFunds (SD-36 AIS)', () => {
-  it('is sufficient when available >= amount on an active account', () => {
-    const v = checkFunds(account(500), 200, DEFAULT_ACCOUNT_INFORMATION_CONFIG);
-    expect(v).toMatchObject({ accountVerified: true, accountStatus: 'active', sufficient: true, available: 500, currency: 'EUR' });
-  });
-  it('is insufficient when available < amount', () => {
-    expect(checkFunds(account(100), 200, DEFAULT_ACCOUNT_INFORMATION_CONFIG).sufficient).toBe(false);
-  });
-  it('rejects a missing account', () => {
-    const v = checkFunds(null, 10, DEFAULT_ACCOUNT_INFORMATION_CONFIG);
-    expect(v.accountVerified).toBe(false);
-    expect(v.sufficient).toBe(false);
-  });
-});
 
 describe('PaymentAuthorizationSaga: funds hold compensation', () => {
   let bus: EventBusInProcess;

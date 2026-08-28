@@ -17,8 +17,6 @@ import { screenAml } from '../../../../../psp/backend/src/providers/aml/services
 import { verifyKyc } from '../../../../../psp/backend/src/providers/kyc/services/kyc.service';
 import { verifyKyb } from '../../../../../psp/backend/src/providers/kyb/services/kyb.service';
 import { scoreCreditBureau } from '../../../../../psp/backend/src/providers/credit-bureau/services/creditBureau.service';
-import { authorizeCard } from '../../../../../psp/backend/src/providers/card-authorization/services/cardAuthorization.service';
-import { validateCardIssuer } from '../../../../../psp/backend/src/providers/card-issuer/services/cardIssuer.service';
 
 describe('capability module engines (ADR-029)', () => {
   it('fds: approves low value, flags high value, threshold configurable', () => {
@@ -36,11 +34,13 @@ describe('capability module engines (ADR-029)', () => {
     expect(r.riskRating).toBe('low');
   });
 
-  it('aml/kyc/kyb/card engines return well-formed payloads', () => {
+  // The card authorisation engine is deliberately absent from this list (v37 P12): authorising a card is a
+  // decision about whether an account will release money, so it belongs to the institution holding it. The
+  // bank answers it over its own API and its own tests cover it.
+  it('aml/kyc/kyb engines return well-formed payloads', () => {
     expect(screenAml({}).requiresReview).toBe(false);
     expect(verifyKyc({}).verificationStatus).toBe('pass');
     expect(verifyKyb({}).sanctionsMatch).toBe(false);
-    expect(authorizeCard({}).authorizationStatus).toBe('approved');
   });
 
   it('credit-bureau: refuses with no subject rather than inventing a score', async () => {
@@ -59,59 +59,4 @@ describe('capability module engines (ADR-029)', () => {
     expect(result.creditScore).toBeUndefined();
   });
 
-  describe('card issuer validation (configurable simulator)', () => {
-    it('approves a well-formed Visa with the configured valid CVV', () => {
-      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '123' });
-      expect(r.actionConfirmed).toBe(true);
-      expect(r.responseCode).toBe('00');
-      expect(r.network).toBe('VISA');
-      expect(r.cvvValidationResult).toBe('match');
-    });
-    it('declines a wrong CVV', () => {
-      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '999' });
-      expect(r.actionConfirmed).toBe(false);
-      expect(r.responseCode).toBe('82');
-      expect(r.cvvValidationResult).toBe('no_match');
-    });
-    it('declines a number that fails the Luhn check', () => {
-      const r = validateCardIssuer({ cardNumber: '4242424242424241' });
-      expect(r.actionConfirmed).toBe(false);
-      expect(r.responseCode).toBe('14');
-    });
-    it('declines an unsupported network', () => {
-      const r = validateCardIssuer({ cardNumber: '9999999999999999' });
-      expect(r.actionConfirmed).toBe(false);
-      expect(r.responseCode).toBe('12');
-    });
-    it('tokenized path (masked PAN + network, no CVV) approves a supported network', () => {
-      const r = validateCardIssuer({ maskedPan: '****-****-****-4242', network: 'VISA' });
-      expect(r.actionConfirmed).toBe(true);
-      expect(r.cvvValidationResult).toBe('not_provided');
-    });
-    it('D1 (P13.1): declines when a CVV was expected on the channel but none was supplied', () => {
-      const r = validateCardIssuer({ maskedPan: '****-****-****-4242', network: 'VISA', cvvExpected: true });
-      expect(r.actionConfirmed).toBe(false);
-      expect(r.responseCode).toBe('82');
-      expect(r.decisionReason).toBe('cvv_required');
-    });
-    it('D1 (P13.1): a correct CVV on a CVV-bearing channel still approves', () => {
-      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '123', cvvExpected: true });
-      expect(r.actionConfirmed).toBe(true);
-      expect(r.cvvValidationResult).toBe('match');
-    });
-    it('tokenized path with NO network hint does NOT false-decline (network not assessable)', () => {
-      // Regression: a masked PAN alone hides the BIN, so the network cannot be assessed. The issuer
-      // must not reject the card here (it was validated at entry), otherwise legit payments break.
-      const r = validateCardIssuer({ maskedPan: '****-****-****-1212' });
-      expect(r.actionConfirmed).toBe(true);
-      expect(r.responseCode).toBe('00');
-      expect(r.network).toBeNull();
-    });
-    it('never echoes the PAN or CVV in the response', () => {
-      const r = validateCardIssuer({ cardNumber: '4242424242424242', cvv: '123' }) as Record<string, unknown>;
-      const serialized = JSON.stringify(r);
-      expect(serialized).not.toContain('4242424242424242');
-      expect(serialized).not.toContain('123');
-    });
-  });
 });

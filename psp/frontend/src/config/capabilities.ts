@@ -81,25 +81,29 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
   },
   'card-authorization': {
     capability: 'card-authorization', providerType: 'card_authorization', label: 'Card Authorization',
-    description: 'Card authorization request/response (no CVV passed; PCI DSS).',
+    description: 'Authorisation is decided by the institution holding the funds, over its own API. '
+      + 'The provider routes the request and records the outcome; it approves nothing itself.',
     callbackSegment: 'card/authorization', frontendFolder: 'card-authorization', moduleDomain: 'gateway', hasModule: false,
     bianServiceDomain: 'Card Authorization',
   },
   'card-issuer': {
     capability: 'card-issuer', providerType: 'card_issuer', label: 'Card Issuer',
-    description: 'CVV/PIN validation and card lifecycle (activate/block/replace).',
-    callbackSegment: 'card/issuer', frontendFolder: 'card-issuer', moduleDomain: 'gateway', hasModule: true,
+    description: 'Card validation and lifecycle belong to the issuing bank, which holds the only copy of '
+      + 'the number and derives the verification value. Administered in the bank\'s own app.',
+    callbackSegment: 'card/issuer', frontendFolder: 'card-issuer', moduleDomain: 'gateway', hasModule: false,
     bianServiceDomain: 'Payment Card',
   },
   'account-information': {
     capability: 'account-information', providerType: 'account_information', label: 'Account Information (AIS)',
-    description: 'Validates payout account status and retrieves internal ledger balance (PSD2 AIS). IBAN never exposed on the wire, resolved by the adapter from the QE vault.',
-    callbackSegment: 'account-information', frontendFolder: 'account-information', moduleDomain: 'gateway', hasModule: true,
+    description: 'Account status and balances are read from the servicing institution under a consent, over '
+      + 'the Open Banking account endpoints. The provider stores no balance of its own.',
+    callbackSegment: 'account-information', frontendFolder: 'account-information', moduleDomain: 'gateway', hasModule: false,
     bianServiceDomain: 'Open Banking',
   },
   'payment-initiation': {
     capability: 'payment-initiation', providerType: 'payment_initiation', label: 'Payment Initiation (PISP)',
-    description: 'Initiates bank transfers over SEPA / ACH / internal rails with configurable T+N settlement delays (PSD2 PISP). Amount and PSP account ref only, no IBAN on the wire.',
+    description: 'A transfer is initiated AT the servicing institution over the Open Banking payment '
+      + 'endpoints, which choose the rail from the destination. The provider moves no money itself.',
     callbackSegment: 'payment-initiation', frontendFolder: 'payment-initiation', moduleDomain: 'gateway', hasModule: false,
     bianServiceDomain: 'Payment Execution',
   },

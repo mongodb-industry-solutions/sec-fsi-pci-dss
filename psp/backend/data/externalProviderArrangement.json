@@ -392,12 +392,10 @@
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-card-auth-001",
-    "externalProviderArrangementName": "Card Authorization Stub (SD-15)",
+    "externalProviderArrangementName": "BankCore Card Authorisation",
     "externalProviderArrangementType": "card_authorization",
     "externalProviderArrangementStatus": "active",
-    "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/card-authorization/score",
-    "externalProviderInternalHandler": "cardAuthorization.stubAdapter",
+    "externalProviderIsInternal": false,
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "card.authorisation.requested",
@@ -474,12 +472,10 @@
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-card-issuer-001",
-    "externalProviderArrangementName": "Card Issuer",
+    "externalProviderArrangementName": "BankCore Card Issuer",
     "externalProviderArrangementType": "card_issuer",
     "externalProviderArrangementStatus": "active",
-    "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/card-issuer/score",
-    "externalProviderInternalHandler": "cardIssuer.internalCvvValidation",
+    "externalProviderIsInternal": false,
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "card.issuer.validation.requested",
@@ -570,11 +566,10 @@
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-ais-001",
-    "externalProviderArrangementName": "Internal Account Information Service (AIS)",
+    "externalProviderArrangementName": "BankCore Account Information (AIS)",
     "externalProviderArrangementType": "account_information",
     "externalProviderArrangementStatus": "active",
-    "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/account-information/validate",
+    "externalProviderIsInternal": false,
     "authConfig": {
       "scheme": "oauth2_cc",
       "oauth2": {
@@ -589,7 +584,6 @@
         "tokenCachingEnabled": true
       }
     },
-    "externalProviderInternalHandler": "accountInformation.internalHandler",
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
       "payout.ais.validation.requested"
@@ -639,11 +633,10 @@
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-pisp-001",
-    "externalProviderArrangementName": "Internal Payment Initiation Service (PISP)",
+    "externalProviderArrangementName": "BankCore Payment Initiation (PIS)",
     "externalProviderArrangementType": "payment_initiation",
     "externalProviderArrangementStatus": "active",
-    "externalProviderIsInternal": true,
-    "externalProviderApiEndpoint": "/api/v1/modules/payment-initiation/transfer",
+    "externalProviderIsInternal": false,
     "authConfig": {
       "scheme": "oauth2_cc",
       "oauth2": {
@@ -656,7 +649,6 @@
         "tokenCachingEnabled": true
       }
     },
-    "externalProviderInternalHandler": "paymentInitiation.internalHandler",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "payout.transfer.requested",
