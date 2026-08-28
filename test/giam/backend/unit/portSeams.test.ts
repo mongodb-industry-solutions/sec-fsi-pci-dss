@@ -22,7 +22,7 @@ import { registerFakes, FAKE_PREFIX, fakeAllowEvaluator, fakeDenyEvaluator } fro
  * due later carries only the fake, and the fake still has to prove the seam, which is what the second
  * block of tests does. Each phase adds its own entry here as it lands.
  */
-const DELIVERED_PHASES = new Set<string>([]);
+const DELIVERED_PHASES = new Set<string>(['P0']);
 
 let fakes: ReturnType<typeof registerFakes>;
 
