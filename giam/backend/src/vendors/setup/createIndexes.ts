@@ -39,7 +39,10 @@ export function plannedIndexes(): IndexPlan[] {
     // Home-realm discovery resolves an entered email domain to a provider.
     { collection: IDENTITY_PROVIDER_COLLECTION, keys: { realmId: 1, 'config.emailDomains': 1 }, options: { name: 'realm_emailDomains', sparse: true } },
 
-    { collection: TENANT_COLLECTION, keys: { tenantId: 1 }, options: { name: 'tenantId_unique', unique: true } },
+    // Unique per REALM, not globally. A tenant is a boundary inside a realm, so the pair is its
+    // identity; a global unique would force every realm to prefix its tenant names and would make the
+    // partition key redundant with itself.
+    { collection: TENANT_COLLECTION, keys: { realmId: 1, tenantId: 1 }, options: { name: 'realm_tenantId_unique', unique: true } },
     { collection: TENANT_COLLECTION, keys: { realmId: 1, name: 1 }, options: { name: 'realm_name_unique', unique: true } },
     { collection: TENANT_COLLECTION, keys: { realmId: 1, parentTenantId: 1 }, options: { name: 'realm_parent', sparse: true } },
 
