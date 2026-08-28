@@ -10,6 +10,7 @@ import { buildExtract, downloadJsonFile } from '../../lib/downloadJson';
 import { JsonView } from '../JsonView';
 import { BankError, Empty } from '../States';
 import { DEFAULT_PAGE_SIZE, Pager } from './Pager';
+import { DateRangeFilter } from './DateRangeFilter';
 
 // EVERY list in this app, from one component.
 //
@@ -42,6 +43,13 @@ export interface FilterSpec {
   /** A select when options are given, a text input otherwise. */
   options?: { value: string; label: string }[];
   placeholder?: string;
+  /**
+   * Renders a date-and-time range control instead of a plain input, writing to TWO query keys.
+   *
+   * A window is one question ("when?") answered by two bounds, so it is one control rather than two fields an
+   * operator has to keep consistent. `key` stays the identity of the filter for the URL and the bar.
+   */
+  dateRange?: { fromKey: string; toKey: string };
 }
 
 export interface DataListProps<T> {
@@ -97,7 +105,16 @@ export function DataList<T extends Row>({
   const query = searchParams.get('q') ?? '';
   const filterValues = useMemo(() => {
     const values: Record<string, string> = {};
-    for (const filter of filters) values[filter.key] = searchParams.get(filter.key) ?? '';
+    for (const filter of filters) {
+      if (filter.dateRange) {
+        // A range owns two keys and not its own, so reading `filter.key` here would send an empty parameter
+        // the bank does not know.
+        values[filter.dateRange.fromKey] = searchParams.get(filter.dateRange.fromKey) ?? '';
+        values[filter.dateRange.toKey] = searchParams.get(filter.dateRange.toKey) ?? '';
+      } else {
+        values[filter.key] = searchParams.get(filter.key) ?? '';
+      }
+    }
     return values;
   }, [filters, searchParams]);
 
@@ -142,9 +159,32 @@ export function DataList<T extends Row>({
     return () => clearTimeout(handle);
   }, [draftQuery, query, writeParams]);
 
+  // `fixed` is applied LAST, so a filter the page has pinned cannot be undone by the URL.
+  //
+  // The order used to be the other way round, and it silently broke the whole point of a pinned filter. Every
+  // key a screen declares as a filter is read from the URL as `''` when absent, so `{...fixed, ...filterValues}`
+  // wrote an empty string over `fixed.holder`, the empty value was then dropped from the query string, and the
+  // owner's page asked for EVERY account and EVERY card at the bank. It looked like a working screen showing
+  // the wrong records, which is the worst kind of wrong on a page about one party.
+  //
+  // Keyed by VALUE, not by object identity. Callers pass this as an object literal (`fixed={{ holder }}`), so a
+  // new object arrives on every render; depending on its identity made `activeQuery` new every render, which
+  // made the fetch effect fire every render, which set state and rendered again. A pinned list would have sat
+  // there re-reading the bank forever.
+  const fixedKey = JSON.stringify(fixed ?? {});
   const activeQuery = useMemo(() => ({
-    ...fixed, ...filterValues, q: query, page, limit,
-  }), [fixed, filterValues, query, page, limit]);
+    ...filterValues, q: query, page, limit, ...fixed,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [fixedKey, filterValues, query, page, limit]);
+
+  // A filter the page has pinned is not offered as a control. Leaving it in the bar would show an empty
+  // "Holder reference" box on a page that is already scoped to one holder, which invites an operator to type
+  // into it and wonder why nothing changes.
+  const openFilters = useMemo(
+    () => filters.filter((filter) => !(fixed && filter.key in fixed)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters, fixedKey],
+  );
 
   useEffect(() => {
     let live = true;
@@ -208,7 +248,11 @@ export function DataList<T extends Row>({
 
   const statusCounts = result?.byStatus ?? {};
   const activeStatus = statusFilterKey ? filterValues[statusFilterKey] ?? '' : '';
-  const appliedCount = Object.values(filterValues).filter(Boolean).length;
+  // Counts only what the OPERATOR applied. A pinned filter is the page's, not theirs, so counting it would
+  // show "Filters 1" on a screen where the bar is empty.
+  const appliedCount = openFilters.filter((filter) => (filter.dateRange
+    ? filterValues[filter.dateRange.fromKey] || filterValues[filter.dateRange.toKey]
+    : filterValues[filter.key])).length;
 
   return (
     <div className="space-y-4">
@@ -238,7 +282,7 @@ export function DataList<T extends Row>({
           </div>
 
           <div className="flex items-center gap-2">
-            {filters.length > 0 && (
+            {openFilters.length > 0 && (
               <button
                 type="button"
                 onClick={() => setFiltersOpen((open) => !open)}
@@ -279,9 +323,22 @@ export function DataList<T extends Row>({
 
         {/* The filter row is collapsed by default on every size: six controls above a list push the results
             off the fold, and most visits do not filter at all. */}
-        {filtersOpen && filters.length > 0 && (
+        {filtersOpen && openFilters.length > 0 && (
           <div className="grid grid-cols-1 gap-3 border-t border-line pt-3 sm:grid-cols-2 lg:grid-cols-4">
-            {filters.map((filter) => (
+            {openFilters.map((filter) => (filter.dateRange ? (
+              <DateRangeFilter
+                key={filter.key}
+                label={filter.label}
+                value={{
+                  from: filterValues[filter.dateRange.fromKey] ?? '',
+                  to: filterValues[filter.dateRange.toKey] ?? '',
+                }}
+                onChange={(next) => writeParams({
+                  [filter.dateRange!.fromKey]: next.from,
+                  [filter.dateRange!.toKey]: next.to,
+                })}
+              />
+            ) : (
               <div key={filter.key} className="min-w-0">
                 <label className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-ink-soft">
                   {filter.label}
@@ -306,12 +363,14 @@ export function DataList<T extends Row>({
                   />
                 )}
               </div>
-            ))}
+            )))}
             {appliedCount > 0 && (
               <div className="flex items-end">
                 <button
                   type="button"
-                  onClick={() => writeParams(Object.fromEntries(filters.map((f) => [f.key, ''])))}
+                  onClick={() => writeParams(Object.fromEntries(openFilters.flatMap((f) => (f.dateRange
+                    ? [[f.dateRange.fromKey, ''], [f.dateRange.toKey, '']]
+                    : [[f.key, '']]))))}
                   className="text-xs text-accent hover:underline"
                 >
                   Clear every filter

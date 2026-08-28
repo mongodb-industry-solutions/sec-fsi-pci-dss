@@ -7,7 +7,7 @@ import { findRegistrationByClientId, hashClientSecret } from '../../modules/tpp-
 import { readSeedFile } from './readSeedFile';
 import { config } from '../../config';
 
-// Registers Leafy Pay as a TPP so a fresh deploy of both services is integrated with no manual step.
+// Registers LeafyPay as a TPP so a fresh deploy of both services is integrated with no manual step.
 //
 // The credential VALUE is a seed-time input (environment, with a local default) because a shared secret
 // has to originate somewhere: the two sides cannot derive the same one independently. What is stored

@@ -6,7 +6,7 @@ export const AUTHENTICATION_DOMAIN_COLLECTION = 'authenticationDomain';
 // to a federated one, and it is deliberately NOT renamed: it names the mechanism, not the realm.
 export type AuthDomainType = 'local' | 'oidc' | 'saml';
 
-// The REALM a user belongs to. Customers and employees are both Leafy Pay users, so this is the platform
+// The REALM a user belongs to. Customers and employees are both LeafyPay users, so this is the platform
 // realm rather than a staff one, and v37 renamed it from `local` to say so: a realm called `local` reads as
 // "wherever this is deployed" instead of naming the institution whose users these are.
 export type AuthDomainName = 'leafypay' | 'msentra' | 'bigid';

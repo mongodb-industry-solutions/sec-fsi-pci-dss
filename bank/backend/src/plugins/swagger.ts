@@ -19,14 +19,14 @@ async function swaggerPlugin(fastify: FastifyInstance) {
     openapi: {
       openapi: '3.0.0',
       info: {
-        title: 'bankcore (Open Banking ASPSP)',
+        title: 'BankCore (Open Banking ASPSP)',
         version: '1.0.0',
         description: `
 ## Overview
 
-Open Banking API of the demo **ASPSP** behind Leafy Pay. The bank owns what a bank owns: the account
+Open Banking API of the demo **ASPSP** behind LeafyPay. The bank owns what a bank owns: the account
 ledger and its balances, the card issuer vault with the only copy of a PAN, and the PSD2 consent
-records. Leafy Pay is a registered **TPP** against it, playing three roles at once: AISP when it reads
+records. LeafyPay is a registered **TPP** against it, playing three roles at once: AISP when it reads
 accounts, PISP when it initiates a credit transfer, and CBPII when it asks for funds confirmation.
 
 The external contract is [Berlin Group NextGenPSD2](https://www.berlin-group.org/nextgenpsd2-downloads)
@@ -166,13 +166,13 @@ The key vault is shared with the PSP, so both services decrypt with the same DEK
       tryItOutEnabled: true,
     },
     theme: {
-      title: 'bankcore API',
+      title: 'BankCore API',
       css: [{
         filename: 'bankcore-topbar.css',
         content: [
           '.topbar-wrapper .link span:not([class]) { display: none; }',
           '.topbar-wrapper .link svg { display: none; }',
-          '.topbar-wrapper .link::after { content: "bankcore"; font-size: 1.15rem; font-weight: 700; color: #00ED64; margin-left: 8px; letter-spacing: 0.01em; }',
+          '.topbar-wrapper .link::after { content: "BankCore"; font-size: 1.15rem; font-weight: 700; color: #00ED64; margin-left: 8px; letter-spacing: 0.01em; }',
           '.swagger-ui .topbar { background-color: #001E2B; }',
         ].join('\n'),
       }],

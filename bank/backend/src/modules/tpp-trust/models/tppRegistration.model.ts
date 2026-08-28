@@ -4,7 +4,7 @@
 // The secret is held as a bcrypt hash and never in clear: the bank verifies, it does not disclose.
 export const TPP_REGISTRATION_COLLECTION = 'tppRegistration';
 
-// PSD2 roles. A TPP may hold several at once, as Leafy Pay does.
+// PSD2 roles. A TPP may hold several at once, as LeafyPay does.
 export type TppRole = 'AISP' | 'PISP' | 'CBPII';
 
 export type TppRegistrationStatus = 'active' | 'suspended' | 'revoked';

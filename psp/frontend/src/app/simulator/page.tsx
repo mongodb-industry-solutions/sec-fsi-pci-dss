@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { CreditCard, Search, Store, ArrowRight, Home, LayoutDashboard, QrCode, X, Landmark, BookOpen } from 'lucide-react';
+import { CreditCard, Search, Store, ArrowRight, ExternalLink, Home, LayoutDashboard, QrCode, X, Landmark, BookOpen } from 'lucide-react';
 import {
   MERCHANT_PUBLIC_URL, demoPublicUrl, BANKCORE_UI_PUBLIC_URL,
   PSP_API_DOC_PATH, BANKCORE_API_DOC_PATH,
@@ -19,6 +19,20 @@ interface HubCard {
   // Set when the card cannot act in this environment, which is how a missing public URL is surfaced instead
   // of becoming a link that fails.
   unavailable?: string;
+  // Set when the card opens a DIFFERENT site: another institution's app, or an API reference. Those have no
+  // way back to the simulator, so sending the current tab there strands whoever clicked. They open in a new
+  // tab instead and the card says so.
+  external?: boolean;
+}
+
+/**
+ * Opens a destination that is NOT part of this app.
+ *
+ * `noopener` is not decoration: without it the opened page can reach back through `window.opener` and navigate
+ * this one, and an API console is exactly the kind of page that should not be able to.
+ */
+function openExternal(target: string) {
+  window.open(target, '_blank', 'noopener,noreferrer');
 }
 
 export default function SimulatorHubPage() {
@@ -51,9 +65,8 @@ export default function SimulatorHubPage() {
         'Open the external merchant app (Espresso Works) that integrates with the PSP purely via OAuth2/OIDC SSO and the payment API.',
       icon: Store,
       cta: 'Open merchant app',
-      onSelect: () => {
-        window.location.href = MERCHANT_PUBLIC_URL;
-      },
+      external: true,
+      onSelect: () => openExternal(MERCHANT_PUBLIC_URL),
     },
     {
       key: 'share',
@@ -73,9 +86,8 @@ export default function SimulatorHubPage() {
         + 'registrations and its audit trail are administered there, not here.',
       icon: Landmark,
       cta: 'Open bank admin',
-      onSelect: () => {
-        window.location.href = BANKCORE_UI_PUBLIC_URL;
-      },
+      external: true,
+      onSelect: () => openExternal(BANKCORE_UI_PUBLIC_URL),
       // A private-only deployment publishes no address for it, and the card says so.
       unavailable: BANKCORE_UI_PUBLIC_URL
         ? undefined
@@ -90,18 +102,20 @@ export default function SimulatorHubPage() {
         + 'works without publishing the bank itself.',
       icon: BookOpen,
       cta: 'Open API reference',
-      onSelect: () => router.push(BANKCORE_API_DOC_PATH),
+      external: true,
+      onSelect: () => openExternal(BANKCORE_API_DOC_PATH),
     },
     /*{
       key: 'psp-api',
-      title: 'Payment provider API',
+      title: 'LeafyPay - Payment API',
       description:
         "The provider's own API reference: payments, checkout, cards on file, beneficiaries and the capability "
         + "router that dispatches to whoever serves each capability. It sits beside the bank's reference on "
         + 'purpose, because these are two institutions publishing two separate APIs.',
       icon: BookOpen,
       cta: 'Open API reference',
-      onSelect: () => router.push(PSP_API_DOC_PATH),
+      external: true,
+      onSelect: () => openExternal(PSP_API_DOC_PATH),
     },*/
   ];
 
@@ -137,7 +151,10 @@ export default function SimulatorHubPage() {
               )}
               <span className={`mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-[#001E2B] transition-colors group-hover:text-[#00ED64] ${c.unavailable ? 'hidden' : ''}`}>
                 {c.cta}
-                <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
+                {/* The icon says which kind of click this is: onward within the demo, or out to another site. */}
+                {c.external
+                  ? <ExternalLink size={14} aria-label="opens in a new tab" />
+                  : <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />}
               </span>
             </button>
           );

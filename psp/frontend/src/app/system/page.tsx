@@ -147,7 +147,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
     api.system.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() => {});
     api.auth.domains()
       .then((r) => { setDomains(r.domains); if (r.domains.length > 0) setSelectedDomain(r.domains[0].name); })
-      .catch(() => setDomains([{ name: 'leafypay', displayName: 'Leafy Pay', type: 'local', flowType: 'client_credentials' }]));
+      .catch(() => setDomains([{ name: 'leafypay', displayName: 'LeafyPay', type: 'local', flowType: 'client_credentials' }]));
   }, []);
 
   function handleDomainChange(name: string) {

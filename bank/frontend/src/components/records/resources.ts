@@ -20,10 +20,10 @@ export interface RecordMeta {
 }
 
 // The date window every log-like resource offers. One definition, because "what happened on Tuesday" is the
-// same question whichever record answers it.
+// same question whichever record answers it, and one CONTROL rather than two boxes: it offers today,
+// yesterday, the last week or month, a single whole day, or two moments with their times.
 const DATE_FILTERS: FilterSpec[] = [
-  { key: 'from', label: 'From', placeholder: '2026-08-01' },
-  { key: 'to', label: 'To', placeholder: '2026-08-27' },
+  { key: 'when', label: 'When', dateRange: { fromKey: 'from', toKey: 'to' } },
 ];
 
 export const RESOURCES: Record<string, RecordMeta> = {

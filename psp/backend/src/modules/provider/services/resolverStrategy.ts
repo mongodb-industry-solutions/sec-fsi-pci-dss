@@ -58,7 +58,7 @@ export type Resolution =
  * **The routing key is the DEBTOR, never the creditor.** For a payment, the provider is the bank that holds
  * the PAYER's account, because that is the institution which must execute the debit. From the creditor's IBAN
  * the PSP derives only the payment PRODUCT, which is a separate derivation from a possibly different IBAN.
- * Conflating the two would dispatch a payment to the recipient's bank, which Leafy Pay has no relationship
+ * Conflating the two would dispatch a payment to the recipient's bank, which LeafyPay has no relationship
  * with and cannot reach: it is not a clearing participant.
  */
 export async function resolveByAccountAspsp(

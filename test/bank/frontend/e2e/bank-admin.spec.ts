@@ -221,6 +221,102 @@ test.describe('the bank administration app', () => {
     });
   });
 
+  test.describe('a page scoped to one record stays scoped', () => {
+    test("an owner's page lists only that owner's accounts and cards", async ({ page }) => {
+      // The regression this exists for: a filter PINNED by the page was being overwritten by the empty value
+      // read from the URL for the same key, then dropped as empty, so the owner's page asked for every account
+      // and every card at the bank. It rendered perfectly and showed the wrong records.
+      await page.goto(`${BANK_UI}/holders`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1200);
+      const owner = page.locator('a[href^="/holders/"]:visible').first();
+      await expect(owner).toBeVisible({ timeout: 20000 });
+      const href = (await owner.getAttribute('href')) ?? '';
+      const reference = decodeURIComponent(href.replace('/holders/', ''));
+      await owner.click();
+      await page.waitForTimeout(2000);
+
+      // What the bank says this owner has, asked directly.
+      const scoped = async (resource: string) => {
+        const response = await page.request.get(
+          `${BANK_UI}/api/admin/${resource}?holder=${encodeURIComponent(reference)}&limit=1`,
+        );
+        return (await response.json()).total as number;
+      };
+      const whole = async (resource: string) => {
+        const response = await page.request.get(`${BANK_UI}/api/admin/${resource}?limit=1`);
+        return (await response.json()).total as number;
+      };
+
+      const [accountsForOwner, cardsForOwner, allAccounts, allCards] = await Promise.all([
+        scoped('accounts'), scoped('cards'), whole('accounts'), whole('cards'),
+      ]);
+      // The check is only meaningful if this owner holds fewer than everything.
+      expect(accountsForOwner, 'the fixture must give this owner fewer accounts than the bank holds')
+        .toBeLessThan(allAccounts);
+      expect(cardsForOwner).toBeLessThan(allCards);
+
+      // Both counts appear on the page, and they are the OWNER's, not the estate's.
+      //
+      // Matched with tolerant whitespace: the page control renders the figure and the noun in separate
+      // elements, so the accessible text reads "3accounts" with nothing between them.
+      const body = await page.locator('body').innerText();
+      expect(body, `the accounts list must show ${accountsForOwner}, not ${allAccounts}`)
+        .toMatch(new RegExp(`${accountsForOwner}\s*accounts`));
+      expect(body, `the cards list must show ${cardsForOwner}, not ${allCards}`)
+        .toMatch(new RegExp(`${cardsForOwner}\s*cards`));
+      expect(body, 'the estate total must not appear on a page about one party')
+        .not.toMatch(new RegExp(`${allAccounts}\s*accounts`));
+      expect(body).not.toMatch(new RegExp(`${allCards}\s*cards`));
+
+      // And the pinned filter is not offered as an empty control an operator could type into.
+      const filters = page.getByRole('button', { name: /^Filters/ });
+      if (await filters.first().isVisible()) {
+        await filters.first().click();
+        await page.waitForTimeout(400);
+        await expect(page.getByLabel('Holder reference')).toHaveCount(0);
+      }
+    });
+  });
+
+  test.describe('choosing when, without typing a date', () => {
+    test('a log offers presets, a single whole day, and two moments', async ({ page }) => {
+      await page.goto(`${BANK_UI}/records/audit`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1200);
+      await page.getByRole('button', { name: /^Filters/ }).click();
+      await page.waitForTimeout(400);
+
+      const when = page.getByLabel('When');
+      await expect(when, 'a date window is one question, so it is one control').toBeVisible();
+      // Two text boxes with example-date placeholders is what this replaced.
+      await expect(page.getByPlaceholder('2026-08-01')).toHaveCount(0);
+
+      // The commonest question costs one interaction and writes both bounds to the same day.
+      await when.selectOption('today');
+      await page.waitForTimeout(900);
+      const url = new URL(page.url());
+      expect(url.searchParams.get('from'), 'today is a single day, so both bounds are that day')
+        .toBe(url.searchParams.get('to'));
+      expect(url.searchParams.get('from')).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+      // A single chosen day is its own mode, with one date field rather than two.
+      await when.selectOption('day');
+      await page.waitForTimeout(500);
+      await expect(page.locator('input[type="date"]')).toHaveCount(1);
+
+      // A real window offers the time as well as the date.
+      await when.selectOption('between');
+      await page.waitForTimeout(500);
+      await expect(page.locator('input[type="datetime-local"]')).toHaveCount(2);
+
+      // Clearing removes both bounds rather than leaving one behind.
+      await when.selectOption('any');
+      await page.waitForTimeout(900);
+      const cleared = new URL(page.url());
+      expect(cleared.searchParams.get('from')).toBeNull();
+      expect(cleared.searchParams.get('to')).toBeNull();
+    });
+  });
+
   test.describe('rules as a form', () => {
     test('a capability edits through controls, not a JSON blob', async ({ page }) => {
       await page.goto(`${BANK_UI}/rules/card-issuer`, { waitUntil: 'domcontentloaded' });
