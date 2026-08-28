@@ -41,6 +41,10 @@ const OWNED_BY_BANKCORE: Record<string, BankcoreOwned> = {
 // Collections the PSP owns. `domainEvent`, `counters` and `idempotencyKey` are here because the PSP
 // keeps its OWN instance; bankcore has separate ones in its own database.
 const OWNED_BY_PSP = new Set([
+  // v39 P2: the OAuth client registry and the integration keys, extracted out of
+  // merchantAgreementProcedure. They stay on the PSP side for now; the extraction that moves them to
+  // the identity authority is a later phase, and this list is about the v37 bank split.
+  'oauthClient', 'apiKey',
   'paymentExecutionProcedure', 'paymentOrderProcedure', 'cardTransactionLog', 'checkoutSessionLog',
   'paymentLinkRecord',
   // Stays as a linked account record: it loses the stored balance, not its home.

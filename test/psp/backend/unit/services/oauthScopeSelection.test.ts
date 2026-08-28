@@ -14,23 +14,27 @@ import {
   requiredScopesIn,
 } from '../../../../../psp/backend/src/modules/gateway/services/merchantOAuth.service';
 
-// Minimal merchant/oauth-client mock for resolveOAuthClient.
+// v39 P2: resolveOAuthClient reads the client registry, then the owner for its commercial
+// standing, so the double answers per collection instead of returning one merged document.
 function makeDb(clientScopes: string[]) {
+  const client = {
+    oauthClientId: 'client-1',
+    oauthClientStatus: 'active',
+    oauthRedirectUris: ['https://app.example.com/cb'],
+    oauthGrantTypes: ['authorization_code'],
+    oauthScopes: clientScopes,
+    oauthRequirePkce: false,
+    merchantAgreementInstanceReference: 'MERCH-1',
+    merchantName: 'Espresso Works',
+  };
+  const merchant = {
+    merchantAgreementInstanceReference: 'MERCH-1',
+    merchantName: 'Espresso Works',
+    merchantAgreementStatus: 'active',
+  };
   return {
-    collection: () => ({
-      findOne: async () => ({
-        merchantAgreementInstanceReference: 'MERCH-1',
-        merchantName: 'Espresso Works',
-        merchantAgreementStatus: 'active',
-        merchantOAuthClient: {
-          oauthClientId: 'client-1',
-          oauthClientStatus: 'active',
-          oauthRedirectUris: ['https://app.example.com/cb'],
-          oauthGrantTypes: ['authorization_code'],
-          oauthScopes: clientScopes,
-          oauthRequirePkce: false,
-        },
-      }),
+    collection: (name: string) => ({
+      findOne: async () => (name === 'oauthClient' ? client : merchant),
     }),
   } as any;
 }

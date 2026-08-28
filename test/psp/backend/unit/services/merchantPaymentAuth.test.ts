@@ -17,17 +17,31 @@ vi.mock('../../../../../psp/backend/src/modules/identity/services/oauth.service'
 
 import { validateMerchantToken } from '../../../../../psp/backend/src/vendors/middleware/validateMerchantToken';
 
+// v39 P2: the client registry is its own collection, so the double answers per collection
+// rather than returning one document that carries both the commercial record and the credential.
 const activeMerchant = {
   merchantAgreementInstanceReference: 'm-1',
   merchantName: 'Espresso Works Ltd',
   merchantAgreementStatus: 'active',
-  merchantOAuthClient: { oauthClientStatus: 'active' },
+};
+
+const activeClient = {
+  oauthClientId: 'client-1',
+  oauthClientStatus: 'active',
+  merchantAgreementInstanceReference: 'm-1',
+  merchantName: 'Espresso Works Ltd',
 };
 
 function makeReq(auth?: string) {
   return {
     headers: auth ? { authorization: auth } : {},
-    server: { db: { collection: () => ({ findOne: vi.fn().mockResolvedValue(activeMerchant) }) } },
+    server: {
+      db: {
+        collection: (name: string) => ({
+          findOne: vi.fn().mockResolvedValue(name === 'oauthClient' ? activeClient : activeMerchant),
+        }),
+      },
+    },
   } as any;
 }
 function makeReply() {
