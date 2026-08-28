@@ -10,7 +10,7 @@ const h = vi.hoisted(() => {
   const findOne = vi.fn().mockResolvedValue(null);
   const updateOne = vi.fn().mockResolvedValue({ matchedCount: 1 });
   const qeDb = { collection: vi.fn(() => ({ insertOne, findOne, updateOne })) };
-  return { qeDb, getDbForRole: vi.fn().mockResolvedValue(qeDb), dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received' }) };
+  return { qeDb, getDbForRole: vi.fn().mockResolvedValue(qeDb), dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } }) };
 });
 vi.mock('../../../../../psp/backend/src/vendors/encryption/roleClients', () => ({
   getDbForRole: h.getDbForRole,
@@ -90,16 +90,22 @@ describe('P5: per-gate *.requested/*.completed pairs + causation', () => {
   });
 
   it('never declines on a fraud verdict: the fds gate approves and carries the verdict for the case', async () => {
-    h.dispatchProvider.mockResolvedValue({
-      provider: 'internal', status: 'received',
-      responseBody: { riskScore: 135, recommendation: 'decline', fraudFlag: true, rulesFired: ['HIGH_VALUE_TXN', 'RISKY_MCC'] },
-    });
+    // Per GROUP, not for every dispatch. A single blanket response gave the issuer gate a fraud verdict with
+    // no `actionConfirmed` in it, and the gate now declines an answer that states no verdict, so the whole
+    // journey failed before reaching the assertion about fraud.
+    h.dispatchProvider.mockImplementation(async (_db: unknown, group: string) => (group === 'fraud_detection'
+      ? {
+        provider: 'internal', status: 'received',
+        responseBody: { riskScore: 135, recommendation: 'decline', fraudFlag: true, rulesFired: ['HIGH_VALUE_TXN', 'RISKY_MCC'] },
+      }
+      : { provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } }));
     await createTransaction(txDb(), { ...baseInput, amount: 1250 });
     const fds = store.events.find((e) => e.eventType === 'fds.scoring.completed')!;
     const payload = fds.payload as { outcome: string; recommendation?: string };
     expect(payload.outcome).toBe('approved');
     expect(payload.recommendation).toBe('decline');
-    h.dispatchProvider.mockResolvedValue({ provider: 'internal', status: 'received' });
+    h.dispatchProvider.mockImplementation(async () => (
+      { provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } }));
   });
 
   it('records a pending-correlation entry for the issuer at dispatch (§7.7)', async () => {

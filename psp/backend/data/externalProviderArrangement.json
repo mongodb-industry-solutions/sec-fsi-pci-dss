@@ -399,7 +399,8 @@
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
       "card.authorisation.requested",
-      "card.authorisation.release.requested"
+      "card.authorisation.release.requested",
+      "card.authorization.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 200,
@@ -467,6 +468,30 @@
           },
           "mapping": []
         }
+      },
+      {
+        "event": "card.authorization.requested",
+        "outbound": {
+          "url": "/v1/cards/authorisations",
+          "httpMethod": "POST",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "approved",
+              "targetPath": "approved"
+            },
+            {
+              "sourcePath": "responseCode",
+              "targetPath": "responseCode"
+            }
+          ]
+        }
       }
     ]
   },
@@ -492,6 +517,18 @@
             "X-Request-ID": "{correlationId}"
           },
           "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "valid",
+              "targetPath": "actionConfirmed"
+            },
+            {
+              "sourcePath": "reasons.0",
+              "targetPath": "decisionReason"
+            }
+          ]
         }
       },
       {
@@ -586,7 +623,9 @@
     },
     "externalProviderCallbackEnabled": false,
     "externalProviderTriggerEvents": [
-      "payout.ais.validation.requested"
+      "bank.balance.read.requested",
+      "funds.check.requested",
+      "provider.account_information.account.validation.requested"
     ],
     "externalProviderEvents": [
       {
@@ -599,6 +638,46 @@
             "X-Request-ID": "{correlationId}"
           },
           "mapping": []
+        }
+      },
+      {
+        "event": "funds.check.requested",
+        "outbound": {
+          "url": "/v1/funds-confirmations",
+          "httpMethod": "POST",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "fundsAvailable",
+              "targetPath": "sufficient"
+            }
+          ]
+        }
+      },
+      {
+        "event": "provider.account_information.account.validation.requested",
+        "outbound": {
+          "url": "/v1/accounts/{payoutAccountBankAccountReference}",
+          "httpMethod": "GET",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "status",
+              "targetPath": "accountStatus"
+            }
+          ]
         }
       }
     ],
@@ -651,9 +730,8 @@
     },
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "payout.transfer.requested",
-      "bank.transfer.settled",
-      "bank.transfer.failed"
+      "bank.payment.status.read.requested",
+      "provider.payment_initiation.transfer.requested"
     ],
     "externalProviderEvents": [
       {
@@ -665,6 +743,30 @@
             "X-Request-ID": "{correlationId}"
           },
           "mapping": []
+        }
+      },
+      {
+        "event": "provider.payment_initiation.transfer.requested",
+        "outbound": {
+          "url": "/v1/payments/{paymentProduct}",
+          "httpMethod": "POST",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "paymentId",
+              "targetPath": "railReference"
+            },
+            {
+              "sourcePath": "transactionStatus",
+              "targetPath": "status"
+            }
+          ]
         }
       }
     ],

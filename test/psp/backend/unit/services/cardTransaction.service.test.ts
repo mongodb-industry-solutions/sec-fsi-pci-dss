@@ -45,7 +45,8 @@ vi.mock('../../../../../psp/backend/src/modules/customer/services/paymentCard.se
   upsertCardByToken: vi.fn().mockResolvedValue({ paymentCardInstanceReference: 'card-x', created: false }),
 }));
 vi.mock('../../../../../psp/backend/src/modules/provider/services/integrationDispatch.service', () => ({
-  dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received' }),
+  // The issuer's verdict is explicit: the gate declines when none is stated, which is the point of it.
+  dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } }),
 }));
 vi.mock('../../../../../psp/backend/src/modules/provider/services/businessProcessEvent.service', () => ({
   emitProcessEvent: vi.fn().mockResolvedValue(undefined),
@@ -181,7 +182,7 @@ describe('createTransaction', () => {
       if (group === 'fraud_detection') {
         return { provider: 'internal', status: 'received', responseBody: { riskScore: 75, recommendation: 'review', fraudFlag: true, rulesFired: ['HIGH_VALUE_TXN', 'RISKY_MCC'] } } as any;
       }
-      return { provider: 'internal', status: 'received' } as any;
+      return { provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } } as any;
     });
     // A LOW amount that the PSP amount rule would NOT flag: proving the verdict (not the amount) decides.
     const result = await createTransaction(txDb(), { ...baseInput, amount: 50, cardTransactionMerchantCategoryCode: '5411' });
@@ -191,7 +192,7 @@ describe('createTransaction', () => {
     expect(call[3]).toEqual(['HIGH_VALUE_TXN', 'RISKY_MCC']); // riskIndicators = rulesFired
     expect(call[4]).toBe('high');                              // severity from score 75
     expect(call[6]).toBe(75);                                  // fraudScore = FDS riskScore
-    vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received' } as any);
+    vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } } as any);
   });
 
   it('does NOT open a case when the FDS verdict is approve, even above the amount heuristic', async () => {
@@ -199,12 +200,12 @@ describe('createTransaction', () => {
       if (group === 'fraud_detection') {
         return { provider: 'internal', status: 'received', responseBody: { riskScore: 10, recommendation: 'approve', fraudFlag: false, rulesFired: [] } } as any;
       }
-      return { provider: 'internal', status: 'received' } as any;
+      return { provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } } as any;
     });
     const result = await createTransaction(txDb(), { ...baseInput, amount: 850, cardTransactionMerchantCategoryCode: '5411' });
     expect(result.fraudCaseCreated).toBe(false);
     expect(h.createFraudCase).not.toHaveBeenCalled();
-    vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received' } as any);
+    vi.mocked(dispatchProvider).mockResolvedValue({ provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } } as any);
   });
 
   // U-01: cardTransactionDescription accepted and function returns successfully 

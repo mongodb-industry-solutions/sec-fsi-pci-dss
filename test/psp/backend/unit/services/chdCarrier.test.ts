@@ -11,7 +11,7 @@ const h = vi.hoisted(() => {
   const findOne = vi.fn().mockResolvedValue(null);
   const updateOne = vi.fn().mockResolvedValue({ matchedCount: 1 });
   const qeDb = { collection: vi.fn(() => ({ insertOne, findOne, updateOne })) };
-  return { qeDb, getDbForRole: vi.fn().mockResolvedValue(qeDb), dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received' }) };
+  return { qeDb, getDbForRole: vi.fn().mockResolvedValue(qeDb), dispatchProvider: vi.fn().mockResolvedValue({ provider: 'internal', status: 'received', responseBody: { actionConfirmed: true } }) };
 });
 vi.mock('../../../../../psp/backend/src/vendors/encryption/roleClients', () => ({
   getDbForRole: h.getDbForRole,

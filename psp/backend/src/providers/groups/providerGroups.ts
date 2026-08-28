@@ -16,6 +16,7 @@ import type { HrpScreeningVerdict } from '../kyc/services/hrpScreening.service';
 import {
   RESPONSE_CODE_APPROVED,
   RESPONSE_CODE_INSUFFICIENT_FUNDS,
+  RESPONSE_CODE_ISSUER_UNAVAILABLE,
   DECISION_REASON_INSUFFICIENT_FUNDS,
   DECISION_REASON_ACCOUNT_NOT_FOUND,
 } from '../../shared/models/responseCodes';
@@ -374,6 +375,7 @@ export class ProviderGroups {
     }
 
     let decision: { actionConfirmed?: boolean; responseCode?: string; decisionReason?: string } | undefined;
+    let unreachable: string | undefined;
     try {
       const r = await dispatchProvider(this.db, 'card_issuer', 'card.issuer.validation.requested', {
         cardToken: p.cardToken, maskedPan: p.maskedPan, cardTransactionInstanceReference: txnId,
@@ -384,10 +386,35 @@ export class ProviderGroups {
         ...(p.cvvExpected ? { cvvExpected: true } : {}),
       }, { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' });
       decision = r.responseBody as typeof decision;
-    } catch { /* fail-safe to approve */ }
+      if (r.status === 'error' || r.status === 'timeout') unreachable = r.error ?? `issuer ${r.status}`;
+      // An answer that does not state a verdict is not an approval. The issuer's verdict is a BOOLEAN it is
+      // expected to send; a response missing it means the mapping or the contract is wrong, and reading that
+      // silence as consent is how a rejected card gets approved.
+      if (!unreachable && typeof decision?.actionConfirmed !== 'boolean') {
+        unreachable = 'the issuer returned no verdict';
+      }
+    } catch (err) {
+      unreachable = err instanceof Error ? err.message : String(err);
+    }
+
+    // FAILS CLOSED, which it did not before (v37 P12).
+    //
+    // This used to approve whenever the issuer could not be reached, and treated an absent verdict as consent.
+    // Both were survivable while the issuer WAS this service and an exception meant a bug; neither is
+    // survivable now that the issuer is another institution across a network, where unreachable is an ordinary
+    // Tuesday. Approving a card whose issuer never validated it is the one outcome an issuer check exists to
+    // prevent, so an unobtainable verdict declines and says why.
+    if (unreachable) {
+      publishIssuerValidationCompleted(txnId, {
+        approved: false,
+        responseCode: RESPONSE_CODE_ISSUER_UNAVAILABLE,
+        decisionReason: `issuer_unavailable: ${unreachable}`,
+      }, e.eventId);
+      return;
+    }
 
     publishIssuerValidationCompleted(txnId, {
-      approved: decision?.actionConfirmed !== false,
+      approved: decision?.actionConfirmed === true,
       responseCode: decision?.responseCode,
       decisionReason: decision?.decisionReason,
     }, e.eventId);

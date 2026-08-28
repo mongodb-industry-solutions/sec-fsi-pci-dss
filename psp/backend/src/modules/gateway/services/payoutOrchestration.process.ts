@@ -311,8 +311,17 @@ export class PayoutOrchestrationProcess {
         },
         { entityType: 'execution', entityId: execRef, processType: 'payment_processing' },
       );
+      // The institution states the account's STATUS, in the standard's own vocabulary. Whether that status is
+      // good enough to receive this payout is the PROVIDER's decision about its own payout, so it is made
+      // here rather than expected as a boolean from the bank (v37 P12).
+      //
+      // Only `enabled` proceeds. `blocked` and `deleted` do not, and neither does an absent status: a
+      // validation that returned nothing has not verified anything, and treating that as a pass is how a
+      // payout lands on an account nobody confirmed.
       const aisBody = (aisDispatch.responseBody ?? {}) as { accountVerified?: boolean; accountStatus?: string };
-      const accountVerified = aisBody.accountVerified === true;
+      const accountVerified = aisBody.accountStatus === 'enabled'
+        // Kept for a provider that answers with its own boolean instead of the standard's status.
+        || aisBody.accountVerified === true;
 
       await appendResolutionStep(db, execRef, {
         stepName: 'provider.account_information.validation',

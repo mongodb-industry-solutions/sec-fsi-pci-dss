@@ -20,7 +20,7 @@ import { resolveProviderFromGroup } from './integrationRoutingGroup.service';
 import { resolveProvider, resolverKindFor, type ResolutionContext } from './resolverStrategy';
 import { getProviderAccessToken } from './providerAccessToken.service';
 import { sanitizeDeep } from './businessProcessEvent.service';
-import { resolveEventOutbound } from './providerEventConfig.service';
+import { resolveEventOutbound, resolveEventInbound } from './providerEventConfig.service';
 
 export interface DispatchResult {
   provider: 'internal' | 'external';
@@ -94,7 +94,7 @@ export async function dispatchProvider(
     // the provider looked like it had no endpoint, so the dispatch fell through to the internal branch and
     // recorded a "sent" that went nowhere. An institution reached by declared per-event paths against its own
     // base URL has no use for the single field, and asking the wrong question here is silent.
-    if (resolved.provider.externalProviderBaseUrl || resolved.provider.externalProviderApiEndpoint) {
+    if (reachableOverTheWire(resolved.provider)) {
       return dispatchExternal(db, resolved.provider, triggeredBy, payload, businessContext);
     }
     return logAndReturn(db, resolved.provider, triggeredBy, payload, businessContext, {
@@ -124,8 +124,8 @@ export async function dispatchProvider(
     if (group) {
       const resolved = await resolveProviderFromGroup(db, group);
       if (resolved) {
-        // ADR-025: endpoint-first, if resolved provider has an endpoint, dispatch externally
-        if (resolved.externalProviderApiEndpoint) {
+        // ADR-025: endpoint-first. Reachable means a base url or a path, not the legacy field alone.
+        if (reachableOverTheWire(resolved)) {
           return dispatchExternal(db, resolved, triggeredBy, payload, businessContext);
         }
         return logAndReturn(db, resolved, triggeredBy, payload, businessContext, {
@@ -138,9 +138,9 @@ export async function dispatchProvider(
     }
   }
 
-  // ADR-025: endpoint-first dispatch logic
-  // Internal providers WITH an endpoint make a real HTTP call (enables loopback to /api/v1/internal/*)
-  if (provider.externalProviderApiEndpoint) {
+  // ADR-025: endpoint-first dispatch logic. An internal provider with a path still makes a real HTTP call,
+  // which is how the surviving built-in engines are reached; an institution is reached by its base url.
+  if (reachableOverTheWire(provider)) {
     return dispatchExternal(db, provider, triggeredBy, payload, businessContext);
   }
 
@@ -309,7 +309,15 @@ async function dispatchExternal(
 
     await updateHealthStatus(db, arrangementId, res.ok ? 'ok' : 'degraded');
 
-    return { provider: 'external', arrangementId, status, latencyMs, responseCode: res.status, responseBody };
+    // The response is translated through the provider's INBOUND mapping before it leaves here.
+    //
+    // Without this the caller had to speak each provider's own vocabulary, and the separation of the bank made
+    // that immediately dangerous: the bank answers a card validation with `valid`, the payment flow reads
+    // `actionConfirmed`, and `undefined !== false` is TRUE, so a card the issuer REJECTED was approved. The
+    // mapping is what the arrangement is for, and applying it on the synchronous path is what makes a declared
+    // translation actually take effect.
+    const mapped = mapInbound(provider, triggeredBy, responseBody);
+    return { provider: 'external', arrangementId, status, latencyMs, responseCode: res.status, responseBody: mapped };
   } catch (err) {
     const latencyMs = Date.now() - start;
     const isTimeout = (err as Error).name === 'AbortError';
@@ -483,6 +491,44 @@ export async function testMapping(
 // (default http://127.0.0.1:8081). Seeded configs MUST be host-less paths so they work unchanged across
 // environments/deployments; only this resolver knows the runtime host. Absolute URLs (real external
 // providers) are returned untouched.
+/**
+ * Translates a provider's response into the vocabulary the caller uses, per the arrangement's inbound mapping.
+ *
+ * A non-object body is returned untouched: a mapping describes fields, and there are none to move in a string
+ * or an array. A mapping that throws is also returned untouched rather than swallowed into an empty object,
+ * because losing the response entirely is worse than returning it unmapped.
+ */
+/**
+ * Whether this provider is reachable over the wire.
+ *
+ * A single predicate on purpose. The choice between an HTTP dispatch and an in-process stub was made in THREE
+ * places, each testing `externalProviderApiEndpoint` alone, and that field held a LOOPBACK path for the
+ * capabilities the provider used to serve itself. Removing the loopback in v37 P12 was correct and it silently
+ * turned all three into the stub branch: the dispatch reported `sent`, nothing was called, and the card
+ * validation never reached the bank. It failed closed rather than dangerously, but it failed.
+ *
+ * An institution reached by declared per-event paths against its own base url has no use for the single legacy
+ * field, so the question is whether there is ANYTHING to call.
+ */
+function reachableOverTheWire(provider: ExternalProviderArrangement): boolean {
+  return Boolean(provider.externalProviderBaseUrl || provider.externalProviderApiEndpoint);
+}
+
+function mapInbound(
+  provider: ExternalProviderArrangement,
+  event: string,
+  body: unknown,
+): unknown {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const rules = resolveEventInbound(provider, event).mapping;
+  if (!rules.length) return body;
+  try {
+    return applyMappings(body as Record<string, unknown>, rules);
+  } catch {
+    return body;
+  }
+}
+
 export function resolveServiceUrl(url: string, providerBaseUrl?: string): string {
   if (/^https?:\/\//i.test(url)) return url;
   // v37 P6.2d: the PROVIDER's own base URL wins for a host-less path, and only then the PSP's own.
