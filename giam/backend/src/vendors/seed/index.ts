@@ -1,5 +1,7 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
+import { seedRealms } from './seedRealms';
+import { seedKeys } from './seedKeys';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -14,8 +16,12 @@ export async function runSeed(): Promise<void> {
   try {
     const db = client.db(config.mongodb.dbName);
     console.log(`Seeding the GIAM database "${config.mongodb.dbName}"\n`);
-    void db;
-    // Seeders arrive with the phases that own their records.
+    // Realms first: every other record is partitioned by one, so nothing can be written before them.
+    await seedRealms(db);
+    // Keys after realms: a key belongs to a realm, and a realm with none can neither sign nor be
+    // verified against.
+    await seedKeys(db);
+    // Principals, credentials, clients and roles arrive with the phases that own them.
     console.log('\nGIAM seed complete.');
   } finally {
     await closeQEClient();
