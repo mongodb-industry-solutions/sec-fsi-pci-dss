@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+/* Theme tokens as utilities and CSS variables. The console keeps the platform palette so a reader
+   moving between the applications and the identity console is not looking at two products. */
+@theme {
+  --color-mongodb-green: #00ED64;
+  --color-mongodb-dark: #001E2B;
+  --color-mongodb-gray: #3D4F58;
+}
+
+/* Tailwind v4 changed the default border colour to currentColor; this restores the soft line that
+   bare `border` utilities are written against. */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+:root {
+  --mongodb-green: #00ED64;
+  --mongodb-dark: #001E2B;
+}
+
+body {
+  @apply bg-gray-50 text-gray-900;
+}
