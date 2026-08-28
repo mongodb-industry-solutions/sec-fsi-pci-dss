@@ -2,6 +2,8 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { seedRealms } from './seedRealms';
 import { seedKeys } from './seedKeys';
+import { seedIdentities } from './seedIdentities';
+import { REALM_COLLECTION } from '../../shared/models/collections';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 
@@ -21,7 +23,10 @@ export async function runSeed(): Promise<void> {
     // Keys after realms: a key belongs to a realm, and a realm with none can neither sign nor be
     // verified against.
     await seedKeys(db);
-    // Principals, credentials, clients and roles arrive with the phases that own them.
+    // Principals and their credentials, into the realm the demo population belongs to. Resolved by
+    // NAME rather than hardcoded by id, so the seeder carries no identifier of its own.
+    await seedIdentities(db);
+    // Clients and roles arrive with the phases that own them.
     console.log('\nGIAM seed complete.');
   } finally {
     await closeQEClient();

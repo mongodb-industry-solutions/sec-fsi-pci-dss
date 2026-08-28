@@ -21,6 +21,16 @@ const PROVABLY_PUBLIC = new Set([
   'get /',
   'get /health',
   'get /api/v1/system/health',
+
+  // Public BY SPECIFICATION. Discovery names endpoints and the key set contains public keys whose
+  // entire purpose is to be held by anyone verifying a signature. Requiring a credential to read
+  // either would break every conforming client and protect nothing.
+  'get /realms/{realm}/.well-known/openid-configuration',
+  'get /realms/{realm}/.well-known/oauth-authorization-server',
+  'get /realms/{realm}/protocol/openid-connect/certs',
+
+  // Public by nature: it is where a credential is presented, so it cannot require one first.
+  'post /realms/{realm}/login',
 ]);
 
 let app: FastifyInstance;
