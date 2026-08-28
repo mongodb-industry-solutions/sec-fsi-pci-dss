@@ -74,7 +74,7 @@ export function configurationReport(): StartupLine[] {
       // The origin, never the key. A derived key is not a weaker one, it is one less thing to configure.
       value: process.env.PSP_BANKCORE_ACCESS_TOKEN_SECRET
         ? 'configured (PSP_BANKCORE_ACCESS_TOKEN_SECRET)'
-        : 'derived from the platform secret, distinct from it',
+        : 'derived from this bank OWN root, never from the platform secret',
     },
     { label: 'PSP callback host', value: config.server.pspBaseUrl },
   ];

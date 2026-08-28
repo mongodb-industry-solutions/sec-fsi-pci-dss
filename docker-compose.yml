@@ -35,6 +35,8 @@ services:
       PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
       # In-network bank host. Private by construction: no host port is published for bankcore.
       PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+      # The credential the PSP presents to the bank diagnostics surface: the bank issued it.
+      PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
     depends_on:
       bankcore:
         condition: service_started
@@ -60,6 +62,8 @@ services:
       PSP_BANKCORE_SEED_DATA_DIR: /app/bank/backend/data
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       PSP_BANKCORE_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      # The bank derives its TPP and diagnostics keys from its OWN root (v39 P4).
+      PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
       # In-network PSP host, for the consent status callbacks bankcore delivers to its TPP.
       PSP_BASE_URL: ${PSP_BASE_URL:-http://backend:8080}
     healthcheck:
@@ -140,7 +144,10 @@ services:
       # Server side only: this app calls the bank from its own route handlers, so the address never reaches
       # the browser and the private in-network one is the right one to use.
       PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
-      PSP_JWT_SECRET: ${PSP_JWT_SECRET:-dev-secret-change-me}
+      # v39 P4: the BANK's own root, never the platform secret. This app administers a separate
+      # institution and presents a credential that institution issued; passing the platform secret
+      # here is what made the boundary between them documentation rather than key material.
+      PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
     depends_on:
       bankcore:
         condition: service_healthy

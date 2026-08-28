@@ -1,5 +1,6 @@
 import 'server-only';
 import jwt from 'jsonwebtoken';
+import { createHash } from 'crypto';
 
 // The only place this app talks to the bank, and it is SERVER side.
 //
@@ -21,19 +22,27 @@ function baseUrl(): string {
   return raw.replace(/\/$/, '');
 }
 
-function jwtSecret(): string {
-  return process.env.PSP_JWT_SECRET ?? process.env.JWT_SECRET ?? 'dev-secret-change-me';
+// v39 P4: the BANK's own diagnostics credential, not the platform secret.
+//
+// This app administers a separate institution, so it presents a credential issued by that
+// institution. Reading the platform secret here meant the bank trusted anything the platform could
+// sign, which made the boundary between them a matter of documentation rather than of key material.
+function adminCredential(): string {
+  const configured = process.env.PSP_BANKCORE_ADMIN_SECRET ?? process.env.BANKCORE_ADMIN_SECRET;
+  if (configured) return configured;
+  const root = process.env.PSP_BANKCORE_SECRET ?? 'bankcore-local-secret-change-in-production';
+  return createHash('sha256').update('bankcore:admin:' + root).digest('hex');
 }
 
 /**
  * A short-lived admin token for one hop.
  *
- * The bank verifies the platform admin JWT on its administrative API. Minted per request and valid for a
+ * The bank verifies its OWN admin credential on its administrative API. Minted per request and valid for a
  * minute: a long-lived service token held in memory is a credential with no expiry, and this one only has to
  * survive a single call.
  */
 function hopToken(actor = 'bank-admin-app'): string {
-  return jwt.sign({ role: 'admin', sub: actor, act: 'bank-admin-app' }, jwtSecret(), { expiresIn: 60 });
+  return jwt.sign({ role: 'admin', sub: actor, act: 'bank-admin-app' }, adminCredential(), { expiresIn: 60 });
 }
 
 // Only the bank's ADMINISTRATIVE resources are reachable through this app. A generic forwarder would let the

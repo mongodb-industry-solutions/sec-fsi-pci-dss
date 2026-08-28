@@ -13,7 +13,7 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
     return reply.status(401).send({ error: 'Missing admin token' }) as never;
   }
   try {
-    const payload = jwt.verify(match[1], config.app.jwtSecret) as jwt.JwtPayload;
+    const payload = jwt.verify(match[1], config.app.adminSecret) as jwt.JwtPayload;
     if (payload.role !== 'admin') {
       return reply.status(403).send({ error: 'Admin role required' }) as never;
     }
