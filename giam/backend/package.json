@@ -18,7 +18,8 @@
     "seed": "ts-node bin/seed.ts",
     "openapi:emit": "ts-node bin/openapi-emit.ts",
     "openapi:lint": "redocly lint openapi.json",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "setup:key:master": "ts-node bin/setup-master-key.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

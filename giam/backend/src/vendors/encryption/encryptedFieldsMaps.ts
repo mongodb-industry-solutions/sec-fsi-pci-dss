@@ -44,7 +44,11 @@ export function buildEncryptedFieldsMaps(deks: GiamDeks): Record<string, { field
     ? {
       queryType: 'substringPreview',
       contention: 8,
-      strMaxLength: 128,
+      // Within the cluster's default substringPreview limits, so setup needs no
+      // fleDisableSubstringPreviewParameterLimits override. The server refuses strMaxLength above 60
+      // outright, and 30 is what the platform already uses for the equivalent field. A longer
+      // formatted name is refused at write time rather than silently truncated.
+      strMaxLength: 30,
       strMaxQueryLength: 10,
       strMinQueryLength: 3,
       caseSensitive: false,
