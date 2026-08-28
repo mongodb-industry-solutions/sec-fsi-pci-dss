@@ -28,6 +28,19 @@ export interface PartyPostalAddress {
 
 export interface PartyControlRecord {
   partyInstanceReference: string;           // PK, UUID
+  /**
+   * The identity key: the `sub` every token carries (v39 P3).
+   *
+   * This record used to be reachable from a token only by going through the login collection, which
+   * is the collection the extraction deletes. Carrying the subject here means a business record is
+   * addressable by the identity that owns it, in one indexed hop, with no identity collection
+   * involved: the direction the whole extraction depends on, since the authority issues the subject
+   * and the application keys its own record by it, never the reverse.
+   *
+   * Optional because a party that cannot sign in has none: the internal ledger owner is a ledger
+   * owner, not a principal, and giving it a subject would make it one.
+   */
+  subjectId?: string;
   // QE equality: searched by analysts (email/phone are PII)
   partyEmailAddress: string;
   // Optional: a self-registered party may omit the phone. When absent, the uniqueness digest

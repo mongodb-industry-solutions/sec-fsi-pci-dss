@@ -17,6 +17,7 @@ import { auditOAuth } from './oauthAudit.service';
 import { PARTY_AUTH_CONSENT_COLLECTION, PartyAuthConsentRecord } from '../models/partyAuthConsent.model';
 import { WebhookService } from '../../gateway/services/merchantWebhook.service';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
+import { PARTY_COLLECTION } from '../models/party.model';
 import { PARTY_AUTHORIZATION_CODE_COLLECTION, PartyAuthorizationCodeRecord } from '../models/partyAuthorizationCode.model';
 import { PARTY_ISSUED_TOKEN_COLLECTION, PartyIssuedTokenRecord } from '../models/partyIssuedToken.model';
 import { getOAuthKeyProvider } from './oidcKeys.service';
@@ -434,20 +435,35 @@ export async function refreshAccessToken(
   return tokens;
 }
 
-// ── Subject → Party resolution (→) ─────────────────────────────────
-// An OAuth/session token `sub` is the login-record id (customerAuthenticationInstanceReference).
-// Domain data (payout accounts, counterparties, executions) is keyed by the partyInstanceReference.
-// This bridges the two so merchant on-behalf-of endpoints (which bind on `sub`) can query domain data.
-// Returns null when the sub is unknown (handled gracefully by callers: empty results, no throw).
+// ── Subject → Party resolution ────────────────────────────────────────────────
+//
+// A token's `sub` is the identity key. Domain data (payout accounts, counterparties, executions) is
+// keyed by the business reference. This is the single bridge between them, and after v39 P3 it
+// resolves against the BUSINESS record, which carries its own subject, rather than against the login
+// collection, which the extraction deletes.
+//
+// That direction matters beyond tidiness: the authority issues the subject and the application keys
+// its record by it. A resolution that went the other way, from the application's key back through an
+// identity collection, is the dependency that would have to be rewritten the day that collection is
+// gone, and it is the reason the bridge lives here rather than at each of its callers.
+//
+// Returns null when the subject is unknown, which callers handle as empty results rather than an
+// error: an unrecognised subject is an authorisation outcome, not a fault.
 export async function resolvePartyInstanceReference(db: Db, sub: string): Promise<string | null> {
   if (!sub) return null;
-  const rec = await db
-    .collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
-    .findOne(
-      { customerAuthenticationInstanceReference: sub },
-      { projection: { _id: 0, partyInstanceReference: 1 } },
-    );
-  return rec?.partyInstanceReference ?? null;
+  const party = await db
+    .collection<{ partyInstanceReference: string }>(PARTY_COLLECTION)
+    .findOne({ subjectId: sub } as never, { projection: { _id: 0, partyInstanceReference: 1 } });
+  return party?.partyInstanceReference ?? null;
+}
+
+/** The inverse, for the paths that hold a business reference and need the identity that owns it. */
+export async function resolveSubjectId(db: Db, partyInstanceReference: string): Promise<string | null> {
+  if (!partyInstanceReference) return null;
+  const party = await db
+    .collection<{ subjectId?: string }>(PARTY_COLLECTION)
+    .findOne({ partyInstanceReference } as never, { projection: { _id: 0, subjectId: 1 } });
+  return party?.subjectId ?? null;
 }
 
 // ── Userinfo ──────────────────────────────────────────────────────────────────

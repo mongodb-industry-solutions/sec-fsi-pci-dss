@@ -124,6 +124,12 @@ export async function createIndexes(client: MongoClient) {
     // Partial: phone is optional (self-registered parties may omit it). Only documents that
     // actually carry a digest participate in the uniqueness constraint.
     { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
+    // v39 P3: the identity key on the business record, which is how a token resolves to a party
+    // without consulting the login collection. Partial for the same reason as the phone digest: a
+    // party that cannot sign in has no subject, and the internal ledger owner is one of those.
+    // Unique because two business records answering to one subject would make that resolution
+    // ambiguous in a way no caller could detect.
+    { key: { subjectId: 1 }, unique: true, partialFilterExpression: { subjectId: { $exists: true } } },
   ]);
 
   // Card Transaction Log

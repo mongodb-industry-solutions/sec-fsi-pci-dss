@@ -50,4 +50,29 @@ export async function seedUsers(db: Db) {
     `  ${CUSTOMER_AUTHENTICATION_COLLECTION}: customer parties with a login: ${withLogin}/${parties.length}` +
     (derived.length > 0 ? ` (+${derived.length} derived)` : ''),
   );
+
+  // v39 P3: stamp the identity key onto the business record.
+  //
+  // Every party that can sign in carries the subject its tokens are issued under, so a token
+  // resolves to a business record in one indexed hop without consulting the login collection. That
+  // collection is the one the extraction deletes, and any resolution still routed through it would
+  // become a dangling dependency the day it goes.
+  //
+  // Every login, not only the customer ones: an employee's party moves to the authority later, and
+  // until it does it has to be resolvable the same way as everyone else's.
+  const allLogins = await db
+    .collection(CUSTOMER_AUTHENTICATION_COLLECTION)
+    .find({}, { projection: { _id: 0, customerAuthenticationInstanceReference: 1, partyInstanceReference: 1 } })
+    .toArray() as unknown as Array<{ customerAuthenticationInstanceReference: string; partyInstanceReference: string }>;
+
+  let stamped = 0;
+  for (const login of allLogins) {
+    if (!login.partyInstanceReference) continue;
+    const result = await db.collection(PARTY_COLLECTION).updateOne(
+      { partyInstanceReference: login.partyInstanceReference },
+      { $set: { subjectId: login.customerAuthenticationInstanceReference } },
+    );
+    stamped += result.matchedCount;
+  }
+  console.log(`  ${PARTY_COLLECTION}: ${stamped} parties stamped with their identity key`);
 }
