@@ -1,7 +1,7 @@
 import * as jwt from 'jsonwebtoken';
 
 const DEFAULT_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
-const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+import { escalationSecret } from './secrets';
 
 export interface EscalationTokenEntry {
   caseId: string;
@@ -25,7 +25,7 @@ interface EscalationClaims extends jwt.JwtPayload {
 export function generateToken(caseId: string, role: string, ttlMs = DEFAULT_TTL_MS): string {
   return jwt.sign(
     { kind: 'escalation', caseId, role } as EscalationClaims,
-    JWT_SECRET,
+    escalationSecret(),
     { expiresIn: Math.floor(ttlMs / 1000) },
   );
 }
@@ -33,7 +33,7 @@ export function generateToken(caseId: string, role: string, ttlMs = DEFAULT_TTL_
 export function validateToken(token?: string): { valid: boolean; entry?: EscalationTokenEntry } {
   if (!token) return { valid: false };
   try {
-    const p = jwt.verify(token, JWT_SECRET) as EscalationClaims;
+    const p = jwt.verify(token, escalationSecret()) as EscalationClaims;
     if (p.kind !== 'escalation' || !p.caseId) return { valid: false };
     return {
       valid: true,

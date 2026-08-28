@@ -8,7 +8,8 @@ import { reloadDbRuntime } from '../../../plugins/mongodb';
 import { logBuffer, appendLog, writeCount } from '../../../shared/services/logBuffer';
 import { beginSSE } from '../../../shared/services/sse';
 import { resolveTestStrategy, resolveTestSequence, aggregateSummaries, NormalizedTestSummary } from '../services/testRunners';
-import { jwtSecret, sha256 } from '../../../vendors/encryption/digest';
+import { sha256 } from '../../../vendors/encryption/digest';
+import { adminSecret } from '../../../vendors/security/secrets';
 
 // In Docker (compiled dist/), __dirname gains an extra /dist/ level that breaks
 // the naïve levels-up heuristic. PSP_PROJECT_ROOT overrides cleanly in any env.
@@ -214,7 +215,7 @@ function verifyAdminToken(authHeader: string | undefined): boolean {
   if (!authHeader?.startsWith('Bearer ')) return false;
   const token = authHeader.slice(7);
   try {
-    const payload = jwt.verify(token, jwtSecret()) as jwt.JwtPayload;
+    const payload = jwt.verify(token, adminSecret()) as jwt.JwtPayload;
     return payload.role === 'admin';
   } catch {
     return false;
@@ -350,7 +351,7 @@ export async function adminController(fastify: FastifyInstance) {
       return reply.status(401).send({ error: 'Invalid admin credentials' });
     }
 
-    const token = jwt.sign({ sub: 'admin', role: 'admin' }, jwtSecret(), { expiresIn: '4h' });
+    const token = jwt.sign({ sub: 'admin', role: 'admin' }, adminSecret(), { expiresIn: '4h' });
     appendLog(`[admin] Login successful for: ${username}`);
     return reply.send({ token });
   });

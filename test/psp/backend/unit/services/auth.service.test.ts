@@ -5,6 +5,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
+import { sessionSecret } from '../../../../../psp/backend/src/vendors/security/secrets';
 
 // ESM namespaces are not spy-able, so mock fs and drive readFileSync through this stub.
 const h = vi.hoisted(() => ({ readFileSync: vi.fn() }));
@@ -46,6 +47,8 @@ function makeDemoDb(records: Record<string, unknown>[]) {
 
 beforeAll(() => {
   process.env.PSP_JWT_SECRET = 'test-secret-key';
+  // v39 P4: the session is signed with its OWN derived key, not the platform root. Verifying with
+  // the root would pass only if the separation had not happened.
   process.env.PSP_JWT_EXPIRES_IN = '1h';
 });
 
@@ -70,7 +73,7 @@ describe('loginUser', () => {
   it('JWT payload contains sub, email, role, name, domain', async () => {
     const db = makeDb(validUser);
     const { token } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
-    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
+    const decoded = jwt.verify(token, sessionSecret()) as Record<string, unknown>;
     expect(decoded.sub).toBe('usr-001');
     expect(decoded.email).toBe('sarah.chen@back.es');
     expect(decoded.role).toBe('level1_analyst');
@@ -105,14 +108,14 @@ describe('loginUser', () => {
   it('stamps epoch 0 when the record has no session epoch', async () => {
     const db = makeDb(validUser);
     const { token } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
-    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
+    const decoded = jwt.verify(token, sessionSecret()) as Record<string, unknown>;
     expect(decoded.epoch).toBe(0);
   });
 
   it('stamps the record\'s current session epoch into the JWT', async () => {
     const db = makeDb({ ...validUser, customerAuthenticationSessionEpoch: 3 });
     const { token } = await loginUser(db, 'sarah.chen@back.es', 'demo-password', 'local');
-    const decoded = jwt.verify(token, 'test-secret-key') as Record<string, unknown>;
+    const decoded = jwt.verify(token, sessionSecret()) as Record<string, unknown>;
     expect(decoded.epoch).toBe(3);
   });
 });

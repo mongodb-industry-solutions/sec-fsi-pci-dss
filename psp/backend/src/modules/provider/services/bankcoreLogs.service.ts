@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { bankcoreAdminCredential } from '../../../vendors/security/secrets';
 import { config } from '../../../config';
 import { appendLog } from '../../../shared/services/logBuffer';
 
@@ -12,7 +13,7 @@ export async function fetchBankcoreLogs(
   try {
     // Short-lived platform admin token, verified by bankcore with the shared secret. The Open Banking
     // surface uses TPP client credentials instead; this is only the diagnostics channel.
-    const token = jwt.sign({ role: 'admin' }, config.app.jwtSecret, { expiresIn: 60 });
+    const token = jwt.sign({ role: 'admin' }, bankcoreAdminCredential(), { expiresIn: 60 });
     const response = await fetchImpl(
       `${config.bankcore.baseUrl}/api/v1/system/logs?limit=${limit}`,
       { signal: AbortSignal.timeout(3000), headers: { Authorization: `Bearer ${token}` } },

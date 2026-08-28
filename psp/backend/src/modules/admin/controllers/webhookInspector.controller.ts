@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { v4 as uuidv4 } from 'uuid';
 import * as jwt from 'jsonwebtoken';
 import { beginSSE } from '../../../shared/services/sse';
-import { jwtSecret } from '../../../vendors/encryption/digest';
+import { adminSecret } from '../../../vendors/security/secrets';
 
 export interface WebhookEntry {
   id: string;
@@ -31,7 +31,7 @@ function broadcast(event: string, text: string) {
 function authorized(authHeader: string | undefined): boolean {
   if (!authHeader?.startsWith('Bearer ')) return false;
   try {
-    const payload = jwt.verify(authHeader.slice(7), jwtSecret()) as jwt.JwtPayload;
+    const payload = jwt.verify(authHeader.slice(7), adminSecret()) as jwt.JwtPayload;
     return payload.role === 'admin';
   } catch { return false; }
 }

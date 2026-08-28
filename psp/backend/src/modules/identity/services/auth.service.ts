@@ -1,4 +1,5 @@
 import { Db } from 'mongodb';
+import { sessionSecret } from '../../../vendors/security/secrets';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../models/customerAuthentication.model';
@@ -102,7 +103,7 @@ export async function loginUser(
     epoch: user.customerAuthenticationSessionEpoch ?? 0,
   };
 
-  const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+  const secret = sessionSecret();
   const expiresIn = process.env.PSP_JWT_EXPIRES_IN ?? '24h';
   const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
 
@@ -242,7 +243,7 @@ export async function changeOwnPassword(
     ...(user.partyInstanceReference && { partyRef: user.partyInstanceReference }),
     epoch: nextEpoch,
   };
-  const secret = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+  const secret = sessionSecret();
   const expiresIn = process.env.PSP_JWT_EXPIRES_IN ?? '24h';
   const token = jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
   return { token };

@@ -14,7 +14,7 @@ declare module 'fastify' {
   }
 }
 
-const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+import { sessionSecret } from '../security/secrets';
 
 // Exact URL matches that bypass JWT auth
 const PUBLIC_EXACT: Set<string> = new Set([
@@ -112,7 +112,7 @@ function blockedFromInvestigation(role: string | undefined, path: string): boole
 function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
   if (!authHeader?.startsWith('Bearer ')) return null;
   try {
-    return jwt.verify(authHeader.slice(7), JWT_SECRET) as jwt.JwtPayload;
+    return jwt.verify(authHeader.slice(7), sessionSecret()) as jwt.JwtPayload;
   } catch {
     return null;
   }
@@ -214,7 +214,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   const token = authHeader.slice(7);
   let payload: jwt.JwtPayload;
   try {
-    payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    payload = jwt.verify(token, sessionSecret()) as jwt.JwtPayload;
     (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
   } catch {
     return reply.status(401).send({ error: 'Invalid or expired token' });
