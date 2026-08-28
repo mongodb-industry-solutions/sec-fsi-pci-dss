@@ -33,8 +33,8 @@
     "build:merchant": "npm run build --prefix merchant",
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "test:ci": "npm run test:unit && npm run test:integration",
-    "test:unit": "vitest run test/psp/backend/unit test/psp/frontend/unit test/bank/backend/unit",
-    "test:integration": "vitest run test/psp/backend/integration test/psp/frontend/integration test/bank/backend/integration",
+    "test:unit": "vitest run test/psp/backend/unit test/psp/frontend/unit test/bank/backend/unit test/giam/backend/unit",
+    "test:integration": "vitest run test/psp/backend/integration test/psp/frontend/integration test/bank/backend/integration test/giam/backend/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
@@ -50,7 +50,9 @@
     "setup:giam:seed": "npm run seed --prefix giam/backend --",
     "dev:giam": "npm run dev --prefix giam/backend",
     "dev:giamfront": "npm run dev --prefix giam/frontend",
-    "build:giam": "npm run build --prefix giam/backend"
+    "build:giam": "npm run build --prefix giam/backend",
+    "test:giam": "vitest run test/giam/backend",
+    "openapi:giam": "npm run openapi:emit --prefix giam/backend && npm run openapi:lint --prefix giam/backend"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",

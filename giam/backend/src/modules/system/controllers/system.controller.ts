@@ -12,6 +12,8 @@ export async function systemController(fastify: FastifyInstance) {
       description:
         'No applicable standard for the enclosing API; the response body follows the IETF '
         + 'health+json draft, reporting the `mongodb:connectivity` check. Public, for deployment probes.',
+      // Explicitly public: a deployment probe cannot present a credential.
+      security: [],
       response: {
         200: {
           description: 'The service is serving and its datastore answered.',
