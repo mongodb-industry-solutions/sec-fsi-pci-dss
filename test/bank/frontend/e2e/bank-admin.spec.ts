@@ -1,9 +1,13 @@
 /**
- * The bank's administration app, at the three sizes it has to work at.
+ * The bank's administration app, at the three sizes it has to work at, and against the properties it claims.
  *
  * "Responsive" is a claim, and the way it fails is specific and mechanical: the page scrolls sideways because
  * something inside it is wider than the viewport, or a control ends up off-screen and unreachable. Both are
  * measurable, so they are measured here rather than eyeballed.
+ *
+ * The rest of this file checks the claims that are easy to believe and easy to get wrong: that a protected value
+ * is absent until it is asked for, that one page control drives every list, that a card can be walked to its
+ * account and its owner, and that no request leaves this app's origin.
  *
  * Requires the bank frontend and the bank backend running. It fails rather than skips when they are not: a
  * responsive check that quietly passes against a dead server is worse than none.
@@ -20,11 +24,19 @@ const VIEWPORTS = [
   { name: 'desktop', width: 1440, height: 900 },
 ];
 
-// The card issuer and account information pages carry a DATA tab, which is the densest thing this app
-// renders and therefore the most likely to overflow a phone.
+// One per kind of screen: the home, a data list, a create form, a rules form, and a log. Each is the densest
+// thing of its kind and therefore the most likely to overflow a phone.
 const PAGES = [
-  '/', '/modules/card-issuer', '/modules/aisp', '/modules/credit-bureau',
-  '/records/audit', '/records/tpp%2Fregistrations',
+  '/',
+  '/cards',
+  '/accounts',
+  '/holders',
+  '/cards/new',
+  '/accounts/new',
+  '/rules/card-issuer',
+  '/rules/credit-bureau',
+  '/records/audit',
+  '/records/tpp/deliveries',
 ];
 
 async function noHorizontalOverflow(page: Page, label: string) {
@@ -41,6 +53,21 @@ async function noHorizontalOverflow(page: Page, label: string) {
   ).toBeLessThanOrEqual(1);
 }
 
+/**
+ * The first card in the estate, so a detail test does not depend on a hardcoded token.
+ *
+ * Two exclusions, both learned the hard way. `/cards/new` is excluded by its exact href rather than by its
+ * text, because it is a link to a FORM in the same toolbar and it sorts before every row. And `:visible`
+ * matters as much: every row exists TWICE in the document, once in the card layout for narrow screens and once
+ * in the table, so `.first()` without it returns the copy the current viewport is hiding.
+ */
+async function firstCardHref(page: Page): Promise<string> {
+  await page.goto(`${BANK_UI}/cards`, { waitUntil: 'domcontentloaded' });
+  const link = page.locator('a[href^="/cards/"]:not([href="/cards/new"]):visible').first();
+  await expect(link, 'the estate must contain at least one card for this to mean anything').toBeVisible({ timeout: 20000 });
+  return (await link.getAttribute('href')) ?? '';
+}
+
 test.describe('the bank administration app', () => {
   test.beforeAll(async ({ request }) => {
     const response = await request.get(`${BANK_UI}/`).catch(() => null);
@@ -55,7 +82,7 @@ test.describe('the bank administration app', () => {
         test(`${path} fits the viewport`, async ({ page }) => {
           const response = await page.goto(`${BANK_UI}${path}`, { waitUntil: 'domcontentloaded' });
           expect(response?.status(), `${path} answered ${response?.status()}`).toBeLessThan(400);
-          await page.waitForTimeout(400);
+          await page.waitForTimeout(600);
           await noHorizontalOverflow(page, `${viewport.name} ${path}`);
 
           // Something was painted, and it is the bank's app rather than an error shell. Asserted by the
@@ -68,102 +95,231 @@ test.describe('the bank administration app', () => {
       test('the way home is reachable without scrolling', async ({ page }) => {
         // The header is sticky for this reason: on a long audit table the way back must not be a scroll away.
         await page.goto(`${BANK_UI}/records/audit`, { waitUntil: 'domcontentloaded' });
-        await page.mouse.wheel(0, 4000);
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(600);
+        await page.mouse.wheel(0, 3000);
         await expect(page.locator('header a[href="/"]')).toBeInViewport();
+      });
+
+      test('a list renders as cards on a phone and a table on a desktop', async ({ page }) => {
+        await page.goto(`${BANK_UI}/cards`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(900);
+        const table = page.locator('table').first();
+        if (viewport.width < 768) {
+          // A table of eight columns at 380px is either an unreadable squeeze or a sideways scroll that hides
+          // the columns that matter, so below `md` the same rows render one card each.
+          await expect(table).toBeHidden();
+        } else {
+          await expect(table).toBeVisible();
+        }
       });
     });
   }
 
-  test('a record set renders as cards on a phone and as a table on a desktop', async ({ page }) => {
-    // The layout switch is the point: eight columns at 380px is either unreadable or a sideways scroll that
-    // hides the columns that matter.
-    await page.setViewportSize({ width: 380, height: 780 });
-    await page.goto(`${BANK_UI}/records/audit`, { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(400);
-    await expect(page.locator('table')).toBeHidden();
+  test.describe('protected values', () => {
+    test('a card number is absent from the page until it is asked for', async ({ page }) => {
+      const href = await firstCardHref(page);
+      await page.goto(`${BANK_UI}${href}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(900);
 
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.waitForTimeout(400);
-    await expect(page.locator('table')).toBeVisible();
-  });
+      // The masked form is what renders. Nothing that looks like a full card number is anywhere in the
+      // document, and that is the property worth testing: a value hidden with CSS is still in the page, still
+      // in memory and still in anything that captures it.
+      const before = await page.content();
+      expect(before, 'a full card number must not be in the page before a reveal').not.toMatch(/\b\d{16}\b/);
 
-  test('the configuration editor keeps its save control reachable on a phone', async ({ page }) => {
-    await page.setViewportSize({ width: 380, height: 780 });
-    await page.goto(`${BANK_UI}/modules/card-issuer`, { waitUntil: 'domcontentloaded' });
-    // The card issuer opens on its DATA tab now, so the rules have to be asked for.
-    await page.getByRole('tab', { name: 'Rules and policies' }).click();
-    await page.waitForTimeout(500);
-    const save = page.getByRole('button', { name: 'Save' });
-    // Sticky at the bottom below `sm`, so it is in view even with a long document above it.
-    await expect(save).toBeInViewport();
-    // Disabled until something changes: a save that does nothing is a save that teaches nothing.
-    await expect(save).toBeDisabled();
-  });
+      const reveal = page.getByRole('button', { name: /reveal the card number/i });
+      await expect(reveal).toBeVisible();
+      await reveal.click();
 
-  test('the browser never learns the bank host', async ({ page }) => {
-    // Every request the page makes must go to this app's own origin. A direct call to the bank would work on
-    // a developer's machine and fail in staging as a CORS error, which is a long way from the cause.
-    const foreign: string[] = [];
-    page.on('request', (request) => {
-      const url = request.url();
-      if (!url.startsWith(BANK_UI) && !url.startsWith('data:')) foreign.push(url);
+      // The number arrives only now, from a call the bank records as a disclosure.
+      await expect(page.locator('text=/\\b\\d{16}\\b/').first()).toBeVisible({ timeout: 15000 });
+
+      // And clicking again discards it rather than merely hiding it.
+      await page.getByRole('button', { name: /hide the card number/i }).click();
+      await page.waitForTimeout(300);
+      expect(await page.content(), 'the number must be discarded on hide').not.toMatch(/\b\d{16}\b/);
     });
-    await page.goto(`${BANK_UI}/records/audit`, { waitUntil: 'networkidle' });
-    expect(foreign, 'the page reached outside its own origin').toEqual([]);
-  });
-});
 
-test.describe('the data administration screens', () => {
-  test('the card estate lists, filters and pages without overflowing a phone', async ({ page }) => {
-    await page.setViewportSize({ width: 380, height: 780 });
-    await page.goto(`${BANK_UI}/modules/card-issuer`, { waitUntil: 'domcontentloaded' });
+    test('an IBAN is revealed one account at a time and never arrives with the list', async ({ page }) => {
+      await page.goto(`${BANK_UI}/accounts`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(900);
+      // A Spanish IBAN in full is 24 characters. The list shows the masked form, so none should appear.
+      expect(await page.content(), 'a full IBAN must not appear in a list').not.toMatch(/\bES\d{22}\b/);
 
-    // The data tab is first: an operator arrives looking for a record far more often than for a rule.
-    await expect(page.getByRole('tab', { name: 'Cards' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByPlaceholder(/Token, last four/)).toBeVisible();
+      // The create form is excluded by its exact href, and `:visible` picks the layout this viewport is
+      // actually showing rather than the duplicate it is hiding.
+      const row = page.locator('a[href^="/accounts/"]:not([href="/accounts/new"]):visible').first();
+      await expect(row).toBeVisible({ timeout: 20000 });
+      await row.click();
+      await page.waitForTimeout(1200);
 
-    // The status summary is built from the bank's own counts, so a filter chip has a number behind it.
-    await expect(page.getByRole('button', { name: /active \d+/ })).toBeVisible();
-    await noHorizontalOverflow(page, 'phone card estate');
-  });
-
-  test('a status filter narrows the estate, and the count follows', async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(`${BANK_UI}/modules/card-issuer`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: /issued \d+/ }).click();
-    // The filtered count must differ from the unfiltered one, or the chip is decorative.
-    await expect(page.getByText(/\d+ records? match\./)).toBeVisible();
-    await expect(page.locator('table tbody tr').first()).toBeVisible();
-    await noHorizontalOverflow(page, 'desktop filtered estate');
+      await page.getByRole('button', { name: /reveal the iban/i }).click();
+      await expect(page.locator('text=/\\bES\\d{22}\\b/').first()).toBeVisible({ timeout: 15000 });
+    });
   });
 
-  test('a terminal card offers no action, because the bank would refuse one', async ({ page }) => {
-    // The lifecycle map in the screen mirrors the bank's own, so it offers only moves the server accepts. A
-    // revoked card is the case worth pinning: `terminal` in place of a button is the screen refusing to
-    // suggest something that would fail.
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(`${BANK_UI}/modules/card-issuer`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: /revoked \d+/ }).click();
-    // Scoped to the TABLE. The phone list renders the same word and comes first in the DOM, so an unscoped
-    // `.first()` picks the hidden copy and fails for a reason that has nothing to do with the behaviour.
-    await expect(page.locator('table tbody').getByText('terminal').first()).toBeVisible();
-    await noHorizontalOverflow(page, 'desktop revoked estate');
+  test.describe('one page control everywhere', () => {
+    // The page size options exist in one component, so every list offers the same ones and defaults to the
+    // same size. This is the check that catches a screen growing its own.
+    for (const path of ['/cards', '/accounts', '/holders', '/records/audit', '/records/tpp/deliveries']) {
+      test(`${path} pages with the shared control`, async ({ page }) => {
+        await page.goto(`${BANK_UI}${path}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(1200);
+
+        const perPage = page.getByLabel('Records per page');
+        await expect(perPage, `${path} must offer the shared page-size control`).toBeVisible();
+        await expect(perPage, 'ten by default, because an operator reads the first rows and pages').toHaveValue('10');
+
+        // The ceiling the bank enforces is offered, and nothing above it.
+        const options = await perPage.locator('option').allTextContents();
+        expect(options).toContain('150');
+        expect(options.some((value) => Number(value) > 150)).toBe(false);
+      });
+    }
+
+    test('the page size lands in the URL, so a filtered list is a link', async ({ page }) => {
+      await page.goto(`${BANK_UI}/cards`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1200);
+      await page.getByLabel('Records per page').selectOption('25');
+      await page.waitForTimeout(800);
+      expect(page.url(), 'the query belongs in the URL, not in component state').toContain('limit=25');
+    });
   });
 
-  test('the accounts list resolves the holder and shows both balances', async ({ page }) => {
-    await page.setViewportSize({ width: 834, height: 1000 });
-    await page.goto(`${BANK_UI}/modules/aisp`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('tab', { name: 'Accounts' })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByPlaceholder(/Masked IBAN/)).toBeVisible();
-    await noHorizontalOverflow(page, 'tablet accounts');
+  test.describe('a card, its account and its owner', () => {
+    test('a card walks to the account it draws on and the party that owns it', async ({ page }) => {
+      // Reached FROM an account rather than from the top of the estate. The estate is newest-first, so
+      // whichever card happens to be newest leads the list, and a card minted by a test or by hand may carry
+      // no funding account. Arriving through an account guarantees the card under test actually has one, and
+      // it is the journey an operator makes anyway.
+      await page.goto(`${BANK_UI}/accounts?status=active`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1200);
+      const account = page.locator('a[href^="/accounts/"]:not([href="/accounts/new"]):visible').first();
+      await expect(account).toBeVisible({ timeout: 20000 });
+      await account.click();
+      await page.waitForTimeout(1800);
+
+      const card = page.locator('a[href^="/cards/"]:not([href="/cards/new"]):visible').first();
+      await expect(card, 'the account must have at least one card drawing on it').toBeVisible({ timeout: 20000 });
+      await card.click();
+      await page.waitForTimeout(1500);
+
+      // Every card this bank issues is a debit card, so it always has both. A screen that showed a token with
+      // no way to reach either would send an operator back to a list to search for it by hand.
+      const toAccount = page.getByRole('link', { name: /open the account/i });
+      const toOwner = page.getByRole('link', { name: /open the owner/i });
+      await expect(toAccount, 'a card must reach its funding account').toBeVisible();
+      await expect(toOwner, 'a card must reach its owner').toBeVisible();
+
+      await toAccount.click();
+      await page.waitForTimeout(1500);
+      expect(page.url()).toContain('/accounts/');
+
+      // And the account reaches back: the cards drawing on it are listed on it.
+      await expect(page.getByRole('heading', { name: /cards drawing on this account/i })).toBeVisible();
+      await expect(page.getByRole('link', { name: /open the owner/i })).toBeVisible();
+    });
   });
 
-  test('a capability with no records shows its rules and nothing it cannot back up', async ({ page }) => {
-    // The consent engine has no estate behind it, so it gets one tab. Offering an empty "records" tab would
-    // imply a collection that does not exist.
-    await page.goto(`${BANK_UI}/modules/credit-bureau`, { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('tab', { name: 'Rules and policies' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Cards' })).toHaveCount(0);
+  test.describe('rules as a form', () => {
+    test('a capability edits through controls, not a JSON blob', async ({ page }) => {
+      await page.goto(`${BANK_UI}/rules/card-issuer`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(900);
+
+      // The whole point of this screen: the rules are named fields with explanations, not a text area holding
+      // a document an operator has to keep valid by hand.
+      await expect(page.locator('textarea'), 'rules must not be edited as raw text').toHaveCount(0);
+      await expect(page.getByLabel('Accepted verification value')).toBeVisible();
+      await expect(page.getByLabel('Global value')).toBeVisible();
+      await expect(page.getByRole('switch', { name: /require a valid check digit/i })).toBeVisible();
+    });
+
+    test('the save is refused until something actually changed', async ({ page }) => {
+      await page.goto(`${BANK_UI}/rules/card-issuer`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(900);
+
+      const save = page.getByRole('button', { name: /save the rules/i });
+      await expect(save, 'writing back what was read is indistinguishable in the audit trail from a real change')
+        .toBeDisabled();
+
+      await page.getByLabel('Global value').fill('321');
+      await expect(save).toBeEnabled();
+
+      // Discarding returns it to untouched, rather than leaving the form dirty forever.
+      await page.getByRole('button', { name: /discard the changes/i }).click();
+      await expect(save).toBeDisabled();
+    });
+
+    test('a collection of rules is editable as entries, not as an array literal', async ({ page }) => {
+      await page.goto(`${BANK_UI}/rules/credit-bureau`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(900);
+      // The rating bands are a list of objects. Collapsed and titled, because six bands each with two fields
+      // is a page nobody reaches the bottom of on a phone.
+      await expect(page.getByRole('button', { name: /add a band/i }).first()).toBeVisible();
+    });
+  });
+
+  test.describe('exporting for analysis elsewhere', () => {
+    for (const path of ['/records/audit', '/cards']) {
+      test(`${path} offers its records as JSON`, async ({ page }) => {
+        await page.goto(`${BANK_UI}${path}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(1200);
+        await expect(page.getByTitle(/download the records matching the current filters as json/i)).toBeVisible();
+      });
+    }
+
+    test('a log row opens into the whole document', async ({ page }) => {
+      await page.goto(`${BANK_UI}/records/audit`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1500);
+      // An audit entry's substance is usually a nested value no column would have shown, so each row expands
+      // into the record itself.
+      const expand = page.getByRole('button', { name: /show the record/i }).first();
+      await expect(expand).toBeVisible();
+      await expand.click();
+      await expect(page.getByRole('button', { name: /collapse all/i }).first()).toBeVisible({ timeout: 10000 });
+    });
+  });
+
+  test.describe('the boundaries this app keeps', () => {
+    test('no request leaves this origin', async ({ page }) => {
+      const foreign: string[] = [];
+      page.on('request', (request) => {
+        const url = new URL(request.url());
+        if (url.origin !== new URL(BANK_UI).origin) foreign.push(request.url());
+      });
+
+      for (const path of ['/', '/cards', '/accounts', '/records/audit']) {
+        await page.goto(`${BANK_UI}${path}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForTimeout(900);
+      }
+
+      // The browser never learns the bank's host and never holds a token: every read goes through this app's
+      // own route handler. A request to the bank from the browser would mean both of those had stopped being
+      // true.
+      expect(foreign, `the browser reached outside its own origin: ${foreign.join(', ')}`).toHaveLength(0);
+    });
+
+    test('the addresses are readable, with no encoded separators', async ({ page }) => {
+      // A resource whose name contains a slash used to be squeezed into one path segment, which put
+      // `/records/tpp%2Fdeliveries` in the address bar. An address an operator cannot read or type is not one
+      // they can share.
+      await page.goto(`${BANK_UI}/records/tpp/deliveries`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(600);
+      expect(page.url()).toContain('/records/tpp/deliveries');
+      expect(page.url(), 'an encoded slash is not a readable address').not.toContain('%2F');
+
+      await page.goto(`${BANK_UI}/`, { waitUntil: 'domcontentloaded' });
+      const encoded = await page.locator('a[href*="%2F"]').count();
+      expect(encoded, 'no navigation on this app should encode a path separator').toBe(0);
+    });
+
+    test('each screen has an address of its own', async ({ page }) => {
+      // Rules and records used to share a page behind two tabs, which made neither linkable. These are five
+      // separate jobs and therefore five separate addresses.
+      for (const path of ['/cards', '/accounts', '/holders', '/rules/card-issuer', '/records/audit']) {
+        const response = await page.goto(`${BANK_UI}${path}`, { waitUntil: 'domcontentloaded' });
+        expect(response?.status(), `${path} must be an address of its own`).toBeLessThan(400);
+      }
+    });
   });
 });

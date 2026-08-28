@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { requireTpp } from '../../../vendors/middleware/tppAuth';
 import { demoCredit } from '../services/ledger.service';
 import { findAccount } from '../../aisp/services/accountInformation.service';
+import { CORRELATED_HEADERS } from '../../../shared/standardHeaders';
 
 // Crediting an account is the BANK's operation, which is the whole point of moving it here: the PSP
 // used to mint money on its own ledger, and a PSP cannot do that. It is a demo affordance, not an
@@ -19,6 +20,7 @@ export async function demoCreditController(fastify: FastifyInstance) {
         + 'so the demo can top up an account, and it is the replacement for the PSP endpoint that used '
         + 'to mint money on its own ledger. Every credit is written to the balance audit log.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
       body: {
         type: 'object',

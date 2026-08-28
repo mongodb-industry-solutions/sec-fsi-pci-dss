@@ -39,6 +39,52 @@ export function isValidIban(iban: string): boolean {
   return remainder === 1;
 }
 
+// The TOTAL length of an IBAN is country specific too, and it is not optional: a Spanish IBAN is 24
+// characters and a German one is 22, so a number of the wrong length is refused by any validator that
+// checks the country's structure even when its check digits compute. The same countries as above, for the
+// same reason: an unlisted country returns null rather than a guess.
+const IBAN_TOTAL_LENGTH: Record<string, number> = {
+  ES: 24, FR: 27, DE: 22, NL: 18, IE: 22, PT: 25, BE: 16, IT: 27, AT: 20, FI: 18, GB: 22,
+};
+
+/**
+ * Builds an IBAN this bank can claim: its own national bank code, padded to the country's own length,
+ * with ISO 13616 check digits.
+ *
+ * It refuses rather than improvising. An IBAN of the wrong length for its country would pass the check
+ * digit arithmetic and still be rejected downstream, which is the worst failure available: the account
+ * would look correct here and be unreachable everywhere else. The first version of this produced
+ * 22 character Spanish IBANs for exactly that reason.
+ *
+ * The national part is caller supplied so it can be made deterministic in a seed and random in
+ * production, without this function owning that choice.
+ */
+export function buildIban(
+  country: string, bankCode: string, nationalDigits: (count: number) => string,
+): string | null {
+  const cc = country.toUpperCase().slice(0, 2);
+  const total = IBAN_TOTAL_LENGTH[cc];
+  const codeLength = IBAN_BANK_CODE_LENGTH[cc];
+  if (!total || !codeLength) return null;
+  if (bankCode.length !== codeLength) return null;
+
+  // Country code, check digits, bank code, then whatever the country has room for.
+  const remaining = total - 4 - bankCode.length;
+  if (remaining <= 0) return null;
+  const body = `${bankCode}${nationalDigits(remaining).slice(0, remaining).padStart(remaining, '0')}`;
+
+  const rearranged = `${body}${cc}00`;
+  const numeric = rearranged.replace(/[A-Z]/g, (character) => String(character.charCodeAt(0) - 55));
+  let remainder = 0;
+  for (const digit of numeric) remainder = (remainder * 10 + Number(digit)) % 97;
+  const check = String(98 - remainder).padStart(2, '0');
+
+  const iban = `${cc}${check}${body}`;
+  // Checked against the bank's own validator before it is handed out, because a builder that trusts its
+  // own arithmetic is a builder whose bug reaches the database.
+  return isValidIban(iban) && iban.length === total ? iban : null;
+}
+
 export function panBin(pan: string): string | null {
   const digits = pan.replace(/\D/g, '');
   return digits.length >= 6 ? digits.slice(0, 6) : null;

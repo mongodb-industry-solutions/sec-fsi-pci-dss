@@ -56,8 +56,17 @@ export default function SimulatorHubPage() {
       },
     },
     {
+      key: 'share',
+      title: 'Share with QR code',
+      description:
+        'Show a QR code with this environment\'s demo URL so anyone can open the demo on a phone and follow along.',
+      icon: QrCode,
+      cta: 'Show QR code',
+      onSelect: () => setShareTarget(demoPublicUrl('/simulator')),
+    },
+    {
       key: 'bankcore',
-      title: 'Open the Bank',
+      title: 'BankCore - Admin App',
       description:
         'Open the bank\'s own administration app. It is a separate institution with its own service, its own '
         + 'database and its own Open Banking API: the cards it issued, the accounts it holds, its third-party '
@@ -73,18 +82,8 @@ export default function SimulatorHubPage() {
         : 'This environment does not publish the bank app. Set PSP_URL_BANKCORE_FRONTEND_PUBLIC to reach it.',
     },
     {
-      key: 'psp-api',
-      title: 'Payment provider API',
-      description:
-        'The provider\'s own API reference: payments, checkout, cards on file, beneficiaries and the '
-        + 'capability router that dispatches to whoever serves each capability.',
-      icon: BookOpen,
-      cta: 'Open API reference',
-      onSelect: () => router.push(PSP_API_DOC_PATH),
-    },
-    {
       key: 'bank-api',
-      title: 'Bank Open Banking API',
+      title: 'BankCore - Open Banking API',
       description:
         'The bank\'s API reference: consents, accounts, balances, transactions, payment initiation, standing '
         + 'orders and card authorisation, as the standard defines them. Served through this origin, so it '
@@ -93,15 +92,17 @@ export default function SimulatorHubPage() {
       cta: 'Open API reference',
       onSelect: () => router.push(BANKCORE_API_DOC_PATH),
     },
-    {
-      key: 'share',
-      title: 'Share with QR code',
+    /*{
+      key: 'psp-api',
+      title: 'Payment provider API',
       description:
-        'Show a QR code with this environment\'s demo URL so anyone can open the demo on a phone and follow along.',
-      icon: QrCode,
-      cta: 'Show QR code',
-      onSelect: () => setShareTarget(demoPublicUrl('/simulator')),
-    },
+        "The provider's own API reference: payments, checkout, cards on file, beneficiaries and the capability "
+        + "router that dispatches to whoever serves each capability. It sits beside the bank's reference on "
+        + 'purpose, because these are two institutions publishing two separate APIs.',
+      icon: BookOpen,
+      cta: 'Open API reference',
+      onSelect: () => router.push(PSP_API_DOC_PATH),
+    },*/
   ];
 
   return (

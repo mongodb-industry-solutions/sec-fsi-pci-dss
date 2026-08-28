@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest } from 'fastify';
 import { authenticateTpp } from '../services/tppRegistration.service';
 import { issueAccessToken } from '../services/tppAccessToken.service';
+import { CORRELATED_HEADERS } from '../../../shared/standardHeaders';
 
 // OAuth 2.0 token endpoint (RFC 6749 §3.2), client credentials grant (§4.4). This is how a registered
 // TPP obtains the token every Open Banking call presents.
@@ -43,6 +44,7 @@ export async function oauthController(fastify: FastifyInstance) {
   fastify.post('/oauth/token', {
     schema: {
       tags: ['oauth'],
+      headers: CORRELATED_HEADERS,
       summary: 'Obtain an access token as a registered TPP',
       description:
         'OAuth 2.0 client credentials grant (RFC 6749 §4.4), the standard machine to machine grant for '

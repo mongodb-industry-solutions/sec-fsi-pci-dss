@@ -17,6 +17,10 @@ import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
   TppEventSubscriptionControlRecord, TppWebhookDeliveryLogRecord,
 } from '../../tpp-trust/models/tppEventSubscription.model';
+import {
+  allOf, countBy, dateFilter, pagedFind, textFilter, type FieldOf,
+} from '../services/adminPaging.service';
+import { DEFAULT_LIMIT, MAX_LIMIT } from '../services/adminSearch.service';
 
 // Administration of the bank's own internals: engine configuration, TPP registrations, consent status.
 //
@@ -50,6 +54,26 @@ function publicRegistration(record: TppRegistrationControlRecord) {
   void tppRegistrationClientSecretHash;
   return { ...safe, tppRegistrationClientSecretConfigured: Boolean(tppRegistrationClientSecretHash) };
 }
+
+// The page contract every administrative list answers on. It is shared with the card and account searches so
+// there is ONE of it: a screen that can page the cards can page the audit trail without knowing the difference,
+// which is what lets the administration app drive them all from one control.
+const PAGE_QUERY = {
+  page: { type: 'integer', minimum: 1 },
+  limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, default: DEFAULT_LIMIT },
+} as const;
+
+const PAGED_RESPONSE = {
+  type: 'object',
+  additionalProperties: true,
+  properties: {
+    results: { type: 'array', items: { type: 'object', additionalProperties: true } },
+    total: { type: 'integer', description: 'Matching the filter, not the page. A page control needs this.' },
+    page: { type: 'integer' },
+    limit: { type: 'integer' },
+    byStatus: { type: 'object', additionalProperties: true },
+  },
+} as const;
 
 const TERMINAL_BY_BANK: ConsentStatus[] = ['valid', 'rejected', 'revokedByPsu'];
 
@@ -139,6 +163,39 @@ export async function bankAdminController(fastify: FastifyInstance) {
         'Being registered and active is what authorises a TPP to operate this bank\'s accounts, so this is '
         + 'the record that grants access. The secret hash is never returned: an admin surface has no reason '
         + 'to disclose a verifier, and a leaked hash is an offline attack on the credential.',
+      security: [{ adminAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          ...PAGE_QUERY,
+          status: { type: 'string', description: 'active, suspended or withdrawn.' },
+          q: { type: 'string', description: 'Free text over the client id and the display name.' },
+        },
+      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
+    },
+  }, async (request) => {
+    const query = request.query as { status?: string; q?: string; page?: number; limit?: number };
+    const collection = fastify.db.collection<TppRegistrationControlRecord>(TPP_REGISTRATION_COLLECTION);
+    const filter = allOf<TppRegistrationControlRecord>(
+      query.status ? { tppRegistrationStatus: query.status as TppRegistrationStatus } : {},
+      textFilter(query.q, ['tppRegistrationClientId', 'tppRegistrationName']),
+    );
+    const [page, byStatus] = await Promise.all([
+      pagedFind(collection, filter, query, { recordCreatedDateTime: -1 }),
+      countBy(collection, 'tppRegistrationStatus'),
+    ]);
+    return { ...page, results: page.results.map(publicRegistration), byStatus };
+  });
+
+  fastify.get('/tpp/registrations/all', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'List every registered third party, unpaged',
+      description:
+        'The whole set in one response, for a picker that has to offer every client rather than a page of '
+        + 'them. The paged endpoint is what a screen listing them should use.',
       security: [{ adminAuth: [] }],
       response: {
         200: {
@@ -252,16 +309,29 @@ export async function bankAdminController(fastify: FastifyInstance) {
         + 'subscription that omits an event type silently stops delivering it, which is why the event list '
         + 'is worth being able to read.',
       security: [{ adminAuth: [] }],
-      response: {
-        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
-        401: ERROR,
-        403: ERROR,
+      querystring: {
+        type: 'object',
+        properties: {
+          ...PAGE_QUERY,
+          // A subscription is active or it is not: there is no status field to filter on, and offering one
+          // would be a control that never narrowed anything.
+          active: { type: 'boolean' },
+          q: { type: 'string', description: 'Free text over the reference and the callback address.' },
+        },
       },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
     },
-  }, async () => ({
-    results: await fastify.db.collection<TppEventSubscriptionControlRecord>(TPP_EVENT_SUBSCRIPTION_COLLECTION)
-      .find({}, { projection: { _id: 0 } }).toArray(),
-  }));
+  }, async (request) => {
+    const query = request.query as { active?: boolean; q?: string; page?: number; limit?: number };
+    const collection = fastify.db
+      .collection<TppEventSubscriptionControlRecord>(TPP_EVENT_SUBSCRIPTION_COLLECTION);
+    const filter = allOf<TppEventSubscriptionControlRecord>(
+      query.active === undefined ? {} : { tppEventSubscriptionActive: query.active },
+      textFilter(query.q, ['tppEventSubscriptionInstanceReference', 'tppEventSubscriptionCallbackUrl']),
+    );
+    const page = await pagedFind(collection, filter, query, { recordCreatedDateTime: -1 });
+    return page;
+  });
 
   fastify.get('/tpp/deliveries', {
     preValidation: requireAdmin,
@@ -278,28 +348,36 @@ export async function bankAdminController(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
+          ...PAGE_QUERY,
           outcome: { type: 'string', description: 'delivered, failed or skipped.' },
           subject: { type: 'string', description: 'The consent or payment reference the event was about.' },
-          limit: { type: 'integer', minimum: 1, maximum: 200 },
+          eventType: { type: 'string' },
+          q: { type: 'string', description: 'Free text over the subject, the event type and the endpoint.' },
+          from: { type: 'string', description: 'ISO date or timestamp, inclusive.' },
+          to: { type: 'string', description: 'ISO date or timestamp, inclusive to the end of that day.' },
         },
       },
-      response: {
-        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
-        401: ERROR,
-        403: ERROR,
-      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
     },
   }, async (request) => {
-    const { outcome, subject, limit } = request.query as { outcome?: string; subject?: string; limit?: number };
-    const filter: Record<string, unknown> = {};
-    if (outcome) filter.deliveryOutcome = outcome;
-    if (subject) filter.tppEventSubjectReference = subject;
-    const results = await fastify.db.collection<TppWebhookDeliveryLogRecord>(TPP_WEBHOOK_DELIVERY_LOG_COLLECTION)
-      .find(filter, { projection: { _id: 0 } })
-      .sort({ recordCreatedDateTime: -1 })
-      .limit(limit ?? 50)
-      .toArray();
-    return { results };
+    const query = request.query as {
+      outcome?: string; subject?: string; eventType?: string; q?: string;
+      from?: string; to?: string; page?: number; limit?: number;
+    };
+    const collection = fastify.db
+      .collection<TppWebhookDeliveryLogRecord>(TPP_WEBHOOK_DELIVERY_LOG_COLLECTION);
+    const filter = allOf<TppWebhookDeliveryLogRecord>(
+      query.outcome ? { deliveryOutcome: query.outcome } : {},
+      query.subject ? { tppEventSubjectReference: query.subject } : {},
+      query.eventType ? { tppEventType: query.eventType } : {},
+      textFilter(query.q, ['tppEventSubjectReference', 'tppEventType', 'deliveryEndpoint', 'deliveryEventId']),
+      dateFilter('recordCreatedDateTime', query.from, query.to),
+    );
+    const [page, byStatus] = await Promise.all([
+      pagedFind(collection, filter, query, { recordCreatedDateTime: -1 }),
+      countBy(collection, 'deliveryOutcome'),
+    ]);
+    return { ...page, byStatus };
   });
 
 
@@ -322,46 +400,54 @@ export async function bankAdminController(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
+          ...PAGE_QUERY,
           actor: { type: 'string', description: 'The third party client id, or an operator subject.' },
           outcome: { type: 'string', description: 'granted, refused or failed.' },
           channel: { type: 'string', description: 'open_banking, admin or internal.' },
+          route: { type: 'string', description: 'The endpoint that was called.' },
           resource: { type: 'string', description: 'Any consent, account, payment, card or authentication reference.' },
           correlationId: { type: 'string', description: 'Follows one journey across both services.' },
-          limit: { type: 'integer', minimum: 1, maximum: 500 },
+          q: {
+            type: 'string',
+            description:
+              'Free text over the actor, the route and every reference, for a reviewer who holds '
+              + 'one string and does not yet know what it names.',
+          },
+          from: { type: 'string', description: 'ISO date or timestamp, inclusive.' },
+          to: { type: 'string', description: 'ISO date or timestamp, inclusive to the end of that day.' },
         },
       },
-      response: {
-        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
-        401: ERROR,
-        403: ERROR,
-      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
     },
   }, async (request) => {
     const query = request.query as {
-      actor?: string; outcome?: string; channel?: string; resource?: string; correlationId?: string; limit?: number;
+      actor?: string; outcome?: string; channel?: string; route?: string; resource?: string;
+      correlationId?: string; q?: string; from?: string; to?: string; page?: number; limit?: number;
     };
-    const filter: Record<string, unknown> = {};
-    if (query.actor) filter.auditActorReference = query.actor;
-    if (query.outcome) filter.auditOutcome = query.outcome;
-    if (query.channel) filter.auditChannel = query.channel;
-    if (query.correlationId) filter.auditCorrelationId = query.correlationId;
-    // One reference, whichever kind it is: a reviewer holding an identifier should not have to know which
-    // sort of thing it names before they can look it up.
-    if (query.resource) {
-      filter.$or = [
-        { auditConsentReference: query.resource },
-        { auditAccountReference: query.resource },
-        { auditPaymentReference: query.resource },
-        { auditCardReference: query.resource },
-        { auditAuthenticationReference: query.resource },
-      ];
-    }
-    const results = await fastify.db.collection<BankAuditLogRecord>(BANK_AUDIT_LOG_COLLECTION)
-      .find(filter, { projection: { _id: 0 } })
-      .sort({ recordCreatedDateTime: -1 })
-      .limit(query.limit ?? 100)
-      .toArray();
-    return { results };
+    const collection = fastify.db.collection<BankAuditLogRecord>(BANK_AUDIT_LOG_COLLECTION);
+
+    // One reference, whichever kind it is: a reviewer holding an identifier should not have to know which sort
+    // of thing it names before they can look it up.
+    const referenceFields: FieldOf<BankAuditLogRecord>[] = [
+      'auditConsentReference', 'auditAccountReference', 'auditPaymentReference',
+      'auditCardReference', 'auditAuthenticationReference',
+    ];
+    const filter = allOf<BankAuditLogRecord>(
+      query.actor ? { auditActorReference: query.actor } : {},
+      query.outcome ? { auditOutcome: query.outcome } : {},
+      query.channel ? { auditChannel: query.channel } : {},
+      query.route ? { auditRequestRoute: query.route } : {},
+      query.correlationId ? { auditCorrelationId: query.correlationId } : {},
+      query.resource ? { $or: referenceFields.map((field) => ({ [field]: query.resource })) } : {},
+      textFilter(query.q, ['auditActorReference', 'auditRequestRoute', ...referenceFields]),
+      dateFilter('recordCreatedDateTime', query.from, query.to),
+    );
+
+    const [page, byStatus] = await Promise.all([
+      pagedFind(collection, filter, query, { recordCreatedDateTime: -1 }),
+      countBy(collection, 'auditOutcome'),
+    ]);
+    return { ...page, byStatus };
   });
 
   // ── Consent administration (the manual authorisation path) ───────────────────────────────────
@@ -377,24 +463,31 @@ export async function bankAdminController(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
+          ...PAGE_QUERY,
           status: { type: 'string', description: 'Filter by consentStatus.' },
-          limit: { type: 'integer', minimum: 1, maximum: 200 },
+          q: { type: 'string', description: 'Free text over the consent reference and the client id.' },
+          from: { type: 'string', description: 'ISO date or timestamp, inclusive.' },
+          to: { type: 'string', description: 'ISO date or timestamp, inclusive to the end of that day.' },
         },
       },
-      response: {
-        200: { type: 'object', properties: { results: { type: 'array', items: { type: 'object', additionalProperties: true } } } },
-        401: ERROR,
-        403: ERROR,
-      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
     },
   }, async (request) => {
-    const { status, limit } = request.query as { status?: string; limit?: number };
-    const results = await fastify.db.collection<BankConsentAgreementControlRecord>(BANK_CONSENT_AGREEMENT_COLLECTION)
-      .find(status ? { bankConsentStatus: status as ConsentStatus } : {}, { projection: { _id: 0 } })
-      .sort({ recordCreatedDateTime: -1 })
-      .limit(limit ?? 50)
-      .toArray();
-    return { results };
+    const query = request.query as {
+      status?: string; q?: string; from?: string; to?: string; page?: number; limit?: number;
+    };
+    const collection = fastify.db
+      .collection<BankConsentAgreementControlRecord>(BANK_CONSENT_AGREEMENT_COLLECTION);
+    const filter = allOf<BankConsentAgreementControlRecord>(
+      query.status ? { bankConsentStatus: query.status as ConsentStatus } : {},
+      textFilter(query.q, ['bankConsentAgreementInstanceReference', 'bankConsentTppClientId']),
+      dateFilter('recordCreatedDateTime', query.from, query.to),
+    );
+    const [page, byStatus] = await Promise.all([
+      pagedFind(collection, filter, query, { recordCreatedDateTime: -1 }),
+      countBy(collection, 'bankConsentStatus'),
+    ]);
+    return { ...page, byStatus };
   });
 
   fastify.patch('/consents/:consentId/status', {

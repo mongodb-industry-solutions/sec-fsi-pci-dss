@@ -3,6 +3,7 @@ import { requireTpp } from '../../../vendors/middleware/tppAuth';
 import {
   createConsent, findConsent, changeConsentStatus, toBerlinGroupConsent,
 } from '../services/consent.service';
+import { CORRELATED_HEADERS } from '../../../shared/standardHeaders';
 
 // Berlin Group NextGenPSD2 consent endpoints. This is the resource the whole AIS and PIS surface hangs
 // off: without a consent in `valid`, nothing else at this bank answers with data.
@@ -72,6 +73,7 @@ export async function consentController(fastify: FastifyInstance) {
         + 'A consent covers the accounts of one account holder; mixing holders has no meaning under the '
         + 'standard and is refused.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       body: {
         type: 'object',
         required: ['access'],
@@ -147,6 +149,7 @@ export async function consentController(fastify: FastifyInstance) {
         + 'the TPP that holds it: another client\'s consent is indistinguishable from one that does not '
         + 'exist, since telling them apart would make this a way to probe for consents.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', properties: { consentId: { type: 'string' } }, required: ['consentId'] },
       response: { 200: CONSENT_RESOURCE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE },
     },
@@ -169,6 +172,7 @@ export async function consentController(fastify: FastifyInstance) {
         + '"is it usable yet" should not have to read the whole resource.\n\n'
         + STATUS_DESCRIPTION,
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', properties: { consentId: { type: 'string' } }, required: ['consentId'] },
       response: {
         200: { type: 'object', additionalProperties: true, properties: { consentStatus: { type: 'string' } } },
@@ -195,6 +199,7 @@ export async function consentController(fastify: FastifyInstance) {
         + 'defines for the TPP withdrawing its own access. A revocation by the account holder is a '
         + 'different status (`revokedByPsu`) reached from the bank side, not through this endpoint.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', properties: { consentId: { type: 'string' } }, required: ['consentId'] },
       response: {
         204: { type: 'null', description: 'Terminated. The consent is no longer usable.' },

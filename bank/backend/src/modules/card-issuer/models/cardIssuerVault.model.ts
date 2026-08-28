@@ -9,6 +9,12 @@ export const ISSUED_CARD_REGISTRY_COLLECTION = 'issuedCardRegistry';
 
 export type IssuedCardStatus = 'issued' | 'active' | 'suspended' | 'revoked';
 
+// Every card this bank issues today is a DEBIT card: it draws on a funding account the bank holds, and an
+// authorisation is a hold against that balance. The field exists so that is stated rather than assumed, and
+// so a credit card can arrive later as a value here plus the things only credit needs (a limit that is not a
+// balance, a statement cycle, interest) instead of as a migration of every existing record.
+export type IssuedCardKind = 'debit' | 'credit';
+
 // Set by the issuer per card, and judged on every authorisation. Only the per-transaction ceiling is
 // enforced: a daily one needs a per-card tally of the day's authorisations, which nothing here keeps yet,
 // and a limit that silently does nothing is worse than an absent one.
@@ -46,6 +52,9 @@ export interface IssuedCardRegistryRecord {
   // Funding account at this bank, which is what a card authorisation is held against.
   accountArrangementInstanceReference?: string;
   paymentCardNetwork: string;
+  // Debit for every card this bank issues today. Read with a default rather than required, so a record
+  // seeded before the field existed reads as what it is instead of as undefined.
+  paymentCardKind?: IssuedCardKind;
   paymentCardBin: string;
   paymentCardLastFour: string;
   paymentCardMaskedDisplay: string;

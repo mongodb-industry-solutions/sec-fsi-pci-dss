@@ -7,6 +7,7 @@ import {
   initiatePayment, findPayment, cancelPayment, toBerlinGroupPayment,
 } from '../services/paymentInitiation.service';
 import { executePayment, reconcileSubmission } from '../../payment-hub/services/paymentExecution.service';
+import { CONSENT_SCOPED_HEADERS } from '../../../shared/standardHeaders';
 
 // Berlin Group NextGenPSD2 Payment Initiation Service. The payment product is part of the path, exactly
 // as the specification writes it, so the TPP selects the scheme and the bank decides how it actually
@@ -61,15 +62,6 @@ const PAYMENT_RESOURCE = {
   },
 } as const;
 
-const STANDARD_HEADERS = {
-  type: 'object',
-  properties: {
-    'consent-id': { type: 'string', description: 'Consent that authorises this initiation (Berlin Group).' },
-    'x-request-id': { type: 'string', description: 'Caller correlation id. Also the idempotency key on initiation.' },
-  },
-  // Deliberately NOT `required`: Fastify's own validation would answer with its generic body, which is
-  // not the Berlin Group error shape, for the most common mistake a caller makes.
-} as const;
 
 // Deliberately NOT an `enum` in the schema. Fastify's own parameter validation would answer first with
 // its generic {statusCode, error, message} body, which this route's error schema then strips to `{}`
@@ -157,7 +149,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
         + '`X-Request-ID` is the idempotency key: a retry returns the SAME `paymentId` rather than '
         + `creating a second payment.\n\n${STATUS_DESCRIPTION}`,
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct'],
@@ -296,7 +288,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
         + 'read under the wrong product is not this payment, and answering anyway would make the path '
         + 'decorative.',
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct', 'paymentId'],
@@ -326,7 +318,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
         'Berlin Group PIS. The polling counterpart to the push notification: a TPP that missed a delivery '
         + `finds the truth here, which is the specification's own answer to that problem.\n\n${STATUS_DESCRIPTION}`,
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct', 'paymentId'],
@@ -365,7 +357,7 @@ export async function paymentInitiationController(fastify: FastifyInstance) {
         + 'that the creditor\'s bank may refuse. Reporting that as a cancellation would promise something '
         + 'the rails do not deliver, so it is refused with the reason instead.',
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct', 'paymentId'],

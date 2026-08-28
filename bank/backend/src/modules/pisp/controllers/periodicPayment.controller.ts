@@ -7,6 +7,7 @@ import { PERIODIC_FREQUENCIES } from '../models/periodicPayment.model';
 import {
   createPeriodicPayment, findPeriodicPayment, cancelPeriodicPayment, toBerlinGroupPeriodicPayment,
 } from '../services/periodicPayment.service';
+import { CONSENT_SCOPED_HEADERS } from '../../../shared/standardHeaders';
 
 // Standing orders, on the standard's own resource. A periodic payment is not a flag on a payment: it has a
 // lifecycle of its own PLUS an outcome per execution, and the standard gives it its own path for that reason.
@@ -91,6 +92,7 @@ export async function periodicPaymentController(fastify: FastifyInstance) {
         + 'collect whenever it liked. `dayOfExecution` on a month that is shorter clamps to the last day that '
         + 'month has, rather than rolling into the next one and moving the payment out of its period.',
       security: [{ tppToken: [] }],
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct'],
@@ -190,6 +192,7 @@ export async function periodicPaymentController(fastify: FastifyInstance) {
         + 'the third party that created it: another one\'s order is not found rather than refused, so this '
         + 'cannot be used to discover that a reference exists.',
       security: [{ tppToken: [] }],
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct', 'paymentId'],
@@ -215,6 +218,7 @@ export async function periodicPaymentController(fastify: FastifyInstance) {
         + 'active order can have had a failed execution, and a single status field could not say both. The '
         + 'per-execution outcomes are on the resource.',
       security: [{ tppToken: [] }],
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct', 'paymentId'],
@@ -257,6 +261,7 @@ export async function periodicPaymentController(fastify: FastifyInstance) {
         + 'revocable: unlike a single payment there is no point of no return for the ORDER, just for each '
         + 'collection it has already made.',
       security: [{ tppToken: [] }],
+      headers: CONSENT_SCOPED_HEADERS,
       params: {
         type: 'object',
         required: ['paymentProduct', 'paymentId'],

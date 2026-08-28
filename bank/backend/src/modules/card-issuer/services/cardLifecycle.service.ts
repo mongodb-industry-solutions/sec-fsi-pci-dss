@@ -4,6 +4,7 @@ import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
   CardIssuerVaultRecord, IssuedCardRegistryRecord, IssuedCardStatus, IssuedCardLimits,
 } from '../models/cardIssuerVault.model';
+import { IssuedCardView, toIssuedCardView } from './issuedCardView';
 import { BANK_PROFILE_COLLECTION } from '../../aspsp/models/bankProfile.model';
 import { luhnValid } from './cardValidation.service';
 import { DEFAULT_SERVICE_CODE } from '../../../vendors/encryption/cardVerificationKey.service';
@@ -20,36 +21,10 @@ const ALLOWED_TRANSITIONS: Record<IssuedCardStatus, IssuedCardStatus[]> = {
   revoked: [],
 };
 
-export interface IssuedCardView {
-  cardToken: string;
-  network: string;
-  bin: string;
-  lastFour: string;
-  maskedDisplay: string;
-  status: IssuedCardStatus;
-  expiryMonth?: string;
-  expiryYear?: string;
-  limits?: IssuedCardLimits;
-}
-
-function toView(record: IssuedCardRegistryRecord): IssuedCardView {
-  return {
-    cardToken: record.paymentCardReference,
-    network: record.paymentCardNetwork,
-    bin: record.paymentCardBin,
-    lastFour: record.paymentCardLastFour,
-    maskedDisplay: record.paymentCardMaskedDisplay,
-    status: record.issuedCardStatus,
-    expiryMonth: record.paymentCardExpiryMonth,
-    expiryYear: record.paymentCardExpiryYear,
-    limits: record.issuedCardLimits,
-  };
-}
-
 export async function findIssuedCard(db: Db, cardToken: string): Promise<IssuedCardView | null> {
   const record = await db.collection<IssuedCardRegistryRecord>(ISSUED_CARD_REGISTRY_COLLECTION)
     .findOne({ paymentCardReference: cardToken }, { projection: { _id: 0 } });
-  return record ? toView(record) : null;
+  return record ? toIssuedCardView(record) : null;
 }
 
 // ── Issuing ──────────────────────────────────────────────────────────────────────────────────────
@@ -134,6 +109,9 @@ export async function issueCard(db: Db, input: {
     accountHolderInstanceReference: input.accountHolderReference,
     accountArrangementInstanceReference: input.fundingAccountReference,
     paymentCardNetwork: network,
+    // Debit, stored rather than inferred: a credit card will arrive as a different value here, and a record
+    // that only means debit because the reader assumes it cannot express that.
+    paymentCardKind: 'debit',
     paymentCardBin: bin,
     paymentCardLastFour: lastFour,
     paymentCardMaskedDisplay: `****-****-****-${lastFour}`,
@@ -147,7 +125,7 @@ export async function issueCard(db: Db, input: {
     schemaVersion: 1,
   };
   await db.collection<IssuedCardRegistryRecord>(ISSUED_CARD_REGISTRY_COLLECTION).insertOne(record);
-  return { ok: true, card: toView(record) };
+  return { ok: true, card: toIssuedCardView(record) };
 }
 
 // ── Status ───────────────────────────────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { requireTpp } from '../../../vendors/middleware/tppAuth';
 import { assessAndRecord, findAssessment } from '../services/creditAssessment.service';
+import { CORRELATED_HEADERS } from '../../../shared/standardHeaders';
 
 // The bank as credit bureau. Not Open Banking framed, because no such standard exists here: Berlin Group
 // covers accounts and payments, and a credit assessment is neither.
@@ -64,6 +65,7 @@ export async function creditBureauController(fastify: FastifyInstance) {
         + 'A party this bank does not bank is refused rather than scored: a number with no evidence behind '
         + 'it would be worse than no answer.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       body: {
         type: 'object',
         required: ['accountHolderReference'],
@@ -100,6 +102,7 @@ export async function creditBureauController(fastify: FastifyInstance) {
         'The assessment on file, without recomputing it. This is what a decision was made against, which is '
         + 'the version worth reviewing when someone asks why they were declined.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: {
         type: 'object',
         required: ['accountHolderReference'],

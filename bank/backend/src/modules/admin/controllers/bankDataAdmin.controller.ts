@@ -2,13 +2,16 @@ import { FastifyInstance } from 'fastify';
 import { requireAdmin } from '../../../vendors/middleware/adminAuth';
 import {
   searchIssuedCards, countCardsByStatus, searchAccounts, countAccountsByStatus,
+  searchHolders, countHoldersByStatus, MAX_LIMIT, DEFAULT_LIMIT,
 } from '../services/adminSearch.service';
 import {
-  issueCard, changeCardStatus, renewCard, replaceCard, setCardLimits, findIssuedCard,
-} from '../../card-issuer/services/cardLifecycle.service';
+  discloseCard, discloseAccountIban, findHolder, discloseHolder, openAccount,
+} from '../services/adminDisclosure.service';
 import {
-  ACCOUNT_ARRANGEMENT_COLLECTION, AccountArrangementControlRecord, AccountStatus,
-} from '../../aspsp/models/accountArrangement.model';
+  issueCard, changeCardStatus, renewCard, replaceCard, setCardLimits,
+} from '../../card-issuer/services/cardLifecycle.service';
+import { AccountStatus } from '../../aspsp/models/accountArrangement.model';
+import { changeAccountStatus, describeRefusal } from '../services/accountAdmin.service';
 import { IssuedCardStatus } from '../../card-issuer/models/cardIssuerVault.model';
 
 // The bank administering its OWN data: the cards it issued and the accounts it holds.
@@ -26,7 +29,9 @@ const ERROR = {
 
 const PAGE_QUERY = {
   page: { type: 'integer', minimum: 1 },
-  limit: { type: 'integer', minimum: 1, maximum: 100 },
+  // The ceiling and the default come from the service, so there is one page contract rather than two that
+  // drift. Every list on this surface answers on it, which is what lets one component drive them all.
+  limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT, default: DEFAULT_LIMIT },
   q: { type: 'string', description: 'Free text over the non-sensitive identifiers.' },
 } as const;
 
@@ -41,15 +46,6 @@ const PAGED_RESPONSE = {
     byStatus: { type: 'object', additionalProperties: true },
   },
 } as const;
-
-// Which account transitions are legal. `pending_approval` is where an account waits for an operator, which is
-// what makes an approval step a real step rather than a button that always succeeds.
-const ACCOUNT_TRANSITIONS: Record<AccountStatus, AccountStatus[]> = {
-  pending_approval: ['active', 'closed'],
-  active: ['blocked', 'closed'],
-  blocked: ['active', 'closed'],
-  closed: [],
-};
 
 export async function bankDataAdminController(fastify: FastifyInstance) {
   // ── Cards ──────────────────────────────────────────────────────────────────────────────────────
@@ -72,7 +68,11 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
           ...PAGE_QUERY,
           status: { type: 'string', enum: ['issued', 'active', 'suspended', 'revoked'] },
           network: { type: 'string' },
+          kind: { type: 'string', enum: ['debit', 'credit'] },
           holder: { type: 'string' },
+          // The funding account. This is how "the cards on this account" is asked for: the same list with one
+          // filter, rather than a second endpoint returning a third shape.
+          account: { type: 'string' },
           last4: { type: 'string' },
           bin: { type: 'string' },
         },
@@ -101,7 +101,8 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const { cardToken } = request.params as { cardToken: string };
-    const card = await findIssuedCard(fastify.db, cardToken);
+    const page = await searchIssuedCards(fastify.db, { reference: cardToken, limit: 1 });
+    const card = page.results[0];
     if (!card) return reply.status(404).send({ error: 'No such card at this issuer' });
     return card;
   });
@@ -317,32 +318,288 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { accountReference } = request.params as { accountReference: string };
     const { status } = request.body as { status: AccountStatus; reason?: string };
+    const result = await changeAccountStatus(fastify.db, accountReference, status);
+    if (!result.ok) {
+      return reply.status(result.refusal === 'unknown_account' ? 404 : 409).send({ error: describeRefusal(result) });
+    }
+    // The `ok` discriminator is the service's, not the API's: a caller reads the status it asked for.
+    const { ok, ...state } = result;
+    void ok;
+    return state;
+  });
+  // Soft delete, and it is worth being explicit about why it is not a delete. A card that authorised a
+  // payment is part of that payment's history: removing the record would leave an authorisation pointing at
+  // nothing, and the retention the card rules require would be unmeetable. So the card is revoked, which is
+  // terminal, and the row survives for the audit.
+  fastify.delete('/cards/:cardToken', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Withdraw a card from use',
+      description:
+        'Revokes the card. It is NOT erased: an authorisation already made refers to it, so the record stays '
+        + 'and the status becomes terminal. Revoking twice is not an error, it is the state already being '
+        + 'what was asked for.',
+      security: [{ adminAuth: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR, 409: ERROR },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const result = await changeCardStatus(fastify.db, cardToken, 'revoked');
+    if (!result.ok) {
+      if (result.refusal === 'unknown_card') return reply.status(404).send({ error: 'No such card at this issuer' });
+      // Already revoked is not a failure: the state is what was asked for.
+      if (result.from === 'revoked') return { cardToken, status: 'revoked', unchanged: true };
+      return reply.status(409).send({ error: `A card cannot go from ${result.from} to revoked` });
+    }
+    return result.card;
+  });
 
-    const collection = fastify.db.collection<AccountArrangementControlRecord>(ACCOUNT_ARRANGEMENT_COLLECTION);
-    const account = await collection.findOne(
-      { accountArrangementInstanceReference: accountReference },
-      { projection: { _id: 0, accountStatus: 1, accountBalance: 1 } },
-    );
+  // ── Disclosures: the values that are encrypted at rest ─────────────────────────────────────────
+  //
+  // Each is a POST, because each is an ACT rather than a read: something authorised and recorded, not a field
+  // that arrives with a detail response. That shape is what stops a list of a hundred accounts decrypting a
+  // hundred IBANs, and it puts one audit row against one act rather than one against "opened a page".
+  fastify.post('/cards/:cardToken/disclosures', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Reveal a card\'s protected values',
+      description:
+        'The card number, the verification value, the expiry and the service code, for ONE card.\n\n'
+        + 'The verification value is not stored anywhere and never has been: it is recomputed from the card '
+        + 'data plus the issuer key, the way an issuer host does inside an HSM, so revealing it is deriving '
+        + 'it. The number is read from the vault, the only place on this platform a full card number exists.'
+        + '\n\nThe response is ephemeral. It is not to be persisted or logged by the caller.',
+      security: [{ adminAuth: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      response: {
+        200: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            cardToken: { type: 'string' },
+            cardNumber: { type: 'string' },
+            verificationValue: { type: 'string' },
+            expiry: { type: 'string' },
+            serviceCode: { type: 'string' },
+            error: {
+              type: 'string',
+              description: 'Why a value is missing, so a blank is never ambiguous.',
+            },
+          },
+        },
+        401: ERROR, 403: ERROR, 404: ERROR,
+      },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const disclosure = await discloseCard(fastify.db, cardToken);
+    if (!disclosure) return reply.status(404).send({ error: 'No such card at this issuer' });
+    return disclosure;
+  });
+
+  fastify.post('/accounts/:accountReference/disclosures', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Reveal an account\'s full IBAN',
+      description:
+        'The IBAN in full, for ONE account. It is personal data rather than cardholder data, which is why it '
+        + 'is encrypted and why it is asked for one account at a time instead of arriving with a list.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['accountReference'],
+        properties: { accountReference: { type: 'string' } },
+      },
+      response: {
+        200: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            accountReference: { type: 'string' },
+            iban: { type: 'string' },
+            bic: { type: 'string' },
+          },
+        },
+        401: ERROR, 403: ERROR, 404: ERROR,
+      },
+    },
+  }, async (request, reply) => {
+    const { accountReference } = request.params as { accountReference: string };
+    const disclosure = await discloseAccountIban(fastify.db, accountReference);
+    if (!disclosure) return reply.status(404).send({ error: 'No such account at this bank' });
+    return disclosure;
+  });
+
+  // ── Accounts, one at a time ────────────────────────────────────────────────────────────────────
+  fastify.get('/accounts/:accountReference', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Read one account',
+      description:
+        'The account as the bank holds it, with the masked IBAN and the masked holder name. Neither full '
+        + 'value arrives here: both are encrypted, and both are their own disclosure.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['accountReference'],
+        properties: { accountReference: { type: 'string' } },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    const { accountReference } = request.params as { accountReference: string };
+    // Read through the same search the list uses, so one account and a page of accounts cannot describe the
+    // same record differently.
+    const page = await searchAccounts(fastify.db, { reference: accountReference, limit: 1 });
+    const account = page.results[0];
     if (!account) return reply.status(404).send({ error: 'No such account at this bank' });
-    if (account.accountStatus === status) return { accountReference, accountStatus: status, unchanged: true };
+    return account;
+  });
 
-    const allowed = ACCOUNT_TRANSITIONS[account.accountStatus] ?? [];
-    if (!allowed.includes(status)) {
-      return reply.status(409).send({ error: `An account cannot go from ${account.accountStatus} to ${status}` });
+  fastify.post('/accounts', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Open an account',
+      description:
+        'Opens an account with an IBAN this bank can actually claim: built from its own declared bank code '
+        + 'with a mod-97 check digit, so the account is routable back to it.\n\n'
+        + 'It lands `pending_approval`, never active. Opening and approving are two acts, and collapsing them '
+        + 'would make the approval step decorative.\n\n'
+        + 'The IBAN is not echoed back. It is a disclosure, and the caller asks for it as one.',
+      security: [{ adminAuth: [] }],
+      body: {
+        type: 'object',
+        required: ['accountHolderReference', 'accountKind', 'accountCurrency', 'accountCountryCode'],
+        properties: {
+          accountHolderReference: { type: 'string' },
+          accountKind: { type: 'string', enum: ['current', 'savings'] },
+          accountCurrency: { type: 'string', minLength: 3, maxLength: 3 },
+          accountCountryCode: { type: 'string', minLength: 2, maxLength: 2 },
+          accountAlias: { type: 'string', maxLength: 60 },
+        },
+      },
+      response: {
+        201: { type: 'object', additionalProperties: true }, 400: ERROR, 401: ERROR, 403: ERROR, 404: ERROR,
+      },
+    },
+  }, async (request, reply) => {
+    const result = await openAccount(fastify.db, request.body as never);
+    if (!result.ok) {
+      const status = result.refusal === 'unknown_holder' ? 404 : 400;
+      return reply.status(status).send({ error: result.refusal });
     }
-    // Closing an account holding money would strand it. Refused with the figure, so the operator knows what
-    // has to happen first rather than being told only that it failed.
-    const available = account.accountBalance?.availableAmount ?? 0;
-    if (status === 'closed' && available !== 0) {
-      return reply.status(409).send({
-        error: `The account still holds ${available.toFixed(2)} ${'' }and cannot be closed until it is empty`,
-      });
-    }
+    const { accountIban, ...safe } = result.account;
+    return reply.status(201).send(safe);
+  });
 
-    await collection.updateOne(
-      { accountArrangementInstanceReference: accountReference },
-      { $set: { accountStatus: status, recordUpdatedDateTime: new Date().toISOString() } },
-    );
-    return { accountReference, accountStatus: status };
+  // Closing an account is the delete, and closing is terminal. The record survives because the payments that
+  // settled to it refer to it, and a statement that cannot name its own account is not a statement.
+  fastify.delete('/accounts/:accountReference', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Close an account',
+      description:
+        'Closes the account. It is NOT erased: settled payments refer to it, so the record stays and the '
+        + 'status becomes terminal. An account still holding money is refused, with the figure, because '
+        + 'closing it would strand the funds.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['accountReference'],
+        properties: { accountReference: { type: 'string' } },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR, 409: ERROR },
+    },
+  }, async (request, reply) => {
+    const { accountReference } = request.params as { accountReference: string };
+    const result = await changeAccountStatus(fastify.db, accountReference, 'closed');
+    if (!result.ok) {
+      return reply.status(result.refusal === 'unknown_account' ? 404 : 409).send({ error: describeRefusal(result) });
+    }
+    const { ok, ...state } = result;
+    void ok;
+    return state;
+  });
+
+  // ── The holder behind an account and a card ────────────────────────────────────────────────────
+  fastify.get('/holders', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'List account holders, masked',
+      description:
+        'Enough to choose an owner when opening an account or issuing a card. Masked, and searchable by '
+        + 'reference and country only: the name carries no query index, so a name search would silently match '
+        + 'nothing.',
+      security: [{ adminAuth: [] }],
+      querystring: {
+        type: 'object',
+        properties: {
+          ...PAGE_QUERY,
+          status: { type: 'string', enum: ['active', 'dormant', 'closed'] },
+          country: { type: 'string', minLength: 2, maxLength: 2 },
+        },
+      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
+    },
+  }, async (request) => {
+    const query = request.query as Record<string, string | number>;
+    const [page, byStatus] = await Promise.all([
+      searchHolders(fastify.db, query as never),
+      countHoldersByStatus(fastify.db),
+    ]);
+    return { ...page, byStatus };
+  });
+
+  fastify.get('/holders/:holderReference', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Read an account holder, masked',
+      description:
+        'The owner behind an account or a card. The name and the contact are both encrypted at rest, so both '
+        + 'arrive MASKED: enough to recognise a record you already know, not enough to learn one you do not. '
+        + 'The full values are a disclosure of their own.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['holderReference'],
+        properties: { holderReference: { type: 'string' } },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    const { holderReference } = request.params as { holderReference: string };
+    const holder = await findHolder(fastify.db, holderReference);
+    if (!holder) return reply.status(404).send({ error: 'No such account holder at this bank' });
+    return holder;
+  });
+
+  fastify.post('/holders/:holderReference/disclosures', {
+    preValidation: requireAdmin,
+    schema: {
+      tags: ['admin'],
+      summary: 'Reveal an account holder\'s name and contact',
+      description: 'The values behind the mask. Personal data, so it is its own recorded act.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['holderReference'],
+        properties: { holderReference: { type: 'string' } },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    const { holderReference } = request.params as { holderReference: string };
+    const disclosure = await discloseHolder(fastify.db, holderReference);
+    if (!disclosure) return reply.status(404).send({ error: 'No such account holder at this bank' });
+    return disclosure;
   });
 }

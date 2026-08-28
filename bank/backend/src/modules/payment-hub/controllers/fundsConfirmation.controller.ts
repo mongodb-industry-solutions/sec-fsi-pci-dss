@@ -33,7 +33,7 @@ export async function fundsConfirmationController(fastify: FastifyInstance) {
   fastify.post('/funds-confirmations', {
     preValidation: requireTpp('funds-confirmations', 'CBPII'),
     schema: {
-      tags: ['payments'],
+      tags: ['funds'],
       summary: 'Confirm whether funds are available',
       description:
         'Berlin Group confirmation of funds. The response is a boolean and nothing else: a party asking '

@@ -5,6 +5,7 @@ import { ConsentAccessKind } from '../../consent/models/bankConsent.model';
 import {
   findAccount, listAccountsForHolder, listTransactions, toBerlinGroupAccount,
 } from '../services/accountInformation.service';
+import { CONSENT_SCOPED_HEADERS } from '../../../shared/standardHeaders';
 
 // Berlin Group NextGenPSD2 Account Information Service, mounted at /v1.
 //
@@ -53,18 +54,6 @@ const ACCOUNT = {
     status: { type: 'string' },
     bic: { type: 'string' },
   },
-} as const;
-
-// The standard's headers. Consent-ID scopes the read, X-Request-ID correlates it end to end.
-const STANDARD_HEADERS = {
-  type: 'object',
-  properties: {
-    'consent-id': { type: 'string', description: 'Consent that authorises this access (Berlin Group).' },
-    'x-request-id': { type: 'string', description: 'Caller correlation id, echoed on the response.' },
-  },
-  // Deliberately NOT `required`. Fastify's own header validation answers with its generic
-  // {statusCode, error, message} body, which is not the Berlin Group error shape, so a TPP would get a
-  // non-standard error for the most common mistake. The handler returns `tppMessages` instead.
 } as const;
 
 const CONSENT_NOTE =
@@ -128,7 +117,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
         + 'account, and it requires the consent to grant balance access as well.\n\n'
         + CONSENT_NOTE,
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       querystring: {
         type: 'object',
         properties: {
@@ -163,7 +152,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
       summary: 'Read one account',
       description: `Berlin Group AIS. The account detail, including its IBAN and BIC.\n\n${CONSENT_NOTE}`,
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
       response: {
         200: ACCOUNT, 400: ERROR_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE,
@@ -194,7 +183,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
         + 'when something is reserved. Amounts are decimal STRINGS per ISO 20022, since a JSON number '
         + `would lose cents on a large value.\n\n${CONSENT_NOTE}`,
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
       response: {
         200: {
@@ -247,7 +236,7 @@ export async function accountInformationController(fastify: FastifyInstance) {
         'Berlin Group AIS. Each entry carries `endToEndId`, the PSP\'s own payment id, so one query '
         + `correlates a payment across both systems. Debits are negative, per the standard.\n\n${CONSENT_NOTE}`,
       security: [{ tppToken: [] }],
-      headers: STANDARD_HEADERS,
+      headers: CONSENT_SCOPED_HEADERS,
       params: { type: 'object', properties: { accountId: { type: 'string' } }, required: ['accountId'] },
       querystring: {
         type: 'object',

@@ -1,4 +1,6 @@
-import { CreditCard, ShieldCheck, Users, FileSearch, ScrollText, BellRing } from 'lucide-react';
+import {
+  BellRing, CreditCard, FileSearch, Landmark, ScrollText, ShieldCheck, Users,
+} from 'lucide-react';
 import { bankHealth } from '../lib/bankApi';
 import { TileGrid, SectionHeading, PageTitle, type Tile } from '../components/Tiles';
 
@@ -7,49 +9,74 @@ import { TileGrid, SectionHeading, PageTitle, type Tile } from '../components/Ti
 // These screens used to live in the provider's frontend, reaching the bank through a proxy there. That was
 // the right shape while the bank had no frontend of its own; it is the wrong one now, because it left the
 // provider carrying the bank's administration and gave one browser origin two institutions' concerns.
+//
+// Three groups, and the order is the order an operator arrives in. They come for a RECORD far more often than
+// for a rule: a card to look at, an account to approve, a party to identify. The rules are what you change once
+// and then leave alone, and the logs are where you go when something has already happened.
 
-const CAPABILITIES: Tile[] = [
+const DATA: Tile[] = [
   {
-    href: '/modules/card-issuer',
-    label: 'Card Issuer',
+    href: '/cards',
+    label: 'Card estate',
     icon: CreditCard,
-    description: 'What this issuer validates a card against: the accepted verification value, its mode, the check digit, the supported networks.',
+    description: 'Every card this bank issued, with its lifecycle. Numbers stay encrypted: a list decrypts nothing, and one card discloses on request.',
   },
   {
-    href: '/modules/card-authorization',
+    href: '/accounts',
+    label: 'Accounts',
+    icon: Landmark,
+    description: 'The accounts this bank holds, their balances and the approval step each one passed through.',
+  },
+  {
+    href: '/holders',
+    label: 'Parties',
+    icon: Users,
+    description: 'The customers behind those accounts and cards. Names and contacts arrive masked, because they are encrypted at rest.',
+  },
+];
+
+const RULES: Tile[] = [
+  {
+    href: '/rules/card-issuer',
+    label: 'Card Issuer',
+    icon: CreditCard,
+    description: 'What this issuer validates a card against: the accepted verification value, its mode, the check digit, the recognised networks.',
+  },
+  {
+    href: '/rules/card-authorization',
     label: 'Card Authorisation',
     icon: ShieldCheck,
     description: 'How the authorisation hold behaves, and the response codes it answers with.',
   },
   {
-    href: '/modules/aisp',
+    href: '/rules/aisp',
     label: 'Account Information',
     icon: Users,
     description: 'What a third party may read from an account, and the ceiling on how much at once.',
   },
   {
-    href: '/modules/pisp',
+    href: '/rules/pisp',
     label: 'Payment Initiation',
     icon: ScrollText,
     description: 'The payment products this bank offers, and the largest instruction it accepts.',
   },
   {
-    href: '/modules/credit-bureau',
+    href: '/rules/credit-bureau',
     label: 'Credit Bureau',
     icon: FileSearch,
     description: 'How this bank scores a party it banks: base score, rating bands, and what its own records earn or cost.',
   },
   {
-    href: '/modules/consent',
+    href: '/rules/consent',
     label: 'Consent',
     icon: ScrollText,
-    description: 'Whether a new consent lands usable or waits for an operator, and how long it stays valid.',
+    description: 'Whether a new consent lands usable or waits for the account holder, and how long it stays valid.',
   },
 ];
 
 const RECORDS: Tile[] = [
   {
-    href: '/records/tpp%2Fregistrations',
+    href: '/records/tpp/registrations',
     label: 'Third-party registrations',
     icon: Users,
     description: 'Which clients may reach this banking API, and what each was granted.',
@@ -61,7 +88,7 @@ const RECORDS: Tile[] = [
     description: 'Account access agreements and their status, including any awaiting authorisation.',
   },
   {
-    href: '/records/tpp%2Fdeliveries',
+    href: '/records/tpp/deliveries',
     label: 'Notification deliveries',
     icon: BellRing,
     description: 'One row per attempt, so a notification that never arrived is visible rather than silent.',
@@ -70,7 +97,7 @@ const RECORDS: Tile[] = [
     href: '/records/audit',
     label: 'Audit trail',
     icon: FileSearch,
-    description: 'Every request this bank answered: who asked, of what, under which consent, and the outcome.',
+    description: 'Every request this bank answered: who asked, of what, under which consent, and the outcome. Searchable and exportable.',
   },
 ];
 
@@ -93,7 +120,7 @@ export default async function BankAdminHome() {
     <div className="space-y-8">
       <PageTitle
         title="Administration"
-        description="This bank's own capabilities and records. Every screen here talks to this bank and to nothing else: the browser holds no token and never learns the bank's host."
+        description="This bank's own records, rules and logs. Every screen here talks to this bank and to nothing else: the browser holds no token and never learns the bank's host."
       />
 
       {/* Health first, because a screen that loads nothing is only explicable once you know the bank is down. */}
@@ -106,12 +133,17 @@ export default async function BankAdminHome() {
       </div>
 
       <section className="space-y-3">
-        <SectionHeading>Capabilities</SectionHeading>
-        <TileGrid tiles={CAPABILITIES} />
+        <SectionHeading>The bank&apos;s own data</SectionHeading>
+        <TileGrid tiles={DATA} />
       </section>
 
       <section className="space-y-3">
-        <SectionHeading>Records</SectionHeading>
+        <SectionHeading>Rules and policies</SectionHeading>
+        <TileGrid tiles={RULES} />
+      </section>
+
+      <section className="space-y-3">
+        <SectionHeading>Records and logs</SectionHeading>
         <TileGrid tiles={RECORDS} />
       </section>
     </div>

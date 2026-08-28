@@ -9,6 +9,7 @@ import { deriveCvvForCard } from '../services/cardCvv.service';
 import {
   issueCard, changeCardStatus, renewCard, replaceCard, setCardLimits, findIssuedCard,
 } from '../services/cardLifecycle.service';
+import { CORRELATED_HEADERS } from '../../../shared/standardHeaders';
 
 // The issuer's card API. A CVV is compared and discarded; a PAN leaves only through the reveal endpoint.
 const ERROR_RESPONSE = {
@@ -71,6 +72,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'persisted. Every rule (accepted CVV, `cvvMode`, Luhn, supported networks) is read per call from '
         + 'the card issuer configuration an operator edits through the admin API.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       body: {
         type: 'object',
         properties: {
@@ -162,6 +164,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         'Network, BIN, last four and lifecycle status for a card token. Reads the registry only, so a '
         + 'display lookup never opens the collection holding cardholder data.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       response: {
         200: CARD_RESPONSE,
@@ -190,6 +193,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'decrypted to answer it, and the response carries the token and last four only. Requires the '
         + 'cardholder data scope, granted separately from the authorisation scope.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       body: {
         type: 'object',
         required: ['cardNumber'],
@@ -253,6 +257,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'be authorised and recorded, not a document to read. The value is ephemeral: do not persist or '
         + 'log it. Requires the cardholder data scope.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       response: {
         200: {
@@ -289,6 +294,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'data plus the issuer key the way an issuer host does inside an HSM. Never stored in any form, '
         + 'since a verification value is sensitive authentication data, and only derivable by the issuer.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       body: {
         type: 'object',
@@ -358,6 +364,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'It lands `issued`, not `active`: a card is activated by whoever receives it, which is what the two '
         + 'states are for. The number is never returned, here or anywhere but the reveal endpoint.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       body: {
         type: 'object',
         required: ['network', 'expiryMonth', 'expiryYear'],
@@ -409,6 +416,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'A blocked card is refused by the authorisation and the validation before any other check, since '
         + 'there is nothing to judge on a card that is not usable.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       body: {
         type: 'object',
@@ -440,6 +448,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         'Same token, same number, later expiry, which is what makes a renewal invisible to everything '
         + 'holding the token. The verification value does change, since the expiry feeds its derivation.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       body: { type: 'object', required: ['expiryMonth', 'expiryYear'], properties: EXPIRY.properties },
       response: { 200: CARD_RESPONSE, 401: ERROR_RESPONSE, 403: ERROR_RESPONSE, 404: ERROR_RESPONSE, 409: ERROR_RESPONSE },
@@ -470,6 +479,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'The new card is issued BEFORE the old one is revoked, so a failure at that point leaves the holder '
         + 'with a card that still works rather than none.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       body: { type: 'object', properties: EXPIRY.properties },
       response: {
@@ -510,6 +520,7 @@ export async function cardIssuerController(fastify: FastifyInstance) {
         + 'authorisations, which nothing here keeps yet, and a limit that silently does nothing would be '
         + 'worse than an absent one.',
       security: [{ tppToken: [] }],
+      headers: CORRELATED_HEADERS,
       params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
       body: {
         type: 'object',

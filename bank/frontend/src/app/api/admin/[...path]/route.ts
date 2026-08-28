@@ -30,6 +30,20 @@ async function write(request: NextRequest, path: string[] | undefined, method: s
   return NextResponse.json(result.body, { status: result.status });
 }
 
+/**
+ * Withdrawing something from use: a card revoked, an account closed.
+ *
+ * Neither is an erasure at the bank, and this handler exists so a screen can say "delete" while the bank does
+ * the correct thing underneath. A card that authorised a payment and an account that received one are both
+ * referred to by records that have to keep making sense.
+ */
+export async function DELETE(request: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
+  const { path } = await context.params;
+  const result = await callBankAdmin(resourceOf(path), { method: 'DELETE' });
+  if (result.error) return NextResponse.json({ error: result.error }, { status: result.status });
+  return NextResponse.json(result.body, { status: result.status });
+}
+
 export async function PUT(request: NextRequest, context: { params: Promise<{ path?: string[] }> }) {
   const { path } = await context.params;
   return write(request, path, 'PUT');
