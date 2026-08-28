@@ -69,6 +69,62 @@ services:
       retries: 6
       start_period: 10s
 
+  # GIAM: the identity and access authority. Every other service is a relying party or a resource
+  # server against it. PUBLIC, and it has to be: a browser is redirected here to sign in, so a private
+  # in-cluster host would work for a server-side call and be unreachable from the laptop doing the demo.
+  giam:
+    build:
+      context: .
+      dockerfile: giam/backend/Dockerfile
+    ports:
+      - "8085:8080"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      GIAM_SEED_DATA_DIR: /app/giam/backend/data
+      MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      GIAM_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
+      # In-network, for the services that resolve discovery server side.
+      GIAM_BASE_URL: ${GIAM_BASE_URL:-http://giam:8080}
+      # Browser facing, and what a realm issuer URL is built from: it ends up inside every token as
+      # `iss`, so it must be the address a relying party can actually reach.
+      GIAM_PUBLIC_URL: ${GIAM_PUBLIC_URL:-http://localhost:8085}
+      GIAM_FRONTEND_URL: ${GIAM_FRONTEND_URL:-http://localhost:8086}
+      GIAM_CORS_ORIGIN: ${GIAM_CORS_ORIGIN:-http://localhost:8086,http://localhost:8080,http://localhost:8082,http://localhost:8084}
+    volumes:
+      # This replica's own private key. Mounted rather than baked: a signing key in an image is a
+      # signing key in a registry. With the default provider each replica holds its own, and the
+      # published key set is what they share, so this volume is per replica and never shared.
+      - ./giam/backend/keys:/app/giam/backend/keys
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 10s
+
+  # The identity console: login, consent, registration, credentials, and the administration of realms,
+  # providers, identities, roles, policies, clients, keys, sessions and audit.
+  giam-frontend:
+    build:
+      context: ./giam/frontend
+      dockerfile: Dockerfile
+    ports:
+      # The plan reserves 8084 for this app, but bank-frontend already publishes there, so the console
+      # takes 8086 and the collision is recorded rather than silently resolved.
+      - "8086:8080"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # Server side only: the console proxies the API same-origin, so the browser never learns this
+      # address and no CORS entry is needed for the console to work.
+      GIAM_API_PRIVATE_URL: ${GIAM_BASE_URL:-http://giam:8080}
+    depends_on:
+      giam:
+        condition: service_healthy
+
   # The bank's own administration app. A separate institution gets a separate app: it talks to the bank's
   # API over the compose network and needs no PSP anything.
   bank-frontend:

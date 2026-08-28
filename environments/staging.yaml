@@ -44,6 +44,23 @@ env:
   # the bank's bcrypt verifier and one to write the PSP's provider credential.
   PSP_BANKCORE_TPP_CLIENT_ID: leafypay-psp
 
+  # ── GIAM, the identity and access authority (v39) ──────────────────────────────────────────────
+  # PRIVATE in-cluster service, for what a relying party calls server side: discovery, token,
+  # introspection, JWKS.
+  GIAM_BASE_URL: "http://sec-fsi-pci-dss-giam-web-app:80"
+  # PUBLIC, and it has to be. A realm issuer URL is built from this value and ends up inside every
+  # token as `iss`, and the browser is redirected here to sign in. A private in-cluster host would
+  # verify correctly server side and be unreachable from the browser doing the signing in, which
+  # reads as a broken login rather than as a wrong URL.
+  GIAM_PUBLIC_URL: "https://sec-fsi-pci-dss-giam.industrysolutions.staging.corp.mongodb.com"
+  GIAM_FRONTEND_URL: "https://sec-fsi-pci-dss-giam-console.industrysolutions.staging.corp.mongodb.com"
+  # The origins allowed to call the identity API from a browser: the console and each relying party.
+  GIAM_CORS_ORIGIN: "https://sec-fsi-pci-dss-giam-console.industrysolutions.staging.corp.mongodb.com,https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com,https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com"
+  # Per-instance keys with one shared published key set: correct at any replica count, with no KMS,
+  # no shared volume and no shared secret. Not a development mode, it is the default everywhere.
+  GIAM_KEY_PROVIDER: instance-local
+  GIAM_KMS_PROVIDER: local
+
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging
   # Merchant OAuth client id/secret + session cookie key — populate these keys in the
@@ -63,6 +80,12 @@ envSecrets:
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-staging
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-staging
   PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-staging
+  # GIAM's own database and its OWN key vault inside it. Never the vault the applications share: an
+  # identity system holding the same key material as what it protects cannot contain a breach.
+  GIAM_DB_NAME: sec-fsi-pci-dss-secrets-staging
+  GIAM_DB_KEYVAULT: sec-fsi-pci-dss-secrets-staging
+  GIAM_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
+  GIAM_ADMIN_TOKEN: sec-fsi-pci-dss-secrets-staging
 
 resources:
   requests:

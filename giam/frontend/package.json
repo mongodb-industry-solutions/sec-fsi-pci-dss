@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 8086",
     "build": "next build",
-    "start": "next start -p 8086",
+    "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
   },
