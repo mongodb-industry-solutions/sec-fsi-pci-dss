@@ -400,7 +400,8 @@
     "externalProviderInternalHandler": "cardAuthorization.stubAdapter",
     "externalProviderCallbackEnabled": true,
     "externalProviderTriggerEvents": [
-      "card.authorization.requested"
+      "card.authorisation.requested",
+      "card.authorisation.release.requested"
     ],
     "externalProviderMode": "sync",
     "externalProviderTimeoutMs": 200,
@@ -432,7 +433,44 @@
     ],
     "recordCreatedDateTime": "2026-06-11T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-11T09:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 2,
+    "authConfig": {
+      "scheme": "oauth2_cc",
+      "oauth2": {
+        "clientId": "",
+        "tokenEndpoint": "/v1/oauth/token",
+        "scopes": [
+          "card-authorisations"
+        ],
+        "tokenCachingEnabled": true
+      }
+    },
+    "externalProviderEvents": [
+      {
+        "event": "card.authorisation.requested",
+        "outbound": {
+          "url": "/v1/cards/authorisations",
+          "httpMethod": "POST",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
+      },
+      {
+        "event": "card.authorisation.release.requested",
+        "outbound": {
+          "url": "/v1/cards/authorisations/{authorisationReference}",
+          "httpMethod": "DELETE",
+          "headers": {
+            "Consent-ID": "{consentId}",
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
+      }
+    ]
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-card-issuer-001",
@@ -451,15 +489,36 @@
     "externalProviderEvents": [
       {
         "event": "card.issuer.validation.requested",
-        "outbound": { "url": "/api/v1/modules/card-issuer/score", "httpMethod": "POST", "mapping": [] }
+        "outbound": {
+          "url": "/v1/cards/validations",
+          "httpMethod": "POST",
+          "headers": {
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
       },
       {
         "event": "card.cvv.reveal.requested",
-        "outbound": { "url": "/api/v1/modules/card-issuer/reveal", "httpMethod": "POST", "mapping": [] }
+        "outbound": {
+          "url": "/v1/cards/{cardToken}/verification-values",
+          "httpMethod": "POST",
+          "headers": {
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
       },
       {
         "event": "card.pan.reveal.requested",
-        "outbound": { "url": "/api/v1/modules/card-issuer/reveal-pan", "httpMethod": "POST", "mapping": [] }
+        "outbound": {
+          "url": "/v1/cards/{cardToken}/pan-reveals",
+          "httpMethod": "POST",
+          "headers": {
+            "X-Request-ID": "{correlationId}"
+          },
+          "mapping": []
+        }
       }
     ],
     "externalProviderMode": "sync",
@@ -495,7 +554,19 @@
     ],
     "recordCreatedDateTime": "2026-06-11T09:00:00.000Z",
     "recordUpdatedDateTime": "2026-06-11T09:00:00.000Z",
-    "schemaVersion": 2
+    "schemaVersion": 2,
+    "authConfig": {
+      "scheme": "oauth2_cc",
+      "oauth2": {
+        "clientId": "",
+        "tokenEndpoint": "/v1/oauth/token",
+        "scopes": [
+          "card-authorisations",
+          "card-data"
+        ],
+        "tokenCachingEnabled": true
+      }
+    }
   },
   {
     "externalProviderArrangementInstanceReference": "int-internal-ais-001",

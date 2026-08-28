@@ -138,7 +138,14 @@ export function DataList<T extends Row>({
   }, [query]);
 
   const writeParams = useCallback((changes: Record<string, string | number | undefined>) => {
-    const next = new URLSearchParams(searchParams.toString());
+    // Built from the LIVE address, not from the render's snapshot of it.
+    //
+    // `useSearchParams` gives the query as of the last render, and `router.replace` updates the address before
+    // the next one arrives. Two changes in quick succession therefore both read the same stale snapshot, and the
+    // second silently discards the first: clearing a date window right after setting it reinstated the dates,
+    // because "clear" was computed against a query that did not have them yet.
+    const current = typeof window === 'undefined' ? searchParams.toString() : window.location.search;
+    const next = new URLSearchParams(current);
     for (const [key, value] of Object.entries(changes)) {
       if (value === undefined || value === '') next.delete(key);
       else next.set(key, String(value));

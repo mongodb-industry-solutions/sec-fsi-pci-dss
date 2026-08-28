@@ -232,8 +232,11 @@ test.describe('the bank administration app', () => {
       await expect(owner).toBeVisible({ timeout: 20000 });
       const href = (await owner.getAttribute('href')) ?? '';
       const reference = decodeURIComponent(href.replace('/holders/', ''));
-      await owner.click();
-      await page.waitForTimeout(2000);
+      // Navigated by URL rather than clicked. The list is newest-first and refetches on mount, so the row under
+      // the cursor can be a different party by the time the click lands, and then the counts asserted below
+      // belong to one party while the page shows another.
+      await page.goto(`${BANK_UI}${href}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(2500);
 
       // What the bank says this owner has, asked directly.
       const scoped = async (resource: string) => {
@@ -305,15 +308,21 @@ test.describe('the bank administration app', () => {
 
       // A real window offers the time as well as the date.
       await when.selectOption('between');
-      await page.waitForTimeout(500);
       await expect(page.locator('input[type="datetime-local"]')).toHaveCount(2);
+      // Waits for the address to actually carry the window before clearing it. Asserting on a fixed delay let
+      // a slow render turn a real ordering bug into an intermittent one.
+      await page.waitForFunction(() => new URLSearchParams(window.location.search).has('from'));
 
-      // Clearing removes both bounds rather than leaving one behind.
+      // Clearing removes BOTH bounds, and does not lose the change to whichever write came before it.
       await when.selectOption('any');
-      await page.waitForTimeout(900);
-      const cleared = new URL(page.url());
-      expect(cleared.searchParams.get('from')).toBeNull();
-      expect(cleared.searchParams.get('to')).toBeNull();
+      await page.waitForFunction(
+        () => {
+          const params = new URLSearchParams(window.location.search);
+          return !params.has('from') && !params.has('to');
+        },
+        undefined,
+        { timeout: 10000 },
+      );
     });
   });
 
