@@ -1,103 +1,56 @@
-import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
-import type { Db } from 'mongodb';
-import {
-  ROLE_COLLECTION, RoleRecord, RolePermissions, Resource, Action,
-  BUILTIN_ROLES, hasPermission,
-} from '../../shared/models/acl.model';
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { Resource, Action, hasPermission } from '../../shared/models/permissionCatalog';
 import type { AuthenticatedRequest } from '../../shared/models/identity.model';
 import { canReadSensitive } from './rbac';
 
-// ── Role-permission cache ─────────────────────────────────────────────────────
-// Permissions are DATA (the `role` collection), editable at runtime. We cache per role with a
-// short TTL and explicit invalidation on edits, so a permission change takes effect without a
-// re-login (the JWT never carries permissions: see /acl/effective). Default-deny throughout.
-const CACHE_TTL_MS = 30_000;
-const cache = new Map<string, { role: RoleRecord | null; expires: number }>();
+/**
+ * The authorization guard, reading a claim.
+ *
+ * v39 P6.4: this used to load a role from a collection this application owned, merge it with an
+ * in-code fallback matrix, and cache the result for thirty seconds per process. All of that is gone
+ * along with the collection it read.
+ *
+ * What replaced it is smaller and stricter: the authority resolves a principal's permissions at
+ * issuance and writes them into the token, so the check is a claim read. No lookup, no cache, no
+ * fallback matrix. Removing the cache removes a real defect as well as code: a thirty-second
+ * per-process cache meant a permission change took up to thirty seconds to apply, and took a
+ * different amount of time on each replica.
+ *
+ * The trade is stated rather than hidden. A permission change now reaches a live token only when the
+ * next one is issued, which is a longer window than thirty seconds. Access tokens are short-lived for
+ * that reason, and the operations where being wrong is expensive ask the authority directly instead
+ * of trusting the claim.
+ */
 
-const BUILTIN_BY_NAME = new Map(BUILTIN_ROLES.map((r) => [r.roleName, r]));
-
-function builtinFallback(roleName: string): RoleRecord | null {
-  const b = BUILTIN_BY_NAME.get(roleName);
-  if (!b) return null;
-  return { ...b, recordCreatedDateTime: new Date(0), recordUpdatedDateTime: new Date(0) };
-}
-
-export function invalidateRoleCache(roleName?: string): void {
-  if (roleName) cache.delete(roleName);
-  else cache.clear();
-}
-
-// Resolve a role record from the DB; fall back to the builtin matrix if the collection is
-// unavailable or the role is a not-yet-seeded builtin. Never throws: enforcement must not fail open.
-//
-// For builtin roles loaded from DB: any resource present in the in-code builtin but absent from the
-// DB record is merged in. This means new resources (e.g. 'beneficiaries' in v18) take effect without
-// requiring a manual re-seed, only additions are merged, so manager permission edits are preserved.
-export async function loadRole(db: Db, roleName: string | undefined): Promise<RoleRecord | null> {
-  if (!roleName) return null;
-  const cached = cache.get(roleName);
-  const now = Date.now();
-  if (cached && cached.expires > now) return cached.role;
-
-  let role: RoleRecord | null = null;
-  try {
-    role = await db.collection<RoleRecord>(ROLE_COLLECTION).findOne({ roleName });
-  } catch {
-    role = null;
-  }
-  if (!role) {
-    role = builtinFallback(roleName);
-  } else if (role.roleIsBuiltin) {
-    // Merge any missing resources from the in-code builtin into the DB record so new resources
-    // added to code propagate immediately without a re-seed.
-    const builtin = BUILTIN_BY_NAME.get(roleName);
-    if (builtin) {
-      const merged: RolePermissions = { ...role.rolePermissions };
-      let patched = false;
-      for (const [res, actions] of Object.entries(builtin.rolePermissions) as [Resource, Action[]][]) {
-        if (!merged[res]) {
-          merged[res] = actions;
-          patched = true;
-        }
-      }
-      if (patched) role = { ...role, rolePermissions: merged };
-    }
-  }
-  cache.set(roleName, { role, expires: now + CACHE_TTL_MS });
-  return role;
-}
-
-export async function loadRolePermissions(db: Db, roleName: string | undefined): Promise<RolePermissions | undefined> {
-  return (await loadRole(db, roleName))?.rolePermissions;
-}
-
-export async function can(db: Db, roleName: string | undefined, resource: Resource, action: Action): Promise<boolean> {
-  return hasPermission(await loadRolePermissions(db, roleName), resource, action);
-}
-
-function serverDb(request: FastifyRequest): Db {
-  return (request.server as FastifyInstance & { db: Db }).db;
+/** Permissions the authority resolved, or an empty list. Default deny: absent is not unrestricted. */
+function permissionsOf(request: FastifyRequest): Array<{ resource: string; action: string }> {
+  const user = (request as FastifyRequest & {
+    user?: { permissions?: Array<{ resource: string; action: string }> };
+  }).user;
+  return user?.permissions ?? [];
 }
 
 function roleOf(request: FastifyRequest): string | undefined {
-  return (request as unknown as AuthenticatedRequest).userRole
-    ?? (request as FastifyRequest & { user?: { role?: string } }).user?.role;
+  const user = (request as FastifyRequest & { user?: { roles?: string[] } }).user;
+  return (request as unknown as AuthenticatedRequest).userRole ?? user?.roles?.[0];
+}
+
+export function can(request: FastifyRequest, resource: Resource, action: Action): boolean {
+  return hasPermission(permissionsOf(request), resource, action);
 }
 
 /**
- * Generic, data-driven authorization guard (PCI DSS, default-deny). Use as a route
- * preHandler: `preHandler: requirePermission('transactions', 'view')`. Denies with 403 + a
- * machine-readable body the frontend maps to <AccessDenied>.
+ * Route guard. Default deny, and the refusal is machine-readable so the interface can render it.
  *
- * `viewSensitive` additionally requires the escalation flow (canReadSensitive) on top of the
- * role granting the permission, so an L2 still needs a valid escalation token, while an auditor
- * (direct sensitive reader) passes. Plain `view`/`manage`/`investigate` are pure ACL checks.
+ * `viewSensitive` additionally requires the elevation on top of the permission, so holding the role
+ * is not the same as exercising it: an investigator still needs an approved elevation, while an
+ * auditor whose whole role is sensitive read-only oversight passes on the permission alone.
  */
 export function requirePermission(resource: Resource, action: Action) {
   return async (request: FastifyRequest, reply: FastifyReply) => {
     const role = roleOf(request);
-    const allowed = await can(serverDb(request), role, resource, action);
-    if (!allowed) {
+
+    if (!can(request, resource, action)) {
       return reply.status(403).send({
         error: `Access denied: your role does not permit ${action} on ${resource}.`,
         code: 'ACL_DENIED',
@@ -106,9 +59,10 @@ export function requirePermission(resource: Resource, action: Action) {
         role: role ?? null,
       });
     }
+
     if (action === 'viewSensitive') {
-      const escToken = (request as unknown as AuthenticatedRequest).escalationToken;
-      if (role && !canReadSensitive(role as never, !!escToken)) {
+      const escalationToken = (request as unknown as AuthenticatedRequest).escalationToken;
+      if (role && !canReadSensitive(role as never, Boolean(escalationToken))) {
         return reply.status(403).send({
           error: 'Access denied: sensitive access requires an active escalation token.',
           code: 'ESCALATION_REQUIRED',
@@ -119,4 +73,15 @@ export function requirePermission(resource: Resource, action: Action) {
       }
     }
   };
+}
+
+/**
+ * Kept as a no-op so the call sites that invalidated the old cache still compile.
+ *
+ * There is no cache to invalidate: permissions travel in the token. The function goes with the last
+ * of those call sites in the deletion pass, and leaving it as a silent no-op until then is better
+ * than leaving code that clears a map nothing reads.
+ */
+export function invalidateRoleCache(): void {
+  // Intentionally empty. See above.
 }

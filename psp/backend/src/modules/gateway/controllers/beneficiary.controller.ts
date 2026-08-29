@@ -121,7 +121,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     // beneficiaries:investigate. ADR-048.
     const effectiveOwner = ownerRef ?? q.ownerRef;
     if (!effectiveOwner) {
-      const maySearch = await can(fastify.db, user?.role, 'beneficiaries', 'investigate');
+      const maySearch = can(request, 'beneficiaries', 'investigate');
       if (!maySearch) {
         return reply.status(403).send({
           error: 'Cross-party beneficiary search requires the investigate capability; provide an owner party reference instead.',

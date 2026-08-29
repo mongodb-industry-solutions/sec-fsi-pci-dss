@@ -345,12 +345,19 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
     // Allowed collections and the authorization rule both live in the service.
     const caller = (request as unknown as {
       userRole?: string;
-      user?: { role?: string; partyRef?: string; sub?: string };
+      user?: {
+        role?: string;
+        partyRef?: string;
+        sub?: string;
+        permissions?: Array<{ resource: string; action: string }>;
+      };
     });
     const decision = await authorizeRawDocumentAccess(fastify.db, collection, id, {
       ...(caller.userRole ?? caller.user?.role ? { role: caller.userRole ?? caller.user?.role } : {}),
       ...(caller.user?.partyRef ? { partyRef: caller.user.partyRef } : {}),
       ...(caller.user?.sub ? { sub: caller.user.sub } : {}),
+      // Resolved by the authority at issuance; this application decides with it, never about it.
+      ...(caller.user?.permissions ? { permissions: caller.user.permissions } : {}),
     });
     if (!decision.allowed) {
       return reply.status(decision.status).send({

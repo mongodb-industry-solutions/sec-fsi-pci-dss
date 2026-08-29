@@ -5,8 +5,7 @@
 
 import { FastifyInstance } from 'fastify';
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
-import { requirePermission, loadRolePermissions } from '../../../vendors/middleware/acl';
-import { hasPermission } from '../../../shared/models/acl.model';
+import { requirePermission, can } from '../../../vendors/middleware/acl';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { listAuditEvents } from '../../provider/services/businessProcessEvent.service';
 import { listKycAdmin, getKycByPartyRef, patchKycData, revealKycSensitive } from '../services/customerAgreement.service';
@@ -25,9 +24,7 @@ export async function customerKycController(fastify: FastifyInstance) {
   // The audited reveal is reachable with customers:manage (administration) or
   // customers:viewSensitive (oversight, where requirePermission also enforces escalation).
   const canReveal = async (request: Parameters<typeof canManage>[0], reply: Parameters<typeof canManage>[1]) => {
-    const role = (request as unknown as { userRole?: string }).userRole;
-    const perms = await loadRolePermissions(fastify.db, role);
-    if (hasPermission(perms, 'customers', 'manage')) return;            // administration path
+    if (can(request, 'customers', 'manage')) return;                    // administration path
     return canSensitive(request, reply);                                // oversight path (+escalation)
   };
   const canSensitive = requirePermission('customers', 'viewSensitive');

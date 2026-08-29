@@ -4,7 +4,8 @@
 // by ownership instead, proven server-side from its own identity (GDPR Art. 15).
 
 import type { Db } from 'mongodb';
-import type { Resource } from '../../../shared/models/acl.model';
+import type { Resource } from '../../../shared/models/permissionCatalog';
+import { hasPermission } from '../../../shared/models/permissionCatalog';
 import { can } from '../../../vendors/middleware/acl';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
@@ -25,6 +26,8 @@ export const RAW_COLLECTION_RESOURCE: Readonly<Record<string, Resource>> = {
 
 export interface RawAccessCaller {
   role?: string;
+  /** Resolved by the authority at issuance and carried in the token. */
+  permissions?: Array<{ resource: string; action: string }>;
   partyRef?: string;
   sub?: string;
 }
@@ -127,7 +130,8 @@ export async function authorizeRawDocumentAccess(
     return { allowed: true };
   }
 
-  if (!(await can(db, role, resource, 'view'))) {
+  // The permissions the authority resolved, carried by the caller rather than looked up here.
+  if (!hasPermission(caller.permissions, resource, 'view')) {
     return {
       allowed: false,
       status: 403,
