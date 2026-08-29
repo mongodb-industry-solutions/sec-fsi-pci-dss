@@ -723,6 +723,165 @@
         }
       }
     },
+    "/admin/resource-servers/{name}/permissions": {
+      "put": {
+        "operationId": "registerResourceServerPermissions",
+        "summary": "Register a resource server permission catalog",
+        "tags": [
+          "authorization"
+        ],
+        "description": "No applicable standard. A protected application declares the enforcement points it ships, and the authority records them so roles can be granted over them. Idempotent and versioned: registering the same catalog twice is one registration, and a permission that disappears is marked deprecated rather than deleted, because existing grants reference it.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "audience",
+                  "permissions"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "realm": {
+                    "type": "string",
+                    "description": "Defaults to the realm whose name matches the audience."
+                  },
+                  "audience": {
+                    "type": "string",
+                    "example": "orders-api"
+                  },
+                  "permissionCatalogVersion": {
+                    "type": "string",
+                    "example": "3"
+                  },
+                  "validationMode": {
+                    "type": "string",
+                    "enum": [
+                      "local-jwks",
+                      "introspection",
+                      "hybrid"
+                    ]
+                  },
+                  "permissions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "resource",
+                        "action"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "resource": {
+                          "type": "string"
+                        },
+                        "action": {
+                          "type": "string"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "orders-api",
+            "in": "path",
+            "name": "name",
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The catalog as the authority now holds it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The catalog as the authority now holds it.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "resourceServerId",
+                    "registered",
+                    "deprecated"
+                  ],
+                  "properties": {
+                    "resourceServerId": {
+                      "type": "string"
+                    },
+                    "registered": {
+                      "type": "integer",
+                      "description": "Permissions in the catalog after this call."
+                    },
+                    "deprecated": {
+                      "type": "integer",
+                      "description": "Permissions no longer declared, kept for existing grants."
+                    },
+                    "permissionCatalogVersion": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "resourceServerId": "a1c4…",
+                  "registered": 27,
+                  "deprecated": 0,
+                  "permissionCatalogVersion": "1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid administrative token was presented.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such realm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No administrative credential is configured.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/posture": {
       "get": {
         "operationId": "getAdminPosture",

@@ -2,7 +2,7 @@ import { Db } from 'mongodb';
 import {
   COUNTERPARTY_COLLECTION,
   CounterpartyArrangement,
-} from '../../modules/identity/models/counterpartyArrangement.model';
+} from '../../modules/customer/models/counterpartyArrangement.model';
 
 // Demo beneficiaries for the two most-used customers (Counterparty Administration).
 // Raw phone/email is NEVER stored, only masked hints and resolved partyInstanceReferences.

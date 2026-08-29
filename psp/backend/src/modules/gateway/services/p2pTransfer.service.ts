@@ -8,7 +8,7 @@
 
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
+import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../customer/models/counterpartyArrangement.model';
 import { getPayoutAccount, getDefaultPayoutAccount } from './payoutAccount.service';
 import { holdAvailableFunds, releaseReservation } from './payoutAccountBalance.service';
 import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';

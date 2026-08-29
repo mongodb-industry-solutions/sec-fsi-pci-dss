@@ -3,7 +3,7 @@ import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/me
 import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
-import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/customer/models/counterpartyArrangement.model';
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
 import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
 import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';

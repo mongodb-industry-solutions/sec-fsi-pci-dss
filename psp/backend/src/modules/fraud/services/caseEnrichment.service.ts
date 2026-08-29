@@ -11,7 +11,7 @@ import { PAYOUT_ACCOUNT_COLLECTION } from '../../gateway/models/payoutAccount.mo
 import { PARTY_COLLECTION } from '../../identity/models/party.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../gateway/models/paymentRequest.model';
-import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
+import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../customer/models/counterpartyArrangement.model';
 
 const CUSTOMER_CREDIT_RATING_COLLECTION = 'customerCreditRatingState';
 

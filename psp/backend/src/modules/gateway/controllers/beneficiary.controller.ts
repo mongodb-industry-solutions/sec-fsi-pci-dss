@@ -21,11 +21,11 @@ import {
   updateBeneficiaryLabel,
   removeBeneficiary,
   registerBeneficiary,
-} from '../../identity/services/counterpartyArrangement.service';
+} from '../../customer/services/counterpartyArrangement.service';
 import { executeP2PTransfer } from '../services/p2pTransfer.service';
 import { getDefaultPayoutAccount, listPayoutAccounts } from '../services/payoutAccount.service';
 import { emitProcessEvent, emitComplianceEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
-import type { CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
+import type { CounterpartyArrangement } from '../../customer/models/counterpartyArrangement.model';
 import type { Db } from 'mongodb';
 
 function getUser(request: unknown): JwtUserPayload | undefined {
