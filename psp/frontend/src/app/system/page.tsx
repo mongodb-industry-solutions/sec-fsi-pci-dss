@@ -12,7 +12,7 @@ import {
 import { api, AuthUser, AuthDomain } from '../../lib/api';
 import { BRAND } from '../../config/brand';
 import { getToken, setToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
-import { DEMO_PASSWORD, ROLE_LABELS } from '../../lib/constants';
+import { ROLE_LABELS } from '../../lib/constants';
 import demoRoster from '../../config/demoRoster.json';
 import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
@@ -155,7 +155,9 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   }
 
   function handleUserSelect(email: string) {
-    setSelectedEmail(email); setPassword(email ? DEMO_PASSWORD : ''); setError(null);
+    // No autofill any more: the shared demo password does not exist in this bundle. Signing in
+    // happens at the identity authority, which offers the demo roster as one-click personas there.
+    setSelectedEmail(email); setPassword(''); setError(null);
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -274,7 +276,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
                     </>} />
                   </label>
                   <input type="email" value={selectedEmail}
-                    onChange={(e) => { setSelectedEmail(e.target.value); if (users.some((u) => u.email === e.target.value)) setPassword(DEMO_PASSWORD); setError(null); }}
+                    onChange={(e) => { setSelectedEmail(e.target.value); setError(null); }}
                     placeholder="user@example.com" className="w-full border rounded-lg px-3 py-2 text-sm" />
                 </div>
               )}

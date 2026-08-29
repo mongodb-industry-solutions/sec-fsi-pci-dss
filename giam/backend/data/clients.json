@@ -213,5 +213,38 @@
     "tokenEndpointAuthMethod": "none",
     "applicationType": "web",
     "status": "active"
+  },
+  {
+    "realm": "leafypay",
+    "clientId": "leafypay-simulator",
+    "clientName": "LeafyPay simulator",
+    "clientType": "confidential",
+    "clientSecret": "leafypay-simulator-demo-secret-2026",
+    "redirectUris": [],
+    "grantTypes": [
+      "client_credentials",
+      "urn:ietf:params:oauth:grant-type:token-exchange"
+    ],
+    "scope": "openid profile email",
+    "requirePkce": false,
+    "tokenEndpointAuthMethod": "client_secret_post",
+    "applicationType": "service",
+    "status": "active",
+    "serviceIdentity": {
+      "kind": "service",
+      "userName": "LeafyPay simulator",
+      "roleName": "demonstration_simulator",
+      "owner": {
+        "kind": "application",
+        "ref": "leafypay",
+        "displayName": "LeafyPay"
+      },
+      "resourceServer": "authority",
+      "permissions": {
+        "impersonation": [
+          "exercise"
+        ]
+      }
+    }
   }
 ]
