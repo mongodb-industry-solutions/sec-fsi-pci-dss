@@ -39,6 +39,20 @@ const PROVABLY_PUBLIC = new Set([
   // Public because a session identifier is the thing being surrendered. Requiring a credential to
   // END a session would leave a session alive whenever the credential was the problem.
   'post /realms/{realm}/protocol/openid-connect/logout',
+
+  // Public because it is what an unauthenticated visitor is about to be shown. It carries branding,
+  // the providers a person may choose and, where a realm declares them, its demo personas: nothing a
+  // sign-in page does not already display.
+  'get /realms/{realm}/login-context',
+
+  // The device-facing half of backchannel authentication. Holding the request identifier lets a
+  // device see what it would be signing and act on it, and every one of these still requires a
+  // signature from a registered private key: the identifier alone approves nothing and denies
+  // nothing. Requiring a credential here would mean the approving device had to hold one, which is
+  // the assumption the flow exists to remove.
+  'get /realms/{realm}/protocol/openid-connect/ext/ciba/auth/{authReqId}',
+  'post /realms/{realm}/protocol/openid-connect/ext/ciba/auth/{authReqId}/approve',
+  'post /realms/{realm}/protocol/openid-connect/ext/ciba/auth/{authReqId}/deny',
 ]);
 
 let app: FastifyInstance;

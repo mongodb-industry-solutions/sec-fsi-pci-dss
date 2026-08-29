@@ -10,6 +10,7 @@ import { AUTHORIZATION_REQUEST_COLLECTION } from '../../../shared/models/collect
 import { AuthorizationRequestRecord, isRedeemable } from '../models/authorizationRequest.model';
 import { scopesOf } from '../models/client.model';
 import { DecisionService } from '../../authorization/services/decision.service';
+import { BackchannelService, isFailure, BACKCHANNEL_GRANT } from '../../authentication/services/backchannel.service';
 
 /**
  * The token endpoint, RFC 6749.
@@ -49,10 +50,11 @@ export async function tokenController(fastify: FastifyInstance) {
         properties: {
           grant_type: {
             type: 'string',
-            description: 'authorization_code, client_credentials or refresh_token.',
+            description: 'authorization_code, client_credentials, refresh_token or the backchannel grant.',
             examples: ['client_credentials'],
           },
           code: { type: 'string' },
+          auth_req_id: { type: 'string', description: 'The backchannel grant: the request the principal approved.' },
           redirect_uri: { type: 'string' },
           code_verifier: { type: 'string' },
           refresh_token: { type: 'string' },
@@ -233,6 +235,47 @@ export async function tokenController(fastify: FastifyInstance) {
           ...(scope.includes('email') && identity.primaryEmail ? { email: identity.primaryEmail } : {}),
         },
       }));
+    }
+
+    if (grantType === BACKCHANNEL_GRANT) {
+      // The approval already happened on the person's own device. What is left is to claim it and
+      // mint, through exactly the same issuer the redirect flow uses.
+      const backchannel = new BackchannelService(fastify.db);
+      const claimed = await backchannel.claimApproved(realm, client.clientId, String(body.auth_req_id ?? ''));
+      if (isFailure(claimed)) return fail(reply as never, claimed.status, claimed.error, claimed.description);
+
+      const directory = new DirectoryService(fastify.db);
+      const identity = claimed.subjectId ? await directory.findBySubjectId(claimed.subjectId) : null;
+      if (!identity) return fail(reply as never, 400, 'invalid_grant', 'subject no longer exists');
+
+      const scope = claimed.scope.split(' ').filter(Boolean);
+      const decision = await new DecisionService(fastify.db)
+        .effectivePermissions(realm.realmId, identity.subjectId, client.clientId);
+
+      const tokens = await issuer.issue({
+        realm,
+        client,
+        subjectId: identity.subjectId,
+        scope,
+        permissions: decision.permissions,
+        roles: decision.roles,
+        ...(identity.accountHolderRef ? { accountHolderRef: identity.accountHolderRef } : {}),
+        sessionEpoch: identity.sessionEpoch,
+        includeRefreshToken: true,
+        includeIdToken: scope.includes('openid'),
+        idTokenClaims: {
+          name: identity.name?.formatted,
+          preferred_username: identity.userName,
+          ...(scope.includes('email') && identity.primaryEmail ? { email: identity.primaryEmail } : {}),
+        },
+      });
+
+      // push delivery carries the tokens to the client's endpoint as well. The poll that got here
+      // already claimed the request, so this cannot produce a second set.
+      if (client.backchannel?.deliveryMode === 'push') {
+        void backchannel.notify(client, claimed.authReqId as string, tokens as unknown as Record<string, unknown>);
+      }
+      return reply.send(tokens);
     }
 
     return fail(reply as never, 400, 'unsupported_grant_type', `grant_type ${grantType} is not supported`);
