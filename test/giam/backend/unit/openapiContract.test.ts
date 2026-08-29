@@ -31,6 +31,10 @@ const PROVABLY_PUBLIC = new Set([
 
   // Public by nature: it is where a credential is presented, so it cannot require one first.
   'post /realms/{realm}/login',
+
+  // Public because a session is the credential, and the session id is in the body. A client
+  // secret here would exclude the public clients this endpoint exists to serve.
+  'post /realms/{realm}/protocol/openid-connect/auth',
 ]);
 
 let app: FastifyInstance;

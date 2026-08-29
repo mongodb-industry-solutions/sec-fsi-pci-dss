@@ -1,10 +1,11 @@
-import { keyProviders, authenticationMethods, credentialStores } from './index';
+import { keyProviders, authenticationMethods, credentialStores, policyEvaluators } from './index';
 import { InstanceLocalKeyProvider } from '../../modules/keys/providers/instanceLocal.provider';
 import { FilesystemKeyProvider } from '../../modules/keys/providers/filesystem.provider';
 import { SharedStoreKeyProvider } from '../../modules/keys/providers/sharedStore.provider';
 import { KmsKeyProvider } from '../../modules/keys/providers/kms.provider';
 import { bcryptPasswordStore, publicKeyStore } from '../../modules/directory/services/credentialStores';
 import { passwordMethod, publicKeyMethod, clientSecretMethod } from '../../modules/authentication/services/authenticationMethods';
+import { rbacEvaluator, abacEvaluator } from '../../modules/authorization/services/policyEvaluators';
 
 /**
  * Registers the implementations GIAM ships with.
@@ -43,5 +44,12 @@ export function registerBuiltinPorts(): void {
     authenticationMethods.register(passwordMethod);
     authenticationMethods.register(publicKeyMethod);
     authenticationMethods.register(clientSecretMethod);
+  }
+
+  // How a decision is reached. Two from the start, and the combination rule is deny-wins, so
+  // adding an evaluator can only ever make a result more restrictive.
+  if (!policyEvaluators.has('rbac')) {
+    policyEvaluators.register(rbacEvaluator);
+    policyEvaluators.register(abacEvaluator);
   }
 }
