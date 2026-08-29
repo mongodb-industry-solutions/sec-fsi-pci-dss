@@ -40,7 +40,7 @@ export async function runSetup(reset = false): Promise<void> {
     }
 
     console.log('1. Provisioning the key vault and GIAM\'s own DEKs...');
-    const deks = await provisionGiamDeks(client);
+    const deks = await provisionGiamDeks(client, reset);
     console.log('');
 
     console.log('2. Creating collections...');

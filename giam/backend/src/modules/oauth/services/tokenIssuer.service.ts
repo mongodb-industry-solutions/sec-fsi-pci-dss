@@ -1,12 +1,15 @@
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import { TOKEN_COLLECTION } from '../../../shared/models/collections';
+import { TOKEN_COLLECTION, RESOURCE_SERVER_COLLECTION } from '../../../shared/models/collections';
 import { TokenRecord, ActorClaim } from '../models/token.model';
 import { RealmRecord } from '../../realm/models/realm.model';
 import { ClientRecord } from '../models/client.model';
 import { JwtTokenFormat } from './jwtTokenFormat';
 import { KeyRing } from '../../keys/services/keyRing.service';
 import { newMeta } from '../../../shared/models/base.model';
+
+/** The name the authority registers its OWN permissions under. Never an audience for a business token. */
+const AUTHORITY_RESOURCE_SERVER = 'authority';
 
 export interface IssueTokensInput {
   realm: RealmRecord;
@@ -53,6 +56,35 @@ export class TokenIssuer {
     return this.db.collection<TokenRecord>(TOKEN_COLLECTION);
   }
 
+  /**
+   * The resource servers a token from this realm is addressed to.
+   *
+   * Taken from what is registered rather than configured per client, because a resource server is
+   * the thing that knows its own name and registers it. A client may narrow this by declaring its
+   * own audience; most never need to.
+   *
+   * The authority's own surface is excluded deliberately. A token for a business API must not also
+   * open the administrative one just because both live in the same realm.
+   */
+  private async audienceFor(realm: RealmRecord, client: ClientRecord): Promise<string[]> {
+    const declared = (client as ClientRecord & { audience?: string[] }).audience;
+    if (declared?.length) return declared;
+
+    const servers = await this.db
+      .collection<{ name: string; audience: string }>(RESOURCE_SERVER_COLLECTION)
+      .find({ realmId: realm.realmId }, { projection: { _id: 0, name: 1, audience: 1 } })
+      .toArray();
+
+    const addressed = servers
+      .filter((server) => server.name !== AUTHORITY_RESOURCE_SERVER)
+      .map((server) => server.audience)
+      .filter(Boolean);
+
+    // A realm with no registered resource server yet: the client's own id keeps the claim populated
+    // rather than emitting a token with an empty audience, which a verifier must refuse.
+    return addressed.length > 0 ? addressed : [client.clientId];
+  }
+
   private ttl(realm: RealmRecord, client: ClientRecord): { access: number; refresh: number } {
     return {
       access: client.tokenPolicy?.accessTokenTtlSeconds ?? realm.tokenPolicy.accessTokenTtlSeconds,
@@ -94,9 +126,17 @@ export class TokenIssuer {
     const accessJti = uuidv4();
     const accessClaims: Record<string, unknown> = {
       iss: realm.issuer,
-      // The client is the audience of its own access token. A resource server checks that it is
-      // named here, which is what stops a token minted for one API opening another.
-      aud: client.clientId,
+      /**
+       * The audience names the RESOURCE SERVERS this token is for, per RFC 9068, not the client that
+       * asked for it.
+       *
+       * It named the client until v39 P12, and that was wrong in a way nothing detected: a resource
+       * server checking the audience against its own registered name could never match, so either it
+       * did not check at all, or it checked something that always failed. Both consumers turned out
+       * to be in the first state. Naming the resource server makes the claim mean what a verifier
+       * assumes it means, which is what stops a token minted for one API opening another.
+       */
+      aud: await this.audienceFor(realm, client),
       sub: input.subjectId ?? client.clientId,
       jti: accessJti,
       iat: now,

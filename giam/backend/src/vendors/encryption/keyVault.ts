@@ -13,13 +13,30 @@ import { config, keyVaultNamespace, keyVaultNamespaceParts } from '../../config'
  * ciphertext and wrapped DEKs together, which discloses nothing on its own because the DEKs are
  * themselves encrypted under the master key the KMS provider holds.
  */
-export async function provisionGiamDeks(client: MongoClient): Promise<GiamDeks> {
+/**
+ * Provisions the vault and this authority's data encryption keys.
+ *
+ * A reset DROPS the vault first, and it has to. A data key is wrapped by the master key, so a vault
+ * that
+ * survives a reset holds keys the CURRENT master key cannot unwrap, and the failure surfaces much
+ * later as an HMAC validation error on the first encrypted write, which names neither the vault nor
+ * the key. Keeping the vault across a reset was the one way to make a rebuild produce a database
+ * that could not be read.
+ */
+export async function provisionGiamDeks(client: MongoClient, reset = false): Promise<GiamDeks> {
   const { database, collection } = keyVaultNamespaceParts();
   const clientEncryption = new ClientEncryption(client, {
     keyVaultNamespace: keyVaultNamespace(),
     kmsProviders: buildKmsProviders(),
   });
   const keyVault = client.db(database).collection(collection);
+
+  if (reset) {
+    // Dropped rather than emptied: the unique index is recreated below, and a half-cleared vault is
+    // the state that produces the confusing failure this exists to prevent.
+    await keyVault.drop().catch(() => { /* absent is the state we want */ });
+    console.log('    dropped the vault, so every key is rewrapped under the current master key');
+  }
 
   // The vault's own contract: one key per alt name, enforced by the database rather than by care.
   await keyVault.createIndex(

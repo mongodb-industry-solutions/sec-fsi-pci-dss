@@ -25,7 +25,10 @@ interface ParityRow {
 }
 
 const PARITY: ParityRow[] = [
-  { capability: 'obtain a TPP access token', method: 'post', path: '/v1/oauth/token', phase: 'done', secured: false },
+  // v39: obtaining a token is no longer a capability of THIS service. A third party gets one from the
+  // identity authority, so the row would assert an endpoint this bank should not have. What replaced
+  // it is asserted in tppTokenEndpoint.test.ts: the endpoint is absent and a real authority token is
+  // accepted. Removing the row is the honest edit; leaving it would demand a regression.
   { capability: 'create an account access consent', method: 'post', path: '/v1/consents', phase: 'done' },
   { capability: 'read a consent', method: 'get', path: '/v1/consents/{consentId}', phase: 'done' },
   { capability: 'read consent status', method: 'get', path: '/v1/consents/{consentId}/status', phase: 'done' },

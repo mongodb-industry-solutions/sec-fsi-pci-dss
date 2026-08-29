@@ -11,17 +11,16 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { config } from '../../../../bank/backend/src/config';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { staffToken, stopStaffAuthority } from '../support/staffToken';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 import {
   BANK_AUDIT_LOG_COLLECTION, BankAuditLogRecord,
 } from '../../../../bank/backend/src/modules/audit/models/bankAuditLog.model';
 
-const ADMIN = () => jwt.sign({ role: 'admin', sub: 'p38-ops' }, config.app.adminSecret, { expiresIn: 300 });
-const TPP = (scopes: string[]) => issueAccessToken(
-  { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never,
-  scopes as never,
-).accessToken;
+// A real employee token: the administrative surface takes a PERMISSION the authority resolved, not
+// a role name asserted inside a token this test signed for itself.
+const ADMIN = () => staffToken('administrator');
+const TPP = (scopes: string[]) => tppToken(scopes);
 
 // The hook records after the response, so a read has to let the write land.
 const settle = () => new Promise((done) => setTimeout(done, 400));
@@ -35,6 +34,8 @@ describe('v37 P3.8: the bank records what it was asked', () => {
   });
 
   afterAll(async () => {
+    await stopStaffAuthority();
+    await stopTppAuthority();
     if (app?.db && !app.dbError) {
       await app.db.collection(BANK_AUDIT_LOG_COLLECTION).deleteMany({ auditCorrelationId: /^p38-/ });
     }
@@ -55,7 +56,7 @@ describe('v37 P3.8: the bank records what it was asked', () => {
       method: 'GET',
       url: '/v1/accounts',
       headers: {
-        authorization: `Bearer ${TPP(['accounts'])}`,
+        authorization: `Bearer ${await TPP(['accounts'])}`,
         'consent-id': consentId,
         'x-request-id': 'p38-read',
       },
@@ -80,7 +81,7 @@ describe('v37 P3.8: the bank records what it was asked', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/cards/searches',
-      headers: { authorization: `Bearer ${TPP(['accounts'])}`, 'x-request-id': 'p38-refused' },
+      headers: { authorization: `Bearer ${await TPP(['accounts'])}`, 'x-request-id': 'p38-refused' },
       payload: { cardNumber: '4111111111111111' },
     });
     expect(response.statusCode).toBe(403);
@@ -107,7 +108,7 @@ describe('v37 P3.8: the bank records what it was asked', () => {
       method: 'POST',
       url: '/v1/cards/validations',
       headers: {
-        authorization: `Bearer ${TPP(['card-authorisations'])}`,
+        authorization: `Bearer ${await TPP(['card-authorisations'])}`,
         'x-request-id': 'p38-nobody',
       },
       payload: { cardNumber: pan, cvv: '123', expiry: '12/34' },
@@ -126,7 +127,7 @@ describe('v37 P3.8: the bank records what it was asked', () => {
     await app.inject({
       method: 'GET',
       url: '/v1/cards/pm_p38_probe',
-      headers: { authorization: `Bearer ${TPP(['card-data'])}`, 'x-request-id': 'p38-card' },
+      headers: { authorization: `Bearer ${await TPP(['card-data'])}`, 'x-request-id': 'p38-card' },
     });
     const rows = await rowsFor('p38-card');
     expect(rows.length).toBeGreaterThan(0);
@@ -147,13 +148,13 @@ describe('v37 P3.8: the bank records what it was asked', () => {
   it('serves the trail on the admin API, filterable by outcome and by any reference', async () => {
     if (app.dbError) return;
     const all = await app.inject({
-      method: 'GET', url: '/api/v1/admin/audit?limit=5', headers: { authorization: `Bearer ${ADMIN()}` },
+      method: 'GET', url: '/api/v1/admin/audit?limit=5', headers: { authorization: `Bearer ${await ADMIN()}` },
     });
     expect(all.statusCode).toBe(200);
     expect(Array.isArray(all.json().results)).toBe(true);
 
     const refused = await app.inject({
-      method: 'GET', url: '/api/v1/admin/audit?outcome=refused&limit=5', headers: { authorization: `Bearer ${ADMIN()}` },
+      method: 'GET', url: '/api/v1/admin/audit?outcome=refused&limit=5', headers: { authorization: `Bearer ${await ADMIN()}` },
     });
     expect(refused.statusCode).toBe(200);
     for (const row of refused.json().results as BankAuditLogRecord[]) {
@@ -164,7 +165,7 @@ describe('v37 P3.8: the bank records what it was asked', () => {
     const byResource = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/audit?resource=pm_p38_probe',
-      headers: { authorization: `Bearer ${ADMIN()}` },
+      headers: { authorization: `Bearer ${await ADMIN()}` },
     });
     expect(byResource.statusCode).toBe(200);
     expect((byResource.json().results as BankAuditLogRecord[]).length).toBeGreaterThan(0);
@@ -177,7 +178,7 @@ describe('v37 P3.8: the bank records what it was asked', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/audit',
-      headers: { authorization: `Bearer ${TPP(['accounts', 'card-data', 'credit-assessments'])}` },
+      headers: { authorization: `Bearer ${await TPP(['accounts', 'card-data', 'credit-assessments'])}` },
     });
     expect(response.statusCode).toBeGreaterThanOrEqual(401);
     expect(response.statusCode).toBeLessThan(404);

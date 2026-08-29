@@ -6,11 +6,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../../../bank/backend/src/modules/aspsp/models/accountArrangement.model';
 
 const REGISTRATION = { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never;
-const withScopes = (scopes: string[]) => issueAccessToken(REGISTRATION, scopes as never).accessToken;
+const withScopes = (scopes: string[]) => tppToken(scopes);
 
 const BUREAU = () => withScopes(['credit-assessments', 'accounts']);
 // Deliberately without credit-assessments: reading someone's creditworthiness is a different permission
@@ -32,6 +32,7 @@ describe('v37 P8: the credit bureau surface', () => {
   });
 
   afterAll(async () => {
+    await stopTppAuthority();
     await app?.close();
   });
 
@@ -39,7 +40,7 @@ describe('v37 P8: the credit bureau surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/credit-assessments',
-      headers: { authorization: `Bearer ${ACCOUNTS_ONLY()}` },
+      headers: { authorization: `Bearer ${await ACCOUNTS_ONLY()}` },
       payload: { accountHolderReference: holder ?? 'anyone' },
     });
     expect(response.statusCode).toBe(403);
@@ -60,7 +61,7 @@ describe('v37 P8: the credit bureau surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/credit-assessments',
-      headers: { authorization: `Bearer ${BUREAU()}` },
+      headers: { authorization: `Bearer ${await BUREAU()}` },
       payload: { accountHolderReference: holder },
     });
     expect(response.statusCode).toBe(200);
@@ -80,7 +81,7 @@ describe('v37 P8: the credit bureau surface', () => {
     const response = await app.inject({
       method: 'GET',
       url: `/v1/credit-assessments/${encodeURIComponent(holder)}`,
-      headers: { authorization: `Bearer ${BUREAU()}` },
+      headers: { authorization: `Bearer ${await BUREAU()}` },
     });
     expect(response.statusCode).toBe(200);
     expect(response.json().creditScore).toBeGreaterThanOrEqual(300);
@@ -88,10 +89,10 @@ describe('v37 P8: the credit bureau surface', () => {
 
   it('reassesses the same party in place rather than accumulating rows', async () => {
     if (!holder) return;
-    const assess = () => app.inject({
+    const assess = async () => app.inject({
       method: 'POST',
       url: '/v1/credit-assessments',
-      headers: { authorization: `Bearer ${BUREAU()}` },
+      headers: { authorization: `Bearer ${await BUREAU()}` },
       payload: { accountHolderReference: holder },
     });
     await assess();
@@ -105,7 +106,7 @@ describe('v37 P8: the credit bureau surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/credit-assessments',
-      headers: { authorization: `Bearer ${BUREAU()}` },
+      headers: { authorization: `Bearer ${await BUREAU()}` },
       payload: { accountHolderReference: 'nobody-this-bank-has-ever-heard-of' },
     });
     if (response.statusCode === 503) return;
@@ -117,7 +118,7 @@ describe('v37 P8: the credit bureau surface', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/credit-assessments/nobody-this-bank-has-ever-heard-of',
-      headers: { authorization: `Bearer ${BUREAU()}` },
+      headers: { authorization: `Bearer ${await BUREAU()}` },
     });
     if (response.statusCode === 503) return;
     expect(response.statusCode).toBe(404);

@@ -84,11 +84,19 @@ export async function machineToken(
   realm: string,
   clientId: string,
   clientSecret: string,
+  scope?: string,
 ): Promise<string | null> {
   const response = await fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret }),
+    // A narrower scope than the client holds is how a test proves a scope gate rather than asserting
+    // it: the authority issues exactly what was asked for, within what the client is registered for.
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+      ...(scope ? { scope } : {}),
+    }),
   });
   if (!response.ok) return null;
   return (await response.json() as { access_token: string }).access_token;

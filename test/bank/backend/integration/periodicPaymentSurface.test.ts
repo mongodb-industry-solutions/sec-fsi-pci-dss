@@ -6,16 +6,15 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 import { PERIODIC_PAYMENT_COLLECTION } from '../../../../bank/backend/src/modules/pisp/models/periodicPayment.model';
 import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../../../bank/backend/src/modules/aspsp/models/accountArrangement.model';
 import { BANK_CONSENT_AGREEMENT_COLLECTION } from '../../../../bank/backend/src/modules/consent/models/bankConsent.model';
 
 const PRODUCT = 'sepa-credit-transfers';
-const token = (clientId = 'leafypay-psp') => issueAccessToken(
-  { tppRegistrationClientId: clientId, tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never,
-  ['payments'] as never,
-).accessToken;
+// A DIFFERENT third party when asked for one, so 'another provider cannot see this order' is a real
+// assertion rather than the same caller looking at its own record.
+const token = (clientId = 'leafypay-psp') => tppToken(['payments'], clientId);
 
 describe('v37 P3.9: the standing order surface', () => {
   let app: FastifyInstance;
@@ -41,6 +40,7 @@ describe('v37 P3.9: the standing order surface', () => {
   });
 
   afterAll(async () => {
+    await stopTppAuthority();
     if (app?.db && !app.dbError) {
       await app.db.collection(PERIODIC_PAYMENT_COLLECTION)
         .deleteMany({ paymentRemittanceInformation: /^P3.9 / });
@@ -62,11 +62,11 @@ describe('v37 P3.9: the standing order surface', () => {
     };
   }
 
-  const create = (payload: Record<string, unknown>, requestId: string, client = 'leafypay-psp') => app.inject({
+  const create = async (payload: Record<string, unknown>, requestId: string, client = 'leafypay-psp') => app.inject({
     method: 'POST',
     url: `/v1/periodic-payments/${PRODUCT}`,
     headers: {
-      authorization: `Bearer ${token(client)}`,
+      authorization: `Bearer ${await token(client)}`,
       'consent-id': consentId,
       'x-request-id': requestId,
     },
@@ -131,7 +131,7 @@ describe('v37 P3.9: the standing order surface', () => {
     const noConsent = await app.inject({
       method: 'POST',
       url: `/v1/periodic-payments/${PRODUCT}`,
-      headers: { authorization: `Bearer ${token()}`, 'x-request-id': `p39-noconsent-${Date.now()}` },
+      headers: { authorization: `Bearer ${await token()}`, 'x-request-id': `p39-noconsent-${Date.now()}` },
       payload: body(),
     });
     expect(noConsent.statusCode).toBe(400);
@@ -141,7 +141,7 @@ describe('v37 P3.9: the standing order surface', () => {
       method: 'POST',
       url: `/v1/periodic-payments/${PRODUCT}`,
       headers: {
-        authorization: `Bearer ${token()}`,
+        authorization: `Bearer ${await token()}`,
         'consent-id': 'not-a-consent',
         'x-request-id': `p39-badconsent-${Date.now()}`,
       },
@@ -155,7 +155,7 @@ describe('v37 P3.9: the standing order surface', () => {
     const resource = await app.inject({
       method: 'GET',
       url: `/v1/periodic-payments/${PRODUCT}/${created}`,
-      headers: { authorization: `Bearer ${token()}` },
+      headers: { authorization: `Bearer ${await token()}` },
     });
     expect(resource.statusCode).toBe(200);
     expect(resource.json().frequency).toBe('Monthly');
@@ -164,7 +164,7 @@ describe('v37 P3.9: the standing order surface', () => {
     const status = await app.inject({
       method: 'GET',
       url: `/v1/periodic-payments/${PRODUCT}/${created}/status`,
-      headers: { authorization: `Bearer ${token()}` },
+      headers: { authorization: `Bearer ${await token()}` },
     });
     expect(status.statusCode).toBe(200);
     // The order's own status AND the transaction status: an active order can have had a failed collection,
@@ -179,7 +179,7 @@ describe('v37 P3.9: the standing order surface', () => {
     const response = await app.inject({
       method: 'GET',
       url: `/v1/periodic-payments/${PRODUCT}/${created}`,
-      headers: { authorization: `Bearer ${token('someone-else')}` },
+      headers: { authorization: `Bearer ${await token('another-tpp')}` },
     });
     expect(response.statusCode).toBe(404);
   });
@@ -189,7 +189,7 @@ describe('v37 P3.9: the standing order surface', () => {
     const response = await app.inject({
       method: 'DELETE',
       url: `/v1/periodic-payments/${PRODUCT}/${created}`,
-      headers: { authorization: `Bearer ${token()}` },
+      headers: { authorization: `Bearer ${await token()}` },
     });
     expect(response.statusCode).toBe(200);
     expect(response.json().transactionStatus).toBe('CANC');
@@ -206,7 +206,7 @@ describe('v37 P3.9: the standing order surface', () => {
     const response = await app.inject({
       method: 'DELETE',
       url: `/v1/periodic-payments/${PRODUCT}/${created}`,
-      headers: { authorization: `Bearer ${token()}` },
+      headers: { authorization: `Bearer ${await token()}` },
     });
     expect(response.statusCode).toBe(409);
   });

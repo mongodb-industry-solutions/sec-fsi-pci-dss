@@ -103,7 +103,7 @@
     "grantTypes": [
       "client_credentials"
     ],
-    "scope": "accounts balances transactions payments funds-confirmations",
+    "scope": "accounts balances transactions payments funds-confirmations card-data card-authorisations credit-assessments",
     "requirePkce": false,
     "tokenEndpointAuthMethod": "client_secret_basic",
     "applicationType": "service",
@@ -243,6 +243,45 @@
       "permissions": {
         "impersonation": [
           "exercise"
+        ]
+      }
+    }
+  },
+  {
+    "realm": "bankcore",
+    "clientId": "another-tpp",
+    "clientName": "Another Provider",
+    "clientType": "confidential",
+    "clientSecret": "dev-another-tpp-secret",
+    "redirectUris": [],
+    "grantTypes": [
+      "client_credentials"
+    ],
+    "scope": "accounts balances transactions payments",
+    "requirePkce": false,
+    "tokenEndpointAuthMethod": "client_secret_basic",
+    "applicationType": "service",
+    "status": "active",
+    "serviceIdentity": {
+      "kind": "service",
+      "userName": "Another Provider, a second registered third party",
+      "roleName": "third_party_provider_secondary",
+      "owner": {
+        "kind": "tenant",
+        "ref": "another-tpp",
+        "displayName": "Another Provider"
+      },
+      "resourceServer": "bankcore",
+      "permissions": {
+        "accounts": [
+          "view"
+        ],
+        "movements": [
+          "view"
+        ],
+        "psd2Role": [
+          "AISP",
+          "PISP"
         ]
       }
     }

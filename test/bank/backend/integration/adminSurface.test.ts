@@ -8,15 +8,16 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import jwt from 'jsonwebtoken';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { config } from '../../../../bank/backend/src/config';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { staffToken, stopStaffAuthority } from '../support/staffToken';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 
-const ADMIN = () => jwt.sign({ role: 'admin', sub: 'ops' }, config.app.adminSecret, { expiresIn: 120 });
-const NOT_ADMIN = () => jwt.sign({ role: 'level1_analyst', sub: 'someone' }, config.app.adminSecret, { expiresIn: 120 });
-const TPP = () => issueAccessToken(
-  { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never,
-  ['accounts', 'balances', 'transactions', 'payments'] as never,
-).accessToken;
+// A real employee token: the administrative surface takes a PERMISSION the authority resolved, not
+// a role name asserted inside a token this test signed for itself.
+const ADMIN = () => staffToken('administrator');
+// An employee with a real token and no administrative permission. The refusal has to come from what
+// the authority granted them, not from the absence of a credential.
+const NOT_ADMIN = () => staffToken('operations');
+const TPP = () => tppToken(['accounts', 'balances', 'transactions', 'payments']);
 
 // Concrete URLs, for calling the app.
 const ADMIN_ROUTES: Array<[string, string]> = [
@@ -52,7 +53,9 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
     paths = (app as unknown as { swagger: () => { paths: typeof paths } }).swagger().paths ?? {};
   });
 
-  afterAll(async () => { if (app) await app.close(); });
+  afterAll(async () => {
+    await stopStaffAuthority();
+    await stopTppAuthority(); if (app) await app.close(); });
 
   it('publishes every administration route under /api/v1/admin, never under /v1', () => {
     const adminPaths = Object.keys(paths).filter((path) => path.startsWith('/api/v1/admin/'));
@@ -85,7 +88,7 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
   it('refuses a valid platform token that is not an admin', async () => {
     const response = await app.inject({
       method: 'GET', url: '/api/v1/admin/module/config',
-      headers: { authorization: `Bearer ${NOT_ADMIN()}` },
+      headers: { authorization: `Bearer ${await NOT_ADMIN()}` },
     });
     expect(response.statusCode).toBe(403);
   });
@@ -93,11 +96,21 @@ describe('v37 P3.7a: the administration surface is separate and protected', () =
   it('refuses a TPP access token: a third party does not configure the bank', async () => {
     const response = await app.inject({
       method: 'GET', url: '/api/v1/admin/module/config',
-      headers: { authorization: `Bearer ${TPP()}` },
+      headers: { authorization: `Bearer ${await TPP()}` },
     });
-    // The TPP token is signed with the bank's own key, so this proves the two mechanisms are separate
-    // rather than merely differently named.
-    expect(response.statusCode).toBe(401);
+    /**
+     * 403 rather than 401, and the change is the improvement.
+     *
+     * The token used to be signed with the bank's own key, so presenting it here failed at
+     * AUTHENTICATION and the surface answered 401. Both tokens now come from the same authority and
+     * both verify, so a third party's machine token is a valid credential that simply does not carry
+     * the permission: it is refused at authorisation, which is what 403 means.
+     *
+     * The property under test is unchanged and is arguably better demonstrated. A refusal that
+     * survives the token being genuinely valid is a stronger separation than one that depended on
+     * the two mechanisms using different keys.
+     */
+    expect(response.statusCode).toBe(403);
   });
 
   it('documents that a configuration change needs no redeploy, which is the point of the surface', () => {
