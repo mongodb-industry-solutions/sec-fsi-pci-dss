@@ -5,7 +5,6 @@ import {
   isSensitiveDecrypted,
 } from '../models/customerAgreement.model';
 import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
-import { CUSTOMER_AUTHENTICATION_COLLECTION } from '../../identity/models/customerAuthentication.model';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole, getSensitiveTierDb, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { phoneDigest } from '../../../vendors/encryption/digest';
@@ -487,15 +486,10 @@ export async function updateSelfProfile(
     }
     matched = true;
 
-    // Sync Extended Reference: customerAuthenticationAssessment.customerAuthenticationUserName
-    // mirrors party.partyName for JWT name claims. Update on every name change so the
-    // source record stays accurate (JWT itself refreshes on next login).
-    if (patch.customerName) {
-      await roleDb.collection(CUSTOMER_AUTHENTICATION_COLLECTION).updateOne(
-        { partyInstanceReference: party.partyInstanceReference },
-        { $set: { customerAuthenticationUserName: patch.customerName } }
-      );
-    }
+    // v39: the principal's display name is the authority's, not this application's. Writing it
+    // back here would make two systems each believe they own it, and the one that loses is whichever
+    // wrote second. A name change reaches tokens when the authority is updated and the person signs
+    // in again.
   }
 
   const agreementPatch: Record<string, unknown> = {};

@@ -115,7 +115,9 @@ export const config = {
      *
      * It goes away entirely when the bank verifies the authority's tokens instead.
      */
-    adminSecret: pspEnv('BANKCORE_ADMIN_SECRET') ?? deriveKey('bankcore:admin', bankcoreRoot()),
+    // v39: no admin secret. A shared symmetric secret between two services means either of them can
+    // mint a token the other accepts; the diagnostics surface now verifies against the authority
+    // published key set, and the authority holds the only private key.
     eventBusEngine: (pspEnv('BANKCORE_EVENT_BUS_ENGINE', 'in-process')!) as 'in-process' | 'kafka' | 'rabbitmq',
     eventBusTopicPrefix: pspEnv('BANKCORE_EVENT_BUS_TOPIC_PREFIX', 'bankcore')!,
     seedDataDir: pspEnv('BANKCORE_SEED_DATA_DIR'),

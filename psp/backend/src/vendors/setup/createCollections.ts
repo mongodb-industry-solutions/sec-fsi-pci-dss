@@ -4,12 +4,9 @@ import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';
 import { config } from '../../config';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
-import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/customer/models/counterpartyArrangement.model';
-import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
-import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
 import { PAYMENT_REQUEST_EVENT_COLLECTION } from '../../modules/gateway/models/paymentRequestEvent.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
@@ -474,41 +471,10 @@ export async function createCollections(
     console.log('  skip:    partyIssuedToken (already exists)');
   }
 
-  // v16 (ADR-038): PartyAuthentication, ConsentGrant, per-user per-client consent with revocation support.
-  if (!existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) || reset) {
-    if (existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) && reset) {
-      await db.collection(PARTY_AUTH_CONSENT_COLLECTION).drop();
-      console.log(`  dropped: ${PARTY_AUTH_CONSENT_COLLECTION}`);
-    }
-    await db.createCollection(PARTY_AUTH_CONSENT_COLLECTION);
-    console.log(`  created: ${PARTY_AUTH_CONSENT_COLLECTION} (consent grants; user-authorized apps registry)`);
-  } else {
-    console.log(`  skip:    ${PARTY_AUTH_CONSENT_COLLECTION} (already exists)`);
-  }
-
-  // PartyEnrolledCredential, user authenticator registry (public keys only, no CHD).
-  if (!existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) || reset) {
-    if (existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) && reset) {
-      await db.collection(PARTY_ENROLLED_CREDENTIAL_COLLECTION).drop();
-      console.log(`  dropped: ${PARTY_ENROLLED_CREDENTIAL_COLLECTION}`);
-    }
-    await db.createCollection(PARTY_ENROLLED_CREDENTIAL_COLLECTION);
-    console.log(`  created: ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (passwordless credentials, public keys only)`);
-  } else {
-    console.log(`  skip:    ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (already exists)`);
-  }
-
-  // PartyBackchannelAuthentication, CIBA auth_req_id lifecycle (TTL-expiring, one-time).
-  if (!existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) || reset) {
-    if (existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) && reset) {
-      await db.collection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).drop();
-      console.log(`  dropped: ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION}`);
-    }
-    await db.createCollection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION);
-    console.log(`  created: ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (CIBA backchannel requests, TTL)`);
-  } else {
-    console.log(`  skip:    ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (already exists)`);
-  }
+  // v39: the consent, enrolled-credential and backchannel collections belong to the identity
+  // authority and are created by its setup, in its database. Creating them here as well would leave
+  // two stores that both look authoritative, and which one a reader trusts becomes an accident of
+  // which they happened to open.
 
   // merchantWebhookDeliveryLog: persisted delivery attempt records (ADR-038)
   const logColls = await db.listCollections({ name: MERCHANT_WEBHOOK_LOG_COLLECTION }).toArray();

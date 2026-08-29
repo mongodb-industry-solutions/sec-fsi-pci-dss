@@ -18,7 +18,6 @@ import {
 import { sanitizeDeep } from '../../../vendors/eventbus';
 export { sanitizeDeep };
 import { getEventBus, makeEvent, type BusinessProcess, type EventBus, type DomainEvent } from '../../../vendors/eventbus';
-import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../../identity/models/customerAuthentication.model';
 import type { FastifyRequest } from 'fastify';
 import { callAuthority } from '../../../vendors/security/authorityApi';
 
@@ -523,14 +522,13 @@ export async function listMerchantActivity(
     col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
-  // Resolve display-safe acting-user names in one batch: name only, no CHD, no IBAN.
-  const subs = [...new Set(docs.map((d) => d.actingPartyReference).filter((s): s is string => !!s))];
-  const users = subs.length
-    ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
-        .find({ customerAuthenticationInstanceReference: { $in: subs } })
-        .toArray()
-    : [];
-  const nameBySub = new Map(users.map((u) => [u.customerAuthenticationInstanceReference, u.customerAuthenticationUserName]));
+  // The acting party is shown by its reference rather than resolved to a name.
+  //
+  // The names live at the identity authority now, and this listing deliberately does not fetch them:
+  // it would mean a call per page render, on a screen that is a business activity log rather than a
+  // directory, and the reference is what actually identifies the actor in every other record here.
+  // A screen that needs the name asks the authority for that one principal.
+  const nameBySub = new Map<string, string | undefined>();
 
   const events: MerchantActivityRow[] = docs.map((d) => ({
     id: d.businessProcessEventInstanceReference,

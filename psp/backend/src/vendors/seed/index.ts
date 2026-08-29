@@ -5,10 +5,7 @@ import { execSync } from 'child_process';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
 import { seedParties } from './seedParties';
-import { seedRoles } from './seedRoles';
-import { seedUsers } from './seedUsers';
 import { seedMerchants } from './seedMerchants';
-import { seedAuthDomains } from './seedAuthDomains';
 import { seedCustomers } from './seedCustomers';
 import { seedCards } from './seedCards';
 import { seedCardDescoping } from './seedCardDescoping';
@@ -24,7 +21,6 @@ import { seedPspRevenueAccount } from './seedPspRevenueAccount';
 import { seedPaymentExecutions } from './seedPaymentExecutions';
 import { seedCounterpartyArrangements } from './seedCounterpartyArrangements';
 import { seedRtpRequests } from './seedRtpRequests';
-import { seedEnrolledCredentials } from './seedEnrolledCredentials';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -82,17 +78,10 @@ export async function runSeed() {
     console.log('Seeding party (SD-13)...');
     await seedParties(db);
 
-    console.log('Seeding role (ADR-030 RBAC builtin matrix)...');
-    await seedRoles(db);
-
-    console.log('Seeding customerAuthenticationAssessment (SD-91)...');
-    await seedUsers(db);
-
-    console.log('Seeding authenticationDomain...');
-    await seedAuthDomains(db);
-
-    console.log('Seeding partyEnrolledCredential (SD-91/SD-16 passwordless)...');
-    await seedEnrolledCredentials(db);
+    // v39: roles, principals, authentication domains and enrolled credentials are seeded by the
+    // identity authority, from its own fixtures, into its own database. Seeding them here as well
+    // would create a second source of truth for who exists and what they may do, which is the exact
+    // thing the extraction removed.
 
     console.log('Seeding customerAgreementProcedure (v2: sensitive fields inline)...');
     await seedCustomers(db);

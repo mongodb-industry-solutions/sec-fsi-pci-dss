@@ -1,12 +1,9 @@
 import { MongoClient, Db, IndexSpecification, CreateIndexesOptions, IndexDescription, MongoServerError } from 'mongodb';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
-import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
 import { COUNTERPARTY_COLLECTION } from '../../modules/customer/models/counterpartyArrangement.model';
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
-import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
-import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
@@ -438,28 +435,7 @@ export async function createIndexes(client: MongoClient) {
     { key: { merchantAgreementInstanceReference: 1, keyStatus: 1 } },
   ]);
 
-  // v16 (ADR-038): PartyAuthentication, ConsentGrant, unique per-user+client pair, sub lookup, revocation
-  await ensureIndexes(db, PARTY_AUTH_CONSENT_COLLECTION, [
-    { key: { consentId: 1 }, unique: true },
-    { key: { partyAuthenticationInstanceReference: 1, oauthClientId: 1 }, unique: true },
-    { key: { partyAuthenticationInstanceReference: 1, consentStatus: 1 } },
-    { key: { oauthClientId: 1, consentStatus: 1 } },
-  ]);
-
-  // PartyEnrolledCredential, unique credentialId, owner+status lookup
-  await ensureIndexes(db, PARTY_ENROLLED_CREDENTIAL_COLLECTION, [
-    { key: { partyEnrolledCredentialInstanceReference: 1 }, unique: true },
-    { key: { credentialId: 1 }, unique: true },
-    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
-  ]);
-
-  // PartyBackchannelAuthentication, unique authReqId, TTL on expiresAt, client+status lookup
-  await ensureIndexes(db, PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION, [
-    { key: { authReqId: 1 }, unique: true },
-    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
-    { key: { clientId: 1, status: 1 } },
-    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
-  ]);
+  // v39: indexes for the identity collections live with those collections, at the authority.
 
   // merchantWebhookDeliveryLog indexes (ADR-038)
   await ensureIndexes(db, MERCHANT_WEBHOOK_LOG_COLLECTION, [

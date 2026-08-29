@@ -30,7 +30,21 @@ interface LoginFixture {
 
 const DATA = resolve(__dirname, '../../../../psp/backend/data');
 const parties = JSON.parse(readFileSync(resolve(DATA, 'parties.json'), 'utf8')) as PartyFixture[];
-const logins = JSON.parse(readFileSync(resolve(DATA, 'customerAuthentications.json'), 'utf8')) as LoginFixture[];
+
+/**
+ * The logins as they stood BEFORE the extraction, frozen here.
+ *
+ * The live fixture was deleted with the rest of the application's identity data, which is correct:
+ * it is no longer a seeder input and leaving it would be a second source of truth for who exists.
+ * But this test is the evidence that every principal survived the move, and deleting its input would
+ * have quietly destroyed that evidence rather than the data.
+ *
+ * So the pre-migration state is kept HERE, as a frozen reference that nothing seeds from. It never
+ * changes again: it is a historical record, and a check against a moving target proves nothing.
+ */
+const logins = JSON.parse(
+  readFileSync(resolve(__dirname, '../fixtures/migration-source-logins.json'), 'utf8'),
+) as LoginFixture[];
 
 /**
  * The role histogram the plan's migration table states.
