@@ -42,9 +42,9 @@ export async function clientRegistrationController(fastify: FastifyInstance) {
       status: { type: 'string' },
     },
     examples: [{
-      client_id: 'espresso-works',
-      client_name: 'Espresso Works',
-      redirect_uris: ['https://espresso.example/callback'],
+      client_id: 'acme-portal',
+      client_name: 'Acme Portal',
+      redirect_uris: ['https://acme.example/callback'],
       grant_types: ['authorization_code', 'refresh_token'],
       scope: 'openid profile',
       status: 'active',

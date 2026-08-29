@@ -197,11 +197,23 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
 
   if (claims.iss !== config.giam.issuerUrl) return recordFailure('wrong_issuer');
 
-  const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  // The audience is the client the token was issued to, and this application accepts tokens for the
-  // clients it serves. A token minted for another audience verifies cryptographically and is still
-  // refused, which is what stops one API's token opening another.
+  /**
+   * The audience is the client the token was issued to, and it is CHECKED, not merely required.
+   *
+   * A token minted for another audience verifies cryptographically and must still be refused: that
+   * is the whole property that stops one API's token opening another. Asserting only that the claim
+   * is present looks like a check and is not one, which is worse than no check at all, because it
+   * reads as though the property holds.
+   *
+   * The accepted set is this resource server's own name and the clients it serves. Both appear
+   * because the authority issues a token whose audience is the CLIENT, while a resource server is
+   * registered under its own name; a deployment where those differ is ordinary.
+   */
+  const audience = (Array.isArray(claims.aud) ? claims.aud : [claims.aud]).map(String);
   if (audience.length === 0) return recordFailure('missing_audience');
+
+  const accepted = new Set([config.giam.audience, config.giam.resourceServerName].filter(Boolean));
+  if (!audience.some((entry) => accepted.has(entry))) return recordFailure('wrong_audience');
 
   const now = Math.floor(Date.now() / 1000);
   const skew = 60;

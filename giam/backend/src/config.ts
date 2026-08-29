@@ -35,9 +35,9 @@ export const config = {
 
   server: {
     host: env('HOST', '0.0.0.0')!,
-    // Own port. LeafyPay holds 8081/8080, merchant 8082, bankcore 8083, the bank app 8084.
+    // Own port, chosen not to collide with the other services in this deployment.
     port: parseInt(giamEnv('PORT', '8085')!, 10),
-    // Private, service to service. What LeafyPay and BankCore resolve discovery against.
+    // Private, service to service. What a resource server resolves discovery against.
     baseUrl: giamEnv('BASE_URL', 'http://127.0.0.1:8085')!,
     // Public, browser facing. Empty when a deployment does not publish GIAM.
     publicUrl: giamEnv('PUBLIC_URL', '')!,

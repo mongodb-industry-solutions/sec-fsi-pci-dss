@@ -137,7 +137,7 @@ export class KeyRing {
    * The realm's published key set: every key still trusted for verification, from ANY replica.
    *
    * The union is what makes the design work. A verifier resolves a kid against this set, so a token
-   * signed by one replica verifies at another, at LeafyPay and at BankCore, with no shared secret.
+   * signed by one replica verifies at another, and at every resource server, with no shared secret.
    */
   async publishedKeySet(realmId: string): Promise<JwkSet> {
     const now = this.clock().getTime();

@@ -151,6 +151,18 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
   // refused here even if it were somehow signed by a key this bank knows.
   if (claims.iss !== config.giam.issuerUrl) return null;
 
+  /**
+   * And the audience names who the token was FOR.
+   *
+   * The issuer check alone is not enough. Within one realm the authority issues tokens to many
+   * clients, and a token minted for one of them verifies perfectly against the same key set. Without
+   * this, any token from this realm opens this bank, which makes the realm boundary the only
+   * boundary there is and turns every client into an equal.
+   */
+  const audience = (Array.isArray(claims.aud) ? claims.aud : [claims.aud]).map(String);
+  const accepted = new Set([config.giam.audience, config.giam.resourceServerName].filter(Boolean));
+  if (!audience.some((entry) => accepted.has(entry))) return null;
+
   const now = Math.floor(Date.now() / 1000);
   const skew = 60;
   if (typeof claims.exp === 'number' && claims.exp + skew < now) return null;
