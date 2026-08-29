@@ -1,23 +1,21 @@
 import { FastifyInstance } from 'fastify';
-import { authController } from './controllers/auth.controller';
-import { oauthController } from './controllers/oauth.controller';
-import { tokenIntrospectionController } from './controllers/tokenIntrospection.controller';
-import { keyManagementController } from './controllers/keyManagement.controller';
+import { authorityProxyController } from './controllers/authorityProxy.controller';
 import { consentGrantsController } from './controllers/consentGrants.controller';
-import { enrollmentController } from './controllers/enrollment.controller';
-import { cibaController } from './controllers/ciba.controller';
-import { cibaStubReceiverController } from './controllers/cibaStubReceiver.controller';
 
+/**
+ * What is left of identity here: a view of the user's own authorizations, and a compatibility shim.
+ *
+ * This application no longer authenticates anyone. It holds no user store, no role table, no signing
+ * key and no session, and the controllers that used to provide them are gone from the routing table.
+ * The authority owns all of it.
+ *
+ * The proxy is registered instead, because one client resolves business and authentication calls
+ * from a single base URL and repointing that base would take the business endpoints with it. It
+ * forwards and does nothing else.
+ */
 export async function identityModule(fastify: FastifyInstance) {
-  await fastify.register(authController, { prefix: '/auth' });
-  // v16: OAuth 2.0 Authorization Server (ADR-033, ADR-034)
-  await fastify.register(oauthController, { prefix: '/auth' });      // POST /api/v1/auth/token, etc.
-  await fastify.register(tokenIntrospectionController, { prefix: '/auth' }); // POST /api/v1/auth/introspect
-  await fastify.register(keyManagementController, { prefix: '/auth' }); // GET/POST /api/v1/auth/keys/*
-  await fastify.register(consentGrantsController, { prefix: '/auth' }); // GET/DELETE /api/v1/auth/grants
-  // passwordless enrollment (session-gated) + CIBA backchannel auth
-  await fastify.register(enrollmentController, { prefix: '/auth' });  // /api/v1/auth/enroll*
-  await fastify.register(cibaController, { prefix: '/auth' });        // /api/v1/auth/bc-authorize*
-  // demo-only ping/push notification receiver (skipAuth, self-authenticated by Bearer token)
-  await fastify.register(cibaStubReceiverController, { prefix: '/auth' }); // /api/v1/auth/ciba/notify
+  // The user's own authorizations, read from the authority rather than from a local collection.
+  await fastify.register(consentGrantsController, { prefix: '/auth' });
+  // Registered last, so an explicit route above always wins over a forwarded one.
+  await fastify.register(authorityProxyController, { prefix: '/auth' });
 }

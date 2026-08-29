@@ -23,19 +23,39 @@ export async function enrollmentController(fastify: FastifyInstance) {
     properties: { realm: { type: 'string', examples: ['acme'] } },
   } as const;
 
+  /**
+   * `alg` is accepted alongside `algorithm` because `alg` is what JOSE calls this field, and a device
+   * that already speaks JOSE should not have to learn a second spelling. Unknown members are ignored
+   * rather than refused, so an authenticator may send its own metadata without being rejected for it.
+   */
   const registrationBody = {
     type: 'object',
-    required: ['challenge', 'publicKeyPem', 'algorithm', 'signature'],
-    additionalProperties: false,
+    required: ['challenge', 'publicKeyPem', 'signature'],
+    additionalProperties: true,
     properties: {
       challenge: { type: 'string', description: 'The challenge this endpoint issued.' },
       publicKeyPem: { type: 'string', description: 'The PUBLIC half. The private half never leaves the device.' },
       algorithm: { type: 'string', enum: ['RS256', 'ES256'] },
+      alg: { type: 'string', enum: ['RS256', 'ES256'], description: 'The JOSE spelling of algorithm.' },
       signature: { type: 'string', description: 'base64url signature over the challenge, proving possession.' },
       credentialId: { type: 'string' },
       label: { type: 'string', description: 'What the person calls this device.' },
     },
   } as const;
+
+  /** One shape from either spelling, so nothing below this line has to know both. */
+  function registration(body: unknown): RegisterInput {
+    const presented = (body ?? {}) as Record<string, unknown> & { authenticatorMetadata?: { deviceName?: string } };
+    return {
+      challenge: String(presented.challenge ?? ''),
+      publicKeyPem: String(presented.publicKeyPem ?? ''),
+      algorithm: (presented.algorithm ?? presented.alg) as RegisterInput['algorithm'],
+      signature: String(presented.signature ?? ''),
+      ...(presented.credentialId ? { credentialId: String(presented.credentialId) } : {}),
+      ...(presented.label ? { label: String(presented.label) }
+        : presented.authenticatorMetadata?.deviceName ? { label: presented.authenticatorMetadata.deviceName } : {}),
+    };
+  }
 
   const credentialView = {
     type: 'object',
@@ -117,7 +137,7 @@ export async function enrollmentController(fastify: FastifyInstance) {
     if (!realm) return fail(reply as never, 400, 'invalid_request', 'unknown realm');
 
     const result = await new EnrollmentService(fastify.db)
-      .register(realm, principal.subjectId, request.body as RegisterInput);
+      .register(realm, principal.subjectId, registration(request.body));
     if (isEnrollmentFailure(result)) return fail(reply as never, result.status, result.error, result.description);
     return reply.send(result);
   });
@@ -225,7 +245,7 @@ export async function enrollmentController(fastify: FastifyInstance) {
     if (!realm) return fail(reply as never, 400, 'invalid_request', 'unknown realm');
 
     const result = await new EnrollmentService(fastify.db)
-      .rotate(realm, principal.subjectId, credentialId, request.body as RegisterInput);
+      .rotate(realm, principal.subjectId, credentialId, registration(request.body));
     if (isEnrollmentFailure(result)) return fail(reply as never, result.status, result.error, result.description);
     return reply.send(result);
   });

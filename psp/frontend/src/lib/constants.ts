@@ -148,3 +148,9 @@ export function formatRiskIndicator(indicator: string): string {
 
   return indicator.replace(/[._]+/g, ' ');
 }
+
+// The identity authority's browser-facing console. A browser NAVIGATES here to sign in and to sign
+// out, so it needs a genuinely public address for the same reason the bank's app does: a private
+// in-cluster host works from a server and is unreachable from a laptop.
+export const AUTHORITY_UI_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC || 'http://localhost:8086';
