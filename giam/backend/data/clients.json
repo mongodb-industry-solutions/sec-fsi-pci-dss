@@ -167,5 +167,28 @@
         ]
       }
     }
+  },
+  {
+    "realm": "bankcore",
+    "clientId": "bankcore-console",
+    "clientName": "BankCore administration console",
+    "clientType": "public",
+    "redirectUris": [
+      "http://localhost:8084/api/auth/callback",
+      "http://127.0.0.1:8084/api/auth/callback"
+    ],
+    "postLogoutRedirectUris": [
+      "http://localhost:8084",
+      "http://127.0.0.1:8084"
+    ],
+    "grantTypes": [
+      "authorization_code",
+      "refresh_token"
+    ],
+    "scope": "openid profile email",
+    "requirePkce": true,
+    "tokenEndpointAuthMethod": "none",
+    "applicationType": "web",
+    "status": "active"
   }
 ]

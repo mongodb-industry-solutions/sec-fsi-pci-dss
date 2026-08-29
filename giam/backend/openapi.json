@@ -475,6 +475,138 @@
         }
       }
     },
+    "/realms/{realm}/protocol/openid-connect/auth": {
+      "post": {
+        "operationId": "authorize",
+        "summary": "Authorization endpoint",
+        "tags": [
+          "oauth"
+        ],
+        "description": "Standard-defined: RFC 6749 section 4.1 and RFC 7636 (PKCE). Exchanges an established session for a single-use authorization code bound to the client, the redirect URI and the PKCE challenge. It never accepts a credential: a request with no session is told one is required rather than being prompted here.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "client_id",
+                  "redirect_uri",
+                  "response_type",
+                  "session_id"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "client_id": {
+                    "type": "string",
+                    "example": "orders-web"
+                  },
+                  "redirect_uri": {
+                    "type": "string",
+                    "example": "https://app.example/callback"
+                  },
+                  "response_type": {
+                    "type": "string",
+                    "enum": [
+                      "code"
+                    ]
+                  },
+                  "scope": {
+                    "type": "string",
+                    "example": "openid profile"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "nonce": {
+                    "type": "string"
+                  },
+                  "code_challenge": {
+                    "type": "string"
+                  },
+                  "code_challenge_method": {
+                    "type": "string",
+                    "enum": [
+                      "S256"
+                    ]
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "description": "The session established at sign-in."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "The authorization code, and the state to echo back.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "The authorization code, and the state to echo back.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "code",
+                    "redirect_uri"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "redirect_uri": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "code": "a1b2…",
+                  "state": "xyz",
+                  "redirect_uri": "https://app.example/callback"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is invalid or the scope is not permitted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No live session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-1"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/realms/{realm}/protocol/openid-connect/token": {
       "post": {
         "operationId": "issueToken",
