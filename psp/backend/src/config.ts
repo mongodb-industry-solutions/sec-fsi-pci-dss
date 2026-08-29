@@ -71,6 +71,23 @@ export const config = {
     awsRegion: env('AWS_REGION', 'us-east-1')!,
   },
 
+  // v39: this application is a relying party and a resource server against the identity authority.
+  // It holds no user store, no role table and no signing key; what it holds is the address of the
+  // issuer it trusts and the name it registers its enforcement points under.
+  giam: {
+    // The realm issuer. Everything else is discovered from it, so a deployment configures one URL.
+    issuerUrl: pspEnv('GIAM_ISSUER_URL', 'http://127.0.0.1:8085/realms/leafypay')!,
+    // What a token must name in its audience claim to be accepted here.
+    audience: pspEnv('GIAM_AUDIENCE', 'leafypay')!,
+    resourceServerName: pspEnv('GIAM_RESOURCE_SERVER', 'leafypay')!,
+    // Presented when registering the catalog at boot. Absent is survivable: registration is
+    // non-fatal, and an unreachable authority must not stop this application serving.
+    registrationToken: pspEnv('GIAM_REGISTRATION_TOKEN'),
+    // How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old
+    // public key can only validate signatures the authority itself produced.
+    jwksCacheSeconds: parseInt(pspEnv('GIAM_JWKS_CACHE_SECONDS', '900')!, 10),
+  },
+
   oauth: {
     keyProvider: (pspEnv('OAUTH_KEY_PROVIDER', 'local')!) as 'local' | 'aws',
     keyStoreDir: pspEnv('OAUTH_KEY_STORE_DIR', './keys')!,

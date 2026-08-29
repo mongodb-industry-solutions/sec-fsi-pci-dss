@@ -4,6 +4,8 @@ import { resolve } from 'path';
 // Load .env from project root (two levels up from backend/bin/).
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
+import { config } from '../src/config';
+import { registerResourceServer } from '../src/vendors/setup/registerResourceServer';
 import corsPlugin from '../src/plugins/cors';
 import mongodbPlugin from '../src/plugins/mongodb';
 import { swaggerPlugin } from '../src/plugins/swagger';
@@ -26,7 +28,6 @@ import { kybModule }       from '../src/providers/kyb';
 import { creditBureauModule }      from '../src/providers/credit-bureau';
 import { cardIssuerModule }         from '../src/providers/card-issuer';
 import { accountInformationModule } from '../src/providers/account-information';
-import { domainModule }       from '../src/modules/domain';
 import { notificationsModule } from '../src/modules/notification';
 import { oidcDiscoveryController } from '../src/modules/identity/controllers/oidcDiscovery.controller';
 import { initOidcKeys } from '../src/modules/identity/services/oidcKeys.service';
@@ -214,7 +215,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   await fastify.register(cardIssuerModule,         { prefix: '/api/v1' });
   await fastify.register(accountInformationModule, { prefix: '/api/v1' });
   // Internal Module without a Provider counterpart (ADR-029).
-  await fastify.register(domainModule,  { prefix: '/api/v1' });
+  // v39 P6.4: the authentication-domain administration surface moved to the identity authority,
+  // where those records now live. Nothing here can administer a realm it does not own.
   // Customer notifications (pending fraud-investigation questions to answer).
   await fastify.register(notificationsModule, { prefix: '/api/v1' });
 
@@ -257,6 +259,15 @@ async function start() {
       console.warn(`[mongodb] Running in degraded mode: ${app.dbError}`);
       console.warn('[mongodb] API routes will return 503 until the database becomes reachable.');
     }
+    // v39 P6.3: register this application enforcement points with the identity authority.
+    //
+    // After listening, and non-fatal. The catalog is what the authority grants FROM; failing to
+    // register it does not stop this application serving requests carrying already-valid tokens,
+    // because those verify against a cached key set and need the authority for nothing.
+    const registration = await registerResourceServer();
+    console.log(registration.registered
+      ? `  permission catalog registered with ${config.giam.issuerUrl}`
+      : `  ! permission catalog NOT registered: ${registration.reason}`);
     console.log(`.........................................................................`);
   } catch (err) {
     app.log.error(err);
