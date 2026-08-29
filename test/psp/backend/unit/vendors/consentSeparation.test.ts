@@ -14,6 +14,7 @@
 // day someone starts writing the empty stub, or points identity code at the bank's consent records,
 // this fails rather than a reviewer catching it.
 import { describe, it, expect } from 'vitest';
+import { existsSync } from 'fs';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { resolve, relative, sep } from 'path';
 
@@ -67,11 +68,19 @@ describe('v39 P3.2: the audit found nothing mixed to split', () => {
     expect(offenders, `writes the consent stub: ${offenders.join(', ')}`).toEqual([]);
   });
 
-  it('keeps the OAuth scope consent in a collection of its own', () => {
-    // partyAuthConsent is what becomes a grant. It is a separate collection from the stub, which is
-    // why "split document by document" turned out to be a classification with nothing in it.
-    const model = readFileSync(resolve(PSP_SRC, 'modules/identity/models/partyAuthConsent.model.ts'), 'utf8');
-    expect(model).toMatch(/PARTY_AUTH_CONSENT_COLLECTION\s*=\s*'partyAuthConsent'/);
+  it('took the OAuth consent and left the account-access consent behind', () => {
+    // The two were always separate collections, which is why "split document by document" turned out
+    // to be a classification with nothing in it: one moved whole and the other did not move at all.
+    //
+    // The OAuth consent is gone from here entirely; a grant is the authority's record now.
+    expect(
+      existsSync(resolve(PSP_SRC, 'modules/identity/models/partyAuthConsent.model.ts')),
+      'the OAuth consent model is still in the application',
+    ).toBe(false);
+
+    // The account-access consent stayed, and stayed exactly where the account-holding institution's
+    // regulated data belongs. Asserting its ABSENCE from the authority is elsewhere in this file;
+    // this asserts its presence here, because "moved nothing" needs both halves to be checked.
     const stub = readFileSync(resolve(PSP_SRC, 'modules/customer/models/consentAgreement.model.ts'), 'utf8');
     expect(stub).toMatch(/CONSENT_AGREEMENT_COLLECTION\s*=\s*'consentAgreement'/);
   });

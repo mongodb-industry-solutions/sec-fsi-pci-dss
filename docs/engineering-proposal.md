@@ -2917,3 +2917,163 @@ An unlinked account can no longer be paid from. One seeded payout account is in 
 rather than approving against a balance nobody stands behind. That is the correct answer to "authorise this
 against money I do not hold", and it is visible instead of silent.
 
+
+---
+
+## v39: extracting identity into an authority
+
+### ADR-070: identity leaves the applications entirely, rather than being shared between them
+
+**Context.** LeafyPay authenticated people, issued tokens, held roles and signed with its own key.
+BankCore verified those tokens using a secret the two services shared, and the merchant and the wallet
+each integrated against LeafyPay's authentication surface directly. Every application that needed a
+login grew one.
+
+**Decision.** Every identity, credential, role, session, token, grant and security event moves to a
+standalone authority. The applications become relying parties and resource servers: they verify tokens
+against a published key set and read claims. None of them stores a principal, decides a permission from
+a local table, or holds a signing key.
+
+**Why not a shared library.** A library would have kept the behaviour consistent and changed nothing
+about the failure mode: each application would still hold credentials, still have a place to write
+principals to, and still be able to drift by not upgrading. The problem was never that the code
+differed. It was that four systems each had the authority to say who somebody is.
+
+**Consequence.** A network hop appears on the authentication path, and an outage at the authority stops
+sign-in everywhere. That is a real cost and it is the right trade: the alternative is four places that
+can each be wrong about who you are, and no single answer to "who has access".
+
+### ADR-071: a realm is a trust and key boundary; a tenant is a data boundary inside it
+
+**Context.** The platform had an "authentication domain", which conflated the protocol a login used
+with the population it served. Adding a second identity source looked like adding a second tenant.
+
+**Decision.** Two records. A realm has its own issuer, its own signing keys and its own clients: a token
+from one realm is meaningless in another. A tenant is an organisational division inside a realm, and
+every record carries one.
+
+**Why.** Conflating them is the mistake that makes multi-tenancy unretrofittable. Separating a tenant
+later means re-keying every record; separating a realm later means re-issuing every token. Neither is a
+migration anybody completes.
+
+### ADR-072: per-instance signing keys with a shared published key set
+
+**Context.** An identity service is usually made highly available by sharing one private key across
+replicas, which needs a KMS, a shared volume or a shared secret. All three are operational burdens and
+each is a single point of compromise.
+
+**Decision.** Each replica holds its own key pair on its own node and registers only the PUBLIC half. A
+realm's key set is the union of every active public key, so every replica publishes an identical set and
+a token signed by one verifies at any other.
+
+**Why this is better isolation, not worse.** Compromising a node yields one key, and revoking it removes
+one entry from the set rather than rotating the signer for the whole deployment. Scaling up needs
+nothing; scaling down is covered by a lease and a publication grace period, which must be at least the
+access-token lifetime or a scale-down signs live users out.
+
+### ADR-073: no capability is gated by environment
+
+**Context.** The easy way to make a demonstration safe is a check for whether this is production.
+
+**Decision.** No code asks which environment it is running in. Hardening is configuration. A weaker
+configuration warns, is documented, and serves; it does not refuse to start.
+
+**Why.** A capability that exists only outside production has never been tested where it matters, and a
+refusal keyed on an environment variable is one variable away from not refusing. Impersonation is the
+concrete case: it is bounded by a REALM flag and by the target being a declared demo persona, so the
+same build is correct for a booth and for a bank.
+
+### ADR-074: one pipeline for people and machines
+
+**Context.** Machine authentication is usually bolted on: a separate endpoint, a separate token shape, a
+separate path that skips the parts written for humans.
+
+**Decision.** A person signing in and a service presenting a credential resolve a principal, get
+authorised, receive a token and produce an audit event through the same code. They differ only in the
+authentication method, which is a port.
+
+**Why.** A second pipeline is how one of the two ends up without an audit trail, and it is always the
+machine one. A service identity here has an owner, a lifecycle, an assurance level and a revocation
+path, which is what stops service accounts becoming permanent unattributable credentials.
+
+### ADR-075: delegation is the default and impersonation the exception
+
+**Context.** RFC 8693 supports both, and they are not equivalent for accountability.
+
+**Decision.** An exchange produces a DELEGATED token by default: the subject stays the person and the
+acting party is named in the actor claim. Impersonation must be asked for explicitly and is refused
+unless the realm permits it and the target is a declared demo persona.
+
+**Why.** Impersonation replaces the subject, so every system downstream sees only the person and the
+agent's part in what happened is gone. No amount of logging elsewhere reconstructs it. The five
+multi-hop rules are enforced at the token endpoint rather than documented, because a rule held by
+convention survives until somebody adds a fourth hop in a hurry.
+
+### ADR-076: an elevation is a time-bound role assignment, not a signed capability
+
+**Context.** Temporary case-scoped access was a signed token the application minted and each service
+verified for itself.
+
+**Decision.** An elevation is a role assignment with an expiry, a justification and an approval,
+recorded at the authority. The approver can never be the requester.
+
+**Why.** The token design was sound in what it did and weak in what it could not do: nobody could ask
+who held elevated access, and an elevation granted in error ran to its expiry regardless of what anyone
+decided afterwards. Both are ordinary questions during an incident. Expressing it as a role assignment
+means it resolves through the same decision point as every other assignment, with no second code path to
+keep in step.
+
+### ADR-077: provisioning says a principal exists; it never says it may operate
+
+**Context.** SCIM lets an external directory create principals here.
+
+**Decision.** A SCIM create lands as pending unless the realm auto-approves, and the active flag a client
+sends on create is ignored. A provisioning client may correct a name or deactivate somebody; it may not
+assign a role.
+
+**Why.** A create that silently confers operational capability turns a directory sync into a privilege
+escalation path. If an upstream directory could grant roles here, whoever administers it could grant
+themselves anything.
+
+### ADR-078: the applications keep their permission CATALOG and lose their role TABLE
+
+**Context.** Deleting authorisation from an application entirely would mean the authority knowing what a
+fraud case is.
+
+**Decision.** Each application declares the resources and actions it enforces, and registers that catalog
+with the authority. The authority holds who has which role and resolves permissions into the token. The
+application reads a claim.
+
+**Why.** The catalog is domain knowledge and belongs where the domain is. The assignment is an access
+decision and belongs where access decisions are made. Splitting them this way is what lets the authority
+carry no financial vocabulary while still answering every authorisation question.
+
+### ADR-079: a compatibility proxy, so an out-of-scope client changes nothing
+
+**Context.** The wallet resolves business and authentication calls from a single base URL. Repointing it
+would move the account and transfer endpoints too.
+
+**Decision.** LeafyPay keeps a transparent reverse proxy on the old authentication paths, forwarding an
+explicit allowlist to the authority. It parses nothing, verifies nothing, caches nothing, holds no secret
+and no state.
+
+**Why, and when it goes.** It is deprecated in its own API document with a stated removal condition: it
+goes when the wallet splits its base URL, which is one variable. The rule that keeps it honest is that
+the moment it makes a decision about a token it has stopped being a proxy and become a second
+authorization server.
+
+### ADR-080: the extraction is enforced by source assertions, not by review
+
+**Context.** Deleting an identity implementation once is easy. Keeping it deleted is not, because the
+next person who needs a user lookup or a token will write one.
+
+**Decision.** A test suite asserts against SOURCE that no consumer mints a token, stores principal
+credentials, seeds principals, creates identity collections, publishes issuer metadata or holds a role
+table. Legitimate exceptions are named individually rather than pattern-matched.
+
+**Why it is a source test.** A runtime test proves the routes are gone; a source test proves the
+CAPABILITY is gone, which is the thing that creeps back. The suite justified itself immediately: it
+found eight surviving violations on its first run, including a service still minting a token with a
+shared secret and a client-secret generator, both of which had survived a deliberate deletion pass.
+Naming each exception rather than loosening the pattern means a second offender cannot hide behind an
+allowance made for the first.

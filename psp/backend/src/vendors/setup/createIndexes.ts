@@ -226,31 +226,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { partitionKey: 1, occurredAt: 1 } },
   ]);
 
-  // Customer Authentication Assessment
-  await ensureIndexes(db, 'customerAuthenticationAssessment', [
-    { key: { customerAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { partyInstanceReference: 1 } },
-    { key: { customerAuthenticationUserRole: 1 } },
-  ]);
 
-  // Party Authentication Assessment
-  await ensureIndexes(db, 'partyAuthenticationAssessment', [
-    { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { partyInstanceReference: 1 } },
-  ]);
 
-  // Authentication Domain config
-  await ensureIndexes(db, 'authenticationDomain', [
-    { key: { partyAuthenticationDomainInstanceReference: 1 }, unique: true },
-    { key: { partyAuthenticationDomainName: 1 }, unique: true },
-    { key: { partyAuthenticationDomainEnabled: 1 } },
-  ]);
 
-  // ADR-030: RBAC role definitions (data-driven ACL)
-  await ensureIndexes(db, 'role', [
-    { key: { roleName: 1 }, unique: true },
-    { key: { roleIsBuiltin: 1 } },
-  ]);
 
   // Customer Credit Rating State
   await ensureIndexes(db, 'customerCreditRatingState', [
@@ -395,26 +373,8 @@ export async function createIndexes(client: MongoClient) {
     { key: { processType: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
-  // v16 (ADR-036): RSA public key registry, unique kid, status filter for JWKS
-  await ensureIndexes(db, 'partyAuthenticationKey', [
-    { key: { keyId: 1 }, unique: true },
-    { key: { keyStatus: 1 } },
-  ]);
 
-  // v16 (ADR-033): OAuth authorization codes, unique code, TTL 5min on expiresAt
-  await ensureIndexes(db, 'partyAuthorizationCode', [
-    { key: { code: 1 }, unique: true },
-    { key: { clientId: 1 } },
-    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
-  ]);
 
-  // v16 (ADR-033): Issued OAuth tokens, unique tokenId, TTL on expiresAt, accessTokenJti lookup
-  await ensureIndexes(db, 'partyIssuedToken', [
-    { key: { tokenId: 1 }, unique: true },
-    { key: { accessTokenJti: 1 }, sparse: true },
-    { key: { clientId: 1, tokenType: 1 } },
-    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
-  ]);
 
   // v39 P2: the OAuth client registry, now a collection of its own.
   //

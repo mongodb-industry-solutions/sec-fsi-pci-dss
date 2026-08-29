@@ -109,29 +109,7 @@ export async function createCollections(
   // v39: authenticationDomain belonged to the login screen and moved with it. A realm at the
   // authority is what a domain used to be, plus the key boundary a domain never had.
 
-  // ADR-030 / RBAC role definitions  -  plaintext, no QE (permission matrix, no CHD)
-  if (!existingNames.has('role') || reset) {
-    if (existingNames.has('role') && reset) {
-      await db.collection('role').drop();
-      console.log('  dropped: role');
-    }
-    await db.createCollection('role');
-    console.log('  created: role');
-  } else {
-    console.log('  skip:    role (already exists)');
-  }
 
-  // Party Authentication Assessment  -  plaintext, identity verification stubs
-  if (!existingNames.has('partyAuthenticationAssessment') || reset) {
-    if (existingNames.has('partyAuthenticationAssessment') && reset) {
-      await db.collection('partyAuthenticationAssessment').drop();
-      console.log('  dropped: partyAuthenticationAssessment');
-    }
-    await db.createCollection('partyAuthenticationAssessment');
-    console.log('  created: partyAuthenticationAssessment');
-  } else {
-    console.log('  skip:    partyAuthenticationAssessment (already exists)');
-  }
 
   // Payment Card Registry  -  plaintext, the physical card deduplicated by token (no CHD)
   if (!existingNames.has('paymentCardRegistry') || reset) {
@@ -425,42 +403,12 @@ export async function createCollections(
     console.log('  skip:    domainEvent (already exists)');
   }
 
-  // v16 (ADR-036): RSA public key registry, public keys only, never private. JWKS + rotation audit.
-  if (!existingNames.has('partyAuthenticationKey') || reset) {
-    if (existingNames.has('partyAuthenticationKey') && reset) {
-      await db.collection('partyAuthenticationKey').drop();
-      console.log('  dropped: partyAuthenticationKey');
-    }
-    await db.createCollection('partyAuthenticationKey');
-    console.log('  created: partyAuthenticationKey (OAuth RS256 public key registry)');
-  } else {
-    console.log('  skip:    partyAuthenticationKey (already exists)');
-  }
 
-  // v16 (ADR-033): OAuth 2.0 authorization codes, TTL 5 minutes (expiresAt index)
-  if (!existingNames.has('partyAuthorizationCode') || reset) {
-    if (existingNames.has('partyAuthorizationCode') && reset) {
-      await db.collection('partyAuthorizationCode').drop();
-      console.log('  dropped: partyAuthorizationCode');
-    }
-    await db.createCollection('partyAuthorizationCode');
-    console.log('  created: partyAuthorizationCode (OAuth auth codes, TTL 5min)');
-  } else {
-    console.log('  skip:    partyAuthorizationCode (already exists)');
-  }
 
-  // v16 (ADR-033): Issued OAuth tokens, refresh tokens + revocation registry. TTL on expiresAt.
-  if (!existingNames.has('partyIssuedToken') || reset) {
-    if (existingNames.has('partyIssuedToken') && reset) {
-      await db.collection('partyIssuedToken').drop();
-      console.log('  dropped: partyIssuedToken');
-    }
-    await db.createCollection('partyIssuedToken');
-    console.log('  created: partyIssuedToken (OAuth refresh tokens + revocation registry)');
-  } else {
-    console.log('  skip:    partyIssuedToken (already exists)');
-  }
 
+  // v39: role, the party authentication assessment, authenticator keys, authorization codes and
+  // issued tokens all moved to the identity authority. This service creates none of them, because a
+  // place to write principals to is eventually written to.
   // v39: the consent, enrolled-credential and backchannel collections belong to the identity
   // authority and are created by its setup, in its database. Creating them here as well would leave
   // two stores that both look authoritative, and which one a reader trusts becomes an accident of

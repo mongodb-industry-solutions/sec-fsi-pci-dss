@@ -19,7 +19,12 @@ const parties = JSON.parse(readFileSync(resolve(DATA, 'parties.json'), 'utf8')) 
   partyInstanceReference: string;
   partyType: string;
 }>;
-const logins = JSON.parse(readFileSync(resolve(DATA, 'customerAuthentications.json'), 'utf8')) as Array<{
+// The pre-extraction logins, frozen. The live fixture went with the rest of the identity data; this
+// test is about whether the BRIDGE was removed cleanly, which is a question about that moment.
+const logins = JSON.parse(readFileSync(
+  resolve(__dirname, '../../../../giam/backend/fixtures/migration-source-logins.json'),
+  'utf8',
+)) as Array<{
   customerAuthenticationInstanceReference: string;
   partyInstanceReference: string;
 }>;
@@ -39,21 +44,22 @@ describe('v39 P3.1: the identity key lives on the business record', () => {
   });
 
   it('resolves a subject through the business record, not through the login collection', () => {
-    const oauth = readFileSync(resolve(SRC, 'modules/identity/services/oauth.service.ts'), 'utf8');
-    const resolver = oauth.slice(
-      oauth.indexOf('export async function resolvePartyInstanceReference'),
-      oauth.indexOf('export async function resolveSubjectId'),
+    // The resolution now reads a CLAIM the authority put in the token, so it survives the deletion of
+    // the login collection by not touching a collection at all.
+    const bridge = readFileSync(resolve(SRC, 'vendors/security/partyReference.ts'), 'utf8');
+    expect(bridge).toMatch(/account_holder/);
+    expect(stripComments(bridge)).not.toMatch(/CUSTOMER_AUTHENTICATION_COLLECTION/);
+  });
+
+  it('offers the inverse at the authority, which is the only place that can answer it', () => {
+    // Naming the principal bound to a business reference is the authority's to answer: it holds the
+    // binding. This application asks; it does not keep a copy of the mapping to answer from.
+    const directory = readFileSync(
+      resolve(SRC, '../../../giam/backend/src/modules/directory/services/directory.service.ts'),
+      'utf8',
     );
-    expect(resolver).toMatch(/PARTY_COLLECTION/);
-    // The whole point of the phase: this resolution survives the deletion of the login collection.
-    expect(stripComments(resolver)).not.toMatch(/CUSTOMER_AUTHENTICATION_COLLECTION/);
+    expect(directory).toMatch(/findByAccountHolderRef/);
   });
-
-  it('offers the inverse, so a business reference can name the identity that owns it', () => {
-    const oauth = readFileSync(resolve(SRC, 'modules/identity/services/oauth.service.ts'), 'utf8');
-    expect(oauth).toMatch(/export async function resolveSubjectId/);
-  });
-
   it('indexes the subject uniquely, and only where one exists', () => {
     const indexes = readFileSync(resolve(SRC, 'vendors/setup/createIndexes.ts'), 'utf8');
     // Unique, because two business records answering to one subject would make the resolution
@@ -63,8 +69,13 @@ describe('v39 P3.1: the identity key lives on the business record', () => {
   });
 
   it('stamps the key from the seeder, so it is rebuilt rather than migrated', () => {
-    const seeder = readFileSync(resolve(SRC, 'vendors/seed/seedUsers.ts'), 'utf8');
-    expect(seeder).toMatch(/subjectId: login\.customerAuthenticationInstanceReference/);
+    // Stamped by the AUTHORITY's seeder now, from its own fixtures. Reusing the pre-extraction
+    // reference is what makes a historical audit row still resolve to the same principal.
+    const seeder = readFileSync(
+      resolve(SRC, '../../../giam/backend/src/vendors/seed/seedIdentities.ts'),
+      'utf8',
+    );
+    expect(seeder).toMatch(/subjectId/);
   });
 });
 

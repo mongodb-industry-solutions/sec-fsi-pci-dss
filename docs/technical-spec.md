@@ -4693,7 +4693,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 | `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
 | `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balance PROJECTION; the balance and its credit log are the bank's from v37) | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
 | `gateway` (SD-65 RTP + QR) | `paymentRequestProcedure`, `paymentRequestEvent`, `qrPaymentRepresentation`, `rtpAliasDirectoryCache` | `party`, `payoutAccountArrangement`, `counterpartyArrangement`, `complianceProcessEvent` | Account/alias based, NOT PCI scope (no PAN/CHD). QE:none on the request (payee name, aliases, remittance, address); the QR record holds no PII at all, its EPC form is derived on read (GDPR Art. 32 / PSD2). Aliases indexed by SHA-256 hash only |
-| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34) |
+| `customer` (SD-13 party) | `party`, `consentAgreement`, `consentAccessLog`, `counterpartyArrangement` | `complianceProcessEvent` | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34). Re-homed out of `identity` in v39: a party is a business record about a person, and account-access consent is regulated data belonging to the account-holding institution. Neither is a credential |
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
 | `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
 | `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
@@ -4714,27 +4714,26 @@ appears in at least one row" was a rule someone had to remember, and it is now a
 in either `createCollections.ts` is missing from it. A collection nobody claims here is undocumented
 ownership, which is the state the rule exists to prevent.
 
-**Two services, two databases.** The PSP owns the payment service provider's records; bankcore owns the
-bank's. Nothing is shared except the key vault. `domainEvent`, `counters` and `idempotencyKey` appear on both
-sides because each service keeps its OWN instance, not because either reaches into the other.
+**Three services, three databases.** LeafyPay owns the payment service provider records; BankCore owns the
+bank records; the identity authority owns every principal, credential, role and token on the platform.
+Nothing is shared. From v39 the authority keeps its OWN key vault as well, because two vaults holding keys
+for the same field is how a record becomes readable by one service and opaque to the other.
+
+`domainEvent`, `counters` and `idempotencyKey` appear on more than one side because each service keeps its
+own instance, not because any of them reaches into another.
+
+The authority collections are NOT listed here. They live in its own registry, which is the source that its
+setup creates from and that its invariant test iterates, so restating them here would create a second list
+to keep in step. What matters at this level is the boundary: no row below names a principal, a credential,
+a role or a token, and a row that started to would be the extraction leaking back.
 
 #### Payment service provider (`psp/backend/`)
 
 | Collection | Owning module | Notes |
 |---|---|---|
-| `party` | `identity` | PII owner surface, QE tiers |
-| `customerAuthenticationAssessment` | `identity` | Credentials and the login realm (`leafypay` from v37) |
-| `partyAuthenticationAssessment` | `identity` | Identity verification stubs |
-| `authenticationDomain` | `domain` | Realm configuration: name, protocol, flow |
-| `role` | `identity` | Permission matrix |
-| `partyAuthenticationKey` | `identity` | Enrolled authenticator keys |
-| `partyEnrolledCredential` | `identity` | Enrolment records |
-| `partyBackchannelAuthentication` | `identity` | Backchannel authentication requests |
-| `partyAuthorizationCode` | `identity` | Authorisation codes, short lived |
-| `partyIssuedToken` | `identity` | Issued tokens, for revocation |
-| `partyAuthConsent` | `identity` | Consent to an authorisation request |
-| `consentAgreement` | `identity` | Granted scopes per client |
-| `consentAccessLog` | `identity` | Evidence of consent-checked access |
+| `party` | `customer` | PII owner surface, QE tiers. A party is a business record about a person; it never held a credential, and it stays here. Re-homed out of `identity` in v39 |
+| `consentAgreement` | `customer` | Account-access consent under the payment-services rules: regulated business data belonging to the institution holding the account. Explicitly NOT the OAuth consent that moved to the authority; the two share a word and nothing else |
+| `consentAccessLog` | `customer` | Evidence of consent-checked access, and it stays for the same reason |
 | `customerAgreementProcedure` | `customer` | KYC, QE identity fields |
 | `merchantAgreementProcedure` | `gateway` | KYB and beneficial owners. No credential lives here from v39 P2 |
 | `merchantAgreementEvents` | `gateway` | KYB decision history |
@@ -4749,7 +4748,7 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `paymentOrderProcedure` | `gateway` | Payment orders |
 | ~~`recurringMandateProcedure`~~ | retired (v37) | Replaced by the bank's `periodicPaymentProcedure`, which is Berlin Group's own standing-order resource. Created by neither side |
 | `payoutAccountArrangement` | `gateway` | Linked account record. Balance is a PROJECTION from v37; the bank owns the ledger |
-| `counterpartyArrangement` | `identity` | Beneficiaries |
+| `counterpartyArrangement` | `customer` | Beneficiaries |
 | `checkoutSessionLog` | `gateway` | Checkout sessions |
 | `paymentLinkRecord` | `gateway` | Payment links |
 | `paymentRequestProcedure` | `gateway` | Request to Pay |

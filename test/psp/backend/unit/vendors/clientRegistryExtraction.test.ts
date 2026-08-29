@@ -7,7 +7,7 @@
 // Asserted against the source, so a reintroduced nested query fails here rather than being noticed
 // in review, and against the fixture, so the seeded population still produces what it produced.
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync, statSync } from 'fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import { resolve, relative, sep } from 'path';
 
 const SRC = resolve(__dirname, '../../../../../psp/backend/src');
@@ -66,12 +66,13 @@ describe('v39 P2: nothing reaches a credential through the merchant record', () 
   });
 
   it('routes every client read through the registry rather than a collection handle', () => {
-    // The five call sites the plan names. Each must import the registry; none may name the client
-    // collection directly, because a second access path is how two callers end up disagreeing.
+    // Each must import the registry; none may name the client collection directly, because a second
+    // access path is how two callers end up disagreeing.
+    //
+    // Three of the five call sites the plan named are gone: the authorization server, the backchannel
+    // service and the OAuth audit service all moved to the identity authority in v39. The rule is
+    // unchanged for the two that remain, and a deleted call site cannot violate it.
     const callSites = [
-      'modules/identity/services/oauth.service.ts',
-      'modules/identity/services/ciba.service.ts',
-      'modules/identity/services/oauthAudit.service.ts',
       'vendors/middleware/validateMerchantToken.ts',
       'modules/gateway/services/merchantOAuth.service.ts',
     ];
@@ -82,11 +83,18 @@ describe('v39 P2: nothing reaches a credential through the merchant record', () 
     }
   });
 
-  it('leaves the identity module with no dependency on the merchant schema for audit', () => {
-    // The owner's display name is denormalized onto the client, so the audit path reads no
-    // commercial collection at all. That is what makes this code portable to another authority.
-    const audit = readFileSync(resolve(SRC, 'modules/identity/services/oauthAudit.service.ts'), 'utf8');
-    expect(stripComments(audit)).not.toMatch(/MERCHANT_AGREEMENT_COLLECTION/);
+  it('kept the audit path free of the merchant schema, and then moved it out entirely', () => {
+    // The owner's display name was denormalized onto the client so the audit path read no commercial
+    // collection at all. That is what made the code portable to another authority, and in v39 it was
+    // in fact ported: the OAuth audit service is now the authority's security event record.
+    //
+    // The assertion becomes an absence. Reinstating an audit path here would mean this application had
+    // started recording identity evidence again, which is a second trail that will disagree with the
+    // first about what happened.
+    expect(
+      existsSync(resolve(SRC, 'modules/identity/services/oauthAudit.service.ts')),
+      'the OAuth audit service is back in the application',
+    ).toBe(false);
   });
 });
 

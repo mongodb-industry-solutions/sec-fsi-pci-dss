@@ -61,10 +61,10 @@ const OWNED_BY_PSP = new Set([
   // investigation reads them. The bank's creditAssessmentState is the actual assessment.
   'customerCreditRatingState',
   'paymentRequestProcedure', 'paymentRequestEvent', 'qrPaymentRepresentation', 'rtpAliasDirectoryCache',
-  'party', 'customerAuthenticationAssessment', 'authenticationDomain', 'role',
-  'partyAuthenticationKey', 'partyAuthorizationCode', 'partyIssuedToken',
-  'partyBackchannelAuthentication', 'partyEnrolledCredential', 'partyAuthenticationAssessment',
-  'consentAgreement', 'partyAuthConsent', 'consentAccessLog',
+  // v39: the principal, credential, role, token and OAuth-consent collections went to the identity
+  // authority. What stays is the business half: a party is a record ABOUT a person, and the
+  // account-access consent is regulated data belonging to the account-holding institution.
+  'party', 'consentAgreement', 'consentAccessLog',
   'customerAgreementProcedure', 'merchantAgreementProcedure', 'merchantAgreementEvents',
   'fraudDiagnosisCase', 'fraudDiagnosisCaseEvents', 'fraudDiagnosisCustomerQuestion',
   'externalProviderArrangement', 'externalProviderArrangementPortfolio',
@@ -223,7 +223,7 @@ describe('v37 P0.7: documented ownership', () => {
 
   it('identity and the acceptance token vault stay at the PSP', () => {
     // The user belongs to the PSP and the acceptance-side vault holds no PAN, so neither moves.
-    for (const name of ['party', 'customerAuthenticationAssessment', 'cardEtokenProcedure']) {
+    for (const name of ['party', 'cardEtokenProcedure']) {
       expect(OWNED_BY_PSP.has(name), `${name} must stay`).toBe(true);
     }
   });
