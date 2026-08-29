@@ -12,6 +12,8 @@ import { scopesOf } from '../models/client.model';
 import { DecisionService } from '../../authorization/services/decision.service';
 import { BackchannelService, isFailure, BACKCHANNEL_GRANT } from '../../authentication/services/backchannel.service';
 import { TokenExchangeService, isRefusal, TOKEN_EXCHANGE_GRANT } from '../services/tokenExchange.service';
+import { DelegationExchangeService, isDelegationRefusal } from '../services/delegationExchange.service';
+import { JwtTokenFormat } from '../services/jwtTokenFormat';
 
 /**
  * The token endpoint, RFC 6749.
@@ -58,7 +60,8 @@ export async function tokenController(fastify: FastifyInstance) {
           auth_req_id: { type: 'string', description: 'The backchannel grant: the request the principal approved.' },
           subject_token: { type: 'string', description: 'Token exchange, RFC 8693: the token being exchanged.' },
           subject_token_type: { type: 'string' },
-          requested_subject: { type: 'string', description: 'Token exchange: the principal to act as.' },
+          requested_subject: { type: 'string', description: 'Token exchange: impersonate this principal. Omit it for a DELEGATED hop, which is the default and keeps the acting party visible.' },
+          transaction_id: { type: 'string', description: 'Binds a delegated token to one task, where the delegation requires it.' },
           redirect_uri: { type: 'string' },
           code_verifier: { type: 'string' },
           refresh_token: { type: 'string' },
@@ -283,6 +286,55 @@ export async function tokenController(fastify: FastifyInstance) {
     }
 
     if (grantType === TOKEN_EXCHANGE_GRANT) {
+      /**
+       * Delegation is the default; impersonation is the exception and must be asked for.
+       *
+       * They are not equivalent for accountability. Delegation keeps `sub` as the person and names
+       * the acting party in `act`, so both are visible downstream. Impersonation REPLACES the
+       * subject, and every system after this point then sees only the person: the agent's part in
+       * what happened is gone, and no amount of logging elsewhere reconstructs it.
+       *
+       * So the caller has to say `requested_subject` to get impersonation, and even that is refused
+       * unless the realm and the target both permit it. Anything else is a delegated hop.
+       */
+      const wantsImpersonation = Boolean(body.requested_subject ?? body.audience);
+
+      if (!wantsImpersonation) {
+        const inbound = await new JwtTokenFormat(ring(), realm.realmId)
+          .verify(String(body.subject_token ?? ''), { issuer: realm.issuer, audience: client.clientId })
+          .catch(() => null);
+        // The inbound token is VERIFIED, not merely parsed. A hop that trusted a decoded token would
+        // let any caller assert the subject and chain it wanted to continue.
+        if (!inbound || typeof inbound.sub !== 'string') {
+          return fail(reply as never, 400, 'invalid_grant', 'the subject token did not verify');
+        }
+
+        const hop = await new DelegationExchangeService(fastify.db).authorizeHop(realm, client, {
+          subjectId: inbound.sub,
+          scope: typeof inbound.scope === 'string' ? inbound.scope.split(' ').filter(Boolean) : [],
+          actor: inbound.act as never,
+        }, {
+          scope: String(body.scope ?? '').split(' ').filter(Boolean),
+          ...(body.transaction_id ? { transactionId: String(body.transaction_id) } : {}),
+        });
+        if (isDelegationRefusal(hop)) return fail(reply as never, hop.status, hop.error, hop.description);
+
+        const delegated = await new DecisionService(fastify.db)
+          .effectivePermissions(realm.realmId, hop.subjectId, client.clientId);
+
+        return reply.send(await issuer.issue({
+          realm,
+          client,
+          subjectId: hop.subjectId,
+          scope: hop.scope,
+          permissions: delegated.permissions,
+          roles: delegated.roles,
+          actor: hop.actor,
+          // A delegated token that can renew itself outlives the delegation that produced it.
+          includeRefreshToken: false,
+        }));
+      }
+
       const exchange = await new TokenExchangeService(fastify.db).resolve(realm, client, {
         subjectToken: String(body.subject_token ?? ''),
         subjectTokenType: body.subject_token_type ? String(body.subject_token_type) : undefined,
