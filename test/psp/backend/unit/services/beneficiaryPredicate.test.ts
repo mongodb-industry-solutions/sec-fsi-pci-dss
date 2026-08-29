@@ -1,6 +1,6 @@
 /**
  * Unit tests: v32 A1/A2/A7/A8 no enumeration of beneficiaries (tests 1-3, 8, 20)
- * Source: backend/src/modules/identity/services/counterpartyArrangement.service.ts
+ * Source: backend/src/modules/customer/services/counterpartyArrangement.service.ts
  *         backend/src/shared/models/acl.model.ts
  *
  * Before v32, GET /api/v1/beneficiaries with no predicate returned every beneficiary of every
@@ -25,8 +25,10 @@ import {
   getBeneficiaryAggregates,
   PredicateRequiredError,
   BENEFICIARY_MIN_QUERY_LENGTH,
-} from '../../../../../psp/backend/src/modules/identity/services/counterpartyArrangement.service';
-import { BUILTIN_ROLES, hasPermission } from '../../../../../psp/backend/src/shared/models/acl.model';
+} from '../../../../../psp/backend/src/modules/customer/services/counterpartyArrangement.service';
+import { hasPermission } from '../../../../../psp/backend/src/shared/models/permissionCatalog';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 /** Records the filter the service builds, so scoping is asserted, not assumed. */
 function makeDb() {
@@ -120,7 +122,26 @@ describe('getBeneficiaryAggregates (A7)', () => {
 });
 
 describe('role grants for beneficiaries (test 20)', () => {
-  const perms = (roleName: string) => BUILTIN_ROLES.find((r) => r.roleName === roleName)?.rolePermissions;
+  /**
+   * The roles are the authority's now, so this reads its fixture rather than a table here.
+   *
+   * The assertions stay because they are about BENEFICIARIES: which roles may search across parties,
+   * and which may not. That is this module's business rule, and the fact that the matrix is stored
+   * somewhere else does not make it somebody else's rule to state. The catalog helper is still local,
+   * because deciding whether a permission set contains a permission is a pure claim check.
+   */
+  const roles = JSON.parse(readFileSync(
+    resolve(__dirname, '../../../../../giam/backend/data/roles.json'),
+    'utf8',
+  )) as Array<{ name: string; permissions: Record<string, string[]> }>;
+
+  const perms = (roleName: string) => {
+    const role = roles.find((r) => r.name === roleName);
+    if (!role) return undefined;
+    return Object.entries(role.permissions).flatMap(
+      ([resource, actions]) => actions.map((action) => ({ resource, action })),
+    );
+  };
 
   it('L1 may drill down but may NOT search across parties', () => {
     expect(hasPermission(perms('level1_analyst'), 'beneficiaries', 'view')).toBe(true);

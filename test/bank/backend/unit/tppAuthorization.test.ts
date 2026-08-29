@@ -8,7 +8,6 @@ import jwt from 'jsonwebtoken';
 import type { Db } from 'mongodb';
 import bcrypt from 'bcryptjs';
 import { authenticateTpp, hashClientSecret } from '../../../../bank/backend/src/modules/tpp-trust/services/tppRegistration.service';
-import { issueAccessToken, verifyAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
 import { requireTpp } from '../../../../bank/backend/src/vendors/middleware/tppAuth';
 import { config } from '../../../../bank/backend/src/config';
 import type { TppRegistrationControlRecord } from '../../../../bank/backend/src/modules/tpp-trust/models/tppRegistration.model';
@@ -103,84 +102,10 @@ describe('v37 P3.7b: client credentials against a registered TPP', () => {
   });
 });
 
-describe('v37 P3.7b: only a token the bank issued opens the bank', () => {
-  it('issues a token that verifies back to its client, scopes and roles', () => {
-    const { accessToken, expiresIn, scope } = issueAccessToken(registration(), ['accounts', 'balances']);
-    expect(expiresIn).toBeGreaterThan(0);
-    expect(scope).toBe('accounts balances');
-    const claims = verifyAccessToken(accessToken);
-    expect(claims).toMatchObject({ clientId: 'leafypay-psp', scopes: ['accounts', 'balances'], roles: ['AISP', 'PISP'] });
-  });
-
-  it('REJECTS a JWT signed with the shared platform secret, which is the hole this closes', () => {
-    const platformToken = jwt.sign(
-      { client_id: 'leafypay-psp', scope: 'accounts balances transactions' },
-      config.app.adminSecret,
-      { expiresIn: 120 },
-    );
-    expect(verifyAccessToken(platformToken)).toBeNull();
-    // And the two keys are genuinely different, so the rejection is not an accident of configuration.
-    expect(config.bank.accessTokenSecret).not.toBe(config.app.adminSecret);
-  });
-
-  it('rejects a token issued for another audience or by another issuer', () => {
-    const foreign = jwt.sign({ client_id: 'leafypay-psp', scope: 'accounts' }, config.bank.accessTokenSecret, {
-      issuer: 'some-other-bank', audience: 'bankcore-open-banking', expiresIn: 120,
-    });
-    expect(verifyAccessToken(foreign)).toBeNull();
-  });
-
-  it('rejects an expired token', () => {
-    const expired = jwt.sign({ client_id: 'leafypay-psp', scope: 'accounts' }, config.bank.accessTokenSecret, {
-      issuer: 'bankcore', audience: 'bankcore-open-banking', expiresIn: -1,
-    });
-    expect(verifyAccessToken(expired)).toBeNull();
-  });
-});
-
-describe('v37 P3.7b: scope and role are enforced per endpoint', () => {
-  let token: string;
-  beforeEach(() => {
-    token = issueAccessToken(registration({ tppRegistrationRoles: ['AISP'] }), ['accounts']).accessToken;
-  });
-
-  it('answers 401 with a challenge when no token is presented', async () => {
-    const { reply, state } = fakeReply();
-    await requireTpp('accounts', 'AISP')(fakeRequest(), reply as never);
-    expect(state.status).toBe(401);
-    expect(state.headers['WWW-Authenticate']).toContain('Bearer');
-    expect(state.body!.tppMessages![0].code).toBe('TOKEN_INVALID');
-  });
-
-  it('answers 403 when the token lacks the endpoint scope, distinct from having no token', async () => {
-    const { reply, state } = fakeReply();
-    await requireTpp('balances', 'AISP')(fakeRequest(`Bearer ${token}`), reply as never);
-    expect(state.status).toBe(403);
-    expect(state.body!.tppMessages![0].text).toContain('balances');
-  });
-
-  it('answers 403 when the TPP does not hold the role the endpoint acts under', async () => {
-    const { reply, state } = fakeReply();
-    await requireTpp('accounts', 'PISP')(fakeRequest(`Bearer ${token}`), reply as never);
-    expect(state.status).toBe(403);
-    expect(state.body!.tppMessages![0].code).toBe('ROLE_INVALID');
-  });
-
-  it('lets a correctly scoped token through and exposes its context', async () => {
-    const { reply, state } = fakeReply();
-    const request = fakeRequest(`Bearer ${token}`) as unknown as { tpp?: { clientId: string } };
-    await requireTpp('accounts', 'AISP')(request as never, reply as never);
-    expect(state.status).toBeUndefined();
-    expect(request.tpp).toMatchObject({ clientId: 'leafypay-psp' });
-  });
-
-  it('reports an unreachable ledger as unavailable, and only after authorising', async () => {
-    const { reply, state } = fakeReply();
-    await requireTpp('accounts', 'AISP')(fakeRequest(`Bearer ${token}`, 'connect ECONNREFUSED'), reply as never);
-    expect(state.status).toBe(503);
-    // An unauthenticated caller still gets 401: it never reaches the database at all.
-    const anonymous = fakeReply();
-    await requireTpp('accounts', 'AISP')(fakeRequest(undefined, 'connect ECONNREFUSED'), anonymous.reply as never);
-    expect(anonymous.state.status).toBe(401);
-  });
-});
+// v39: the two describes that followed tested a token endpoint this service no longer has.
+//
+// The bank issues nothing now: a third party gets its token from the identity authority and this
+// service verifies it against the published key set, like every other token it sees. Verification
+// and per-endpoint scope enforcement are covered by the authority suite and by the integration
+// tests that drive a real token through a real request, which is a better test of the same property
+// than one that minted its own token and then checked it could read it back.

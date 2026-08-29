@@ -146,7 +146,7 @@ describe('sensitive tier never travels outside the audited escalation path (C2, 
 
   it('an L2 investigator with a valid token and a case receives the audited payload', async () => {
     h.validateToken.mockReturnValue({ valid: true, entry: { caseId: 'case-1' } });
-    const res = await getByInstanceReference({} as never, 'ca-1', 'level2_investigator', 'tok') as Record<string, unknown>;
+    const res = await getByInstanceReference({} as never, 'ca-1', 'level2_investigator', { caseRef: 'case-1' }) as Record<string, unknown>;
     expect(res.sensitive).toBeDefined();
     // Even there, the deprecated field is gone (ADR-050).
     expect(Object.keys(res.sensitive as Record<string, unknown>)).toEqual([
@@ -164,7 +164,7 @@ describe('sensitive tier never travels outside the audited escalation path (C2, 
   it('audits the disclosure naming the fields actually disclosed (PCI Req 10.2.2)', async () => {
     h.validateToken.mockReturnValue({ valid: true, entry: { caseId: 'case-1' } });
     h.appendAuditEvent.mockClear();
-    await getByInstanceReference({} as never, 'ca-1', 'security_auditor', 'tok');
+    await getByInstanceReference({} as never, 'ca-1', 'security_auditor', { caseRef: 'case-1' });
     expect(h.appendAuditEvent).toHaveBeenCalledTimes(1);
     const details = h.appendAuditEvent.mock.calls[0][4];
     expect(details.fields).toEqual([

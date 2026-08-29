@@ -266,7 +266,7 @@ describe('searchKyc tier gate on result fields', () => {
     expect(rows[0].sensitive).toBeUndefined();
 
     h.validateToken.mockReturnValue({ valid: true, entry: { caseId: 'case-1' } });
-    rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'level2_investigator', 'tok');
+    rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'level2_investigator', { caseRef: 'case-1' });
     expect(rows[0].sensitive).toBeDefined();
   });
 });

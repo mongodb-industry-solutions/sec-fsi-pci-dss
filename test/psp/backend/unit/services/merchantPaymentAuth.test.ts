@@ -11,7 +11,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const h = vi.hoisted(() => ({ verifyAccessToken: vi.fn() }));
-vi.mock('../../../../../psp/backend/src/modules/identity/services/oauth.service', () => ({
+// v39: the verifier is the shared one that checks against the authority's published key set. Mocked
+// here because this test is about what validateMerchantToken DOES with a verified token, not about
+// verification itself, which has its own suite.
+vi.mock('../../../../../psp/backend/src/vendors/security/tokenVerifier', () => ({
   verifyAccessToken: h.verifyAccessToken,
 }));
 

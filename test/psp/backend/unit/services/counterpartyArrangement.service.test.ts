@@ -1,6 +1,6 @@
 /**
  * Unit tests: beneficiary registry, re-add after soft-delete 
- * Source: backend/src/modules/identity/services/counterpartyArrangement.service.ts (registerBeneficiary)
+ * Source: backend/src/modules/customer/services/counterpartyArrangement.service.ts (registerBeneficiary)
  *
  * Requirement: DELETE soft-deletes an arrangement (status='removed') but the unique index on
  * (ownerPartyReference, counterpartyPartyReference) still covers it. Re-adding the same beneficiary
@@ -26,7 +26,7 @@ vi.mock('../../../../../psp/backend/src/vendors/encryption/roleClients', () => (
   getEncryptionWriteDb: h.getDbForRole,
 }));
 
-import { registerBeneficiary } from '../../../../../psp/backend/src/modules/identity/services/counterpartyArrangement.service';
+import { registerBeneficiary } from '../../../../../psp/backend/src/modules/customer/services/counterpartyArrangement.service';
 
 function makeCol() {
   return {

@@ -7,7 +7,7 @@
 // unreachable in staging, the same bug with two symptoms. The Next.js rewrite is what keeps that true,
 // and this suite is the mechanical guard the plan asks for.
 import { describe, it, expect } from 'vitest';
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'fs';
 import { join, resolve } from 'path';
 
 const ROOT = resolve(__dirname, '../../../..');
@@ -112,8 +112,14 @@ describe('v37 P1.7b: bankcore is deployable, and its API is reviewable', () => {
     // Being reachable made the log buffer world readable, and the TPP protection does not cover it
     // because that lands in P3.7b. The platform admin token does.
     const controller = read('bank/backend/src/modules/system/controllers/system.controller.ts');
-    expect(controller).toContain('preHandler: requireAdmin');
-    expect(read('bank/backend/src/vendors/middleware/adminAuth.ts')).toContain("payload.role !== 'admin'");
+    // v39: guarded by a PERMISSION the authority resolved rather than by a role name this service
+    // reads off a token. The diagnostics surface is still closed; what changed is that the check is
+    // now the same one every other protected route makes, instead of a bespoke admin comparison
+    // against a secret two services shared.
+    expect(controller).toContain("requireStaff('bankAudit', 'view')");
+    // The bespoke admin guard is gone entirely rather than rewritten: it verified a token minted with
+    // a secret both services held, which meant either could mint one the other accepted.
+    expect(existsSync(resolve(ROOT, 'bank/backend/src/vendors/middleware/adminAuth.ts'))).toBe(false);
     // /health stays open: the deploy platform probes it and it carries no data. Check the ROUTE, not
     // the file, since the guard is imported at the top.
     const healthRoute = controller.split("fastify.get('/health'")[1].split("fastify.get('/logs'")[0];

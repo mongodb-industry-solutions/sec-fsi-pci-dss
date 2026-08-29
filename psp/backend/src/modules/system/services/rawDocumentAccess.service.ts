@@ -18,7 +18,6 @@ import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.mo
 export const RAW_COLLECTION_RESOURCE: Readonly<Record<string, Resource>> = {
   party: 'customers',                          // Party
   customerAgreementProcedure: 'customers',     // Customer Agreement
-  customerAuthenticationAssessment: 'customers', // the customer's own auth record
   cardTransactionLog: 'transactions',          // Card Transaction
   paymentCardManagement: 'cards',              // Payment Card
   fraudDiagnosisCase: 'fraudCases',            // Fraud Diagnosis

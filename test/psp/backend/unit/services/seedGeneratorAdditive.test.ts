@@ -22,7 +22,6 @@ const BACKEND = join(process.cwd(), 'psp', 'backend');
 const DATA = join(BACKEND, 'data');
 const FIXTURES = [
   'parties.json',
-  'customerAuthentications.json',
   'customerAgreements.json',
   'paymentCards.json',
   'payoutAccounts.json',
@@ -63,7 +62,6 @@ afterAll(() => {
 // rather than by count alone.
 const PRIMARY_KEY: Record<string, string> = {
   'parties.json': 'partyInstanceReference',
-  'customerAuthentications.json': 'customerAuthenticationInstanceReference',
   'customerAgreements.json': 'customerAgreementInstanceReference',
   'paymentCards.json': 'paymentCardInstanceReference',
   'payoutAccounts.json': 'payoutAccountInstanceReference',
@@ -109,10 +107,9 @@ describe('v33 F6: the generator is additive and refuses to clobber', () => {
     expect(raw).not.toContain('SYNTH-');
   });
 
-  it('leaves every customer with a login and every transaction on a real card', () => {
-    const customers = after['parties.json'].filter((p) => p.partyType === 'customer');
-    const withLogin = new Set(after['customerAuthentications.json'].map((l) => l.partyInstanceReference as string));
-    expect(customers.filter((p) => !withLogin.has(p.partyInstanceReference as string))).toEqual([]);
+  it('leaves every transaction on a real card', () => {
+    // The login half of this assertion moved with the logins: the authority seeds a principal for
+    // every customer, and its own reconciliation test checks that against these very parties.
 
     const tokens = new Set(after['paymentCards.json'].map((c) => c.paymentCardReference as string));
     expect(after['cardTransactions.json'].filter((t) => !tokens.has(t.paymentCardReference as string))).toEqual([]);

@@ -35,7 +35,6 @@ import { faker } from '@faker-js/faker';
 import { enrichKyc, type CustomerAgreementSeed } from '../src/vendors/seed/seedCustomers';
 import {
   completeCustomerPopulation,
-  deriveCustomerLogins,
   repointTransactionsToCards,
   syncFraudCaseSnapshots,
   type AgreementSeed,
