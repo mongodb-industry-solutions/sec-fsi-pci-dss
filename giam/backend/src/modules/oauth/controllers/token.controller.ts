@@ -9,6 +9,7 @@ import { DirectoryService } from '../../directory/services/directory.service';
 import { AUTHORIZATION_REQUEST_COLLECTION } from '../../../shared/models/collections';
 import { AuthorizationRequestRecord, isRedeemable } from '../models/authorizationRequest.model';
 import { scopesOf } from '../models/client.model';
+import { DecisionService } from '../../authorization/services/decision.service';
 
 /**
  * The token endpoint, RFC 6749.
@@ -114,10 +115,18 @@ export async function tokenController(fastify: FastifyInstance) {
       const invalid = requested.filter((scope) => !allowed.includes(scope));
       if (invalid.length > 0) return fail(reply as never, 400, 'invalid_scope', `not permitted: ${invalid.join(' ')}`);
 
+      // A machine principal's permissions are resolved exactly as a person's are, from the roles
+      // assigned to it. That is the one-pipeline rule at the authorization step: a service identity
+      // is not a special case that skips the decision point.
+      const machine = await new DecisionService(fastify.db)
+        .effectivePermissions(realm.realmId, client.clientId, client.clientId);
+
       return reply.send(await issuer.issue({
         realm,
         client,
+        subjectId: client.clientId,
         scope: requested.length > 0 ? requested : allowed,
+        permissions: machine.permissions,
       }));
     }
 
@@ -200,11 +209,17 @@ export async function tokenController(fastify: FastifyInstance) {
       if (!identity) return fail(reply as never, 400, 'invalid_grant', 'subject no longer exists');
 
       const scope = pending.scope.split(' ').filter(Boolean);
+      // Resolved at issuance and carried in the token, so a resource server reads a claim rather
+      // than calling the authority on every request.
+      const decision = await new DecisionService(fastify.db)
+        .effectivePermissions(realm.realmId, identity.subjectId, client.clientId);
+
       return reply.send(await issuer.issue({
         realm,
         client,
         subjectId: identity.subjectId,
         scope,
+        permissions: decision.permissions,
         sessionEpoch: identity.sessionEpoch,
         nonce: pending.nonce,
         includeRefreshToken: true,

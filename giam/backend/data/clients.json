@@ -1,0 +1,166 @@
+[
+  {
+    "realm": "leafypay",
+    "clientId": "oauth001-0000-4000-8000-000000000001",
+    "clientName": "Espresso Works",
+    "clientType": "confidential",
+    "clientSecret": "espresso-demo-secret-2026",
+    "redirectUris": [
+      "http://localhost:8082/api/auth/callback",
+      "http://127.0.0.1:8082/api/auth/callback"
+    ],
+    "postLogoutRedirectUris": [
+      "http://localhost:8082",
+      "http://127.0.0.1:8082"
+    ],
+    "grantTypes": [
+      "authorization_code",
+      "refresh_token",
+      "urn:openid:params:grant-type:ciba"
+    ],
+    "scope": "openid profile email read:beneficiaries write:beneficiaries write:transfers read:accounts read:transactions read:rtp write:rtp read:merchant_profile read:notifications write:payments",
+    "requirePkce": true,
+    "tokenEndpointAuthMethod": "client_secret_basic",
+    "applicationType": "web",
+    "status": "active",
+    "owner": {
+      "kind": "merchant",
+      "ref": "m0000001-0000-4000-8000-000000000001",
+      "displayName": "Espresso Works"
+    }
+  },
+  {
+    "realm": "leafypay",
+    "clientId": "f1dc0169-4f90-402c-adc8-f7e2c5c0fc7d",
+    "clientName": "Leafy Wallet",
+    "clientType": "confidential",
+    "clientSecret": "wallet-demo-secret-2026",
+    "redirectUris": [
+      "http://localhost:3000/auth/callback",
+      "http://127.0.0.1:3000/auth/callback"
+    ],
+    "grantTypes": [
+      "authorization_code",
+      "refresh_token",
+      "urn:openid:params:grant-type:ciba"
+    ],
+    "scope": "openid profile email read:beneficiaries write:beneficiaries write:transfers read:accounts read:transactions read:rtp write:rtp",
+    "requirePkce": true,
+    "tokenEndpointAuthMethod": "client_secret_basic",
+    "applicationType": "web",
+    "status": "active",
+    "backchannel": {
+      "deliveryMode": "poll"
+    },
+    "owner": {
+      "kind": "merchant",
+      "ref": "m0000002-0000-4000-8000-000000000002",
+      "displayName": "Leafy Wallet"
+    }
+  },
+  {
+    "realm": "leafypay",
+    "clientId": "leafypay-backend",
+    "clientName": "LeafyPay backend service",
+    "clientType": "confidential",
+    "clientSecret": "leafypay-backend-demo-secret-2026",
+    "redirectUris": [],
+    "grantTypes": [
+      "client_credentials"
+    ],
+    "scope": "openid",
+    "requirePkce": false,
+    "tokenEndpointAuthMethod": "client_secret_basic",
+    "applicationType": "service",
+    "status": "active",
+    "serviceIdentity": {
+      "kind": "service",
+      "userName": "LeafyPay backend service",
+      "roleName": "platform_service",
+      "owner": {
+        "kind": "application",
+        "ref": "leafypay",
+        "displayName": "LeafyPay"
+      },
+      "resourceServer": "leafypay",
+      "permissions": {
+        "auditEvents": [
+          "view"
+        ],
+        "modules": [
+          "view"
+        ]
+      }
+    }
+  },
+  {
+    "realm": "bankcore",
+    "clientId": "leafypay-psp",
+    "clientName": "LeafyPay, as a registered third party",
+    "clientType": "confidential",
+    "clientSecret": "dev-bankcore-tpp-secret",
+    "redirectUris": [],
+    "grantTypes": [
+      "client_credentials"
+    ],
+    "scope": "accounts balances transactions payments funds-confirmations",
+    "requirePkce": false,
+    "tokenEndpointAuthMethod": "client_secret_basic",
+    "applicationType": "service",
+    "status": "active",
+    "serviceIdentity": {
+      "kind": "service",
+      "userName": "LeafyPay, as a registered third party",
+      "roleName": "third_party_provider",
+      "owner": {
+        "kind": "application",
+        "ref": "leafypay",
+        "displayName": "LeafyPay"
+      },
+      "resourceServer": "bankcore",
+      "permissions": {
+        "accounts": [
+          "view"
+        ],
+        "payments": [
+          "manage"
+        ]
+      }
+    }
+  },
+  {
+    "realm": "bankcore",
+    "clientId": "bankcore-backend",
+    "clientName": "BankCore backend service",
+    "clientType": "confidential",
+    "clientSecret": "bankcore-backend-demo-secret-2026",
+    "redirectUris": [],
+    "grantTypes": [
+      "client_credentials"
+    ],
+    "scope": "openid",
+    "requirePkce": false,
+    "tokenEndpointAuthMethod": "client_secret_basic",
+    "applicationType": "service",
+    "status": "active",
+    "serviceIdentity": {
+      "kind": "service",
+      "userName": "BankCore backend service",
+      "roleName": "platform_service",
+      "owner": {
+        "kind": "application",
+        "ref": "bankcore",
+        "displayName": "BankCore"
+      },
+      "resourceServer": "bankcore",
+      "permissions": {
+        "accounts": [
+          "view"
+        ],
+        "bankAudit": [
+          "view"
+        ]
+      }
+    }
+  }
+]

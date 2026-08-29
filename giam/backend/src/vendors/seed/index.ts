@@ -3,6 +3,8 @@ import { resolve } from 'path';
 import { seedRealms } from './seedRealms';
 import { seedKeys } from './seedKeys';
 import { seedIdentities } from './seedIdentities';
+import { seedAuthorization } from './seedAuthorization';
+import { seedClients } from './seedClients';
 import { REALM_COLLECTION } from '../../shared/models/collections';
 import { getQEClient, closeQEClient } from '../encryption/qeClient';
 import { config } from '../../config';
@@ -26,7 +28,10 @@ export async function runSeed(): Promise<void> {
     // Principals and their credentials, into the realm the demo population belongs to. Resolved by
     // NAME rather than hardcoded by id, so the seeder carries no identifier of its own.
     await seedIdentities(db);
-    // Clients and roles arrive with the phases that own them.
+    // Roles and their assignments. After principals, since an assignment names one.
+    await seedAuthorization(db);
+    // Clients last: a service identity's role has to exist before it can be assigned.
+    await seedClients(db);
     console.log('\nGIAM seed complete.');
   } finally {
     await closeQEClient();
