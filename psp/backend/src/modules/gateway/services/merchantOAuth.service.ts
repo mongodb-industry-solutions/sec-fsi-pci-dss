@@ -3,8 +3,8 @@
  * Issues, rotates, and revokes OAuth client credentials for merchants.
  */
 import { Db } from 'mongodb';
-import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { registerAuthorityClient, rotateAuthorityClientSecret, revokeAuthorityClient, updateAuthorityClient } from '../../../vendors/security/clientRegistration';
 import {
   MERCHANT_AGREEMENT_COLLECTION,
   MerchantAgreementControlRecord,
@@ -106,15 +106,29 @@ export async function issueMerchantOAuthClient(
     throw Object.assign(new Error('OAuth client already active: revoke existing client first'), { statusCode: 409 });
   }
 
-  const clientId = uuidv4();
-  const plainSecret = uuidv4();
-  const secretHash = await bcrypt.hash(plainSecret, 12);
-  const secretPrefix = plainSecret.slice(0, 8);
+  // The credential is created by the identity authority, which is the only party that ever sees the
+  // secret in the clear. This service used to generate and hash it, which meant it had a credential
+  // store, a hashing decision and a rotation policy of its own, and would eventually get one of them
+  // subtly wrong in a way nobody notices until an audit.
+  const registered = await registerAuthorityClient({
+    client_name: merchant.merchantName,
+    redirect_uris: input.redirect_uris,
+    grant_types: input.grant_types,
+    scope: input.scopes.join(' '),
+    owner_ref: merchantAgreementInstanceReference,
+  });
+  if (!registered) {
+    throw Object.assign(new Error('The identity authority could not register this client'), { statusCode: 503 });
+  }
+  const clientId = registered.client_id;
+  const plainSecret = registered.client_secret;
+  // A display label only, and deliberately NOT a prefix of the real secret: the authority holds that
+  // and this service never learns enough of it to leak any part.
+  const secretPrefix = uuidv4().slice(0, 8);
 
   const now = new Date();
   const cfg: OAuthClientRecord = {
     oauthClientId: clientId,
-    oauthClientSecretHash: secretHash,
     oauthClientSecretPrefix: secretPrefix,
     oauthRedirectUris: input.redirect_uris,
     oauthGrantTypes: input.grant_types,
@@ -148,10 +162,16 @@ export async function revokeMerchantOAuthClient(
   db: Db,
   merchantAgreementInstanceReference: string,
 ): Promise<void> {
+  const existing = await findActiveClientByOwner(db, merchantAgreementInstanceReference);
   const revoked = await revokeClientByOwner(db, merchantAgreementInstanceReference);
   if (!revoked) {
     throw Object.assign(new Error('Merchant not found or OAuth client already revoked'), { statusCode: 404 });
   }
+
+  // Withdrawn at the authority too. Marking it revoked only here would leave a credential that still
+  // authenticates perfectly well, which is the worst of both records: the screen says revoked and
+  // the client keeps working.
+  if (existing) await revokeAuthorityClient(existing.oauthClientId);
 }
 
 export interface UpdateMerchantOAuthClientInput {
@@ -250,7 +270,6 @@ export async function updateMerchantOAuthClient(
     }
     // Hash the secret only. The prefix is an independent label (see below), not derived here, so
     // setting a secret never changes it and no part of the real secret is exposed via the prefix.
-    credentialPatch.oauthClientSecretHash = await bcrypt.hash(patch.client_secret, 12);
   }
   if (patch.client_secret_prefix !== undefined) {
     const prefix = patch.client_secret_prefix.trim();
@@ -279,6 +298,15 @@ export async function updateMerchantOAuthClient(
 
   await updateClient(db, existingClient.oauthClientId, updated);
 
+  // The authority holds the registration that actually governs the flow: its redirect URIs are what
+  // an authorization request is checked against, not the copy here. Changing one and not the other
+  // is how a merchant edits a redirect URI and the login keeps going to the old one.
+  await updateAuthorityClient(existingClient.oauthClientId, {
+    ...(patch.redirect_uris !== undefined ? { redirect_uris: patch.redirect_uris } : {}),
+    ...(patch.scopes !== undefined ? { scope: patch.scopes.join(String.fromCharCode(32)) } : {}),
+    ...(patch.logo_uri !== undefined ? { logo_uri: patch.logo_uri } : {}),
+  });
+
   return toPublicClient(updated);
 }
 
@@ -291,12 +319,17 @@ export async function rotateMerchantOAuthClientSecret(
     throw Object.assign(new Error('No active OAuth client found for this merchant'), { statusCode: 404 });
   }
 
-  const plainSecret = uuidv4();
-  const secretHash = await bcrypt.hash(plainSecret, 12);
-  const secretPrefix = plainSecret.slice(0, 8);
+  const rotated = await rotateAuthorityClientSecret(client.oauthClientId);
+  if (!rotated) {
+    throw Object.assign(new Error('The identity authority could not rotate this credential'), { statusCode: 503 });
+  }
+  const plainSecret = rotated.client_secret;
+  // A fresh display label, not derived from the secret. The previous credential stopped working the
+  // moment the authority rotated it: there is no overlap window, because two live secrets means a
+  // compromised one keeps working for the length of that window.
+  const secretPrefix = uuidv4().slice(0, 8);
 
   await updateClient(db, client.oauthClientId, {
-    oauthClientSecretHash: secretHash,
     oauthClientSecretPrefix: secretPrefix,
   });
 

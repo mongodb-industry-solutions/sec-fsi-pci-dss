@@ -130,23 +130,23 @@ use the reveal endpoint, which emits one compliance event per disclosure (PCI DS
       phone?: string;
       accountRef?: string;
     };
-    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    const { userRole, elevation } = request as unknown as AuthenticatedRequest;
 
     try {
       if (email) {
-        const result = await getByEmail(fastify.db, email, userRole, escalationToken, actorOf(request));
+        const result = await getByEmail(fastify.db, email, userRole, elevation, actorOf(request));
         if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
         return reply.send(result);
       }
 
       if (phone) {
-        const result = await getByPhone(fastify.db, phone, userRole, escalationToken, actorOf(request));
+        const result = await getByPhone(fastify.db, phone, userRole, elevation, actorOf(request));
         if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
         return reply.send(result);
       }
 
       if (accountRef) {
-        const result = await getByAccountRef(fastify.db, accountRef, userRole, escalationToken, actorOf(request));
+        const result = await getByAccountRef(fastify.db, accountRef, userRole, elevation, actorOf(request));
         if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
         return reply.send(result);
       }
@@ -219,11 +219,11 @@ fields are returned only to \`level2_investigator\` (with escalation token) and 
     },
   }, async (request, reply) => {
     const body = request.body as { field: string; value?: string; from?: string; to?: string; limit?: number };
-    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    const { userRole, elevation } = request as unknown as AuthenticatedRequest;
     try {
       const rows = await searchKyc(
         { field: body.field, value: body.value, from: body.from, to: body.to },
-        userRole, escalationToken, actorOf(request), body.limit ?? 50,
+        userRole, elevation, actorOf(request), body.limit ?? 50,
       );
       return reply.send({ field: body.field, count: rows.length, results: rows });
     } catch (err) {
@@ -275,9 +275,9 @@ enrollment date). QE:equality fields (email, phone, account reference) are not r
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    const { userRole, elevation } = request as unknown as AuthenticatedRequest;
     try {
-      const result = await getByInstanceReference(fastify.db, id, userRole, escalationToken, actorOf(request));
+      const result = await getByInstanceReference(fastify.db, id, userRole, elevation, actorOf(request));
       if (!result) return reply.status(404).send({ error: 'Customer agreement not found' });
       return reply.send(result);
     } catch (err) {

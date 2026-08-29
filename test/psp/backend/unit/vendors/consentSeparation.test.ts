@@ -72,7 +72,7 @@ describe('v39 P3.2: the audit found nothing mixed to split', () => {
     // why "split document by document" turned out to be a classification with nothing in it.
     const model = readFileSync(resolve(PSP_SRC, 'modules/identity/models/partyAuthConsent.model.ts'), 'utf8');
     expect(model).toMatch(/PARTY_AUTH_CONSENT_COLLECTION\s*=\s*'partyAuthConsent'/);
-    const stub = readFileSync(resolve(PSP_SRC, 'modules/identity/models/consentAgreement.model.ts'), 'utf8');
+    const stub = readFileSync(resolve(PSP_SRC, 'modules/customer/models/consentAgreement.model.ts'), 'utf8');
     expect(stub).toMatch(/CONSENT_AGREEMENT_COLLECTION\s*=\s*'consentAgreement'/);
   });
 });

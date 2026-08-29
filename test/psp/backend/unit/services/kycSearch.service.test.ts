@@ -29,7 +29,7 @@ vi.mock('../../../../../psp/backend/src/modules/fraud/services/fraudDiagnosis.se
 }));
 
 import { searchKyc, getKycSearchRegistry } from '../../../../../psp/backend/src/modules/customer/services/customerAgreement.service';
-import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/identity/models/party.model';
+import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/party.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/customerAgreement.model';
 
 const party = {

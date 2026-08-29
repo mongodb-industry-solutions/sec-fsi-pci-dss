@@ -1,15 +1,15 @@
+import type { Elevation } from '../../../shared/models/identity.model';
 import { Db } from 'mongodb';
 import {
   CUSTOMER_AGREEMENT_COLLECTION,
   CustomerAgreementControlRecord,
   isSensitiveDecrypted,
 } from '../models/customerAgreement.model';
-import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../customer/models/party.model';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getDbForRole, getSensitiveTierDb, getEncryptionWriteDb } from '../../../vendors/encryption/roleClients';
 import { phoneDigest } from '../../../vendors/encryption/digest';
 import { canReadSensitive, canRevealKycSensitive } from '../../../vendors/middleware/rbac';
-import { validateToken } from '../../../vendors/security/escalationTokens';
 import { appendAuditEvent } from '../../fraud/services/fraudDiagnosis.service';
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
@@ -84,11 +84,20 @@ function buildResponse(
 
 // -- Internal helpers --------------------------------------------------------─
 
-async function resolveDb(role: UserRole, escalationToken: string | undefined): Promise<{ db: Db; hasValidToken: boolean; caseId?: string }> {
-  const tokenResult = validateToken(escalationToken);
-  const hasValidToken = tokenResult.valid;
-  const db = await getDbForRole(role, hasValidToken);
-  return { db, hasValidToken, caseId: tokenResult.entry?.caseId };
+/**
+ * The database handle for a caller, honouring any elevation they hold.
+ *
+ * The elevation was decided at the edge and arrives here as a fact. This function used to verify a
+ * token itself, which meant a service was making an authorisation decision about a credential; that
+ * belongs where the request is, and only there.
+ */
+async function resolveDb(role: UserRole, elevation?: Elevation): Promise<{ db: Db; hasValidToken: boolean; caseId?: string }> {
+  const elevated = Boolean(elevation);
+  const db = await getDbForRole(role, elevated);
+  // The case travels with the handle, because every sensitive read made under an elevation is
+  // audited against the case it was granted for. Keeping only the boolean would preserve the access
+  // and lose the reason.
+  return { db, hasValidToken: elevated, caseId: elevation?.caseRef };
 }
 
 async function findPartyAndAgreement(
@@ -121,8 +130,8 @@ async function maybeAudit(db: Db, caseId: string | undefined, role: UserRole, do
 
 // -- Public query functions --------------------------------------------------─
 
-export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
-  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+export async function getByEmail(db: Db, email: string, role: UserRole = 'level1_analyst', elevation?: Elevation, actor?: { ref?: string; name?: string }) {
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, elevation);
   const canSee = canReadSensitive(role, hasValidToken);
   const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
   if (!result) return null;
@@ -130,8 +139,8 @@ export async function getByEmail(db: Db, email: string, role: UserRole = 'level1
   return buildResponse(result.doc, result.party, role, canSee, caseId);
 }
 
-export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
-  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1_analyst', elevation?: Elevation, actor?: { ref?: string; name?: string }) {
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, elevation);
   const canSee = canReadSensitive(role, hasValidToken);
   // Match on the normalized blind-index digest (space/format-insensitive), not the formatted encrypted
   // value, so "+34 612 345 678" and "+34612345678" resolve to the same party.
@@ -141,8 +150,8 @@ export async function getByPhone(db: Db, phone: string, role: UserRole = 'level1
   return buildResponse(result.doc, result.party, role, canSee, caseId);
 }
 
-export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
-  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'level1_analyst', elevation?: Elevation, actor?: { ref?: string; name?: string }) {
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, elevation);
   const canSee = canReadSensitive(role, hasValidToken);
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ customerAgreementReference: ref } as Partial<CustomerAgreementControlRecord>);
@@ -154,8 +163,8 @@ export async function getByAccountRef(db: Db, ref: string, role: UserRole = 'lev
   return buildResponse(doc, party, role, canSee, caseId);
 }
 
-export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
-  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+export async function getByInstanceReference(db: Db, id: string, role: UserRole = 'level1_analyst', elevation?: Elevation, actor?: { ref?: string; name?: string }) {
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, elevation);
   const canSee = canReadSensitive(role, hasValidToken);
   const doc = await roleDb.collection<CustomerAgreementControlRecord>(CUSTOMER_AGREEMENT_COLLECTION)
     .findOne({ customerAgreementInstanceReference: id });
@@ -170,8 +179,8 @@ export async function getByInstanceReference(db: Db, id: string, role: UserRole 
 // ── v31 KYC Administration (customer module) ─────────────────────────────────────────────────────
 // KYC detail keyed on partyInstanceReference (the party is the single owner of a KYC record). L1/L2
 // masking respected exactly like the lookup functions (viewSensitive + escalation token → L2 decrypt).
-export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole = 'level1_analyst', escalationToken?: string, actor?: { ref?: string; name?: string }) {
-  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+export async function getKycByPartyRef(db: Db, partyRef: string, role: UserRole = 'level1_analyst', elevation?: Elevation, actor?: { ref?: string; name?: string }) {
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, elevation);
   const canSee = canReadSensitive(role, hasValidToken);
   const result = await findPartyAndAgreement(roleDb, { partyInstanceReference: partyRef } as Partial<PartyControlRecord>);
   if (!result) return null;
@@ -762,7 +771,7 @@ function buildKycFilter(def: KycSearchFieldDef, mode: KycSearchMode, req: KycSea
 export async function searchKyc(
   req: KycSearchRequest,
   role: UserRole = 'level1_analyst',
-  escalationToken?: string,
+  elevation?: Elevation,
   actor?: { ref?: string; name?: string },
   limit = 50,
 ): Promise<Record<string, unknown>[]> {
@@ -778,7 +787,7 @@ export async function searchKyc(
     ? (() => { const w = textQueryWindow(def, mode, req.value); return buildTextRefiner(def, mode, w.value, w.window); })()
     : null;
 
-  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, escalationToken);
+  const { db: roleDb, hasValidToken, caseId } = await resolveDb(role, elevation);
   const canSee = canReadSensitive(role, hasValidToken);
   const cap = Math.min(Math.max(limit, 1), 100);
 

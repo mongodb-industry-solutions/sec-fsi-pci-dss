@@ -1,3 +1,15 @@
+/**
+ * Temporary authority the caller currently holds, resolved at the edge.
+ *
+ * Its PRESENCE means elevated; its scope says what for. Both matter: the second is what the audit
+ * trail records, so a sensitive field read is attributable to the case it was read for rather than
+ * just to the person. Losing the scope would keep the access and lose the reason.
+ */
+export interface Elevation {
+  /** The case, change window or review this authority was granted for. */
+  caseRef: string;
+}
+
 import type { FastifyRequest } from 'fastify';
 
 export type UserRole =
@@ -31,5 +43,5 @@ export interface JwtUserPayload {
 
 export interface AuthenticatedRequest extends FastifyRequest {
   userRole: UserRole;
-  escalationToken?: string;
+  elevation?: Elevation;
 }

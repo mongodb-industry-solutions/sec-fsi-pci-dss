@@ -28,7 +28,7 @@ vi.mock('../../../../../psp/backend/src/vendors/security/escalationTokens', () =
 import { getByEmail, getByPhone, getByAccountRef } from '../../../../../psp/backend/src/modules/customer/services/customerAgreement.service';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/customerAgreement.model';
 import { phoneDigest } from '../../../../../psp/backend/src/vendors/encryption/digest';
-import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/identity/models/party.model';
+import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/party.model';
 
 const party = {
   partyInstanceReference: 'party-001',

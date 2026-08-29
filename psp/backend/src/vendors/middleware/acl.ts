@@ -61,8 +61,8 @@ export function requirePermission(resource: Resource, action: Action) {
     }
 
     if (action === 'viewSensitive') {
-      const escalationToken = (request as unknown as AuthenticatedRequest).escalationToken;
-      if (role && !canReadSensitive(role as never, Boolean(escalationToken))) {
+      const elevation = (request as unknown as AuthenticatedRequest).elevation;
+      if (role && !canReadSensitive(role as never, Boolean(elevation))) {
         return reply.status(403).send({
           error: 'Access denied: sensitive access requires an active escalation token.',
           code: 'ESCALATION_REQUIRED',

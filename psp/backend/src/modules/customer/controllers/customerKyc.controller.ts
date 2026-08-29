@@ -1,3 +1,4 @@
+import type { Elevation } from '../../../shared/models/identity.model';
 // KYC Administration controller (v31). Mounted under /customer (same prefix as the
 // customer-agreement search controller: one customer surface, no forked API). The Operations Officer
 // reviews/corrects KYC data here; sensitive identity fields stay behind the L1/L2 QE tiers + escalation
@@ -75,9 +76,9 @@ export async function customerKycController(fastify: FastifyInstance) {
     preHandler: canView,
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
-      const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+      const { userRole, elevation } = request as unknown as AuthenticatedRequest;
       const u = (request as { user?: JwtUserPayload }).user;
-      const result = await getKycByPartyRef(fastify.db, partyInstanceReference, userRole, escalationToken, { ref: u?.partyRef ?? u?.sub, name: u?.name });
+      const result = await getKycByPartyRef(fastify.db, partyInstanceReference, userRole, elevation, { ref: u?.partyRef ?? u?.sub, name: u?.name });
       if (!result) return reply.status(404).send({ error: 'KYC record not found' });
       return reply.send(result);
     },
@@ -135,10 +136,10 @@ export async function customerKycController(fastify: FastifyInstance) {
     preHandler: canReveal,
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
-      const req = request as unknown as { userRole?: string; escalationToken?: string };
+      const req = request as unknown as { userRole?: string; elevation?: Elevation };
       const result = await revealKycSensitive(fastify.db, partyInstanceReference, actor(request), {
         ...(req.userRole ? { callerRole: req.userRole as never } : {}),
-        hasValidToken: !!req.escalationToken,
+        hasValidToken: !!req.elevation,
       });
       if (result.status === 'forbidden') {
         return reply.status(403).send({

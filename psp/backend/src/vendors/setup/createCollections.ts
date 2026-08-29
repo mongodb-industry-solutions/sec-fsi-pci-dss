@@ -46,7 +46,6 @@ export async function createCollections(
     { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
     // v37: the issuer vault moved to the bank, so no collection here holds a PAN.
     // Customer Authentication
-    { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
     // Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS)
     ...(maps.payoutAccountArrangement
       ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
@@ -107,17 +106,8 @@ export async function createCollections(
     console.log(`  created: ${name}`);
   }
 
-  // authenticationDomain  -  plaintext, no QE (domain config, no CHD)
-  if (!existingNames.has('authenticationDomain') || reset) {
-    if (existingNames.has('authenticationDomain') && reset) {
-      await db.collection('authenticationDomain').drop();
-      console.log('  dropped: authenticationDomain');
-    }
-    await db.createCollection('authenticationDomain');
-    console.log('  created: authenticationDomain');
-  } else {
-    console.log('  skip:    authenticationDomain (already exists)');
-  }
+  // v39: authenticationDomain belonged to the login screen and moved with it. A realm at the
+  // authority is what a domain used to be, plus the key boundary a domain never had.
 
   // ADR-030 / RBAC role definitions  -  plaintext, no QE (permission matrix, no CHD)
   if (!existingNames.has('role') || reset) {

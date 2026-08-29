@@ -83,6 +83,11 @@ export const config = {
     // Presented when registering the catalog at boot. Absent is survivable: registration is
     // non-fatal, and an unreachable authority must not stop this application serving.
     registrationToken: pspEnv('GIAM_REGISTRATION_TOKEN'),
+    // This service's OWN client credentials, for the calls it makes as itself rather than on behalf
+    // of a person. Absent means it was never registered to act as itself, and it degrades rather
+    // than fabricating an identity.
+    clientId: pspEnv('GIAM_CLIENT_ID', 'leafypay-backend')!,
+    clientSecret: pspEnv('GIAM_CLIENT_SECRET'),
     // How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old
     // public key can only validate signatures the authority itself produced.
     jwksCacheSeconds: parseInt(pspEnv('GIAM_JWKS_CACHE_SECONDS', '900')!, 10),

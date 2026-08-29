@@ -1,3 +1,4 @@
+import type { Elevation } from '../../../shared/models/identity.model';
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -9,7 +10,7 @@ import { canReadSensitive } from '../../../vendors/middleware/rbac';
 import { createFraudCase } from '../../fraud/services/fraudDiagnosis.service';
 import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
-import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../customer/models/party.model';
 import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { getChdCrypto } from '../../../vendors/encryption/chdCrypto';
 import { getCardByToken, upsertCardByToken } from '../../customer/services/paymentCard.service';
@@ -603,11 +604,10 @@ export async function getTransactionById(
   db: Db,
   id: string,
   role: 'level1_analyst' | 'level2_investigator' | 'security_auditor' | 'customer' | 'merchant_officer' = 'level1_analyst',
-  escalationToken?: string
+  elevation?: Elevation
 ) {
   // v2: use role-aware QE client. L2 auto-decrypts sensitive fields; L1 returns Binary.
-  const { validateToken } = await import('../../../vendors/security/escalationTokens');
-  const hasValidToken = validateToken(escalationToken).valid;
+  const hasValidToken = Boolean(elevation);
   const roleDb = await getDbForRole(role, hasValidToken);
 
   const txn = await roleDb.collection<CardTransactionLogControlRecord>(CARD_TRANSACTION_COLLECTION)

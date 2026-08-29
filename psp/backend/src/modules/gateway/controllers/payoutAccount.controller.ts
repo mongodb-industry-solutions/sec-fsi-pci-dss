@@ -9,7 +9,7 @@ import type { PayoutAccountStatus } from '../models/payoutAccount.model';
 import { requirePermission } from '../../../vendors/middleware/acl';
 import { dualPermission, resolveOwner } from '../../../vendors/middleware/dualAuth';
 import { maskAccountIdentifier } from '../services/bankTransfer.service';
-import { PARTY_COLLECTION } from '../../identity/models/party.model';
+import { PARTY_COLLECTION } from '../../customer/models/party.model';
 import { COUNTERPARTY_COLLECTION } from '../../customer/models/counterpartyArrangement.model';
 import {
   listPayoutAccounts,

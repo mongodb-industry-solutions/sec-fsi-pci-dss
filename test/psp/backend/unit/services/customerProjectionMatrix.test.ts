@@ -29,7 +29,7 @@ vi.mock('../../../../../psp/backend/src/modules/fraud/services/fraudDiagnosis.se
 }));
 
 import { getByInstanceReference } from '../../../../../psp/backend/src/modules/customer/services/customerAgreement.service';
-import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/identity/models/party.model';
+import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/party.model';
 
 const GOV_ID = { type: 'driver_license', number: 'GB31454621', issuingCountry: 'GB', expiryDate: '2031-12-24' };
 

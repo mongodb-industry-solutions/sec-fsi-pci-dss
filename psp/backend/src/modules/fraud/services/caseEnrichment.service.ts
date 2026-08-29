@@ -1,3 +1,4 @@
+import type { Elevation } from '../../../shared/models/identity.model';
 import { Db } from 'mongodb';
 import type { UserRole } from '../../../shared/models/identity.model';
 import { getCaseById } from './fraudDiagnosis.service';
@@ -8,7 +9,7 @@ import { getMerchantById } from '../../gateway/services/merchant.service';
 import { listProcessEvents } from '../../provider/services/businessProcessEvent.service';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../gateway/models/paymentExecution.model';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../gateway/models/payoutAccount.model';
-import { PARTY_COLLECTION } from '../../identity/models/party.model';
+import { PARTY_COLLECTION } from '../../customer/models/party.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../gateway/models/paymentRequest.model';
 import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../customer/models/counterpartyArrangement.model';
@@ -193,7 +194,7 @@ export async function getCaseEnrichment(
   db: Db,
   caseId: string,
   role: UserRole,
-  escalationToken?: string,
+  elevation?: Elevation,
   actor?: { ref?: string; name?: string }
 ): Promise<Record<string, unknown> | null> {
   const fraudCase = await getCaseById(db, caseId);
@@ -206,7 +207,7 @@ export async function getCaseEnrichment(
 
   // ── Operation (from the card transaction; non-sensitive view) ──────────────
   const txn = txnId
-    ? await getTransactionById(db, txnId, role as never, escalationToken).catch(() => null)
+    ? await getTransactionById(db, txnId, role as never, elevation).catch(() => null)
     : null;
   // merchantAgreementInstanceReference is plaintext on the txn but not returned by the
   // role-aware getter; read it directly (no decryption needed) for the KYB link.
@@ -282,7 +283,7 @@ export async function getCaseEnrichment(
 
   // ── KYC summary (+ sensitive only if the role/token already unlocked it) ───
   const customer = customerId
-    ? await getByInstanceReference(db, customerId, role, escalationToken, actor).catch(() => null)
+    ? await getByInstanceReference(db, customerId, role, elevation, actor).catch(() => null)
     : null;
   const accountRef = customer?.customerAgreementReference as string | undefined;
   const kyc = customer ? {

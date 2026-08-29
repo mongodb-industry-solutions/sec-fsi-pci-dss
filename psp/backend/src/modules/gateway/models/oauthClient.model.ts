@@ -26,8 +26,8 @@ export type OAuthBackchannelDeliveryMode = 'poll' | 'ping' | 'push';
 
 export interface OAuthClientRecord {
   oauthClientId: string;
-  /** bcrypt(12). The plaintext is shown once and never stored. */
-  oauthClientSecretHash: string;
+  // v39: no secret and no hash. The credential belongs to the identity authority, which is the only
+  // party that ever holds it in any form. What stays here is the client id and the commercial link.
   oauthClientSecretPrefix: string;
   oauthRedirectUris: string[];
   oauthGrantTypes: OAuthGrantType[];
@@ -67,9 +67,9 @@ export interface OAuthClientRecord {
 }
 
 /** Everything safe to return over the API: the secret hash is never one of them. */
-export type OAuthClientPublic = Omit<OAuthClientRecord, 'oauthClientSecretHash'>;
+export type OAuthClientPublic = OAuthClientRecord;
 
 export function toPublicClient(record: OAuthClientRecord): OAuthClientPublic {
-  const { oauthClientSecretHash: _secret, ...rest } = record;
+  const { ...rest } = record;
   return rest;
 }

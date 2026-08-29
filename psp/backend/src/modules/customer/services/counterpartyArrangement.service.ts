@@ -12,7 +12,7 @@ import {
   CounterpartyLookupType,
   maskLookupValue,
 } from '../models/counterpartyArrangement.model';
-import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../customer/models/party.model';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 
 export interface RegisterBeneficiaryInput {

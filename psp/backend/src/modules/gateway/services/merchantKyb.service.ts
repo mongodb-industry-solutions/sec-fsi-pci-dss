@@ -14,7 +14,7 @@ import {
   MerchantBeneficialOwnerRole,
   MerchantAgreementKybCheck,
 } from '../models/merchantAgreement.model';
-import { PARTY_COLLECTION, PartyControlRecord } from '../../identity/models/party.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../customer/models/party.model';
 import { CUSTOMER_AGREEMENT_COLLECTION, CustomerAgreementControlRecord } from '../../customer/models/customerAgreement.model';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import {

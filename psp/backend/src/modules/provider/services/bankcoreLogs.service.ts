@@ -1,6 +1,5 @@
-import jwt from 'jsonwebtoken';
-import { bankcoreAdminCredential } from '../../../vendors/security/secrets';
 import { config } from '../../../config';
+import { authorityMachineToken } from '../../../vendors/security/machineToken';
 import { appendLog } from '../../../shared/services/logBuffer';
 
 // Pulls the bank's ring buffer over the private network and mirrors a failure into the PSP's own
@@ -11,9 +10,12 @@ export async function fetchBankcoreLogs(
 ): Promise<{ lines: string[]; error?: string }> {
   if (!config.bankcore.enabled) return { lines: [], error: 'PSP_BANKCORE_ENABLED is false' };
   try {
-    // Short-lived platform admin token, verified by bankcore with the shared secret. The Open Banking
-    // surface uses TPP client credentials instead; this is only the diagnostics channel.
-    const token = jwt.sign({ role: 'admin' }, bankcoreAdminCredential(), { expiresIn: 60 });
+    // A real machine token from the identity authority, obtained with this service's OWN client
+    // credentials. It used to be a JWT minted here with a secret the two services shared, which meant
+    // either of them could mint a token the other accepted. The Open Banking surface uses third-party
+    // client credentials instead; this is only the diagnostics channel.
+    const token = await authorityMachineToken('bankcore-diagnostics');
+    if (!token) return { lines: [], error: 'no diagnostics token could be obtained' };
     const response = await fetchImpl(
       `${config.bankcore.baseUrl}/api/v1/system/logs?limit=${limit}`,
       { signal: AbortSignal.timeout(3000), headers: { Authorization: `Bearer ${token}` } },

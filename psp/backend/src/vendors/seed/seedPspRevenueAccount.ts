@@ -7,7 +7,7 @@
 // (seedBalanceCredits skips zero-balance accounts, so no opening deposit is invented for it).
 
 import { Db } from 'mongodb';
-import { PARTY_COLLECTION, PartyControlRecord } from '../../modules/identity/models/party.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../modules/customer/models/party.model';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../../modules/gateway/models/payoutAccount.model';
 import {
   PSP_REVENUE_PARTY_REFERENCE,

@@ -48,7 +48,6 @@ const PUBLIC_EXACT: Set<string> = new Set([
   // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
   // or their own RS256 access token, NOT the PSP session JWT. Exact paths only, so the
   // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
-  '/.well-known/openid-configuration',
   '/api/v1/auth/jwks',
   '/api/v1/auth/authorize',
   '/api/v1/auth/token',
@@ -237,6 +236,6 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
   }
 
-  // Always populate userRole and escalationToken after auth resolves
-  attachRbacContext(request);
+  // The role and any elevation are resolved once, here, rather than by each service for itself.
+  await attachRbacContext(request);
 }

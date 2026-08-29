@@ -21,7 +21,6 @@
  *
  * BIAN collection mapping:
  *   parties.json                 → party (SD-13 Party Data Management)
- *   customerAuthentications.json → customerAuthenticationAssessment (SD-91)
  *   customerAgreements.json      → customerAgreementProcedure (SD-53) [includes address, govId]
  *   paymentCards.json            → paymentCardManagement (SD-88)
  *   payoutAccounts.json          → payoutAccountArrangement (SD-66)
@@ -32,7 +31,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
-import * as bcrypt from 'bcryptjs';
 import { faker } from '@faker-js/faker';
 import { enrichKyc, type CustomerAgreementSeed } from '../src/vendors/seed/seedCustomers';
 import {
@@ -119,11 +117,9 @@ function load<T>(name: string): T[] {
 }
 
 async function main() {
-  const demoPassword = await bcrypt.hash('demo-password', 12);
 
   // Curated population, kept verbatim. Everything below only appends.
   const parties = load<PartySeed>('parties.json');
-  const customerAuthentications = load<AuthenticationSeed>('customerAuthentications.json');
   const customerAgreements = load<AgreementSeed>('customerAgreements.json');
   const paymentCards = load<CardSeed>('paymentCards.json');
   const payoutAccounts = load<PayoutAccountSeed>('payoutAccounts.json');
@@ -133,7 +129,6 @@ async function main() {
 
   const baseline = {
     'parties.json': parties.length,
-    'customerAuthentications.json': customerAuthentications.length,
     'customerAgreements.json': customerAgreements.length,
     'paymentCards.json': paymentCards.length,
     'payoutAccounts.json': payoutAccounts.length,
@@ -242,38 +237,10 @@ async function main() {
   parties.push(...newCustomerParties);
 
   // -- 2. Customer authentication assessments (SD-91) ----------------
-  // The curated staff/customer logins. Added only when absent; F1 below covers every other customer.
-  const loginSpecs = [
-    { email: 'luis.fernandez@back.es', role: 'customer', name: 'Luis Fernandez' },
-    { email: 'julia.santos@back.es', role: 'customer', name: 'Julia Santos' },
-    { email: 'sarah.chen@back.es', role: 'level1_analyst', name: 'Sarah Chen' },
-    { email: 'michael.obi@back.es', role: 'level2_investigator', name: 'Michael Obi' },
-    { email: 'diego.sans@back.es', role: 'security_auditor', name: 'Diego Sans' },
-  ];
-  const loginEmails = new Set(
-    customerAuthentications.map((a) => String(a.customerAuthenticationEmailAddress ?? '').toLowerCase()),
-  );
-  for (const spec of loginSpecs) {
-    if (loginEmails.has(spec.email)) continue;
-    const party = partyByEmail.get(spec.email);
-    if (!party) continue; // the matching party was not generated (population already large enough)
-    loginEmails.add(spec.email);
-    customerAuthentications.push({
-      customerAuthenticationInstanceReference: uuid(),
-      partyInstanceReference: party.partyInstanceReference,
-      customerAuthenticationEmailAddress: spec.email,
-      customerAuthenticationCredentialHash: demoPassword,
-      customerAuthenticationUserRole: spec.role,
-      customerAuthenticationUserName: spec.name,
-      customerAuthenticationLoginDomain: 'local',
-      customerAuthenticationAccountStatus: 'active',
-      customerAuthenticationDemoFeatured: true,
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: NOW,
-      schemaVersion: 1,
-    });
-  }
+  // v39: logins are not generated here any more. Principals, their roles and their credentials
+  // belong to the identity authority, which seeds them from its own fixtures into its own database.
+  // Generating them here as well would produce a second set of people who look real to whoever
+  // reads this database, and the two would drift the moment either side changed.
 
   // -- 3. F2 / D-3: complete every customer party --------------------
   // One code path serves both a freshly generated synthetic party and a curated one with a gap
@@ -506,16 +473,6 @@ async function main() {
     });
   }
 
-  // -- 7. F1: a login for every customer party ----------------------
-  const derivedLogins = deriveCustomerLogins(parties, customerAuthentications);
-  customerAuthentications.push(...derivedLogins);
-  const customerParties = parties.filter((p) => p.partyType === 'customer');
-  const partiesWithLogin = new Set(customerAuthentications.map((a) => a.partyInstanceReference));
-  console.log(
-    `  customer parties with a login: ${customerParties.filter((p) => partiesWithLogin.has(p.partyInstanceReference)).length}` +
-    `/${customerParties.length} (+${derivedLogins.length} derived)`,
-  );
-
   // -- 8. F3: the transaction-to-card link --------------------------
   const repoint = repointTransactionsToCards(cardTransactions, paymentCards, customerAgreements);
   const snapshots = syncFraudCaseSnapshots(fraudCases, cardTransactions);
@@ -530,37 +487,13 @@ async function main() {
     );
   }
 
-  // -- Consistency guard (prevents party/auth email drift) ----------─
-  // The self-profile lookup resolves a customer's agreement via QE:equality
-  // match of party.partyEmailAddress == login email (customerAgreement.service
-  // getSelfProfile). If any authentication's email has no party whose
-  // partyEmailAddress matches exactly — or its partyInstanceReference points
-  // to a non-existent party — /system/cards silently returns empty. Fail loud
-  // at generation time instead of shipping drifted seed data.
-  const partyByRef = new Map(parties.map((p) => [p.partyInstanceReference, p]));
-  const drift: string[] = [];
-  for (const auth of customerAuthentications) {
-    const party = partyByRef.get(auth.partyInstanceReference);
-    if (!party) {
-      drift.push(
-        `login ${auth.customerAuthenticationEmailAddress} → partyInstanceReference ` +
-          `${auth.partyInstanceReference} has no matching party record`,
-      );
-      continue;
-    }
-    if (String(party.partyEmailAddress).toLowerCase() !== String(auth.customerAuthenticationEmailAddress).toLowerCase()) {
-      drift.push(
-        `login ${auth.customerAuthenticationEmailAddress} → party ` +
-          `${auth.partyInstanceReference} partyEmailAddress is ` +
-          `${party.partyEmailAddress} (must equal the login email)`,
-      );
-    }
-  }
-  if (drift.length > 0) {
-    throw new Error(
-      `Seed consistency check failed — party/authentication email drift:\n  - ${drift.join('\n  - ')}`,
-    );
-  }
+  // v39: the party-to-login drift guard moved with the logins.
+  //
+  // It checked that every login had a party whose email matched exactly, because the self-profile
+  // lookup joins on that and a mismatch made a customer's own cards silently disappear. The logins
+  // are the authority's now, so the check spans two systems and lives where both halves are
+  // visible: the seed reconciliation test, which compares these parties against the migrated
+  // principals. Keeping half of it here would check one side against nothing.
 
   // -- Write files --------------------------------------------------─
   // F6: refuse to shrink. A generator that produces fewer records than the fixtures hold is stale,
@@ -579,7 +512,6 @@ async function main() {
   };
 
   write('parties.json', parties);
-  write('customerAuthentications.json', customerAuthentications);
   write('customerAgreements.json', customerAgreements);
   write('paymentCards.json', paymentCards);
   write('payoutAccounts.json', payoutAccounts);

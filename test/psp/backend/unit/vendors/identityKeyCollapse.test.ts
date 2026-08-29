@@ -34,7 +34,7 @@ function stripComments(text: string): string {
 
 describe('v39 P3.1: the identity key lives on the business record', () => {
   it('declares the subject on the party record', () => {
-    const model = readFileSync(resolve(SRC, 'modules/identity/models/party.model.ts'), 'utf8');
+    const model = readFileSync(resolve(SRC, 'modules/customer/models/party.model.ts'), 'utf8');
     expect(model).toMatch(/subjectId\?: string;/);
   });
 

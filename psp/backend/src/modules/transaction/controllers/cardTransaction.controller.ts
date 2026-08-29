@@ -527,8 +527,8 @@ role to retrieve.`,
     },
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
-    const txn = await getTransactionById(fastify.db, id, userRole as Parameters<typeof getTransactionById>[2], escalationToken);
+    const { userRole, elevation } = request as unknown as AuthenticatedRequest;
+    const txn = await getTransactionById(fastify.db, id, userRole as Parameters<typeof getTransactionById>[2], elevation);
     if (txn) return reply.send(txn);
 
     // Not a card payment: resolve it as a transfer or a payment request, so every movement reference
