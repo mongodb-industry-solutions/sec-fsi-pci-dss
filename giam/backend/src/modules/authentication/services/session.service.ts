@@ -1,4 +1,6 @@
 import { Db } from 'mongodb';
+import { v4 as uuidv4 } from 'uuid';
+import { newMeta } from '../../../shared/models/base.model';
 import { SESSION_COLLECTION } from '../../../shared/models/collections';
 import { SessionRecord, isLive } from '../models/session.model';
 import { DirectoryService } from '../../directory/services/directory.service';
@@ -23,6 +25,40 @@ export class SessionService {
 
   private get sessions() {
     return this.db.collection<SessionRecord>(SESSION_COLLECTION);
+  }
+
+  /**
+   * Opens a session for a principal that has just authenticated.
+   *
+   * Here rather than in each controller because a password sign-in and a federated one must produce
+   * the SAME session: the same lifetimes, the same epoch, the same shape. Two places building this
+   * record is how one of them quietly ends up without an idle timeout.
+   */
+  async start(input: {
+    realm: { realmId: string; tenantId: string; tokenPolicy: { sessionMaxTtlSeconds: number; sessionIdleTtlSeconds: number } };
+    subjectId: string;
+    epoch?: number;
+    userAgentHash?: string;
+    ipHash?: string;
+  }): Promise<SessionRecord> {
+    const now = new Date();
+    const session: SessionRecord = {
+      realmId: input.realm.realmId,
+      tenantId: input.realm.tenantId,
+      sessionId: uuidv4(),
+      subjectId: input.subjectId,
+      epoch: input.epoch ?? 0,
+      createdAt: now.toISOString(),
+      lastSeenAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + input.realm.tokenPolicy.sessionMaxTtlSeconds * 1000).toISOString(),
+      idleExpiresAt: new Date(now.getTime() + input.realm.tokenPolicy.sessionIdleTtlSeconds * 1000).toISOString(),
+      clientIds: [],
+      ...(input.userAgentHash ? { userAgentHash: input.userAgentHash } : {}),
+      ...(input.ipHash ? { ipHash: input.ipHash } : {}),
+      meta: newMeta('Session'),
+    };
+    await this.sessions.insertOne(session);
+    return session;
   }
 
   async find(realmId: string, sessionId: string): Promise<SessionRecord | null> {

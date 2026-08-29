@@ -1,4 +1,4 @@
-import { keyProviders, authenticationMethods, credentialStores, policyEvaluators } from './index';
+import { keyProviders, authenticationMethods, credentialStores, policyEvaluators, identityProviders } from './index';
 import { InstanceLocalKeyProvider } from '../../modules/keys/providers/instanceLocal.provider';
 import { FilesystemKeyProvider } from '../../modules/keys/providers/filesystem.provider';
 import { SharedStoreKeyProvider } from '../../modules/keys/providers/sharedStore.provider';
@@ -6,6 +6,7 @@ import { KmsKeyProvider } from '../../modules/keys/providers/kms.provider';
 import { bcryptPasswordStore, publicKeyStore } from '../../modules/directory/services/credentialStores';
 import { passwordMethod, publicKeyMethod, clientSecretMethod } from '../../modules/authentication/services/authenticationMethods';
 import { rbacEvaluator, abacEvaluator } from '../../modules/authorization/services/policyEvaluators';
+import { oidcIdentityProvider } from '../../modules/realm/services/oidcProvider';
 
 /**
  * Registers the implementations GIAM ships with.
@@ -36,6 +37,13 @@ export function registerBuiltinPorts(): void {
   if (!credentialStores.has('bcrypt-password')) {
     credentialStores.register(bcryptPasswordStore);
     credentialStores.register(publicKeyStore);
+  }
+
+  // Where an identity may come from. Adding a third-party provider is a record and a claim mapping,
+  // with no application code and no application deployment: that is the whole argument for brokering
+  // rather than each application implementing OIDC, and then SAML, again.
+  if (!identityProviders.has('oidc')) {
+    identityProviders.register(oidcIdentityProvider);
   }
 
   // How a principal proves identity. A person with a password, a person with a device and a machine

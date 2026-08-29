@@ -40,6 +40,13 @@ const PROVABLY_PUBLIC = new Set([
   // END a session would leave a session alive whenever the credential was the problem.
   'post /realms/{realm}/protocol/openid-connect/logout',
 
+  // The two halves of a federated sign-in, public for the same reason the local one is. Starting the
+  // flow is the first step for somebody who has nothing to present yet, and completing it presents
+  // the upstream code, which IS the credential being offered. The code is verified against the
+  // provider's published keys before any claim in it is believed.
+  'get /realms/{realm}/federation/{provider}/start',
+  'post /realms/{realm}/federation/{provider}/callback',
+
   // Public by nature, like the login route above it: somebody who has no account cannot present one
   // in order to make one. The realm decides whether the route does anything at all, and whether the
   // principal it creates may sign in yet.

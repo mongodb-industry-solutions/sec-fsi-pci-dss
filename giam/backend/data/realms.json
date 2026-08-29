@@ -3,7 +3,9 @@
     "realmId": "d1a2b3c4-0001-0001-0001-000000000001",
     "name": "leafypay",
     "displayName": "Leafy Pay",
-    "aliases": ["local"],
+    "aliases": [
+      "local"
+    ],
     "enabled": true,
     "demoMode": true,
     "registration": {
@@ -27,7 +29,11 @@
         "config": {
           "tenant": "",
           "clientId": "",
-          "scopes": ["openid", "profile", "email"]
+          "scopes": [
+            "openid",
+            "profile",
+            "email"
+          ]
         },
         "claimMappings": []
       },
@@ -44,6 +50,41 @@
           "clientId": ""
         },
         "claimMappings": []
+      },
+      {
+        "providerId": "d1a2b3c4-0004-0004-0004-000000000004",
+        "name": "partnerbank",
+        "displayName": "Partner Bank (staff SSO)",
+        "protocol": "oidc",
+        "adapter": "oidc",
+        "enabled": true,
+        "notice": "Federated through this authority. No application here holds its configuration, learns its group names, or is redeployed when it changes.",
+        "config": {
+          "issuer": "http://localhost:8085/realms/bankcore",
+          "clientId": "partnerbank-federation",
+          "clientSecretRef": "GIAM_FEDERATION_PARTNERBANK_SECRET",
+          "redirectUri": "http://localhost:8086/auth/federation/partnerbank/callback",
+          "scopes": [
+            "openid",
+            "profile",
+            "email"
+          ],
+          "emailDomains": [
+            "partnerbank.example"
+          ]
+        },
+        "claimMappings": [
+          {
+            "claim": "roles",
+            "value": "fraud_investigator",
+            "roleName": "level2_investigator"
+          },
+          {
+            "claim": "roles",
+            "value": "compliance",
+            "roleName": "security_auditor"
+          }
+        ]
       }
     ]
   },

@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import { RealmService } from '../../realm/services/realm.service';
 import { DirectoryService } from '../../directory/services/directory.service';
+import { SessionService } from '../services/session.service';
 import { authenticationMethods } from '../../../shared/ports';
 import { bindAuthenticationMethods } from '../services/authenticationMethods';
 import { bindCredentialStores } from '../../directory/services/credentialStores';
@@ -104,23 +105,15 @@ export async function loginController(fastify: FastifyInstance) {
     const directory = new DirectoryService(fastify.db);
     const identity = await directory.findBySubjectId(resolution.subjectId);
 
-    const now = new Date();
-    const session: SessionRecord = {
-      realmId: realm.realmId,
-      tenantId: realm.tenantId,
-      sessionId: uuidv4(),
+    // Built by the session service, so a password sign-in and a federated one produce exactly the
+    // same session rather than two records that agree today and drift later.
+    const session = await new SessionService(fastify.db).start({
+      realm,
       subjectId: resolution.subjectId,
       epoch: identity?.sessionEpoch ?? 0,
-      createdAt: now.toISOString(),
-      lastSeenAt: now.toISOString(),
-      expiresAt: new Date(now.getTime() + realm.tokenPolicy.sessionMaxTtlSeconds * 1000).toISOString(),
-      idleExpiresAt: new Date(now.getTime() + realm.tokenPolicy.sessionIdleTtlSeconds * 1000).toISOString(),
-      clientIds: [],
-      ...(request.headers['user-agent'] ? { userAgentHash: hashIp(String(request.headers['user-agent'])) } : {}),
-      ...(request.ip ? { ipHash: hashIp(request.ip) } : {}),
-      meta: newMeta('Session'),
-    };
-    await fastify.db.collection<SessionRecord>(SESSION_COLLECTION).insertOne(session);
+      ...(request.headers['user-agent'] ? { userAgentHash: hashIp(String(request.headers['user-agent'])) as string } : {}),
+      ...(request.ip ? { ipHash: hashIp(request.ip) as string } : {}),
+    });
 
     return reply.send({
       subjectId: resolution.subjectId,
