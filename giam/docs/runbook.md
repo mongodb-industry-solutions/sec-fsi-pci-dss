@@ -88,6 +88,60 @@ offered for signing immediately and stays **published** for `GIAM_KEY_PUBLICATIO
 
 ---
 
+## Measured performance
+
+Numbers, not claims. Taken on a developer machine against a shared Atlas cluster, with **two
+replicas** of the authority on the default `instance-local` key custody. Treat the absolute values as
+this environment's; the shape of them is what matters.
+
+### The multi-replica claim, verified
+
+| Property | Result |
+|---|---|
+| Replicas sign with distinct keys | yes |
+| Published key sets identical from either replica | yes |
+| Both signing keys present in the published set | yes |
+| Token signed by replica A, accepted at replica B | yes |
+
+That is the whole scalability position, measured rather than asserted: no KMS, no shared volume, no
+shared secret, and a token from one replica verifies at the other.
+
+### Latency
+
+| Operation | Sequential (p50) | 20 concurrent (p50) | 20 concurrent (p95) |
+|---|---|---|---|
+| Token issuance (client credentials) | 1341 ms | 7710 ms | 9157 ms |
+| Introspection | **7 ms** | 7110 ms | 8860 ms |
+| Key set fetch | 239 ms | — | — |
+
+### What these numbers say, including the unflattering part
+
+**Introspection at 7 ms sequentially is the number that matters most**, because it is the cost a
+resource server pays for the authoritative answer. It makes the hybrid recommendation practical: verify
+locally by default, introspect on the operations where being wrong is expensive, and the second is
+cheap enough not to be an excuse.
+
+**Token issuance at 1.3 seconds is poor, and the cause is known.** Client authentication verifies the
+secret with bcrypt at cost 12. That is the right cost for a password, and the wrong one here: bcrypt's
+cost parameter exists to slow brute force against a LOW-ENTROPY human-chosen secret. A client secret is
+128 bits of randomness, so no attacker is guessing it, and the work factor buys nothing while costing
+roughly a quarter of a second per verification.
+
+Under concurrency it compounds, because the hashing is CPU-bound on a single-threaded event loop: 20
+concurrent requests queue behind each other, which is exactly the p50 of 7.7 seconds above.
+
+**The fix, not applied here and recorded rather than quietly deferred:** verify machine credentials
+with a fast keyed digest (HMAC-SHA256 over the secret with a server-held key) instead of bcrypt, and
+keep bcrypt for human passwords where it belongs. It is the same reasoning as the API-key question in
+the data model, and it changes stored credential material, so it deserves its own change with its own
+reseed rather than being slipped into a phase about something else.
+
+Until then, a deployment expecting heavy machine traffic should raise the access-token lifetime for
+service clients so tokens are issued less often, which trades a longer revocation window for the
+throughput.
+
+---
+
 ## Documented limitations
 
 Every entry here also appears as a posture finding with the same code, so it can be alerted on rather
