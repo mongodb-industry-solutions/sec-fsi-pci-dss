@@ -4,7 +4,9 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../../psp/backend/bin/server';
-import { getOAuthKeyProvider } from '../../../../../psp/backend/src/modules/identity/services/oidcKeys.service';
+import { authorityToken, stopAuthority } from './authorityToken';
+
+export { stopAuthority };
 
 const BACKEND_DATA = resolve(__dirname, '../../../../../psp/backend/data');
 
@@ -67,27 +69,39 @@ export async function closeContractApp(app: FastifyInstance | undefined): Promis
   await app.close();
 }
 
-// Mints an RS256 access token exactly as issueTokens() does (aud=clientId, space-delimited scope).
-export async function mintOAuthToken(sub: string, scopes: string[], clientId: string): Promise<string> {
-  const provider = getOAuthKeyProvider();
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT', kid: provider.getKid() };
-  const payload = {
-    iss: process.env.PSP_BASE_URL ?? 'http://localhost:8081',
-    sub,
-    aud: clientId,
-    exp: now + 3600,
-    iat: now,
-    jti: `test-${now}-${Math.random().toString(36).slice(2)}`,
-    scope: scopes.join(' '),
-    token_type: 'Bearer',
-  };
-  const signingInput = [
-    Buffer.from(JSON.stringify(header)).toString('base64url'),
-    Buffer.from(JSON.stringify(payload)).toString('base64url'),
-  ].join('.');
-  const sig = await provider.sign(Buffer.from(signingInput));
-  return `${signingInput}.${sig.toString('base64url')}`;
+/**
+ * A real token for a persona, obtained from the identity authority by RFC 8693 token exchange.
+ *
+ * It used to be minted here with this application's own signing key. That key is gone, so a test
+ * cannot forge a token this application will accept even if it wanted to, which is the extraction
+ * working as intended. What a suite asserts changes accordingly: it used to prove an endpoint
+ * accepts a token the test made up, and it now proves the endpoint accepts one the authority issued.
+ *
+ * Exchange rather than a sign-in, because these suites name a SUBJECT and hold no password for it.
+ * The authority refuses any subject that is not a declared demo persona, so this cannot become a way
+ * to obtain a token for an arbitrary principal.
+ */
+export async function mintOAuthToken(sub: string, scopes: string[], _clientId: string): Promise<string> {
+  const own = await authorityToken('leafypay-simulator', 'leafypay-simulator-demo-secret-2026');
+  if (!own) throw new Error('the identity authority is not reachable, so no token can be obtained');
+
+  const response = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
+      subject_token: own,
+      subject_token_type: 'urn:ietf:params:oauth:token-type:access_token',
+      requested_subject: sub,
+      scope: scopes.join(' '),
+      client_id: 'leafypay-simulator',
+      client_secret: 'leafypay-simulator-demo-secret-2026',
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`the authority refused a token for ${sub}: ${response.status}`);
+  }
+  return (await response.json() as { access_token: string }).access_token;
 }
 
 function openApiPaths(app: FastifyInstance): Record<string, Record<string, unknown>> {

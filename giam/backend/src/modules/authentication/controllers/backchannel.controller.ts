@@ -4,6 +4,7 @@ import { ClientAuthService, readClientCredentials } from '../../oauth/services/c
 import { BackchannelService, isFailure, BACKCHANNEL_GRANT } from '../services/backchannel.service';
 import { CLIENT_COLLECTION } from '../../../shared/models/collections';
 import { ClientRecord } from '../../oauth/models/client.model';
+import { requirePrincipal } from '../../../vendors/middleware/principalAuth';
 
 /**
  * Backchannel authentication, the routes a client and an approving device use.
@@ -136,6 +137,41 @@ export async function backchannelController(fastify: FastifyInstance) {
     });
     if (isFailure(result)) return fail(reply as never, result.status, result.error, result.description);
     return reply.send(result);
+  });
+
+  // ── The device asks what is waiting for its owner ───────────────────────────
+  fastify.get(`${base}/auth/pending`, {
+    preHandler: requirePrincipal,
+    schema: {
+      operationId: 'listPendingBackchannelRequests',
+      tags: ['authentication'],
+      summary: 'Approvals waiting for the calling principal',
+      description:
+        'OpenID Connect Client-Initiated Backchannel Authentication Core 1.0, the device-facing half. '
+        + 'Scoped to the CALLER: an approving device shows its owner what is waiting for them, and this '
+        + 'cannot be used to discover what anybody else has been asked to approve.',
+      security: [{ bearerAuth: [] }],
+      params: realmParam,
+      response: {
+        200: {
+          description: 'What is waiting, newest first.',
+          type: 'object',
+          additionalProperties: false,
+          required: ['pending'],
+          properties: { pending: { type: 'array', items: challengeResponse } },
+          examples: [{ pending: [challengeResponse.examples[0]] }],
+        },
+        401: { $ref: 'OAuthError#', description: 'No valid access token.' },
+        404: { $ref: 'OAuthError#', description: 'No such realm.' },
+      },
+    },
+  }, async (request, reply) => {
+    const caller = request.principal!;
+    const realm = await realmOf((request.params as { realm: string }).realm);
+    if (!realm) return fail(reply as never, 404, 'invalid_request', 'unknown realm');
+
+    const waiting = await new BackchannelService(fastify.db).pending(realm.realmId, caller.subjectId);
+    return reply.send({ pending: waiting });
   });
 
   // ── The device fetches what it must sign ────────────────────────────────────

@@ -18,7 +18,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
 import { buildApp } from '../../../../../psp/backend/bin/server';
 import type { FastifyInstance } from 'fastify';
-import { getOAuthKeyProvider } from '../../../../../psp/backend/src/modules/identity/services/oidcKeys.service';
+import { mintOAuthToken } from '../support/contract';
 
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;
@@ -27,27 +27,11 @@ const ESPRESSO_CLIENT_ID = 'oauth001-0000-4000-8000-000000000001';
 const SUB = 'PTY-MERCHANT-GW-TEST';
 const OTHER_SUB = 'PTY-SOMEONE-ELSE';
 
-// Mint a valid RS256 access token exactly like issueTokens() does (aud=clientId, space-delimited scope).
+// A real token for the persona, from the identity authority. This application holds no signing key,
+// so a test cannot mint one it would accept: the assertion is now that a genuinely issued token
+// works, which is a stronger claim than that a self-signed one does.
 async function mintToken(sub: string, scopes: string[]): Promise<string> {
-  const provider = getOAuthKeyProvider();
-  const kid = provider.getKid();
-  const now = Math.floor(Date.now() / 1000);
-  const payload = {
-    iss: process.env.PSP_BASE_URL ?? 'http://localhost:8081',
-    sub,
-    aud: ESPRESSO_CLIENT_ID,
-    exp: now + 3600,
-    iat: now,
-    jti: `test-${now}-${Math.random().toString(36).slice(2)}`,
-    scope: scopes.join(' '),
-    token_type: 'Bearer',
-  };
-  const headerAndPayload = [
-    Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid })).toString('base64url'),
-    Buffer.from(JSON.stringify(payload)).toString('base64url'),
-  ].join('.');
-  const sig = await provider.sign(Buffer.from(headerAndPayload));
-  return `${headerAndPayload}.${sig.toString('base64url')}`;
+  return mintOAuthToken(sub, scopes, ESPRESSO_CLIENT_ID);
 }
 
 describe('v23 merchant OAuth channel on the shared modules', () => {

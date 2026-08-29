@@ -4,10 +4,27 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
 import type { FastifyInstance } from 'fastify';
 import {
+
+
   LIVE_READ, WALLET_CLIENT_ID, WALLET_REQUIRED_SCOPES,
   buildContractApp, closeContractApp, requireLive, mintOAuthToken, readSeedFile, routeExists, requiredBlocks,
   responseSchema, schemaKeepsField,
 } from '../support/contract';
+
+/**
+ * The seeded principals, read from the identity authority's fixtures.
+ *
+ * This used to read a login file in this application. That file is gone with everything else about
+ * identity, and the binding now runs the other way: a principal carries the business reference it
+ * belongs to, rather than a login carrying a party.
+ */
+function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
+  const raw = require('fs').readFileSync(
+    require('path').resolve(__dirname, '../../../../../giam/backend/data/identities.json'),
+    'utf8',
+  );
+  return JSON.parse(raw);
+}
 
 // A seeded customer with payout accounts, beneficiaries and executions. Deterministic ids.
 const CUSTOMER_PARTY_REF = 'b0000001-0000-4000-8000-000000000001';
@@ -23,10 +40,10 @@ interface MerchantSeed {
 }
 
 function walletSub(): string {
-  const auths = readSeedFile<AuthSeed[]>('customerAuthentications.json');
-  const rec = auths.find((a) => a.partyInstanceReference === CUSTOMER_PARTY_REF);
+  const auths = readAuthorityIdentities();
+  const rec = auths.find((a) => a.accountHolderRef === CUSTOMER_PARTY_REF);
   if (!rec) throw new Error(`seed defect: no login record for ${CUSTOMER_PARTY_REF}`);
-  return rec.customerAuthenticationInstanceReference;
+  return rec.subjectId;
 }
 
 // Every request the wallet makes: [method, concrete url, declared OpenAPI path]. The concrete url

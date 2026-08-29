@@ -10,6 +10,23 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPairSync, createSign, createHmac, randomUUID } from 'node:crypto';
 import { readSeedFile } from './support/contract';
 
+/**
+ * The seeded principals, read from the identity authority's fixtures.
+ *
+ * This used to read a login file in this application. That file is gone with everything else about
+ * identity, and the binding now runs the other way: a principal carries the business reference it
+ * belongs to, rather than a login carrying a party.
+ */
+function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
+  const raw = require('fs').readFileSync(
+    require('path').resolve(__dirname, '../../../../giam/backend/data/identities.json'),
+    'utf8',
+  );
+  return JSON.parse(raw);
+}
+
+
+
 const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
 
 // The merchant is a CONFIDENTIAL client, so only its hash is seeded and the plaintext lives in the merchant
@@ -31,7 +48,7 @@ interface MerchantSeed {
 }
 
 function customer(): AuthSeed {
-  return readSeedFile<AuthSeed[]>('customerAuthentications.json')
+  return readAuthorityIdentities()
     .filter((a) => a.customerAuthenticationUserRole === 'customer')[0];
 }
 
