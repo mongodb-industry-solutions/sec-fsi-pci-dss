@@ -20,10 +20,22 @@ env:
   PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
 
   # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
-  # Browser-facing consent page → PUBLIC PSP frontend.
-  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com/auth/authorize"
-  # Server-to-server (OIDC discovery + token + userinfo + API) → PRIVATE in-cluster backend service.
+  # Browser-facing sign-in → the PUBLIC GIAM console. Credential entry lives at the authority.
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-fsi-pci-dss-giam-console.industrysolutions.prod.corp.mongodb.com/auth/login"
+  # Server-to-server discovery, token and introspection → PRIVATE in-cluster GIAM service.
+  PSP_MERCHANT_ISSUER_URL: "http://sec-fsi-pci-dss-giam-web-app:80/realms/leafypay"
+  # Server-to-server BUSINESS API → PRIVATE in-cluster backend service. Unchanged: no business
+  # endpoint moved, and this variable is the proof that authentication was separable from them.
   PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
+  # LeafyPay's own browser-facing pages. Set EXPLICITLY: they used to be derived from the authorize
+  # URL by string replacement, so moving that URL to the authority would have silently taken the
+  # portal, the dashboard, the simulator and the credentials page with it, to a host that serves none.
+  PSP_MERCHANT_APP_FRONTEND_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
+  PSP_MERCHANT_LOGOUT_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com/auth/logout"
+  PSP_MERCHANT_PORTAL_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com"
+  PSP_MERCHANT_DASHBOARD_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com/system"
+  PSP_MERCHANT_SIMULATOR_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com/simulator"
+  PSP_MERCHANT_CREDENTIALS_URL: "https://sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com/system/profile/credentials"
   # This app's own public URL (redirect_uri host + seeder branding).
   PSP_MERCHANT_BASE_URL: "https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com"
   # Browser-facing Swagger UI (/help link) → PUBLIC backend URL (the API base above is in-cluster only).

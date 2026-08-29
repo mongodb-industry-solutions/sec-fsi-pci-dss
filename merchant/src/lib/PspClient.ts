@@ -157,10 +157,19 @@ export class PspClient {
   }
 
   // ── OIDC / identity ───────────────────────────────────────────────────────────
-  userinfo() {
-    return this.request<{ sub: string; name?: string; preferred_username?: string; email?: string }>(
-      '/api/v1/auth/userinfo',
-    );
+  // Identity comes from the ISSUER's userinfo endpoint, read from discovery rather than hardcoded:
+  // the application no longer serves one, and an issuer is free to place it wherever it likes.
+  async userinfo(): Promise<{ sub: string; name?: string; preferred_username?: string; email?: string }> {
+    await this.ensureFreshToken();
+    const cfg = await discover();
+    const res = await fetch(cfg.userinfo_endpoint, {
+      headers: { Authorization: `Bearer ${this.session.accessToken}` },
+      cache: 'no-store',
+    });
+    const text = await res.text();
+    const data = text ? safeJson(text) : undefined;
+    if (!res.ok) throw new PspError(res.status, data, (data as any)?.error_description ?? (data as any)?.error);
+    return data as { sub: string; name?: string; preferred_username?: string; email?: string };
   }
 
   // ── Products: payment methods ───────────────────────────────────────────────

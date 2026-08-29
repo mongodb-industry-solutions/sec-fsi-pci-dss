@@ -21,12 +21,14 @@ let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 export async function discover(): Promise<OidcConfig> {
   if (discoveryCache) return discoveryCache;
-  const url = `${ENV.pspBaseUrl()}/.well-known/openid-configuration`;
+  // Discovery is asked of the ISSUER, not the business API. Everything else in this file reads its
+  // endpoints out of the returned document, so this single line is what repoints the whole flow.
+  const url = `${ENV.issuerUrl()}/.well-known/openid-configuration`;
   let res: Response;
   try {
     res = await fetch(url, { cache: 'no-store' });
   } catch (e) {
-    // The merchant process cannot reach the PSP base URL (wrong host/port, container networking, …).
+    // The merchant process cannot reach the issuer (wrong host/port, container networking, …).
     oauthLog.error('discover.unreachable', { url, error: (e as Error).message });
     throw new Error(`OIDC discovery unreachable at ${url}: ${(e as Error).message}`);
   }
