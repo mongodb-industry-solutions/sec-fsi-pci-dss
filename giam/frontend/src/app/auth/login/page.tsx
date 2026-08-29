@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiUrl } from '../../../lib/env';
+import { tokenFromSession } from '../../../lib/session';
 
 /**
  * The sign-in screen.
@@ -77,6 +78,9 @@ export default function LoginPage() {
         return;
       }
       const body = await response.json();
+      // The console then obtains a token for itself the ordinary way, so the screens that need one
+      // work. A failure here does not undo the sign-in: the person IS signed in.
+      await tokenFromSession(realm, body.sessionId);
       setSignedIn({ userName: body.userName, sessionId: body.sessionId });
     } catch {
       setError('The identity service could not be reached.');
@@ -93,7 +97,10 @@ export default function LoginPage() {
         <div className="w-full max-w-md rounded-xl border bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold text-mongodb-dark">Signed in</h1>
           <p className="mt-2 text-gray-600">{signedIn.userName}</p>
-          <p className="mt-6 text-xs text-gray-400 break-all">session {signedIn.sessionId}</p>
+          <div className="mt-6 flex justify-center gap-4 text-sm">
+            <a href="/profile/credentials" className="underline">Your authenticators</a>
+            <a href="/auth/logout" className="underline">Sign out</a>
+          </div>
         </div>
       </main>
     );

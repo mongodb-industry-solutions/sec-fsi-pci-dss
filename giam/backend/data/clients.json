@@ -190,5 +190,28 @@
     "tokenEndpointAuthMethod": "none",
     "applicationType": "web",
     "status": "active"
+  },
+  {
+    "realm": "leafypay",
+    "clientId": "giam-console",
+    "clientName": "Identity console",
+    "clientType": "public",
+    "redirectUris": [
+      "http://localhost:8086/auth/callback",
+      "http://127.0.0.1:8086/auth/callback"
+    ],
+    "postLogoutRedirectUris": [
+      "http://localhost:8086",
+      "http://127.0.0.1:8086"
+    ],
+    "grantTypes": [
+      "authorization_code",
+      "refresh_token"
+    ],
+    "scope": "openid profile email",
+    "requirePkce": true,
+    "tokenEndpointAuthMethod": "none",
+    "applicationType": "web",
+    "status": "active"
   }
 ]
