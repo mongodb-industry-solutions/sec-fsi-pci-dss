@@ -6,6 +6,7 @@ import { requireAdmin } from '../../../vendors/middleware/adminAuth';
 import { IDENTITY_COLLECTION } from '../../../shared/models/collections';
 import { IdentityRecord } from '../models/identity.model';
 import { newMeta } from '../../../shared/models/base.model';
+import { provisioningTargets } from '../../../shared/ports';
 import {
   toScimUser, toScimList, scimError, parseScimFilter, applyScimPatch,
   provisionedLifecycleState, SCIM_USER_SCHEMA,
@@ -63,6 +64,16 @@ export async function scimController(fastify: FastifyInstance) {
     return new RealmService(fastify.db).byName(name);
   }
 
+  /** Pushes a lifecycle change outward, and never lets a delivery failure undo the change. */
+  async function notifyConsumers(operation: 'create' | 'update' | 'deactivate', subjectId: string, payload: Record<string, unknown>) {
+    try {
+      await provisioningTargets.resolve('webhook').push(operation, subjectId, payload);
+    } catch {
+      // Deliberately swallowed. A consumer that cannot be told must not be able to keep a suspended
+      // principal active here.
+    }
+  }
+
   function identities() {
     return fastify.db.collection<IdentityRecord>(IDENTITY_COLLECTION);
   }
@@ -71,7 +82,7 @@ export async function scimController(fastify: FastifyInstance) {
     preHandler: requireAdmin,
     schema: {
       operationId: 'scimListUsers',
-      tags: ['directory'],
+      tags: ['scim'],
       summary: 'List principals',
       description:
         'Standard-defined: SCIM 2.0, RFC 7644 section 3.4.2. Only `eq` filters on userName, '
@@ -145,7 +156,7 @@ export async function scimController(fastify: FastifyInstance) {
     preHandler: requireAdmin,
     schema: {
       operationId: 'scimGetUser',
-      tags: ['directory'],
+      tags: ['scim'],
       summary: 'One principal',
       description: 'Standard-defined: SCIM 2.0, RFC 7644 section 3.4.1.',
       security: [{ bearerAuth: [] }],
@@ -176,7 +187,7 @@ export async function scimController(fastify: FastifyInstance) {
     preHandler: requireAdmin,
     schema: {
       operationId: 'scimCreateUser',
-      tags: ['directory'],
+      tags: ['scim'],
       summary: 'Provision a principal',
       description:
         'Standard-defined: SCIM 2.0, RFC 7644 section 3.3. The created principal is NOT activated '
@@ -254,6 +265,16 @@ export async function scimController(fastify: FastifyInstance) {
       detail: { via: 'scim', lifecycleState, externalId: body.externalId },
     });
 
+    // Told to consumers, never awaited. A receiver that is down must not fail the provisioning, and
+    // reconciliation is what corrects it.
+    void notifyConsumers('create', record.subjectId, {
+      realmId: realm.realmId,
+      active: record.active,
+      lifecycleState,
+      userName: record.userName,
+      version: record.meta.version,
+    });
+
     return reply
       .status(201)
       .header('content-type', 'application/scim+json')
@@ -264,7 +285,7 @@ export async function scimController(fastify: FastifyInstance) {
     preHandler: requireAdmin,
     schema: {
       operationId: 'scimPatchUser',
-      tags: ['directory'],
+      tags: ['scim'],
       summary: 'Change a principal',
       description:
         'Standard-defined: SCIM 2.0, RFC 7644 section 3.5.2. Only a short allowlist of attributes can '
@@ -340,6 +361,13 @@ export async function scimController(fastify: FastifyInstance) {
       detail: { via: 'scim', changed: Object.keys(update) },
     });
 
+    void notifyConsumers(deactivating ? 'deactivate' : 'update', id, {
+      realmId: realm.realmId,
+      active: update.active ?? existing.active,
+      lifecycleState: deactivating ? 'suspended' : existing.lifecycleState,
+      version: (existing.meta?.version ?? 0) + 1,
+    });
+
     const updated = await identities().findOne({ subjectId: id }, { projection: { _id: 0 } });
     return reply
       .header('content-type', 'application/scim+json')
@@ -350,7 +378,7 @@ export async function scimController(fastify: FastifyInstance) {
     preHandler: requireAdmin,
     schema: {
       operationId: 'scimDeleteUser',
-      tags: ['directory'],
+      tags: ['scim'],
       summary: 'Deprovision a principal',
       description:
         'Standard-defined: SCIM 2.0, RFC 7644 section 3.6. The record is retired rather than deleted. '
@@ -397,6 +425,12 @@ export async function scimController(fastify: FastifyInstance) {
       outcome: 'success',
       subjectId: id,
       detail: { via: 'scim' },
+    });
+
+    void notifyConsumers('deactivate', id, {
+      realmId: realm.realmId,
+      active: false,
+      lifecycleState: 'deprovisioned',
     });
 
     return reply.status(204).send();

@@ -1,4 +1,4 @@
-import { keyProviders, authenticationMethods, credentialStores, policyEvaluators, identityProviders } from './index';
+import { keyProviders, authenticationMethods, credentialStores, policyEvaluators, identityProviders, provisioningTargets } from './index';
 import { InstanceLocalKeyProvider } from '../../modules/keys/providers/instanceLocal.provider';
 import { FilesystemKeyProvider } from '../../modules/keys/providers/filesystem.provider';
 import { SharedStoreKeyProvider } from '../../modules/keys/providers/sharedStore.provider';
@@ -7,6 +7,7 @@ import { bcryptPasswordStore, publicKeyStore } from '../../modules/directory/ser
 import { passwordMethod, publicKeyMethod, clientSecretMethod } from '../../modules/authentication/services/authenticationMethods';
 import { rbacEvaluator, abacEvaluator } from '../../modules/authorization/services/policyEvaluators';
 import { oidcIdentityProvider } from '../../modules/realm/services/oidcProvider';
+import { webhookProvisioningTarget } from '../../modules/provisioning/services/webhookTarget';
 
 /**
  * Registers the implementations GIAM ships with.
@@ -37,6 +38,12 @@ export function registerBuiltinPorts(): void {
   if (!credentialStores.has('bcrypt-password')) {
     credentialStores.register(bcryptPasswordStore);
     credentialStores.register(publicKeyStore);
+  }
+
+  // Where a lifecycle change is sent. A suspension has to reach runtime authorization without
+  // waiting for a review cycle, which a short token lifetime alone does not achieve.
+  if (!provisioningTargets.has('webhook')) {
+    provisioningTargets.register(webhookProvisioningTarget);
   }
 
   // Where an identity may come from. Adding a third-party provider is a record and a claim mapping,

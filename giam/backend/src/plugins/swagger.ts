@@ -84,6 +84,7 @@ is expensive to get wrong.
         { name: 'keys', description: '**No applicable standard.** Signing key inventory, custody and rotation.' },
         { name: 'sessions', description: '**No applicable standard.** Active sessions and forced termination.' },
         { name: 'audit', description: '**No applicable standard.** Security event query, and the standard event delivery streams.' },
+        { name: 'provisioning', description: '**No applicable standard.** Outbound lifecycle delivery, and the reconciliation that corrects a missed one.' },
         { name: 'workload', description: 'Workload identity federation, attestation state and credential exchange.' },
         { name: 'privilege', description: '**No applicable standard.** Time-bound privilege elevation and its approvals.' },
         { name: 'admin', description: '**No applicable standard.** Diagnostics, posture and operational surface. Not part of the integration contract.' },
