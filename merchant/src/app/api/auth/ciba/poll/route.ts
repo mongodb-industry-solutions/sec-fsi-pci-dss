@@ -1,4 +1,4 @@
-// POST /api/auth/ciba/poll: poll the PSP token endpoint with the ciba grant (session-less).
+// POST /api/auth/ciba/poll: poll the authority token endpoint with the ciba grant (session-less).
 // On approval the merchant mints the same ew_session it would after SSO, then signals the browser to
 // redirect. While the user has not approved yet, returns { status: 'pending' | 'slow_down' }; terminal
 // failures map to 'denied' | 'expired' | 'error'.
