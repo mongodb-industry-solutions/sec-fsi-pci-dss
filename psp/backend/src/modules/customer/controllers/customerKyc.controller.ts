@@ -190,7 +190,7 @@ export async function customerKycController(fastify: FastifyInstance) {
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
       const { page = 1, limit = 100 } = request.query as { page?: number; limit?: number };
-      const result = await listAuditEvents(fastify.db, { source: 'all', ref: partyInstanceReference, entityType: 'customer', page: Number(page), limit: Number(limit) });
+      const result = await listAuditEvents(fastify.db, { source: 'all', ref: partyInstanceReference, entityType: 'customer', page: Number(page), limit: Number(limit), request });
       return reply.send(result);
     },
   });

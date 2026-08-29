@@ -62,6 +62,7 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     accounts: ['view', 'viewSensitive'],
     beneficiaries: ['view', 'investigate', 'manage'],
     paymentRequests: ['view'],
+    grants: ['view', 'manage'],
   },
   security_auditor: {
     transactions: ['view', 'viewSensitive'],
@@ -75,6 +76,7 @@ const EXPECTED: Record<string, Record<string, string[]>> = {
     accounts: ['view', 'viewSensitive'],
     beneficiaries: ['view', 'investigate'],
     paymentRequests: ['view'],
+    grants: ['view'],
   },
   merchant_officer: {
     merchants: ['view', 'manage'],

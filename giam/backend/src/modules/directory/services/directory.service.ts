@@ -25,6 +25,18 @@ export class DirectoryService {
     return this.identities.findOne({ subjectId }, { projection: { _id: 0 } });
   }
 
+  /**
+   * The principal bound to a business reference.
+   *
+   * The authority does not know what the reference names and never resolves it against anything.
+   * What it can answer is which principal was bound to it, which is what lets a consuming
+   * application ask about a person it knows by its own identifier without holding a copy of the
+   * mapping, and without this service learning what the identifier means.
+   */
+  async findByAccountHolderRef(realmId: string, accountHolderRef: string): Promise<IdentityRecord | null> {
+    return this.identities.findOne({ realmId, accountHolderRef }, { projection: { _id: 0 } });
+  }
+
   async findByUserName(realmId: string, userName: string): Promise<IdentityRecord | null> {
     return this.identities.findOne({ realmId, userName }, { projection: { _id: 0 } });
   }

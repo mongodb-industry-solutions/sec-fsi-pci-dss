@@ -9,13 +9,31 @@
     "builtin": true,
     "sodRationale": "Scoped to self by the role rather than by each permission, because the answer is the same for all of them: viewing transactions means viewing one's own, and no permission changes that.",
     "permissions": {
-      "transactions": ["view"],
-      "cards": ["view", "manage"],
-      "merchants": ["view"],
-      "consents": ["view"],
-      "accounts": ["view", "manage"],
-      "beneficiaries": ["view", "manage"],
-      "paymentRequests": ["view", "manage"]
+      "transactions": [
+        "view"
+      ],
+      "cards": [
+        "view",
+        "manage"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "consents": [
+        "view"
+      ],
+      "accounts": [
+        "view",
+        "manage"
+      ],
+      "beneficiaries": [
+        "view",
+        "manage"
+      ],
+      "paymentRequests": [
+        "view",
+        "manage"
+      ]
     }
   },
   {
@@ -27,12 +45,25 @@
     "scopeKind": "all",
     "builtin": true,
     "permissions": {
-      "transactions": ["view"],
-      "customers": ["view"],
-      "cards": ["view"],
-      "merchants": ["view"],
-      "fraudCases": ["view", "investigate"],
-      "beneficiaries": ["view"]
+      "transactions": [
+        "view"
+      ],
+      "customers": [
+        "view"
+      ],
+      "cards": [
+        "view"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "fraudCases": [
+        "view",
+        "investigate"
+      ],
+      "beneficiaries": [
+        "view"
+      ]
     },
     "denialRationale": [
       {
@@ -56,15 +87,44 @@
     "builtin": true,
     "sodRationale": "Sensitive reveals are gated by a time-bound elevation rather than by the role alone, so holding the role is not the same as exercising it, and every reveal has an approval behind it.",
     "permissions": {
-      "transactions": ["view", "viewSensitive"],
-      "customers": ["view", "viewSensitive"],
-      "cards": ["view", "viewSensitive"],
-      "merchants": ["view"],
-      "fraudCases": ["view", "investigate"],
-      "auditEvents": ["view"],
-      "accounts": ["view", "viewSensitive"],
-      "beneficiaries": ["view", "investigate", "manage"],
-      "paymentRequests": ["view"]
+      "transactions": [
+        "view",
+        "viewSensitive"
+      ],
+      "customers": [
+        "view",
+        "viewSensitive"
+      ],
+      "cards": [
+        "view",
+        "viewSensitive"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "fraudCases": [
+        "view",
+        "investigate"
+      ],
+      "auditEvents": [
+        "view"
+      ],
+      "accounts": [
+        "view",
+        "viewSensitive"
+      ],
+      "beneficiaries": [
+        "view",
+        "investigate",
+        "manage"
+      ],
+      "paymentRequests": [
+        "view"
+      ],
+      "grants": [
+        "view",
+        "manage"
+      ]
     }
   },
   {
@@ -77,17 +137,48 @@
     "builtin": true,
     "sodRationale": "Read-only is the whole role. An auditor able to change what it audits cannot attest to it, so no permission here grants a mutation and none may be added without ending the role's independence.",
     "permissions": {
-      "transactions": ["view", "viewSensitive"],
-      "customers": ["view", "viewSensitive"],
-      "cards": ["view", "viewSensitive"],
-      "fraudCases": ["view", "viewSensitive"],
-      "merchants": ["view"],
-      "providers": ["view"],
-      "modules": ["view"],
-      "auditEvents": ["view"],
-      "accounts": ["view", "viewSensitive"],
-      "beneficiaries": ["view", "investigate"],
-      "paymentRequests": ["view"]
+      "transactions": [
+        "view",
+        "viewSensitive"
+      ],
+      "customers": [
+        "view",
+        "viewSensitive"
+      ],
+      "cards": [
+        "view",
+        "viewSensitive"
+      ],
+      "fraudCases": [
+        "view",
+        "viewSensitive"
+      ],
+      "merchants": [
+        "view"
+      ],
+      "providers": [
+        "view"
+      ],
+      "modules": [
+        "view"
+      ],
+      "auditEvents": [
+        "view"
+      ],
+      "accounts": [
+        "view",
+        "viewSensitive"
+      ],
+      "beneficiaries": [
+        "view",
+        "investigate"
+      ],
+      "paymentRequests": [
+        "view"
+      ],
+      "grants": [
+        "view"
+      ]
     },
     "denialRationale": [
       {
@@ -107,8 +198,13 @@
     "builtin": true,
     "sodRationale": "This role owns the DECISION on a business file. The operations officer owns DATA CORRECTION on an already-registered one. Both touch the same resource and emit the same compliance events; the boundary is procedural and is recorded in the audit actor. A verdict override stays here and never appears on the administration surface.",
     "permissions": {
-      "merchants": ["view", "manage"],
-      "accounts": ["view"]
+      "merchants": [
+        "view",
+        "manage"
+      ],
+      "accounts": [
+        "view"
+      ]
     },
     "denialRationale": [
       {
@@ -127,13 +223,32 @@
     "builtin": true,
     "sodRationale": "The correction half of the split with the merchant officer: this role corrects an already-registered business file and its beneficial owners, and never decides whether the business is approved. Administration is gated by the DATA resource rather than by the modules resource, so there is no path where administering modules confers the ability to edit business data.",
     "permissions": {
-      "cards": ["view", "manage"],
-      "accounts": ["view", "manage"],
-      "customers": ["view", "manage"],
-      "merchants": ["view", "manage"],
-      "modules": ["view", "manage"],
-      "providers": ["view"],
-      "auditEvents": ["view"]
+      "cards": [
+        "view",
+        "manage"
+      ],
+      "accounts": [
+        "view",
+        "manage"
+      ],
+      "customers": [
+        "view",
+        "manage"
+      ],
+      "merchants": [
+        "view",
+        "manage"
+      ],
+      "modules": [
+        "view",
+        "manage"
+      ],
+      "providers": [
+        "view"
+      ],
+      "auditEvents": [
+        "view"
+      ]
     },
     "denialRationale": [
       {
@@ -158,14 +273,30 @@
     "builtin": true,
     "sodRationale": "Platform administration with NO access to business or cardholder data. The separation is the point: the role that configures the platform cannot read what flows through it. Its authentication-configuration and role-administration permissions now belong to the AUTHORITY's own resource server rather than to the application, because that is where those objects live after the extraction; the application no longer has a roles resource to grant.",
     "permissions": {
-      "providers": ["view", "manage"],
-      "modules": ["view"],
-      "auditEvents": ["view"]
+      "providers": [
+        "view",
+        "manage"
+      ],
+      "modules": [
+        "view"
+      ],
+      "auditEvents": [
+        "view"
+      ]
     },
     "authorityPermissions": {
-      "realms": ["view", "manage"],
-      "roles": ["view", "manage"],
-      "identities": ["view", "manage"]
+      "realms": [
+        "view",
+        "manage"
+      ],
+      "roles": [
+        "view",
+        "manage"
+      ],
+      "identities": [
+        "view",
+        "manage"
+      ]
     },
     "denialRationale": [
       {
