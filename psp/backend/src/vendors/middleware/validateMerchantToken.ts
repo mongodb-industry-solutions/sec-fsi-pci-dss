@@ -3,7 +3,7 @@
  * Validates RS256 JWT, extracts client_id → resolves merchant, checks scopes.
  */
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { verifyAccessToken } from '../../modules/identity/services/oauth.service';
+import { verifyAccessToken } from '../security/tokenVerifier';
 import { MERCHANT_AGREEMENT_COLLECTION, MerchantAgreementControlRecord } from '../../modules/gateway/models/merchantAgreement.model';
 import { findClientById } from '../../modules/gateway/services/oauthClientRegistry.service';
 
@@ -40,16 +40,16 @@ export async function validateMerchantToken(
     return reply.status(401).send({ error: 'invalid_token', error_description: 'Missing Bearer token' }) as any;
   }
 
-  let payload;
-  try {
-    payload = await verifyAccessToken(bearer);
-  } catch (err: any) {
-    return reply.status(401).send({ error: 'invalid_token', error_description: err.message }) as any;
+  // The verifier answers null rather than throwing: an invalid token is a refusal, not an error.
+  // Every refusal reads the same, so nothing here tells a caller WHY it was refused.
+  const payload = await verifyAccessToken(bearer);
+  if (!payload) {
+    return reply.status(401).send({ error: 'invalid_token', error_description: 'The token is not valid.' }) as any;
   }
 
   const db = (request.server as any).db;
   const clientId = Array.isArray(payload.aud) ? payload.aud[0] : payload.aud as string;
-  const scopes = (payload.scope as string ?? '').split(' ').filter(Boolean);
+  const scopes = Array.isArray(payload.scope) ? payload.scope : String(payload.scope ?? '').split(' ').filter(Boolean);
 
   if (requiredScope && !scopes.includes(requiredScope)) {
     return reply.status(403).send({
@@ -95,9 +95,12 @@ export async function tryMerchantContext(request: FastifyRequest): Promise<Merch
   if (!bearer) return undefined;
   try {
     const payload = await verifyAccessToken(bearer);
+    // No token, no merchant context. This function answers "is there a merchant here", and an
+    // unverifiable token means there is not.
+    if (!payload) return undefined;
     const db = (request.server as any).db;
     const clientId = Array.isArray(payload.aud) ? payload.aud[0] : (payload.aud as string);
-    const scopes = ((payload.scope as string) ?? '').split(' ').filter(Boolean);
+    const scopes = Array.isArray(payload.scope) ? payload.scope : String(payload.scope ?? '').split(' ').filter(Boolean);
     const client = await findClientById(db, clientId);
     if (!client) return undefined;
     // Same eligibility as validateMerchantToken: never attribute actions to an inactive client or a

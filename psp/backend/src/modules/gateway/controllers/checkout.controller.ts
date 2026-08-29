@@ -12,7 +12,7 @@ import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
 import { tryMerchantContext } from '../../../vendors/middleware/validateMerchantToken';
 import { dualPermission } from '../../../vendors/middleware/dualAuth';
-import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+import { resolvePartyReference } from '../../../vendors/security/partyReference';
 
 const SESSION_STATUS_ENUM = ['pending', 'completed', 'expired', 'cancelled'];
 
@@ -101,7 +101,7 @@ export async function checkoutController(fastify: FastifyInstance) {
       merchantCtx = await tryMerchantContext(request);
       actingSubjectReference = body.actingSubjectReference ?? merchantCtx?.sub;
       if (actingSubjectReference) {
-        actingPartyReference = await resolvePartyInstanceReference(fastify.db, actingSubjectReference) ?? undefined;
+        actingPartyReference = await resolvePartyReference(actingSubjectReference) ?? undefined;
       }
     } catch {
       merchantCtx = undefined;

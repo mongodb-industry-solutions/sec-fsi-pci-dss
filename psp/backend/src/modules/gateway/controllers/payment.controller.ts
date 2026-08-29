@@ -15,7 +15,7 @@ import {
 import { validateMerchantToken } from '../../../vendors/middleware/validateMerchantToken';
 import { createTransaction, CardIssuerDeclinedError, resolveAccountReferenceForParty } from '../../transaction/services/cardTransaction.service';
 import { attributionFromMerchantContext, emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
-import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+import { resolvePartyReference } from '../../../vendors/security/partyReference';
 import { getChargeableCardToken } from '../../customer/services/paymentCard.service';
 
 const PAYMENT_STATUS_ENUM = [
@@ -159,7 +159,7 @@ initiated → confirmed → authorized → captured → settled
     // party + canonical account so the charge lands in THEIR payment history. Falls back to the merchant
     // account key when no acting user is supplied (pure machine charge).
     const actingPartyReference = body.actingSubjectReference
-      ? await resolvePartyInstanceReference(fastify.db, body.actingSubjectReference) ?? undefined
+      ? await resolvePartyReference(body.actingSubjectReference) ?? undefined
       : undefined;
     const actingAccountReference = actingPartyReference
       ? await resolveAccountReferenceForParty(fastify.db, actingPartyReference)

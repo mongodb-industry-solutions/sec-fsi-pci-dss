@@ -62,6 +62,10 @@ export function toScimUser(identity: IdentityRecord, baseUrl: string): ScimUser 
       kind: identity.kind,
       lifecycleState: identity.lifecycleState,
       ...(identity.providerId ? { providerId: identity.providerId } : {}),
+      // The opaque binding to a consuming application's own record. This authority never resolves it
+      // and does not know what it names; publishing it lets an application find its own records for a
+      // principal without either side learning the other's vocabulary.
+      ...(identity.accountHolderRef ? { accountHolderRef: identity.accountHolderRef } : {}),
       // Deliberately never the credential, the hash or the session epoch. A provisioning client has
       // no business learning how a principal authenticates.
     },

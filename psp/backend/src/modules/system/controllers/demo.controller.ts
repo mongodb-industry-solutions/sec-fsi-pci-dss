@@ -4,7 +4,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
-import { getDemoUsers } from '../../identity/services/auth.service';
+import { getDemoUsers } from '../services/demoRoster.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import { authorizeRawDocumentAccess, RAW_COLLECTION_RESOURCE } from '../services/rawDocumentAccess.service';

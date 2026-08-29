@@ -2,7 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { listForParty, unreadCount, markRead, markAllRead } from '../notifications.service';
 import { subscribePartyNotifications } from '../../../vendors/eventbus';
 import { beginSSE } from '../../../shared/services/sse';
-import { resolvePartyInstanceReference } from '../../identity/services/oauth.service';
+import { partyReferenceFrom } from '../../../vendors/security/partyReference';
 
 // Resolve the caller's own party across BOTH auth channels (v23):
 //  · OAuth (merchant on-behalf-of): require scope read:notifications, party = resolveParty(token.sub).
@@ -16,7 +16,7 @@ async function resolveNotificationParty(request: FastifyRequest, reply: FastifyR
       return null;
     }
     // Unmapped subject → empty string; downstream lookups yield an empty list / 404 (never a leak).
-    return (await resolvePartyInstanceReference(request.server.db, merchant.sub)) ?? '';
+    return partyReferenceFrom(merchant as never) ?? '';
   }
   return (request as { user?: { partyRef?: string } }).user?.partyRef ?? '';
 }

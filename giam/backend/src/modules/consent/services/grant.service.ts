@@ -69,6 +69,15 @@ export class GrantService {
     return this.decorate(realmId, records);
   }
 
+  /** Everyone who has authorised one client. An oversight view, gated by the caller. */
+  async listForClient(realmId: string, clientId: string, status: GrantStatusFilter = 'all'): Promise<GrantView[]> {
+    const records = await this.grants
+      .find({ realmId, clientId, ...(status === 'all' ? {} : { status }) }, { projection: { _id: 0 } })
+      .sort({ grantedAt: -1 })
+      .toArray();
+    return this.decorate(realmId, records);
+  }
+
   async byId(realmId: string, subjectId: string, grantId: string): Promise<GrantView | null> {
     // Owner scoped in the query itself, so another principal's grant is simply not found rather than
     // found and then refused. The two are indistinguishable to the caller, which is the point.

@@ -29,8 +29,6 @@ import { creditBureauModule }      from '../src/providers/credit-bureau';
 import { cardIssuerModule }         from '../src/providers/card-issuer';
 import { accountInformationModule } from '../src/providers/account-information';
 import { notificationsModule } from '../src/modules/notification';
-import { oidcDiscoveryController } from '../src/modules/identity/controllers/oidcDiscovery.controller';
-import { initOidcKeys } from '../src/modules/identity/services/oidcKeys.service';
 
 export async function buildApp(): Promise<FastifyInstance> {
   // Background subsystems report through console.*; mirror them before anything can log.
@@ -88,16 +86,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   // fastify.dbError is set to a non-null string on failure (credentials stripped).
   await fastify.register(mongodbPlugin);
 
-  // v16: initialise OAuth key provider after DB is connected (registers public key in Atlas)
-  fastify.addHook('onReady', async () => {
-    if (!fastify.dbError && fastify.db) {
-      try {
-        await initOidcKeys(fastify.db);
-      } catch (err) {
-        fastify.log.warn({ err }, '[oauth-keys] Key init failed — OIDC endpoints unavailable until fixed');
-      }
-    }
-  });
+  // v39: nothing is initialised here for signing. This application holds no key: it verifies
+  // tokens against the authority published key set and issues none of its own.
 
   // Auth: skip JWT check for public routes and Swagger UI
   fastify.addHook('preHandler', authMiddleware);
@@ -191,9 +181,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // v16: OIDC Discovery at root (/.well-known/openid-configuration) + JWKS (/api/v1/auth/jwks)
-  // These MUST be registered at root level — oidcDiscovery handles both paths internally.
-  await fastify.register(oidcDiscoveryController);
+  // v39: discovery and the key set are served by the identity authority. A relying party that
+  // published its own would be asserting it is an issuer, which it is not.
 
   // API routes  -  each module registers its own routes internally
   await fastify.register(identityModule,     { prefix: '/api/v1' });

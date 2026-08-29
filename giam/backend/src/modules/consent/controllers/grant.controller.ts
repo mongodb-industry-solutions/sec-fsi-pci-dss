@@ -102,6 +102,7 @@ export async function grantController(fastify: FastifyInstance) {
             description: 'Another principal, for a caller whose role grants oversight. Refused otherwise.',
           },
           accountHolderRef: { type: 'string', description: 'The principal bound to this business reference. Same oversight rule as subjectId.' },
+          clientId: { type: 'string', description: 'Everyone who has authorised this client. An oversight query, so it needs the same permission.' },
         },
       },
       response: {
@@ -120,7 +121,7 @@ export async function grantController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const caller = request.principal!;
-    const { status, subjectId, accountHolderRef } = request.query as { status?: GrantStatusFilter; subjectId?: string; accountHolderRef?: string };
+    const { status, subjectId, accountHolderRef, clientId } = request.query as { status?: GrantStatusFilter; subjectId?: string; accountHolderRef?: string; clientId?: string };
     const realm = await realmOf((request.params as { realm: string }).realm);
     if (!realm) return reply.status(404).send(problem(404, 'Unknown realm'));
 
@@ -129,6 +130,15 @@ export async function grantController(fastify: FastifyInstance) {
     // A reference naming nobody answers exactly as a reference naming somebody with no grants would,
     // so this cannot be used to probe whether a principal exists.
     if ('missing' in target) return reply.status(404).send(problem(404, 'No such grant'));
+
+    // Asking who has authorised a client is a question about other people, so it takes the same
+    // permission as asking about another principal directly.
+    if (clientId) {
+      const oversight = await new DecisionService(fastify.db)
+        .check(realm.realmId, caller.subjectId, caller.clientId, 'grants', 'view');
+      if (oversight.effect !== 'allow') return reply.status(403).send(problem(403, 'Not permitted', oversight.reason));
+      return reply.send({ grants: await new GrantService(fastify.db).listForClient(realm.realmId, clientId, status ?? 'all') });
+    }
 
     return reply.send({
       grants: await new GrantService(fastify.db).list(realm.realmId, target.subjectId, status ?? 'all'),

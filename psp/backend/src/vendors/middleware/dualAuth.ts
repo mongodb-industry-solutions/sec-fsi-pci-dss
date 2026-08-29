@@ -16,7 +16,7 @@ import type { Db } from 'mongodb';
 import type { Resource, Action } from '../../shared/models/permissionCatalog';
 import type { JwtUserPayload, AuthenticatedRequest } from '../../shared/models/identity.model';
 import { can } from './acl';
-import { resolvePartyInstanceReference } from '../../modules/identity/services/oauth.service';
+import { partyReferenceFrom } from '../security/partyReference';
 
 export type AuthChannel = 'session' | 'oauth';
 
@@ -102,7 +102,9 @@ export async function resolveOwner(
       });
       return null;
     }
-    const ownerPartyRef = (await resolvePartyInstanceReference(serverDb(request), merchant.sub)) ?? undefined;
+    // Read from the token the authority issued, rather than looked up here: this application no
+    // longer holds the records that mapping used to live in.
+    const ownerPartyRef = partyReferenceFrom(merchant as never);
     return { channel: 'oauth', ownerPartyRef, actingSubject: merchant.sub };
   }
 
