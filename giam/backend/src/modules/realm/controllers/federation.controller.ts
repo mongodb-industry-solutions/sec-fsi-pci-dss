@@ -180,7 +180,6 @@ export async function federationController(fastify: FastifyInstance) {
         sessionEpoch: 0,
         externalId,
         providerId: provider.providerId,
-        createdAt: now,
         meta: newMeta('Identity'),
       } as unknown as IdentityRecord;
       await identities.insertOne(record);

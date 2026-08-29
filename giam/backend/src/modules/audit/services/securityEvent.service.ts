@@ -81,6 +81,25 @@ export interface RecordEventInput {
   detail?: Record<string, unknown>;
   target?: { type: string; ref: string };
   ipHash?: string;
+
+  /**
+   * The accountability chain.
+   *
+   * The trail has to answer, for any action: which human authorised it, which logical agent performed
+   * it, which runtime executed it, which tool was called, which policy version allowed it and what
+   * happened. Each of those is a separate field because collapsing any two of them loses exactly the
+   * distinction an investigation needs.
+   */
+  principalSubjectId?: string;
+  agentId?: string;
+  workloadSpiffeId?: string;
+  delegationId?: string;
+  transactionId?: string;
+  toolId?: string;
+  normalizedAction?: string;
+  policyVersion?: string;
+  decision?: 'allow' | 'deny';
+  enforcementResult?: string;
 }
 
 export class SecurityEventService {
@@ -111,6 +130,18 @@ export class SecurityEventService {
         ...(input.correlationId ? { correlationId: input.correlationId } : {}),
         ...(input.detail ? { detail: redactSecrets(input.detail) as Record<string, unknown> } : {}),
         ...(input.target ? { target: input.target } : {}),
+        // Written only when present, so an event that has nothing to say about the chain does not
+        // carry a row of empty fields implying it was checked and found absent.
+        ...(input.principalSubjectId ? { principalSubjectId: input.principalSubjectId } : {}),
+        ...(input.agentId ? { agentId: input.agentId } : {}),
+        ...(input.workloadSpiffeId ? { workloadSpiffeId: input.workloadSpiffeId } : {}),
+        ...(input.delegationId ? { delegationId: input.delegationId } : {}),
+        ...(input.transactionId ? { transactionId: input.transactionId } : {}),
+        ...(input.toolId ? { toolId: input.toolId } : {}),
+        ...(input.normalizedAction ? { normalizedAction: input.normalizedAction } : {}),
+        ...(input.policyVersion ? { policyVersion: input.policyVersion } : {}),
+        ...(input.decision ? { decision: input.decision } : {}),
+        ...(input.enforcementResult ? { enforcementResult: input.enforcementResult } : {}),
         actor: {
           ...(input.subjectId ? { subjectId: input.subjectId } : {}),
           ...(input.clientId ? { clientId: input.clientId } : {}),

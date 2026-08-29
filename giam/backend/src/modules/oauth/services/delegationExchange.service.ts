@@ -72,6 +72,10 @@ export class DelegationExchangeService {
         clientId: client.clientId,
         subjectId: presented.subjectId,
         cause,
+        principalSubjectId: presented.subjectId,
+        agentId: client.clientId,
+        decision: 'deny',
+        ...(requested.transactionId ? { transactionId: requested.transactionId } : {}),
         detail: { transactionId: requested.transactionId },
       });
       // One answer for every refusal. Distinguishing "no delegation" from "expired" from "too deep"
@@ -126,6 +130,13 @@ export class DelegationExchangeService {
       clientId: client.clientId,
       subjectId: presented.subjectId,
       target: { type: 'delegation', ref: delegation.delegationId },
+      // The chain, named field by field. This is the record that answers, later, which human
+      // authorised the action and which agent actually took it.
+      principalSubjectId: delegation.principalSubjectId,
+      agentId: delegation.agentId,
+      delegationId: delegation.delegationId,
+      ...(requested.transactionId ? { transactionId: requested.transactionId } : {}),
+      decision: 'allow',
       detail: { purpose: delegation.purpose, scope: effective, depth: chainDepth(presented.actor) + 1 },
     });
 

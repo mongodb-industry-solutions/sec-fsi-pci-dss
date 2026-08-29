@@ -103,7 +103,6 @@ export async function registrationController(fastify: FastifyInstance) {
       active: lifecycleState === 'active',
       lifecycleState,
       sessionEpoch: 0,
-      createdAt: now,
       meta: newMeta('Identity'),
     } as IdentityRecord);
 
@@ -118,7 +117,6 @@ export async function registrationController(fastify: FastifyInstance) {
       secretHash: issued?.secretHash as string,
       status: 'active',
       assurance: { level: 'aal1', method: 'password', verifiedAt: now },
-      createdAt: now,
       meta: newMeta('Credential'),
     } as CredentialRecord);
 
