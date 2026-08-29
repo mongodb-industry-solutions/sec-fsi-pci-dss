@@ -1062,6 +1062,121 @@
         }
       }
     },
+    "/realms/{realm}/protocol/openid-connect/logout": {
+      "post": {
+        "operationId": "endSession",
+        "summary": "End a session",
+        "tags": [
+          "authentication"
+        ],
+        "description": "Standard-defined: OpenID Connect RP-Initiated Logout 1.0 and Back-Channel Logout 1.0. Ends the session, revokes what was issued under it, raises the principal session epoch so any unrecorded token is retired too, and notifies every client that holds one. A delivery failure never undoes the logout: a receiver that is down must not keep a session alive.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "session_id": {
+                    "type": "string",
+                    "description": "The session to end."
+                  },
+                  "subject_id": {
+                    "type": "string",
+                    "description": "Ends EVERY session this principal holds."
+                  },
+                  "post_logout_redirect_uri": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "example": "acme",
+            "in": "path",
+            "name": "realm",
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "What was ended and who was told.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "What was ended and who was told.",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "sessions",
+                    "revokedTokens"
+                  ],
+                  "properties": {
+                    "sessions": {
+                      "type": "integer"
+                    },
+                    "revokedTokens": {
+                      "type": "integer"
+                    },
+                    "notified": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "notificationFailures": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "post_logout_redirect_uri": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "example": {
+                  "sessions": 1,
+                  "revokedTokens": 3,
+                  "notified": [
+                    "orders-web"
+                  ],
+                  "notificationFailures": []
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Neither a session nor a subject was named.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such realm.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/def-0"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/resource-servers/{name}/permissions": {
       "put": {
         "operationId": "registerResourceServerPermissions",

@@ -35,6 +35,10 @@ const PROVABLY_PUBLIC = new Set([
   // Public because a session is the credential, and the session id is in the body. A client
   // secret here would exclude the public clients this endpoint exists to serve.
   'post /realms/{realm}/protocol/openid-connect/auth',
+
+  // Public because a session identifier is the thing being surrendered. Requiring a credential to
+  // END a session would leave a session alive whenever the credential was the problem.
+  'post /realms/{realm}/protocol/openid-connect/logout',
 ]);
 
 let app: FastifyInstance;
