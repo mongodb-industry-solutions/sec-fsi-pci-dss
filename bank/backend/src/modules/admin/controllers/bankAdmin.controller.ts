@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { requireAdmin } from '../../../vendors/middleware/adminAuth';
+import { requireStaff } from '../../../vendors/middleware/staffAuth';
 import {
   BANK_AUDIT_LOG_COLLECTION, BankAuditLogRecord,
 } from '../../audit/models/bankAuditLog.model';
@@ -80,7 +80,7 @@ const TERMINAL_BY_BANK: ConsentStatus[] = ['valid', 'rejected', 'revokedByPsu'];
 export async function bankAdminController(fastify: FastifyInstance) {
   // ── Engine configuration ─────────────────────────────────────────────────────────────────────
   fastify.get('/module/config', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('bankModules', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List the configuration of every bank engine',
@@ -98,7 +98,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   }, async () => ({ results: await listModuleConfigurations(fastify.db) }));
 
   fastify.get('/module/config/:capability', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('bankModules', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'Read the configuration of one bank engine',
@@ -116,7 +116,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   fastify.put('/module/config/:capability', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('bankModules', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Replace the configuration of one bank engine',
@@ -155,7 +155,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
 
   // ── TPP registrations ────────────────────────────────────────────────────────────────────────
   fastify.get('/tpp/registrations', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('tppRegistrations', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List the registered third parties',
@@ -189,7 +189,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   fastify.get('/tpp/registrations/all', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('tppRegistrations', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List every registered third party, unpaged',
@@ -213,7 +213,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   fastify.patch('/tpp/registrations/:reference/status', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('tppRegistrations', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Suspend, revoke or reactivate a registered third party',
@@ -245,7 +245,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/tpp/registrations/:reference/secret/rotate', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('tppRegistrations', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Rotate the client secret of a registered third party',
@@ -300,7 +300,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
 
   // ── Notification subscriptions and the delivery inspector ────────────────────────────────────
   fastify.get('/tpp/subscriptions', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('tppRegistrations', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List the notification subscriptions',
@@ -334,7 +334,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   fastify.get('/tpp/deliveries', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('tppRegistrations', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'Inspect notification deliveries',
@@ -383,7 +383,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
 
   // ── The bank's own audit trail ────────────────────────────────────────────────────────────────
   fastify.get('/audit', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('bankAudit', 'view'),
     schema: {
       tags: ['admin'],
       summary: "Read the bank's audit trail",
@@ -452,7 +452,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
 
   // ── Consent administration (the manual authorisation path) ───────────────────────────────────
   fastify.get('/consents', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('consents', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List consents, newest first',
@@ -491,7 +491,7 @@ export async function bankAdminController(fastify: FastifyInstance) {
   });
 
   fastify.patch('/consents/:consentId/status', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('consents', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Authorise, reject or revoke a consent from the bank side',

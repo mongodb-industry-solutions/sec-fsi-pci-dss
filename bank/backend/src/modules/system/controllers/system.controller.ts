@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { readLogs } from '../../../shared/services/logBuffer';
-import { requireAdmin } from '../../../vendors/middleware/adminAuth';
+import { requireStaff } from '../../../vendors/middleware/staffAuth';
 import { config } from '../../../config';
 
 // Diagnostics the PSP admin panel reads over the private network. No cardholder data, no secrets.
@@ -44,7 +44,7 @@ export async function systemController(fastify: FastifyInstance) {
   fastify.get('/logs', {
     // Admin only: bankcore is publicly reachable so its API can be reviewed, and a log buffer is not
     // something to publish.
-    preHandler: requireAdmin,
+    preHandler: requireStaff('bankAudit', 'view'),
     schema: {
       tags: ['system'],
       summary: 'Recent bankcore log lines',

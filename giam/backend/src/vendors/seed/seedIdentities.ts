@@ -35,6 +35,8 @@ interface IdentityFixture {
   lifecycleState: IdentityRecord['lifecycleState'];
   demoFeatured?: boolean;
   roleName?: string;
+  /** Binds an account holder to their own records, for a self-scoped role. */
+  accountHolderRef?: string;
   owner?: { kind: string; ref: string; displayName?: string };
   workload?: IdentityRecord['workload'];
 }
@@ -52,9 +54,9 @@ interface CredentialFixture {
   assurance: CredentialRecord['assurance'];
 }
 
-export async function seedIdentities(db: Db): Promise<void> {
-  const fixtures = readSeedFile<IdentityFixture[]>('identities.json');
-  const credentialFixtures = readSeedFile<CredentialFixture[]>('credentials.json');
+export async function seedIdentities(db: Db, fixtureName = 'identities.json', credentialFixtureName = 'credentials.json'): Promise<void> {
+  const fixtures = readSeedFile<IdentityFixture[]>(fixtureName);
+  const credentialFixtures = readSeedFile<CredentialFixture[]>(credentialFixtureName);
 
   const identities = db.collection<IdentityRecord>(IDENTITY_COLLECTION);
   const credentials = db.collection<CredentialRecord>(CREDENTIAL_COLLECTION);
@@ -91,6 +93,7 @@ export async function seedIdentities(db: Db): Promise<void> {
         lifecycleState: fixture.lifecycleState,
         sessionEpoch: 0,
         demoFeatured: Boolean(fixture.demoFeatured),
+        ...(fixture.accountHolderRef ? { accountHolderRef: fixture.accountHolderRef } : {}),
       },
       { subjectId: fixture.subjectId, realmId, tenantId: DEFAULT_TENANT_ID },
       'Identity',

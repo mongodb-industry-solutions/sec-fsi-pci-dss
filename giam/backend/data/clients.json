@@ -122,8 +122,13 @@
         "accounts": [
           "view"
         ],
-        "payments": [
-          "manage"
+        "movements": [
+          "view"
+        ],
+        "psd2Role": [
+          "AISP",
+          "PISP",
+          "CBPII"
         ]
       }
     }

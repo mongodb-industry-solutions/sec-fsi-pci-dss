@@ -28,8 +28,12 @@ export async function runSeed(): Promise<void> {
     // Principals and their credentials, into the realm the demo population belongs to. Resolved by
     // NAME rather than hardcoded by id, so the seeder carries no identifier of its own.
     await seedIdentities(db);
+    // The bank realm population: its staff and one account holder. A separate fixture because a
+    // realm is a separate institution, not a section of another one.
+    await seedIdentities(db, 'bankIdentities.json', 'bankCredentials.json');
     // Roles and their assignments. After principals, since an assignment names one.
     await seedAuthorization(db);
+    await seedAuthorization(db, 'bankRoles.json', 'bankIdentities.json');
     // Clients last: a service identity's role has to exist before it can be assigned.
     await seedClients(db);
     console.log('\nGIAM seed complete.');

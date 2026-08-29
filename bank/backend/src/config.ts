@@ -89,6 +89,18 @@ export const config = {
     tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', 'dev-bankcore-tpp-secret')!,
   },
 
+  // v39 P7: this bank is a relying party and a resource server against the identity authority,
+  // in its OWN realm. It holds no user store, no token issuer and no signing key for access tokens.
+  giam: {
+    // The BANK realm issuer. A token from the platform realm carries a different one and is refused
+    // before any claim is read, which is what makes the institutional boundary structural.
+    issuerUrl: pspEnv('BANKCORE_GIAM_ISSUER_URL', 'http://127.0.0.1:8085/realms/bankcore')!,
+    audience: pspEnv('BANKCORE_GIAM_AUDIENCE', 'bankcore')!,
+    resourceServerName: pspEnv('BANKCORE_GIAM_RESOURCE_SERVER', 'bankcore')!,
+    registrationToken: pspEnv('BANKCORE_GIAM_REGISTRATION_TOKEN') ?? pspEnv('GIAM_ADMIN_TOKEN'),
+    jwksCacheSeconds: parseInt(pspEnv('BANKCORE_GIAM_JWKS_CACHE_SECONDS', '900')!, 10),
+  },
+
   app: {
     /**
      * The bank's own diagnostics credential (v39 P4).

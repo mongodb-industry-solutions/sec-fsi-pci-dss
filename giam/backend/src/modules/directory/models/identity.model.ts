@@ -84,6 +84,15 @@ export interface IdentityRecord extends Scoped {
    */
   owner?: OwnerRef;
 
+  /**
+   * Binds a principal to the business record they own, for a self-scoped role.
+   *
+   * An opaque string the authority never resolves: it means something to the application that
+   * issued it and nothing here. It travels in the token so a resource server can bind a person to
+   * their own records without asking the authority what the reference names.
+   */
+  accountHolderRef?: string;
+
   /** Offered on the sign-in roster. Also the only set impersonation may ever target. */
   demoFeatured?: boolean;
 

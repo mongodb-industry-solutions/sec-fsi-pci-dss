@@ -17,6 +17,10 @@ export interface IssueTokensInput {
   sessionEpoch?: number;
   /** Permissions the resource server enforces, resolved by the decision point at issuance. */
   permissions?: Array<{ resource: string; action: string }>;
+  /** Roles the authority resolved, for the checks a resource server still expresses in roles. */
+  roles?: string[];
+  /** Opaque binding to the business record a self-scoped principal owns. */
+  accountHolderRef?: string;
   /** Delegation chain, when the token was obtained by exchange rather than issued directly. */
   actor?: ActorClaim;
   nonce?: string;
@@ -105,6 +109,10 @@ export class TokenIssuer {
       // without listing outstanding tokens.
       ...(input.sessionEpoch !== undefined ? { session_epoch: input.sessionEpoch } : {}),
       ...(input.permissions?.length ? { permissions: input.permissions } : {}),
+      ...(input.roles?.length ? { roles: input.roles } : {}),
+      // Carried so a resource server can bind a person to their own records without asking the
+      // authority what the reference names. The authority never resolves it either.
+      ...(input.accountHolderRef ? { account_holder: input.accountHolderRef } : {}),
       ...(input.actor ? { act: input.actor } : {}),
     };
 

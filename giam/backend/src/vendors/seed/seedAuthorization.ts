@@ -65,9 +65,13 @@ function assignmentId(subjectId: string, role: string): string {
   return uuidv5(`assignment:${subjectId}:${role}`, AUTHORIZATION_NAMESPACE);
 }
 
-export async function seedAuthorization(db: Db): Promise<void> {
-  const roleFixtures = readSeedFile<RoleFixture[]>('roles.json');
-  const identityFixtures = readSeedFile<IdentityFixture[]>('identities.json');
+export async function seedAuthorization(
+  db: Db,
+  roleFixtureName = 'roles.json',
+  identityFixtureName = 'identities.json',
+): Promise<void> {
+  const roleFixtures = readSeedFile<RoleFixture[]>(roleFixtureName);
+  const identityFixtures = readSeedFile<IdentityFixture[]>(identityFixtureName);
 
   const realms = await db.collection(REALM_COLLECTION)
     .find({}, { projection: { _id: 0, realmId: 1, name: 1 } })
@@ -183,7 +187,9 @@ export async function seedAuthorization(db: Db): Promise<void> {
     );
     // A principal assigned a role that does not exist would hold nothing while appearing to hold
     // something, which is the worst of both: the interface shows a role and every check denies.
-    if (!known) throw new Error(`identities.json assigns unknown role "${identity.roleName}"`);
+    if (!known) {
+      throw new Error(`${identityFixtureName} assigns unknown role "${identity.roleName}" in realm "${identity.realm}"`);
+    }
 
     await upsertSeed<RoleAssignmentRecord>(
       assignments,

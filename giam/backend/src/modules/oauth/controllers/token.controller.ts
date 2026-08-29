@@ -127,6 +127,7 @@ export async function tokenController(fastify: FastifyInstance) {
         subjectId: client.clientId,
         scope: requested.length > 0 ? requested : allowed,
         permissions: machine.permissions,
+        roles: machine.roles,
       }));
     }
 
@@ -220,6 +221,8 @@ export async function tokenController(fastify: FastifyInstance) {
         subjectId: identity.subjectId,
         scope,
         permissions: decision.permissions,
+        roles: decision.roles,
+        ...(identity.accountHolderRef ? { accountHolderRef: identity.accountHolderRef } : {}),
         sessionEpoch: identity.sessionEpoch,
         nonce: pending.nonce,
         includeRefreshToken: true,

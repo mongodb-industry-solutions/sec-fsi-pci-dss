@@ -21,6 +21,7 @@ import { cardAuthorizationModule } from '../src/modules/card-authorization';
 import { cardIssuerModule } from '../src/modules/card-issuer';
 import { creditBureauModule } from '../src/modules/credit-bureau';
 import { config } from '../src/config';
+import { registerResourceServer } from '../src/vendors/setup/registerResourceServer';
 
 export async function buildApp(): Promise<FastifyInstance> {
   mirrorConsoleToLogBuffer();
@@ -202,6 +203,14 @@ async function start() {
       console.log(line);
       appendLog(`[${new Date().toISOString()}] STARTUP ${line.trim()}`);
     }
+    // v39 P7: declare this bank enforcement points to the authority. Non-fatal by design.
+    const registration = await registerResourceServer();
+    const registrationLine = registration.registered
+      ? `  permission catalog registered with ${config.giam.issuerUrl}`
+      : `  ! permission catalog NOT registered: ${registration.reason}`;
+    console.log(registrationLine);
+    appendLog(`[${new Date().toISOString()}] STARTUP ${registrationLine.trim()}`);
+
     if (app.dbError !== null) {
       console.warn(`[bankcore/mongodb] Running in degraded mode: ${app.dbError}`);
       console.warn('[bankcore/mongodb] API routes return 503 until the database becomes reachable.');

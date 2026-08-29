@@ -1,12 +1,21 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import { verifyAccessToken } from '../../modules/tpp-trust/services/tppAccessToken.service';
+import { verifyRealmToken } from '../security/tokenVerifier';
 import { TppRole, TppScope } from '../../modules/tpp-trust/models/tppRegistration.model';
 
-// Authorisation for the Open Banking surface: a token this bank issued to a registered TPP through the
-// client credentials grant, scoped per operation group and per PSD2 role.
-//
-// The token is signed with the bank's own key, so a JWT minted anywhere else on the platform is
-// refused. That is the point: before this, any holder of a platform token could read accounts.
+/**
+ * Authorisation for the Open Banking surface.
+ *
+ * v39 P7: the token is now issued by the identity authority in THIS BANK's realm and verified
+ * against that realm's published key set. The bank no longer mints it, and no longer holds a secret
+ * that could. What changed is where the trust comes from; the scope check, the role check, the
+ * RFC 6750 error shape and the ordering of the availability gate are all unchanged, because those
+ * are the bank's own rules about its own API.
+ *
+ * The realm is what makes the refusal structural. A token from the platform's realm carries a
+ * different issuer and was signed by a different key published at a different key set, so it fails
+ * here before any claim is examined. Before this, the bank verified a PSP-issued token with a shared
+ * secret, and the boundary between two institutions rested on the platform choosing not to mint one.
+ */
 export interface TppContext {
   clientId: string;
   scopes: TppScope[];
@@ -27,24 +36,42 @@ function refuse(reply: FastifyReply, status: number, code: string, text: string)
 }
 
 /**
- * Requires a valid TPP token, plus the scope and role the endpoint needs. Both are checked: a scope
- * says which operation group, a role says which PSD2 capacity the TPP is acting in, and a real ASPSP
- * grants them independently.
+ * Requires a TPP token, plus the scope and the PSD2 role the endpoint needs.
+ *
+ * Both are checked. A scope says which operation group; a role says which capacity the third party
+ * is acting in, and a real institution grants those independently.
  */
 export function requireTpp(scope?: TppScope, role?: TppRole) {
   return async function handler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const match = /^\s*Bearer\s+(.+?)\s*$/i.exec(request.headers.authorization ?? '');
-    // RFC 6750 shape: a TPP must be able to tell "no token" from "wrong scope".
+    // RFC 6750 shape: a third party must be able to tell "no token" from "wrong scope".
     if (!match) return refuse(reply, 401, 'TOKEN_INVALID', 'Missing bearer token');
 
-    const claims = verifyAccessToken(match[1]);
+    const claims = await verifyRealmToken(match[1]);
     if (!claims) return refuse(reply, 401, 'TOKEN_INVALID', 'Invalid or expired access token');
 
-    if (scope && !claims.scopes.includes(scope)) {
+    /**
+     * A machine token, and only a machine token.
+     *
+     * An interactive token presented here is refused even when the person holding it is an
+     * administrator. A third-party operation carries a consent obligation that a staff session does
+     * not satisfy, so the two grants must never substitute for each other, in either direction.
+     */
+    if (!claims.clientId || claims.sub !== claims.clientId) {
+      return refuse(reply, 403, 'TOKEN_INVALID', 'This endpoint requires a registered third-party credential');
+    }
+
+    if (scope && !claims.scope.includes(scope)) {
       return refuse(reply, 403, 'TOKEN_INVALID', `The access token lacks the '${scope}' scope`);
     }
-    if (role && !claims.roles.includes(role)) {
-      return refuse(reply, 403, 'ROLE_INVALID', `This TPP is not registered as ${role}`);
+
+    // The PSD2 capacities this third party is registered for, carried as permissions the authority
+    // resolved from its role. The bank still decides what each capacity may reach.
+    const roles = claims.permissions
+      .filter((permission) => permission.resource === 'psd2Role')
+      .map((permission) => permission.action as TppRole);
+    if (role && !roles.includes(role)) {
+      return refuse(reply, 403, 'ROLE_INVALID', `This third party is not registered as ${role}`);
     }
 
     // Checked only once the caller is authorised, so an unauthenticated request never reaches the
@@ -53,6 +80,10 @@ export function requireTpp(scope?: TppScope, role?: TppRole) {
       return refuse(reply, 503, 'SERVICE_BLOCKED', 'The bank ledger is unavailable');
     }
 
-    request.tpp = { clientId: claims.clientId, scopes: claims.scopes, roles: claims.roles };
+    request.tpp = {
+      clientId: claims.clientId,
+      scopes: claims.scope as TppScope[],
+      roles,
+    };
   };
 }

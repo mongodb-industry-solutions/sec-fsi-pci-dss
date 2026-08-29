@@ -1,0 +1,63 @@
+[
+  {
+    "realm": "bankcore",
+    "subjectId": "bank-emp-0001-operations",
+    "userName": "Marta Oliveira",
+    "kind": "human",
+    "email": "marta.oliveira@bankcore.example",
+    "name": { "formatted": "Marta Oliveira", "givenName": "Marta", "familyName": "Oliveira" },
+    "active": true,
+    "lifecycleState": "active",
+    "demoFeatured": true,
+    "roleName": "bank_operations"
+  },
+  {
+    "realm": "bankcore",
+    "subjectId": "bank-emp-0002-cardofficer",
+    "userName": "Tomas Reyes",
+    "kind": "human",
+    "email": "tomas.reyes@bankcore.example",
+    "name": { "formatted": "Tomas Reyes", "givenName": "Tomas", "familyName": "Reyes" },
+    "active": true,
+    "lifecycleState": "active",
+    "demoFeatured": true,
+    "roleName": "bank_card_officer"
+  },
+  {
+    "realm": "bankcore",
+    "subjectId": "bank-emp-0003-compliance",
+    "userName": "Ingrid Larsen",
+    "kind": "human",
+    "email": "ingrid.larsen@bankcore.example",
+    "name": { "formatted": "Ingrid Larsen", "givenName": "Ingrid", "familyName": "Larsen" },
+    "active": true,
+    "lifecycleState": "active",
+    "demoFeatured": true,
+    "roleName": "bank_compliance"
+  },
+  {
+    "realm": "bankcore",
+    "subjectId": "bank-emp-0004-admin",
+    "userName": "Samuel Adeyemi",
+    "kind": "human",
+    "email": "samuel.adeyemi@bankcore.example",
+    "name": { "formatted": "Samuel Adeyemi", "givenName": "Samuel", "familyName": "Adeyemi" },
+    "active": true,
+    "lifecycleState": "active",
+    "demoFeatured": true,
+    "roleName": "bank_admin"
+  },
+  {
+    "realm": "bankcore",
+    "subjectId": "bank-cus-0001-holder",
+    "userName": "Elena Duarte",
+    "kind": "human",
+    "email": "elena.duarte@example.com",
+    "name": { "formatted": "Elena Duarte", "givenName": "Elena", "familyName": "Duarte" },
+    "active": true,
+    "lifecycleState": "active",
+    "demoFeatured": true,
+    "roleName": "bank_customer",
+    "accountHolderRef": "hld00001-0000-4000-8000-000000000001"
+  }
+]
