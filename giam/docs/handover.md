@@ -22,14 +22,19 @@ Measured on the running fleet at the tip of this branch:
 
 | Suite | Result |
 |---|---|
-| Unit | 1344 passed, 1 failed |
+| Unit | 1345 passed |
 | Integration | 273 passed, 126 skipped |
 | End to end | 116 passed |
 
-The one failure is `test/psp/frontend/unit/lib/adminModules.test.ts`. It expects the provider to
-offer a card-issuer administration screen, which the provider stopped offering when the bank got its
-own frontend. That commit predates this branch, so the failure is not from this work and the decision
-it encodes is not this work's to make. It is left visible rather than quietly adjusted.
+Everything is green.
+
+One failure was left standing at first handover, in `test/psp/frontend/unit/lib/adminModules.test.ts`,
+and it turned out to be a real defect rather than a stale assertion. The module index filters on a
+`hasModule` flag that was false for card issuing and account information, but both screens exist on
+disk with subpages and the API client actively calls their endpoints. They were reachable by typing
+the URL and missing from the only page that links to them. The flag says whether the provider offers a
+screen, which is a different statement from where the capability's configuration is administered. It
+predates this branch and is fixed in its own commit, separate from the identity work.
 
 The skipped integration cases are the live suites, which skip unless the fleet is listening. They
 were run against a live fleet and pass; they skip in an environment without one, by design.
