@@ -19,6 +19,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
 import { buildApp } from '../../../../../psp/backend/bin/server';
 import type { FastifyInstance } from 'fastify';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;
@@ -80,7 +81,7 @@ describe('v36: movement collection', () => {
       .send({
         grant_type: 'client_credentials',
         client_id: 'oauth001-0000-4000-8000-000000000001',
-        client_secret: 'espresso-demo-secret-2026',
+        client_secret: clientSecretFor('oauth001-0000-4000-8000-000000000001'),
         scope: 'read:transactions',
       });
     expect(tok.status).toBe(200);
@@ -99,7 +100,7 @@ describe('v36: movement collection', () => {
       .send({
         grant_type: 'client_credentials',
         client_id: 'oauth001-0000-4000-8000-000000000001',
-        client_secret: 'espresso-demo-secret-2026',
+        client_secret: clientSecretFor('oauth001-0000-4000-8000-000000000001'),
         scope: 'read:accounts',
       });
     const res = await supertest(app.server)

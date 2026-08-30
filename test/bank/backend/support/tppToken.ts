@@ -8,12 +8,13 @@
 //
 // So this asks the authority. It is slower and it is the real path.
 import { startAuthority, machineToken, type Authority } from './authorityProcess';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 const REALM = 'bankcore';
 /** The registered third parties, so a test can prove one cannot see another's records. */
 const CLIENTS: Record<string, string> = {
-  'leafypay-psp': 'dev-bankcore-tpp-secret',
-  'another-tpp': 'dev-another-tpp-secret',
+  'leafypay-psp': clientSecretFor('leafypay-psp'),
+  'another-tpp': clientSecretFor('another-tpp'),
 };
 const DEFAULT_CLIENT = 'leafypay-psp';
 

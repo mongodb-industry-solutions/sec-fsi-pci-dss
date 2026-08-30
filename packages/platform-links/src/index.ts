@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 // Environment aware service links, resolved once and shared by both seeders.
 //
 // The environment is read at SEED time to write an absolute endpoint into a record; at runtime only
@@ -101,4 +103,56 @@ export function assertLinks(assertions: LinkAssertion[]): Array<{ name: string; 
     }
     return { name, ok: true, detail: `${kind}: ${value}` };
   });
+}
+
+/**
+ * The demo client secret for a client id, derived rather than written down.
+ *
+ * A literal secret in a fixture is indistinguishable, to a scanner and to a reader, from a real
+ * credential that leaked. Deriving it removes the literal without pretending the value is a secret:
+ * it is a demo credential, reproducible on purpose, because the seeder and every client that presents
+ * it have to arrive at the same string without a shared file to read it from.
+ *
+ * Domain separated on the client id, so two clients never share a secret and a client id cannot be
+ * swapped for another without changing the credential. What is STORED remains a bcrypt hash; this is
+ * only what gets presented.
+ *
+ * `GIAM_CLIENT_SECRET_ROOT` moves every derived secret at once. Unset, the documented development
+ * root is used and the caller is warned once, because a predictable credential is a real weakness and
+ * a demo that refuses to start is not a demo. Hardening here is configuration, not a code path.
+ */
+const DEVELOPMENT_SECRET_ROOT = 'giam-development-client-secret-root';
+let warnedAboutSecretRoot = false;
+
+/**
+ * Clients whose secret is already held somewhere outside the authority.
+ *
+ * These are not derived, because deriving them would mean the authority seeded one value while the
+ * application presenting it read another, and that fails at the token endpoint with nothing on screen
+ * to explain it. The table lives here rather than in the fixture so that the seeder and every caller
+ * resolve a secret through one function: two copies of this precedence is how they drift.
+ */
+export const CLIENT_SECRET_REFS: Readonly<Record<string, string>> = {
+  'oauth001-0000-4000-8000-000000000001': 'PSP_MERCHANT_OAUTH_CLIENT_SECRET',
+  'leafypay-simulator': 'NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET',
+};
+
+export function clientSecretFor(clientId: string, env: NodeJS.ProcessEnv = process.env): string {
+  const ref = CLIENT_SECRET_REFS[clientId];
+  const held = ref ? env[ref]?.trim() : undefined;
+  if (held) return held;
+
+  const configured = env.GIAM_CLIENT_SECRET_ROOT?.trim();
+  if (!configured && !warnedAboutSecretRoot) {
+    warnedAboutSecretRoot = true;
+    console.warn(
+      '[giam] GIAM_CLIENT_SECRET_ROOT is not set, so client secrets derive from the published '
+      + 'development root and are predictable. Set it outside development.',
+    );
+  }
+  const root = configured || DEVELOPMENT_SECRET_ROOT;
+  // Length-prefixed so no two different client ids can produce the same input to the hash.
+  return createHash('sha256')
+    .update(`giam:client-secret:${clientId.length}:${clientId}:${root}`)
+    .digest('base64url');
 }

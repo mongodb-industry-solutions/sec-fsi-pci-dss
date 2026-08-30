@@ -211,7 +211,10 @@ services:
       PSP_MERCHANT_SIMULATOR_URL: ${PSP_MERCHANT_SIMULATOR_URL:-http://localhost:8080/simulator}
       PSP_MERCHANT_CREDENTIALS_URL: ${PSP_MERCHANT_CREDENTIALS_URL:-http://localhost:8080/system/profile/credentials}
       PSP_MERCHANT_OAUTH_CLIENT_ID: ${PSP_MERCHANT_OAUTH_CLIENT_ID:-oauth001-0000-4000-8000-000000000001}
-      PSP_MERCHANT_OAUTH_CLIENT_SECRET: ${PSP_MERCHANT_OAUTH_CLIENT_SECRET:-espresso-demo-secret-2026}
+      # No default. The authority derives this client's secret from its id when the variable is unset,
+      # and a literal here would be a second opinion about the same value: set it in .env, or leave it
+      # unset on both sides and let the derivation agree with itself.
+      PSP_MERCHANT_OAUTH_CLIENT_SECRET: ${PSP_MERCHANT_OAUTH_CLIENT_SECRET:-}
       PSP_MERCHANT_SESSION_SECRET: ${PSP_MERCHANT_SESSION_SECRET:-change-me-to-a-32-byte-random-secret-value}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/"]

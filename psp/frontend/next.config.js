@@ -13,8 +13,28 @@ try {
 } catch {
     APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || FRONTEND_VERSION;
 }
+// The simulator's client secret is inlined into the browser bundle, so it cannot be derived in the
+// bundle itself: node crypto is not there. It is derived HERE, where Node is available, from the one
+// shared function the authority's seeder also uses, so the two always agree without a literal being
+// written down. Guarded like the requires above, and for the same reason: this image builds from its
+// OWN directory, not the repo root, so packages/ is not in the build context and must not become a
+// declared dependency. In local dev the require resolves from the repo-root node_modules; in a
+// container it throws, and the value comes from the environment instead.
+let SIMULATOR_CLIENT_SECRET = process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
+if (!SIMULATOR_CLIENT_SECRET) {
+    try {
+        SIMULATOR_CLIENT_SECRET = require('@leafypay/platform-links').clientSecretFor(
+            process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_ID || 'leafypay-simulator',
+        );
+    } catch {
+        // Left empty on purpose: the authority declines the flow, which is the correct outcome for an
+        // unconfigured simulator, and is a far clearer failure than a fabricated credential.
+    }
+}
+
 const nextConfig = {
     env: {
+        NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET: SIMULATOR_CLIENT_SECRET,
         NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
         NEXT_PUBLIC_APP_VERSION: APP_VERSION,
         // Product name (compound, two words). Inlined so the client bundle picks up the value from the

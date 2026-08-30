@@ -5,6 +5,7 @@ import { resolve } from 'path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../../psp/backend/bin/server';
 import { authorityToken, stopAuthority } from './authorityToken';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 export { stopAuthority };
 
@@ -82,7 +83,7 @@ export async function closeContractApp(app: FastifyInstance | undefined): Promis
  * to obtain a token for an arbitrary principal.
  */
 export async function mintOAuthToken(sub: string, scopes: string[], _clientId: string): Promise<string> {
-  const own = await authorityToken('leafypay-simulator', 'leafypay-simulator-demo-secret-2026');
+  const own = await authorityToken('leafypay-simulator', clientSecretFor('leafypay-simulator'));
   if (!own) throw new Error('the identity authority is not reachable, so no token can be obtained');
 
   const response = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/token', {
@@ -95,7 +96,7 @@ export async function mintOAuthToken(sub: string, scopes: string[], _clientId: s
       requested_subject: sub,
       scope: scopes.join(' '),
       client_id: 'leafypay-simulator',
-      client_secret: 'leafypay-simulator-demo-secret-2026',
+      client_secret: clientSecretFor('leafypay-simulator'),
     }),
   });
   if (!response.ok) {

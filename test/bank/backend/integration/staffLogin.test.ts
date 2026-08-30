@@ -10,6 +10,7 @@
 // hand-rolled and no signature is faked.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
+import { clientSecretFor } from '@leafypay/platform-links';
 import {
   startAuthority, machineToken, interactiveToken, decodeClaims, type Authority,
 } from '../support/authorityProcess';
@@ -156,7 +157,7 @@ describe('v39 P7.4: an account holder sees their own records and nobody else s',
 describe('v39 P7.7: the two institutions are separate, and the two grants do not substitute', () => {
   it('refuses a platform-realm token on the Open Banking surface', async () => {
     if (!authority) return;
-    const platformToken = await machineToken(authority, PLATFORM_REALM, 'leafypay-backend', 'leafypay-backend-demo-secret-2026');
+    const platformToken = await machineToken(authority, PLATFORM_REALM, 'leafypay-backend', clientSecretFor('leafypay-backend'));
     expect(platformToken, 'the platform realm issued no token to test with').toBeTruthy();
     // Genuine, unexpired and correctly signed. It is simply not this bank's, and no improvement to
     // its claims could make it acceptable, because it fails at the signature.
@@ -173,7 +174,7 @@ describe('v39 P7.7: the two institutions are separate, and the two grants do not
 
   it('refuses a platform-realm token on the bank administrative surface', async () => {
     if (!authority) return;
-    const platformToken = await machineToken(authority, PLATFORM_REALM, 'leafypay-backend', 'leafypay-backend-demo-secret-2026');
+    const platformToken = await machineToken(authority, PLATFORM_REALM, 'leafypay-backend', clientSecretFor('leafypay-backend'));
     const response = await bank.inject({
       method: 'GET',
       url: '/api/v1/admin/module/config',
@@ -185,7 +186,7 @@ describe('v39 P7.7: the two institutions are separate, and the two grants do not
 
   it('accepts the bank-realm third party it is meant to accept', async () => {
     if (!authority) return;
-    const tppToken = await machineToken(authority, BANK_REALM, 'leafypay-psp', 'dev-bankcore-tpp-secret');
+    const tppToken = await machineToken(authority, BANK_REALM, 'leafypay-psp', clientSecretFor('leafypay-psp'));
     expect(tppToken).toBeTruthy();
 
     const claims = decodeClaims(tppToken as string);
@@ -197,7 +198,7 @@ describe('v39 P7.7: the two institutions are separate, and the two grants do not
 
   it('refuses a third-party machine token on the staff surface', async () => {
     if (!authority) return;
-    const tppToken = await machineToken(authority, BANK_REALM, 'leafypay-psp', 'dev-bankcore-tpp-secret');
+    const tppToken = await machineToken(authority, BANK_REALM, 'leafypay-psp', clientSecretFor('leafypay-psp'));
     const response = await bank.inject({
       method: 'GET',
       url: '/api/v1/admin/module/config',

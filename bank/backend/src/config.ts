@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
@@ -86,7 +87,7 @@ export const config = {
     // Read at SEED time only, to write the bank's verifier and the PSP's credential. At runtime the
     // bank reads the hash from its registration record and never this value.
     tppSeedClientId: pspEnv('BANKCORE_TPP_CLIENT_ID', 'leafypay-psp')!,
-    tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', 'dev-bankcore-tpp-secret')!,
+    tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', clientSecretFor('leafypay-psp'))!,
   },
 
   // v39 P7: this bank is a relying party and a resource server against the identity authority,

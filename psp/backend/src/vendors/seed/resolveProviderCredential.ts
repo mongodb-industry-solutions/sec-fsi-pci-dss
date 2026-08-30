@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { absoluteEndpoint, resolvePlatformLinks } from '@leafypay/platform-links';
 import { ExternalProviderArrangement } from '../../modules/provider/models/externalProviderArrangement.model';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 // Turns the hostname-free fixture into the absolute, environment specific link, and fills in the TPP
 // credential the PSP holds against the bank. Promoting local to staging to production is a re-seed.
@@ -10,7 +11,7 @@ import { ExternalProviderArrangement } from '../../modules/provider/models/exter
 // originate somewhere; at runtime only the record is read, with no fallback, since a silent fallback is
 // how two environments end up disagreeing.
 const DEFAULT_CLIENT_ID = 'leafypay-psp';
-const DEFAULT_CLIENT_SECRET = 'dev-bankcore-tpp-secret';
+const DEFAULT_CLIENT_SECRET = clientSecretFor('leafypay-psp');
 
 function fromEnv(name: string, fallback: string): string {
   const value = process.env[`PSP_${name}`] ?? process.env[name];

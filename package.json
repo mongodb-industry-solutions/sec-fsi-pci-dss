@@ -70,5 +70,8 @@
     "tsx": "^4.22.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@leafypay/platform-links": "file:./packages/platform-links"
   }
 }

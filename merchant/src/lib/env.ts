@@ -7,12 +7,15 @@
 //   process.env (incl. merchant/.env.local loaded by Next)  >  repo-root .env  >  built-in default
 // Missing .env files never obstruct startup, and a missing value never throws here. Enforcement of
 // "the client must be registered and authorized" lives at the PSP authorization server, which
-// rejects an unknown / unauthenticated client: the merchant must not fabricate credentials, so an
-// unset client id/secret resolves to empty and the PSP declines the flow (invalid_client).
+// rejects an unknown / unauthenticated client: the merchant must not fabricate an identity, so an
+// unset client id resolves to empty and the PSP declines the flow (invalid_client). The demo client
+// SECRET is derived from the client id by the same function the authority seeds with, so naming a
+// client is what authenticates, and naming none still authenticates as nobody.
 import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 // Optional fallback: parse the repo-root .env (one level above the merchant package). Read-only,
 // loaded once, best-effort. In containers the parent .env usually doesn't exist and env comes from
@@ -121,11 +124,19 @@ export const ENV = {
   apiDocsUrl: () =>
     envVar('PSP_MERCHANT_SWAGGER_URL') ??
     `${envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081'}/doc`,
-  // Client credentials have NO built-in default: the merchant must never fabricate a client identity.
-  // If unset they resolve to '' and the PSP declines the flow (invalid_client): enforcement belongs
-  // to the authorization server, so an unconfigured merchant cannot authenticate, yet nothing crashes.
+  // The client ID has NO built-in default: the merchant must never fabricate a client identity. If
+  // unset it resolves to '' and the PSP declines the flow (invalid_client): enforcement belongs to the
+  // authorization server, so an unconfigured merchant cannot authenticate, yet nothing crashes.
   clientId: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_ID') ?? '',
-  clientSecret: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_SECRET') ?? '',
+  // The secret is different in kind: it is not an identity claim but the proof for one, and the demo
+  // credential is derived from the client id by the same function the authority seeds with, so the two
+  // agree without either holding a literal. Naming no client still authenticates as nobody.
+  clientSecret: () => {
+    const configured = envVar('PSP_MERCHANT_OAUTH_CLIENT_SECRET');
+    if (configured) return configured;
+    const clientId = envVar('PSP_MERCHANT_OAUTH_CLIENT_ID');
+    return clientId ? clientSecretFor(clientId) : '';
+  },
   // This app's public base URL (local default 8082; container listens on 8080 behind ingress).
   baseUrl: () => envVar('PSP_MERCHANT_BASE_URL') ?? 'http://localhost:8082',
   // Redirect URI defaults to <baseUrl>/api/auth/callback but can be overridden per env.

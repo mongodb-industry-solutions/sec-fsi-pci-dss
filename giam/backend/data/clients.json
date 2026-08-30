@@ -4,7 +4,6 @@
     "clientId": "oauth001-0000-4000-8000-000000000001",
     "clientName": "Espresso Works",
     "clientType": "confidential",
-    "clientSecret": "espresso-demo-secret-2026",
     "redirectUris": [
       "http://localhost:8082/api/auth/callback",
       "http://127.0.0.1:8082/api/auth/callback"
@@ -34,7 +33,6 @@
     "clientId": "f1dc0169-4f90-402c-adc8-f7e2c5c0fc7d",
     "clientName": "Leafy Wallet",
     "clientType": "confidential",
-    "clientSecret": "wallet-demo-secret-2026",
     "redirectUris": [
       "http://localhost:3000/auth/callback",
       "http://127.0.0.1:3000/auth/callback"
@@ -63,7 +61,6 @@
     "clientId": "leafypay-backend",
     "clientName": "LeafyPay backend service",
     "clientType": "confidential",
-    "clientSecret": "leafypay-backend-demo-secret-2026",
     "redirectUris": [],
     "grantTypes": [
       "client_credentials"
@@ -98,7 +95,6 @@
     "clientId": "leafypay-psp",
     "clientName": "LeafyPay, as a registered third party",
     "clientType": "confidential",
-    "clientSecret": "dev-bankcore-tpp-secret",
     "redirectUris": [],
     "grantTypes": [
       "client_credentials"
@@ -138,7 +134,6 @@
     "clientId": "bankcore-backend",
     "clientName": "BankCore backend service",
     "clientType": "confidential",
-    "clientSecret": "bankcore-backend-demo-secret-2026",
     "redirectUris": [],
     "grantTypes": [
       "client_credentials"
@@ -219,7 +214,6 @@
     "clientId": "leafypay-simulator",
     "clientName": "LeafyPay simulator",
     "clientType": "confidential",
-    "clientSecret": "leafypay-simulator-demo-secret-2026",
     "redirectUris": [],
     "grantTypes": [
       "client_credentials",
@@ -252,7 +246,6 @@
     "clientId": "another-tpp",
     "clientName": "Another Provider",
     "clientType": "confidential",
-    "clientSecret": "dev-another-tpp-secret",
     "redirectUris": [],
     "grantTypes": [
       "client_credentials"

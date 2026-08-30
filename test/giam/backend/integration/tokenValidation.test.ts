@@ -11,10 +11,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createPrivateKey, generateKeyPairSync, sign as cryptoSign } from 'crypto';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 const REALM = 'leafypay';
 const CLIENT_ID = 'leafypay-backend';
-const CLIENT_SECRET = 'leafypay-backend-demo-secret-2026';
+const CLIENT_SECRET = clientSecretFor('leafypay-backend');
 
 let giam: FastifyInstance;
 let issuer: string;

@@ -1,6 +1,7 @@
 import { Db } from 'mongodb';
 import * as bcrypt from 'bcryptjs';
 import { v5 as uuidv5 } from 'uuid';
+import { clientSecretFor } from '@leafypay/platform-links';
 import {
   CLIENT_COLLECTION, REALM_COLLECTION, IDENTITY_COLLECTION, ROLE_ASSIGNMENT_COLLECTION, ROLE_COLLECTION,
   PERMISSION_COLLECTION, RESOURCE_SERVER_COLLECTION,
@@ -35,7 +36,6 @@ interface ClientFixture {
   clientId: string;
   clientName: string;
   clientType: ClientRecord['clientType'];
-  clientSecret?: string;
   redirectUris: string[];
   postLogoutRedirectUris?: string[];
   grantTypes: ClientRecord['grantTypes'];
@@ -79,18 +79,25 @@ export async function seedClients(db: Db): Promise<void> {
     const realmId = realmIdByName.get(fixture.realm);
     if (!realmId) throw new Error(`clients.json names realm "${fixture.realm}", which is not seeded`);
 
+    // Whether a client HAS a secret is what the fixture states; what that secret IS comes from the
+    // shared derivation, which every presenting caller uses too.
+    const clientSecret = fixture.clientType === 'confidential'
+      ? clientSecretFor(fixture.clientId)
+      : undefined;
+
     await upsertSeed<ClientRecord>(
       clients,
       { realmId, clientId: fixture.clientId },
       {
         clientName: fixture.clientName,
         clientType: fixture.clientType,
-        // Hashed at seed time. The plaintext lives in the fixture because a demo has to be able to
-        // present it; what is STORED is never the plaintext, which is the property that matters.
-        ...(fixture.clientSecret
+        // Derived from the client id, then hashed. The fixture says WHETHER a client is confidential
+        // and never what its secret is: a literal in a checked-in file is indistinguishable from a
+        // leaked credential, to a scanner and to a reader. What is STORED is the hash either way.
+        ...(clientSecret
           ? {
-            clientSecretHash: await bcrypt.hash(fixture.clientSecret, 12),
-            clientSecretPrefix: fixture.clientSecret.slice(0, 8),
+            clientSecretHash: await bcrypt.hash(clientSecret, 12),
+            clientSecretPrefix: clientSecret.slice(0, 8),
           }
           : {}),
         redirectUris: fixture.redirectUris,

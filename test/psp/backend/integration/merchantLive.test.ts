@@ -9,6 +9,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPairSync, createSign, createHmac, randomUUID } from 'node:crypto';
 import { readSeedFile } from './support/contract';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 /**
  * A real token for this customer, from the identity authority.
@@ -89,7 +90,7 @@ const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
 // app's own configuration. This is the demo value from `merchant/env.example`, which is what the running
 // merchant app authenticates with; an environment that changed it sets the variable instead.
 const MERCHANT_CLIENT_ID = process.env.PSP_MERCHANT_OAUTH_CLIENT_ID ?? 'oauth001-0000-4000-8000-000000000001';
-const MERCHANT_CLIENT_SECRET = process.env.PSP_MERCHANT_OAUTH_CLIENT_SECRET ?? 'espresso-demo-secret-2026';
+const MERCHANT_CLIENT_SECRET = process.env.PSP_MERCHANT_OAUTH_CLIENT_SECRET ?? clientSecretFor('oauth001-0000-4000-8000-000000000001');
 
 interface AuthSeed {
   subjectId: string;

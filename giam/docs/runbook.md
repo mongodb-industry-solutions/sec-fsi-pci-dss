@@ -147,6 +147,19 @@ throughput.
 Every entry here also appears as a posture finding with the same code, so it can be alerted on rather
 than remembered.
 
+### `client_secret_root_unset`
+
+`GIAM_CLIENT_SECRET_ROOT` is not set.
+
+Demo client secrets are derived from the client id rather than written down in the repository, which
+is what keeps a checked-in fixture from looking like a leaked credential. Deriving them does not make
+them secret on its own: with no root of its own, the derivation uses a root that is published in the
+source, so every confidential client secret on the deployment is computable by anyone who can read it.
+
+Set the variable to a value of its own, and set the **same** value everywhere a client presents a
+secret. The two sides derive independently, so a root configured on one side only does not fail
+loudly: it fails at the token endpoint as `invalid_client`, which reads like a wrong password.
+
 ### `key_path_may_not_be_shared`
 
 `GIAM_KEY_PROVIDER=filesystem` with more than one declared replica.

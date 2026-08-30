@@ -61,8 +61,11 @@ export const AUTHORITY_ISSUER_URL =
 // pair is useless against a real deployment even if it leaks.
 export const SIMULATOR_CLIENT_ID =
   process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_ID || 'leafypay-simulator';
+// Read from the environment with no literal fallback. This value is inlined into the browser bundle,
+// so it cannot be derived here: the derivation is done in next.config, which runs in Node, and the
+// result is injected as this variable. One source, and nothing secret written down in the repository.
 export const SIMULATOR_CLIENT_SECRET =
-  process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || 'leafypay-simulator-demo-secret-2026';
+  process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
 
 export const ROLE_LABELS: Record<string, string> = {
   customer: 'Customer',

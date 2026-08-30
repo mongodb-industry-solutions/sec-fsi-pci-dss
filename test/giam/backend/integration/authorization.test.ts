@@ -12,6 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 const DATA = resolve(__dirname, '../../../../giam/backend/data');
 
@@ -194,7 +195,7 @@ describe('v39 P6.2: the separation-of-duties reasoning survived as data', () => 
 
 describe('v39 P6.7: a permission granted to a service identity is enforced end to end', () => {
   it('issues a machine token carrying the permissions its role grants', async () => {
-    const response = await machineToken('leafypay-backend', 'leafypay-backend-demo-secret-2026');
+    const response = await machineToken('leafypay-backend', clientSecretFor('leafypay-backend'));
     expect(response.statusCode).toBe(200);
 
     const body = response.json();
@@ -211,7 +212,7 @@ describe('v39 P6.7: a permission granted to a service identity is enforced end t
   });
 
   it('grants a service only what its role holds, and nothing a person holds', async () => {
-    const response = await machineToken('leafypay-backend', 'leafypay-backend-demo-secret-2026');
+    const response = await machineToken('leafypay-backend', clientSecretFor('leafypay-backend'));
     const permissions = claims(response.json().access_token).permissions as Array<{ resource: string; action: string }>;
     // Default deny is the whole model: a service that could read cardholder data because it is a
     // service would make the role matrix decorative for exactly the principals nobody watches.
@@ -238,7 +239,7 @@ describe('v39 P6.7: a permission granted to a service identity is enforced end t
   it('refuses a machine credential presented to the wrong realm', async () => {
     // The bank realm's third party cannot authenticate against the application realm, even with its
     // own correct secret: a client is a record inside one realm, not a platform-wide identity.
-    const response = await machineToken('leafypay-psp', 'dev-bankcore-tpp-secret', realmName);
+    const response = await machineToken('leafypay-psp', clientSecretFor('leafypay-psp'), realmName);
     expect(response.statusCode).toBe(401);
     expect(response.json().error).toBe('invalid_client');
   });
