@@ -24,6 +24,13 @@ export type ModuleDomain = 'fraud' | 'customer' | 'gateway';
 // v37: `hasModule: false` on a capability the BANK owns. Its engine configuration is administered in the
 // bank's own app against the bank's own API, so the provider offers no screen for it. This is not the
 // capability being absent: routing still resolves it, and the provider still dispatches to whoever serves it.
+//
+// The flag answers one question only, "does the provider offer a screen", and it is what the three
+// listing surfaces filter on. Moving a capability's CONFIGURATION to the bank is not the same as the
+// provider having nothing left to show: card issuing and account information still administer the
+// provider's own records, the cards its customers hold and its linked account records, and those
+// screens exist. Setting the flag false for them orphaned two real pages, reachable by URL but absent
+// from the index that links to them.
 export interface CapabilityDescriptor {
   capability: CapabilityKey;
   providerType: string;          // legacy externalProviderArrangementType value
@@ -90,14 +97,14 @@ export const CAPABILITIES: Record<CapabilityKey, CapabilityDescriptor> = {
     capability: 'card-issuer', providerType: 'card_issuer', label: 'Card Issuer',
     description: 'Card validation and lifecycle belong to the issuing bank, which holds the only copy of '
       + 'the number and derives the verification value. Administered in the bank\'s own app.',
-    callbackSegment: 'card/issuer', frontendFolder: 'card-issuer', moduleDomain: 'gateway', hasModule: false,
+    callbackSegment: 'card/issuer', frontendFolder: 'card-issuer', moduleDomain: 'gateway', hasModule: true,
     bianServiceDomain: 'Payment Card',
   },
   'account-information': {
     capability: 'account-information', providerType: 'account_information', label: 'Account Information (AIS)',
     description: 'Account status and balances are read from the servicing institution under a consent, over '
       + 'the Open Banking account endpoints. The provider stores no balance of its own.',
-    callbackSegment: 'account-information', frontendFolder: 'account-information', moduleDomain: 'gateway', hasModule: false,
+    callbackSegment: 'account-information', frontendFolder: 'account-information', moduleDomain: 'gateway', hasModule: true,
     bianServiceDomain: 'Open Banking',
   },
   'payment-initiation': {
