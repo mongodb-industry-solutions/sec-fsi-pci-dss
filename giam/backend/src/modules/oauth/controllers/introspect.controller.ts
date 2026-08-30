@@ -9,6 +9,7 @@ import { DirectoryService } from '../../directory/services/directory.service';
 import { canAuthenticate } from '../../directory/models/identity.model';
 import { SecurityEventService } from '../../audit/services/securityEvent.service';
 import { oauthError } from '../../../shared/models/problem';
+import { RESOURCE_SERVER_COLLECTION } from '../../../shared/models/collections';
 
 /**
  * Introspection and revocation: the centralised half of token validation.
@@ -112,10 +113,26 @@ export async function introspectController(fastify: FastifyInstance) {
     // The authoritative part: a signature says it was issued, the record says whether it still counts.
     if (!record || record.revokedAt) return reply.send(inactive);
 
-    // A resource server may introspect only tokens for its OWN audience. Otherwise introspection
-    // becomes a way for any registered client to read the claims of anyone else's token.
-    const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (!audience.includes(outcome.client.clientId)) return reply.send(inactive);
+    /**
+     * A caller may introspect only tokens addressed to it. Otherwise introspection becomes a way for
+     * any registered client to read the claims of anyone else's token.
+     *
+     * "Addressed to it" now means the RESOURCE SERVER, because that is what an audience names since
+     * the issuer was corrected to RFC 9068. A client introspecting its own token still matches by
+     * client id, which is the case a confidential client checking what it holds.
+     *
+     * This is a realm-wide boundary rather than a per-client one, and that is stated rather than
+     * glossed: within a realm, every registered resource server can introspect tokens issued for
+     * that realm's protected API. Narrowing it further requires each caller to declare which
+     * resource server it IS, which is a registration change and belongs with one.
+     */
+    const audience = (Array.isArray(claims.aud) ? claims.aud : [claims.aud]).map(String);
+    const servers = await fastify.db
+      .collection<{ audience: string }>(RESOURCE_SERVER_COLLECTION)
+      .find({ realmId: realm.realmId }, { projection: { _id: 0, audience: 1 } })
+      .toArray();
+    const addressable = new Set([outcome.client.clientId, ...servers.map((server) => server.audience)]);
+    if (!audience.some((entry) => addressable.has(entry))) return reply.send(inactive);
 
     // Current status, not status at issuance. This is the whole reason to ask.
     if (claims.sub && claims.sub !== record.clientId) {

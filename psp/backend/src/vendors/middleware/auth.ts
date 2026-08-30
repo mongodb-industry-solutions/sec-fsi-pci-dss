@@ -135,6 +135,35 @@ async function tryVerifyToken(authHeader: string | undefined): Promise<Authentic
   return {
     ...claims,
     roles: Array.isArray(claims.roles) ? claims.roles as string[] : [],
+    /**
+     * The business record this principal owns, under the name the rest of this service already uses.
+     *
+     * The authority carries the binding as `account_holder`, which is its vocabulary and correctly
+     * says nothing about what the reference means. Everything here calls it `partyRef`, in hundreds
+     * of places, and renaming those would be a large change for no behavioural gain.
+     *
+     * So the translation happens ONCE, here, at the edge where the token is read. Leaving it out was
+     * a real defect and not a cosmetic one: own-scope resolution silently found nothing, so a
+     * customer asking for their own beneficiaries looked like a cross-party search and was refused
+     * for lacking an investigator's permission. The failure blamed authorisation for a binding that
+     * was never populated.
+     */
+    partyRef: typeof claims.account_holder === 'string' ? claims.account_holder : undefined,
+    /**
+     * The single role, under the name the rest of this service reads.
+     *
+     * The authority resolves every role a principal holds and carries them as a list, which is the
+     * honest shape. Much of this codebase still asks "what role is this" in the singular, and those
+     * checks are the ones own-scope resolution depends on: a customer whose role did not resolve
+     * fell through to the cross-party branch and was refused for lacking an investigator permission,
+     * which is a confusing way to be told a claim was never read.
+     *
+     * Narrowing a list to its first element is a real loss of information, so it is done here, once,
+     * and only for the checks that have not yet been rewritten as permission checks.
+     */
+    role: Array.isArray(claims.roles) && claims.roles.length > 0
+      ? String(claims.roles[0])
+      : undefined,
   };
 }
 

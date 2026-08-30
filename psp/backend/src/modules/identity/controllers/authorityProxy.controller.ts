@@ -63,12 +63,34 @@ export async function authorityProxyController(fastify: FastifyInstance) {
     headers['x-forwarded-host'] = String(request.headers.host ?? '');
     if (request.id) headers['x-correlation-id'] = String(request.id);
 
-    // The body is passed through as received. Re-serialising it would be a rewrite, and the point of
-    // this route is that the authority sees exactly what the device sent.
+    /**
+     * The body is re-encoded in the SHAPE it arrived in, not always as JSON.
+     *
+     * This read `JSON.stringify(body)` regardless, which quietly corrupted every form-encoded
+     * request: the token endpoint is `application/x-www-form-urlencoded` by specification, so the
+     * parsed fields were re-serialised as JSON and forwarded under a form content type. The
+     * authority then found no `grant_type` and refused a request the client had made correctly.
+     *
+     * Nothing is rewritten here in the sense that matters: the same fields go out that came in. What
+     * changes is only the encoding, and it changes to match the header already being forwarded.
+     */
     const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
-    const body = hasBody
-      ? (typeof request.body === 'string' ? request.body : JSON.stringify(request.body ?? {}))
-      : undefined;
+    const requestContentType = String(request.headers['content-type'] ?? '');
+    let body: string | undefined;
+
+    if (hasBody) {
+      if (typeof request.body === 'string') {
+        body = request.body;
+      } else if (requestContentType.includes('application/x-www-form-urlencoded')) {
+        body = new URLSearchParams(
+          Object.entries((request.body ?? {}) as Record<string, unknown>)
+            .filter(([, value]) => value !== undefined && value !== null)
+            .map(([name, value]) => [name, String(value)]),
+        ).toString();
+      } else {
+        body = JSON.stringify(request.body ?? {});
+      }
+    }
 
     let upstream: Response;
     try {

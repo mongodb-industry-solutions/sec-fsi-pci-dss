@@ -16,12 +16,17 @@ export interface PlatformLinks {
   pspBaseUrl: string;
   // Public PSP frontend, the only browser facing link in this set.
   pspFrontendUrl: string;
+  // The identity authority. Every token in the platform is issued here, by any application, for any
+  // audience, so a seeded token endpoint resolves against this and never against the resource server
+  // it will later be presented to.
+  authorityBaseUrl: string;
 }
 
 const DEFAULTS = {
   bankcoreBaseUrl: 'http://localhost:8083',
   pspBaseUrl: 'http://127.0.0.1:8081',
   pspFrontendUrl: 'http://localhost:3000',
+  authorityBaseUrl: 'http://127.0.0.1:8085',
 };
 
 type Env = Record<string, string | undefined>;
@@ -36,6 +41,9 @@ export function resolvePlatformLinks(env: Env = process.env): PlatformLinks {
     bankcoreBaseUrl: stripTrailingSlash(read(env, 'BANKCORE_BASE_URL', DEFAULTS.bankcoreBaseUrl)),
     pspBaseUrl: stripTrailingSlash(read(env, 'BASE_URL', DEFAULTS.pspBaseUrl)),
     pspFrontendUrl: stripTrailingSlash(read(env, 'URL_FRONTEND', DEFAULTS.pspFrontendUrl)),
+    authorityBaseUrl: stripTrailingSlash(
+      env.GIAM_ISSUER_URL?.trim() || read(env, 'GIAM_BASE_URL', DEFAULTS.authorityBaseUrl),
+    ),
   };
 }
 

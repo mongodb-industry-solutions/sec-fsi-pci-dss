@@ -15,6 +15,62 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { readSeedFile } from './support/contract';
 
 /**
+ * A real token for this customer, from the identity authority.
+ *
+ * Signing in happens there now. These suites are about the BUSINESS endpoints behind the token, so
+ * obtaining it is setup rather than the thing under test; the sign-in itself has its own coverage in
+ * the authority's suite.
+ */
+async function authorityLogin(userName: string): Promise<string> {
+  const session = await fetch('http://127.0.0.1:8085/realms/leafypay/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login: userName, password: 'demo-password' }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!session.ok) return '';
+  const { sessionId } = await session.json() as { sessionId: string };
+
+  const { createHash, randomBytes } = await import('crypto');
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  // A URI the console client is actually registered for. The authority refuses an unregistered one,
+  // which is correct and is why this is not simply whatever host the test happens to run against.
+  const redirectUri = 'http://localhost:8086/auth/callback';
+
+  const authorize = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: 'giam-console',
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'openid profile',
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      session_id: sessionId,
+    }),
+  });
+  if (!authorize.ok) return '';
+  const { code } = await authorize.json() as { code: string };
+
+  const token = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'authorization_code',
+      code,
+      redirect_uri: redirectUri,
+      code_verifier: verifier,
+      client_id: 'giam-console',
+    }),
+  });
+  if (!token.ok) return '';
+  return (await token.json() as { access_token: string }).access_token;
+}
+
+
+/**
  * The seeded principals, read from the identity authority's fixtures.
  *
  * This used to read a login file in this application. That file is gone with everything else about
@@ -34,15 +90,15 @@ function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?
 const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
 
 interface AuthSeed {
-  customerAuthenticationInstanceReference: string;
-  partyInstanceReference: string;
-  customerAuthenticationUserRole: string;
-  customerAuthenticationEmailAddress: string;
+  subjectId: string;
+  accountHolderRef: string;
+  roleName: string;
+  email: string;
 }
 
 function walletCustomer(): AuthSeed {
   const customers = readAuthorityIdentities()
-    .filter((a) => a.customerAuthenticationUserRole === 'customer');
+    .filter((a) => a.roleName === 'customer');
   return customers[0];
 }
 
@@ -71,34 +127,22 @@ describe('v37 P11.3: the wallet against the running services', () => {
   beforeAll(async () => {
     live = await reachable();
     if (!live) return;
-    const response = await fetch(`${PSP}/api/v1/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      // No domain, exactly as the wallet sends it.
-      body: JSON.stringify({ email: customer.customerAuthenticationEmailAddress, password: 'demo-password' }),
-      signal: AbortSignal.timeout(15000),
-    });
-    token = ((await response.json().catch(() => ({}))) as { token?: string }).token ?? '';
+    token = await authorityLogin(customer.userName);
   });
 
-  it('logs in with NO auth domain, which is what the wallet sends', async () => {
+  it('signs in without naming a realm, which is what the wallet does', async () => {
     if (!live) return;
-    // The wallet omits the domain entirely, so default resolution on the hosted login is under test here.
-    // After the v37 rename this is also the path that would break if the alias were one-directional.
-    const response = await fetch(`${PSP}/api/v1/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: customer.customerAuthenticationEmailAddress, password: 'demo-password' }),
-      signal: AbortSignal.timeout(15000),
-    });
-    expect(response.status).toBe(200);
-    const body = await response.json() as { token?: string };
-    expect(body.token).toBeTruthy();
+    // The wallet never sends a realm, so default resolution is under test. What changed in v39 is
+    // WHERE that resolution happens: the authority owns the sign-in, and this application holds no
+    // login route to send a password to. The property is unchanged and is now asserted where it
+    // actually lives.
+    const token = await authorityLogin(customer.userName);
+    expect(token, 'a seeded customer could not sign in without naming a realm').toBeTruthy();
   });
 
   it('lists accounts, and every one carries a balance', async () => {
     if (!live) return;
-    const { status, body } = await get(`/api/v1/accounts/${encodeURIComponent(customer.partyInstanceReference)}`, token);
+    const { status, body } = await get(`/api/v1/accounts/${encodeURIComponent(customer.accountHolderRef)}`, token);
     expect(status).toBe(200);
     const results = body.results as Array<Record<string, unknown>>;
     expect(Array.isArray(results)).toBe(true);
@@ -121,22 +165,22 @@ describe('v37 P11.3: the wallet against the running services', () => {
 
   it('lists beneficiaries and creates one', async () => {
     if (!live) return;
-    const listed = await get(`/api/v1/beneficiaries?party=${encodeURIComponent(customer.partyInstanceReference)}`, token);
+    const listed = await get(`/api/v1/beneficiaries?party=${encodeURIComponent(customer.accountHolderRef)}`, token);
     expect(listed.status).toBe(200);
 
     // Added by looking a person up, not by typing an IBAN: the wallet resolves a phone or an email to a
     // party the platform already knows, so bank coordinates never travel through the browser.
     const others = readAuthorityIdentities()
-      .filter((a) => a.customerAuthenticationUserRole === 'customer'
-        && a.partyInstanceReference !== customer.partyInstanceReference);
+      .filter((a) => a.roleName === 'customer'
+        && a.accountHolderRef !== customer.accountHolderRef);
     const target = others[others.length - 1];
 
-    const created = await fetch(`${PSP}/api/v1/beneficiaries/${encodeURIComponent(customer.partyInstanceReference)}`, {
+    const created = await fetch(`${PSP}/api/v1/beneficiaries/${encodeURIComponent(customer.accountHolderRef)}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         lookupType: 'email',
-        lookupValue: target.customerAuthenticationEmailAddress,
+        lookupValue: target.email,
         label: 'P11 compatibility check',
       }),
       signal: AbortSignal.timeout(15000),
@@ -157,7 +201,7 @@ describe('v37 P11.3: the wallet against the running services', () => {
 
   it('moves money between two accounts the same owner holds, at the bank', async () => {
     if (!live) return;
-    const { body } = await get(`/api/v1/accounts/${encodeURIComponent(customer.partyInstanceReference)}`, token);
+    const { body } = await get(`/api/v1/accounts/${encodeURIComponent(customer.accountHolderRef)}`, token);
     const results = (body.results ?? []) as Array<Record<string, string>>;
     if (results.length < 2) return;
     const [from, to] = results;

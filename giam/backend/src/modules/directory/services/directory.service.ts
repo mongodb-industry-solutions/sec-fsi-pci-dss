@@ -87,11 +87,23 @@ export class DirectoryService {
    * The epoch travels in the token, so raising it retires a whole generation at once. That is what
    * makes "sign out everywhere" a single write rather than a search for outstanding credentials.
    */
+  /**
+   * Retires every token issued to this principal before now, without listing them.
+   *
+   * Two round trips rather than one findOneAndUpdate, because queryable encryption does not support
+   * findAndModify on an encrypted collection. That is not a detail worth hiding: written the obvious
+   * way, this threw at runtime and turned every logout into a 500, while the session was left
+   * terminated. A sign-out that half succeeds is worse than one that fails, because the person
+   * believes they are out.
+   *
+   * The read-after-write is not atomic and does not need to be. The increment is, and the returned
+   * value is only reported; nothing decides anything on it.
+   */
   async bumpSessionEpoch(subjectId: string): Promise<number> {
-    const updated = await this.identities.findOneAndUpdate(
+    await this.identities.updateOne({ subjectId }, { $inc: { sessionEpoch: 1 } });
+    const updated = await this.identities.findOne(
       { subjectId },
-      { $inc: { sessionEpoch: 1 } },
-      { returnDocument: 'after', projection: { _id: 0, sessionEpoch: 1 } },
+      { projection: { _id: 0, sessionEpoch: 1 } },
     );
     return updated?.sessionEpoch ?? 0;
   }

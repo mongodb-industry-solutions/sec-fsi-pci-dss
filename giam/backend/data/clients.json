@@ -103,7 +103,7 @@
     "grantTypes": [
       "client_credentials"
     ],
-    "scope": "accounts balances transactions payments funds-confirmations card-data card-authorisations credit-assessments",
+    "scope": "accounts balances transactions payments funds-confirmations card-data card-authorisations credit-assessments demo-credits",
     "requirePkce": false,
     "tokenEndpointAuthMethod": "client_secret_basic",
     "applicationType": "service",

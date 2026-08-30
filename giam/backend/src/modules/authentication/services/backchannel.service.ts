@@ -102,10 +102,23 @@ export class BackchannelService {
     const directory = new DirectoryService(this.db);
 
     if (input.loginHint) {
-      const identity = await directory.findByLogin(realmId, input.loginHint.trim());
+      const hint = input.loginHint.trim();
+      /**
+       * A login hint is an email, a user name, or a subject identifier.
+       *
+       * The subject is the important one and was missing. A client that already knows WHO it wants to
+       * ask, because it holds a subject from a previous token, would otherwise have to go back to an
+       * email to start a backchannel request, which is the opposite of the direction this flow is
+       * meant to travel: the point of the hint token is that a client never handles an address.
+       */
+      const identity = await directory.findByLogin(realmId, hint)
+        ?? await directory.findBySubjectId(hint);
+
       // The specification's own code for this, and it does disclose whether a hint matched. That is
       // inherent to the flow: a client that cannot learn the hint was wrong cannot ask at all.
-      if (!identity) return refuse(400, 'unknown_user_id', 'no principal matches the hint');
+      if (!identity || identity.realmId !== realmId) {
+        return refuse(400, 'unknown_user_id', 'no principal matches the hint');
+      }
       return identity.subjectId;
     }
 

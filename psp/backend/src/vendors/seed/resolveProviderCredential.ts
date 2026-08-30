@@ -22,12 +22,16 @@ export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
   const oauth2 = record.authConfig?.scheme === 'oauth2_cc' ? record.authConfig.oauth2 : undefined;
   if (!oauth2) return;
 
-  const { bankcoreBaseUrl } = resolvePlatformLinks();
+  const { bankcoreBaseUrl, authorityBaseUrl } = resolvePlatformLinks();
   oauth2.clientId = fromEnv('BANKCORE_TPP_CLIENT_ID', DEFAULT_CLIENT_ID);
   oauth2.clientSecretPlaintext = fromEnv('BANKCORE_TPP_CLIENT_SECRET', DEFAULT_CLIENT_SECRET);
   // The fixture holds the relative standard path; the host is the environment's.
+  //
+  // It is the AUTHORITY's host, not the bank's. The bank stopped issuing tokens and is a resource
+  // server that only verifies them, so a credential resolved against the bank asks for a token at a
+  // service that has none to give, and the call that follows arrives with no bearer at all.
   if (!oauth2.tokenEndpoint.startsWith('http')) {
-    oauth2.tokenEndpoint = absoluteEndpoint(bankcoreBaseUrl, oauth2.tokenEndpoint);
+    oauth2.tokenEndpoint = absoluteEndpoint(authorityBaseUrl, oauth2.tokenEndpoint);
   }
   // The bank's base URL goes on the same record as its credential (P4.1). Picking the two from different
   // records is how a token ends up presented at the wrong bank.
