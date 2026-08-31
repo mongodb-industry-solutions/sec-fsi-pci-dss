@@ -44,6 +44,21 @@ interface LoginContext {
 
 const DEFAULT_REALM = 'leafypay';
 
+// Plaintext behind the seed fixture's credential hashes, so it belongs to the demo data.
+const DEMO_PASSWORD = 'demo-password';
+
+/** Personas grouped by the role they hold, so the screen offers a ready-made user per role. */
+function byRole(roster: RosterEntry[]): Array<[string, RosterEntry[]]> {
+  const groups = new Map<string, RosterEntry[]>();
+  for (const entry of roster) {
+    const role = entry.role ?? 'no role assigned';
+    const existing = groups.get(role);
+    if (existing) existing.push(entry);
+    else groups.set(role, [entry]);
+  }
+  return [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
+}
+
 export default function LoginPage() {
   const [context, setContext] = useState<LoginContext | null>(null);
   const [realm, setRealm] = useState(DEFAULT_REALM);
@@ -52,6 +67,7 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signedIn, setSignedIn] = useState<{ userName?: string; sessionId: string } | null>(null);
+  const [showRoster, setShowRoster] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -182,23 +198,60 @@ export default function LoginPage() {
 
         {context && context.roster.length > 0 && (
           <div className="mt-8 border-t pt-6">
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-gray-400">
-              Demo personas, one per role
-            </p>
-            <div className="grid gap-2">
-              {context.roster.slice(0, 8).map((entry) => (
-                <button
-                  key={entry.subjectId}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => submit({ login: entry.userName, password: 'demo-password' })}
-                  className="flex items-center justify-between rounded-md border px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
-                >
-                  <span>{entry.userName}</span>
-                  {entry.role && <span className="text-xs text-gray-500">{entry.role}</span>}
-                </button>
-              ))}
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                Demo personas, by role
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowRoster(!showRoster)}
+                className="text-xs text-gray-500 underline"
+              >
+                {showRoster ? 'Hide' : `Show ${context.roster.length}`}
+              </button>
             </div>
+
+            {showRoster && (
+              <div className="max-h-80 space-y-4 overflow-y-auto pr-1">
+                {byRole(context.roster).map(([role, entries]) => (
+                  <div key={role}>
+                    <p className="mb-1 text-xs font-semibold text-gray-600">{role}</p>
+                    <div className="grid gap-1">
+                      {entries.map((entry) => (
+                        <div key={entry.subjectId} className="flex items-center gap-1">
+                          {/* Fills the form without signing in, so the credential is visible first. */}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => { setLogin(entry.userName); setPassword(DEMO_PASSWORD); }}
+                            className="flex-1 rounded-md border px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            <span className="block">{entry.userName}</span>
+                            {entry.email && (
+                              <span className="block text-xs text-gray-500">{entry.email}</span>
+                            )}
+                          </button>
+                          {/* And the one-click path the booth demonstration runs on, kept. */}
+                          <button
+                            type="button"
+                            disabled={busy}
+                            title={`Sign in as ${entry.userName}`}
+                            onClick={() => {
+                              setLogin(entry.userName);
+                              setPassword(DEMO_PASSWORD);
+                              submit({ login: entry.userName, password: DEMO_PASSWORD });
+                            }}
+                            className="rounded-md border px-2 py-2 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                          >
+                            Go
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

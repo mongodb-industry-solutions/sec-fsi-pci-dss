@@ -53,6 +53,9 @@ const FLOW_TYPE_COLORS: Record<string, string> = {
   oidc:               'bg-blue-100 text-blue-700',
 };
 
+// Plaintext behind the seed fixture's credential hashes, so it belongs to the demo data.
+const DEMO_PASSWORD = 'demo-password';
+
 // ── Dashboard card definitions ────────────────────────────────────────────────
 
 interface DashboardCard {
@@ -155,9 +158,8 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   }
 
   function handleUserSelect(email: string) {
-    // No autofill any more: the shared demo password does not exist in this bundle. Signing in
-    // happens at the identity authority, which offers the demo roster as one-click personas there.
-    setSelectedEmail(email); setPassword(''); setError(null);
+    // Both fields, which is what debug mode's own tooltip promises: one click instead of typing.
+    setSelectedEmail(email); setPassword(DEMO_PASSWORD); setError(null);
   }
 
   async function handleLogin(e: React.FormEvent) {

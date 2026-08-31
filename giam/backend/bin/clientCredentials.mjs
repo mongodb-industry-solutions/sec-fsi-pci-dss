@@ -1,22 +1,12 @@
-/**
- * Prints the DEMO client credentials, so an integrator can configure an application without a
- * credential being written down in the repository to copy from.
- *
- * This exists because the secrets are derived rather than stored in the fixture. That removes the
- * literal, but it also removes the file people used to read to find out what to configure, and the
- * answer cannot be "read the hash in the database". This is that answer.
- *
- * It is a demo helper and says so on every run. In a real deployment the authority issues these and
- * delivers them to each integrator out of band, and nothing here applies.
- */
+// Prints the DEMO client credentials, since they are derived rather than written down in the fixture
+// and "read the bcrypt hash in the database" is not an answer for someone configuring an app.
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// The repo-root .env, because a pinned variable lives there and reporting "unset" while it is set
-// would send someone configuring an application to the wrong value.
+// The repo-root .env: reporting "unset" while a variable is set would point at the wrong value.
 try {
   const { config } = await import('dotenv');
   config({ path: join(here, '../../../.env'), quiet: true });

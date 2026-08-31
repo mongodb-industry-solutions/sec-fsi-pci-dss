@@ -4,7 +4,7 @@ import { Landmark } from 'lucide-react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'BankCore — Administration',
+  title: 'BankCore',
   description: "The bank's own administration: its capabilities, its records, its Open Banking API.",
 };
 
@@ -27,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               BankCore
             </Link>
             {/* The subtitle is the first thing to go on a narrow screen: the name and the way home are not. */}
-            <span className="hidden text-xs text-bank-ink/60 sm:inline">Administration</span>
+            <span className="hidden text-xs text-bank-ink/60 sm:inline"></span>
             <span className="ml-auto rounded-full border border-bank-ink/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-bank-ink/70">
               ASPSP
             </span>

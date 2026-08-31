@@ -106,33 +106,17 @@ export function assertLinks(assertions: LinkAssertion[]): Array<{ name: string; 
 }
 
 /**
- * The demo client secret for a client id.
+ * The demo client secret for a client id: preconfiguration only, never a production credential.
  *
- * WHAT THIS IS FOR, because it decides everything below: preconfiguring the demo integration between
- * the applications and the authority, and nothing else. In a real deployment these credentials are
- * issued by the authority and delivered to each integrator out of band, and none of this runs.
- *
- * So the value is deliberately fixed and reproducible. A literal in a checked-in fixture is what this
- * removes, because it is indistinguishable, to a scanner and to a reader, from a real credential that
- * leaked. It does not pretend the result is secret: anyone with the source can compute it, and for a
- * demo credential that is the correct trade. The alternative, generating one per seed, would mean the
- * merchant, the wallet, the simulator and two backends could no longer know what to present, since
- * every one of them reads its secret from its own configuration.
- *
- * Domain separated and length prefixed on the client id, so two clients never share a secret and no
- * two ids collide. What is STORED remains a bcrypt hash; this is only what gets presented.
+ * Fixed and reproducible on purpose. It removes the literal from the fixture, where it is
+ * indistinguishable from a leaked credential, without pretending the result is secret. Generating one
+ * per seed was rejected: every consumer reads its secret from its own configuration, so none of them
+ * would know what to present. Domain separated and length prefixed, so no two ids collide.
  */
 const DEMO_SECRET_ROOT = 'giam-demo-client-secret-root';
 
-/**
- * Clients whose secret an operator may already have pinned outside the authority.
- *
- * When one of these variables is set it WINS, because the application presenting the secret reads the
- * same variable: deriving instead would seed one value and present another, and that fails at the
- * token endpoint as `invalid_client`, which reads like a wrong password rather than a misconfiguration.
- * The table lives here so the seeder and every caller resolve a secret through one function: two
- * copies of this precedence is how they drift.
- */
+// Clients an operator may have pinned by env var: it wins, because the app presenting the secret
+// reads that same variable. Kept here so the seeder and every caller share one precedence.
 export const CLIENT_SECRET_REFS: Readonly<Record<string, string>> = {
   'oauth001-0000-4000-8000-000000000001': 'PSP_MERCHANT_OAUTH_CLIENT_SECRET',
   'leafypay-simulator': 'NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET',
