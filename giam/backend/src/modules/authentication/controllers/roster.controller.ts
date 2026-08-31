@@ -32,6 +32,19 @@ export async function rosterController(fastify: FastifyInstance) {
         required: ['realm'],
         properties: { realm: { type: 'string', examples: ['acme'] } },
       },
+      querystring: {
+        type: 'object',
+        properties: {
+          client_id: {
+            type: 'string',
+            description:
+              'The application the person is signing in to. It already travels in the authorization '
+              + 'request, so nothing extra is passed: the roster is narrowed to the roles that client '
+              + 'declares, because the useful personas differ from one application to the next.',
+            examples: ['acme-portal'],
+          },
+        },
+      },
       response: {
         200: {
           description: 'Everything the sign-in screen needs, in one call.',
@@ -106,6 +119,18 @@ export async function rosterController(fastify: FastifyInstance) {
     const roleNameById = new Map(roles.map((role) => [role.roleId, role.name]));
     const roleBySubject = new Map(assignments.map((a) => [a.subjectId, roleNameById.get(a.roleId)]));
 
+    // The roles this client's screen offers. Read from the client record rather than passed in, so a
+    // caller cannot widen its own roster by asking for more.
+    const { client_id: clientId } = request.query as { client_id?: string };
+    const { CLIENT_COLLECTION } = await import('../../../shared/models/collections');
+    const client = clientId
+      ? await fastify.db.collection(CLIENT_COLLECTION).findOne(
+        { realmId: realm.realmId, clientId, status: 'active' },
+        { projection: { _id: 0, demoRoster: 1 } },
+      ) as { demoRoster?: string[] } | null
+      : null;
+    const offered = client?.demoRoster;
+
     return reply.send({
       realm: realm.name,
       displayName: realm.displayName,
@@ -120,12 +145,20 @@ export async function rosterController(fastify: FastifyInstance) {
         enabled: provider.enabled,
         ...(provider.notice ? { notice: provider.notice } : {}),
       })),
-      roster: roster.map((identity) => ({
-        subjectId: identity.subjectId,
-        userName: identity.userName,
-        ...(toScimEmails(identity)[0] ? { email: toScimEmails(identity)[0].value } : {}),
-        ...(roleBySubject.get(identity.subjectId) ? { role: roleBySubject.get(identity.subjectId) as string } : {}),
-      })),
+      roster: roster
+        // An unknown client, or one that declares nothing, gets every featured persona: that is the
+        // behaviour a realm with no application-specific screen should have.
+        .filter((identity) => {
+          if (!offered) return true;
+          const role = roleBySubject.get(identity.subjectId);
+          return Boolean(role && offered.includes(role));
+        })
+        .map((identity) => ({
+          subjectId: identity.subjectId,
+          userName: identity.userName,
+          ...(toScimEmails(identity)[0] ? { email: toScimEmails(identity)[0].value } : {}),
+          ...(roleBySubject.get(identity.subjectId) ? { role: roleBySubject.get(identity.subjectId) as string } : {}),
+        })),
     });
   });
 }

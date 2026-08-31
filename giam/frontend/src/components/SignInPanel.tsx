@@ -65,10 +65,13 @@ function byRole(roster: RosterEntry[]): Array<[string, RosterEntry[]]> {
 export function SignInPanel({
   defaultRealm = 'leafypay',
   heading,
+  clientId,
   onSignedIn,
 }: {
   defaultRealm?: string;
   heading?: string;
+  /** Narrows the demo roster to the personas this application should offer. */
+  clientId?: string;
   onSignedIn?: (signedIn: SignedIn) => void;
 }) {
   const [context, setContext] = useState<LoginContext | null>(null);
@@ -82,12 +85,12 @@ export function SignInPanel({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(apiUrl(`/realms/${realm}/login-context`))
+    fetch(apiUrl(`/realms/${realm}/login-context${clientId ? `?client_id=${encodeURIComponent(clientId)}` : ''}`))
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => { if (!cancelled) setContext(data); })
       .catch(() => { if (!cancelled) setContext(null); });
     return () => { cancelled = true; };
-  }, [realm]);
+  }, [realm, clientId]);
 
   async function submit(credentials: { login: string; password: string }) {
     setBusy(true);

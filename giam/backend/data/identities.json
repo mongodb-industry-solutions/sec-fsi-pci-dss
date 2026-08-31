@@ -355,7 +355,7 @@
     },
     "active": true,
     "lifecycleState": "active",
-    "demoFeatured": false,
+    "demoFeatured": true,
     "roleName": "operations_officer",
     "accountHolderRef": "b0000067-0000-4000-8000-000000000067"
   },
@@ -1222,5 +1222,23 @@
     "demoFeatured": false,
     "roleName": "customer",
     "accountHolderRef": "b0000050-0000-4000-8000-000000000050"
+  },
+  {
+    "realm": "leafypay",
+    "subjectId": "a1000101-0000-4000-8000-000000000101",
+    "userName": "Priya Nair",
+    "kind": "human",
+    "email": "priya.nair@back.es",
+    "name": {
+      "formatted": "Priya Nair",
+      "givenName": "Priya",
+      "familyName": "Nair"
+    },
+    "active": true,
+    "lifecycleState": "active",
+    "demoFeatured": true,
+    "roleName": "manager",
+    "accountHolderRef": "b0000101-0000-4000-8000-000000000101",
+    "phone": "+1 323 555 0101"
   }
 ]

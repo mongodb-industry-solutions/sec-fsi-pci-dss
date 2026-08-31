@@ -1,231 +1,125 @@
 'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ShieldCheck, Eye, EyeOff, ArrowLeft, LogIn } from 'lucide-react';
+import { API_BASE_URL } from '../../lib/constants';
+import { ADMIN_TOKEN_KEY } from '../../lib/adminHelpers';
 
-import { useCallback, useEffect, useState } from 'react';
-import {
-  listViews, readView, readPosture, cellText,
-  adminToken, setAdminToken, clearAdminToken,
-  AdminError, type ConsoleView, type Posture,
-} from '../../lib/admin';
+export function setAdminToken(token: string) {
+  sessionStorage.setItem(ADMIN_TOKEN_KEY, token);
+}
 
-/**
- * The operator console.
- *
- * One screen driven by the catalog the authority publishes, rather than nine screens that each know
- * the shape of one collection. A view added at the authority appears here on the next load, and the
- * columns come from what the API says it returns: the console cannot show a field the API withholds,
- * because it never learns the field exists.
- *
- * Read only, deliberately. Changing a realm, a role or a client is a mutation that deserves its own
- * route, its own audit event and its own confirmation, none of which belong behind a table cell.
- */
-export default function AdminPage() {
-  const [views, setViews] = useState<ConsoleView[]>([]);
-  const [active, setActive] = useState<string>('');
-  const [records, setRecords] = useState<Array<Record<string, unknown>>>([]);
-  const [total, setTotal] = useState(0);
-  const [realm, setRealm] = useState('');
-  const [search, setSearch] = useState('');
-  const [posture, setPosture] = useState<Posture | null>(null);
+export default function AdminLoginPage() {
+  const router = useRouter();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsToken, setNeedsToken] = useState(false);
-  const [token, setToken] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handle = useCallback((cause: unknown) => {
-    if (cause instanceof AdminError) {
-      // 503 means nobody configured a credential, and 401 means the one held is wrong. They are
-      // different problems and the console says which, rather than showing one login box for both.
-      setNeedsToken(cause.status === 401);
-      setError(cause.status === 503
-        ? 'This authority has no administrative credential configured, so the surface is closed.'
-        : cause.message);
-      return;
-    }
-    setError('The identity service could not be reached.');
-  }, []);
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
 
-  const loadCatalog = useCallback(async () => {
     try {
-      const { views: available } = await listViews();
-      setViews(available);
-      setNeedsToken(false);
-      setError(null);
-      setActive((current) => current || available[0]?.name || '');
-      setPosture(await readPosture().catch(() => null));
-    } catch (cause) {
-      handle(cause);
+      const res = await fetch(`${API_BASE_URL}/api/v1/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error((err as { error?: string }).error ?? 'Login failed');
+      }
+
+      const { token } = await res.json() as { token: string };
+      setAdminToken(token);
+      router.push('/admin/panel');
+    } catch (err) {
+      setError((err as Error).message ?? 'Login failed');
+    } finally {
+      setSubmitting(false);
     }
-  }, [handle]);
-
-  useEffect(() => {
-    if (!adminToken()) {
-      setNeedsToken(true);
-      return;
-    }
-    void loadCatalog();
-  }, [loadCatalog]);
-
-  useEffect(() => {
-    if (!active) return;
-    let cancelled = false;
-    setLoading(true);
-    readView(active, { realm: realm || undefined, q: search || undefined, limit: 100 })
-      .then((page) => {
-        if (cancelled) return;
-        setRecords(page.records);
-        setTotal(page.total);
-        setError(null);
-      })
-      .catch((cause) => { if (!cancelled) handle(cause); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [active, realm, search, handle]);
-
-  if (needsToken) {
-    return (
-      <main className="min-h-screen flex items-center justify-center p-8">
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            setAdminToken(token);
-            void loadCatalog();
-          }}
-          className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm"
-        >
-          <h1 className="text-2xl font-semibold text-mongodb-dark">Operator console</h1>
-          <p className="mt-2 text-sm text-gray-500">
-            This surface has its own credential, separate from any sign-in.
-          </p>
-          <input
-            type="password"
-            value={token}
-            onChange={(event) => setToken(event.target.value)}
-            autoComplete="off"
-            className="mt-6 w-full rounded-md border px-3 py-2"
-            placeholder="Administrative token"
-          />
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-          <button type="submit" className="mt-4 w-full rounded-md bg-mongodb-green px-4 py-2 font-medium text-mongodb-dark">
-            Continue
-          </button>
-        </form>
-      </main>
-    );
   }
 
-  const current = views.find((view) => view.name === active);
-  const columns = current?.fields ?? [];
-
   return (
-    <main className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-mongodb-dark">Operator console</h1>
-          <div className="flex items-center gap-4">
-            {posture && (
-              // Shown next to everything else on purpose. A weakness reported only in a log nobody
-              // opens is the same as a weakness nobody reported.
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-medium ${
-                  posture.status === 'healthy' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-900'
-                }`}
-                title={posture.findings?.map((finding) => finding.code).join(', ')}
-              >
-                {posture.status}
-                {posture.findings?.length ? ` · ${posture.findings.length}` : ''}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => { clearAdminToken(); setNeedsToken(true); }}
-              className="text-sm text-gray-500 hover:text-gray-800"
-            >
-              Forget token
-            </button>
+    <div className="flex items-center justify-center min-h-[80vh]">
+      <div className="bg-gray-900 border border-orange-500/20 rounded-2xl shadow-xl w-full max-w-sm p-8">
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-3">
+            <div className="w-14 h-14 rounded-full bg-orange-500/10 border border-orange-500/30 flex items-center justify-center">
+              <ShieldCheck size={28} className="text-orange-400" />
+            </div>
           </div>
+          <h1 className="text-xl font-bold text-white">Administration Mode</h1>
+          <p className="text-gray-400 text-sm mt-1">Enter admin credentials to continue</p>
         </div>
-      </header>
 
-      <div className="flex">
-        <nav className="w-56 shrink-0 border-r bg-white p-3">
-          {views.map((view) => (
-            <button
-              key={view.name}
-              type="button"
-              onClick={() => { setActive(view.name); setSearch(''); }}
-              className={`mb-1 block w-full rounded-md px-3 py-2 text-left text-sm ${
-                view.name === active ? 'bg-gray-100 font-medium text-mongodb-dark' : 'text-gray-600 hover:bg-gray-50'
-              }`}
-            >
-              {view.name}
-            </button>
-          ))}
-        </nav>
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => { setUsername(e.target.value); setError(null); }}
+              placeholder="admin"
+              autoComplete="username"
+              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+            />
+          </div>
 
-        <section className="min-w-0 flex-1 p-6">
-          {current && (
-            <div className="mb-4">
-              <h2 className="text-lg font-medium text-mongodb-dark">{current.summary}</h2>
-              {current.note && (
-                // The reason a field is missing, shown where somebody would otherwise wonder.
-                <p className="mt-1 text-sm text-gray-500">{current.note}</p>
-              )}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-1">Password</label>
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => { setPassword(e.target.value); setError(null); }}
+                placeholder="Enter admin password"
+                autoComplete="current-password"
+                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 pr-10 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                tabIndex={-1}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-900/30 border border-red-500/40 rounded-lg px-3 py-2 text-sm text-red-400">
+              {error}
             </div>
           )}
 
-          <div className="mb-4 flex gap-3">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search the fields shown"
-              className="w-72 rounded-md border px-3 py-2 text-sm"
-            />
-            {current?.realmScoped && (
-              <input
-                value={realm}
-                onChange={(event) => setRealm(event.target.value)}
-                placeholder="Realm"
-                className="w-48 rounded-md border px-3 py-2 text-sm"
-              />
-            )}
-            <span className="self-center text-sm text-gray-500">
-              {loading ? 'Loading…' : `${records.length} of ${total}`}
-            </span>
-          </div>
+          <button
+            type="submit"
+            disabled={!username || !password || submitting}
+            suppressHydrationWarning
+            className="w-full bg-orange-600 text-white py-2.5 rounded-lg font-semibold hover:bg-orange-500 transition-colors disabled:opacity-40"
+          >
+            <span className="inline-flex items-center gap-2">
+            <LogIn size={15} />
+            {submitting ? 'Authenticating...' : 'Access Admin Panel'}
+          </span>
+          </button>
+        </form>
 
-          {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        <div className="mt-5 text-center">
+          <Link href="/" className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-300 transition-colors">
+            <ArrowLeft size={12} /> Back to Mode Selection
+          </Link>
+        </div>
 
-          <div className="overflow-auto rounded-lg border bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                <tr>
-                  {columns.map((column) => (
-                    <th key={column} className="whitespace-nowrap px-3 py-2 font-medium">{column}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {records.map((record, index) => (
-                  <tr key={index} className="border-t align-top">
-                    {columns.map((column) => (
-                      <td key={column} className="max-w-xs truncate px-3 py-2" title={cellText(record[column])}>
-                        {cellText(record[column])}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-                {!loading && records.length === 0 && (
-                  <tr>
-                    <td colSpan={Math.max(1, columns.length)} className="px-3 py-8 text-center text-gray-500">
-                      Nothing matches.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </section>
       </div>
-    </main>
+    </div>
   );
 }

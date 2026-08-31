@@ -70,7 +70,11 @@ export default function LoginPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
-      <SignInPanel defaultRealm={realm} onSignedIn={handleSignedIn} />
+      <SignInPanel
+        defaultRealm={realm}
+        {...(request?.clientId ? { clientId: request.clientId } : {})}
+        onSignedIn={handleSignedIn}
+      />
     </main>
   );
 }

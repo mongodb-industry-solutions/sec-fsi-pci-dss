@@ -45,6 +45,7 @@ interface ClientFixture {
   applicationType?: ClientRecord['applicationType'];
   status: ClientRecord['status'];
   backchannel?: ClientRecord['backchannel'];
+  demoRoster?: string[];
   owner?: { kind: string; ref: string; displayName?: string };
   /** Present when this client is a principal in its own right rather than an application's agent. */
   serviceIdentity?: {
@@ -108,6 +109,7 @@ export async function seedClients(db: Db): Promise<void> {
         tokenEndpointAuthMethod: fixture.tokenEndpointAuthMethod,
         ...(fixture.applicationType ? { applicationType: fixture.applicationType } : {}),
         ...(fixture.backchannel ? { backchannel: fixture.backchannel } : {}),
+        ...(fixture.demoRoster ? { demoRoster: fixture.demoRoster } : {}),
         ...(fixture.owner ? { owner: fixture.owner } : {}),
         status: fixture.status,
       },

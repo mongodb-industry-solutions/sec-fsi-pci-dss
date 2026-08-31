@@ -106,6 +106,32 @@ is not an unrestricted one.
 
 ---
 
+## 3b. The demo roster, and why it is scoped per client
+
+`GET {issuer}/login-context?client_id=…` is what the hosted sign-in screen renders: the realm's
+branding, the federated providers on offer, and, in a demonstration realm, a roster of ready-made
+personas.
+
+The roster is narrowed by the **client id already present in the authorization request**, so nothing
+extra is passed. Each client record carries a `demoRoster` listing the role names its screen should
+offer, and the useful set differs sharply per application:
+
+| Application | Offers | Why |
+|---|---|---|
+| The provider's own portal | its staff and its customers | a merchant signs in as a customer who owns one |
+| A third party's app | customers only | its testers are users, never the provider's back office |
+| The authority's console | who administers identity, who audits it, one ordinary user | the rest administer nothing here |
+| The bank | its own staff and account holders | no provider role exists in that realm at all |
+
+Two properties matter. The list comes from the **client record**, never from the query, so a caller
+cannot widen its own roster by asking for more. And a client that declares nothing gets every featured
+persona in the realm, which is what a realm with no application-specific screen should do.
+
+Every offered role carries **at least two** personas, so a screen demonstrates a role rather than a
+person.
+
+---
+
 ## 4. What the authority must NOT do
 
 Constraints, not preferences. An implementation violating any of these is not a drop-in replacement.

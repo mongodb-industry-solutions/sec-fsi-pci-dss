@@ -26,7 +26,10 @@
       "kind": "merchant",
       "ref": "m0000001-0000-4000-8000-000000000001",
       "displayName": "Espresso Works"
-    }
+    },
+    "demoRoster": [
+      "customer"
+    ]
   },
   {
     "realm": "leafypay",
@@ -54,7 +57,10 @@
       "kind": "merchant",
       "ref": "m0000002-0000-4000-8000-000000000002",
       "displayName": "Leafy Wallet"
-    }
+    },
+    "demoRoster": [
+      "customer"
+    ]
   },
   {
     "realm": "leafypay",
@@ -88,7 +94,16 @@
           "view"
         ]
       }
-    }
+    },
+    "demoRoster": [
+      "customer",
+      "manager",
+      "operations_officer",
+      "level1_analyst",
+      "level2_investigator",
+      "security_auditor",
+      "merchant_officer"
+    ]
   },
   {
     "realm": "bankcore",
@@ -184,7 +199,14 @@
     "requirePkce": true,
     "tokenEndpointAuthMethod": "none",
     "applicationType": "web",
-    "status": "active"
+    "status": "active",
+    "demoRoster": [
+      "bank_admin",
+      "bank_compliance",
+      "bank_operations",
+      "bank_card_officer",
+      "bank_customer"
+    ]
   },
   {
     "realm": "leafypay",
@@ -207,7 +229,12 @@
     "requirePkce": true,
     "tokenEndpointAuthMethod": "none",
     "applicationType": "web",
-    "status": "active"
+    "status": "active",
+    "demoRoster": [
+      "manager",
+      "security_auditor",
+      "customer"
+    ]
   },
   {
     "realm": "leafypay",
@@ -239,7 +266,16 @@
           "exercise"
         ]
       }
-    }
+    },
+    "demoRoster": [
+      "customer",
+      "manager",
+      "operations_officer",
+      "level1_analyst",
+      "level2_investigator",
+      "security_auditor",
+      "merchant_officer"
+    ]
   },
   {
     "realm": "bankcore",

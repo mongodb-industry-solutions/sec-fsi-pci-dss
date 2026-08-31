@@ -72,6 +72,23 @@ const EXPECTED_ROLES: Record<string, number> = {
  */
 const CUSTOMER_HOLDING_A_STAFF_ROLE = 'merchant_officer';
 
+/**
+ * Parties created AFTER the extraction, which this reconciliation excludes by name.
+ *
+ * The logins above are frozen at migration time and never gain an entry again, so a party added later
+ * has no counterpart there and never will. Without this the historical numbers would have to be
+ * edited every time the demo population grows, which would turn a record of what happened into a
+ * test that tracks the present and proves nothing about the move.
+ *
+ * Naming each one keeps the assertions meaningful. Filtering the party list down to "whatever the
+ * logins reference" would make them true by construction.
+ */
+const ADDED_AFTER_MIGRATION = new Map([
+  ['b0000101-0000-4000-8000-000000000101', 'Priya Nair, a second manager so every role offers two demo personas'],
+]);
+
+const migrationParties = parties.filter((party) => !ADDED_AFTER_MIGRATION.has(party.partyInstanceReference));
+
 const byPartyRef = new Map(parties.map((party) => [party.partyInstanceReference, party]));
 const loginsByParty = new Map<string, LoginFixture[]>();
 for (const login of logins) {
@@ -93,7 +110,7 @@ describe('v39 P1.6: the party and login fixtures reconcile exactly', () => {
   it('has no party without a login', () => {
     // This is what the derivation helper exists to cover. On the committed fixtures it covers
     // nothing, which is the finding: the helper is inert here, not load bearing.
-    const withoutLogin = parties
+    const withoutLogin = migrationParties
       .filter((party) => !loginsByParty.has(party.partyInstanceReference))
       .map((party) => `${party.partyType}:${party.partyName}`);
     expect(withoutLogin, `parties with no login: ${withoutLogin.join(', ')}`).toEqual([]);
@@ -110,7 +127,7 @@ describe('v39 P1.6: the party and login fixtures reconcile exactly', () => {
   it('produces exactly one identity per real principal', () => {
     // The number P5's parity gate is measured against: every one of these must sign in afterwards
     // with the credentials that work today.
-    expect(logins.length).toBe(parties.length);
+    expect(logins.length).toBe(migrationParties.length);
     expect(new Set(logins.map((l) => l.customerAuthenticationInstanceReference)).size).toBe(logins.length);
     expect(logins.length).toBe(68);
   });
@@ -118,7 +135,7 @@ describe('v39 P1.6: the party and login fixtures reconcile exactly', () => {
 
 describe('v39 P1.6: the apparent count mismatch has one cause, and it is not a defect', () => {
   it('reproduces the counts the plan reports', () => {
-    const partyTypes = parties.reduce<Record<string, number>>((counts, party) => {
+    const partyTypes = migrationParties.reduce<Record<string, number>>((counts, party) => {
       counts[party.partyType] = (counts[party.partyType] ?? 0) + 1;
       return counts;
     }, {});

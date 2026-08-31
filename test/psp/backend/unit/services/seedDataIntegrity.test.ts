@@ -270,8 +270,10 @@ describe('v33 seed-data integrity: a complete population (D-3)', () => {
   });
 
   it('the curated login picker stays short while every customer is reachable', () => {
+    // v39: two personas per role rather than one, so a sign-in screen can offer a ROLE instead of a
+    // named person. Sixteen is still a curated fraction of the population, which is the property.
     const featured = logins.filter((l) => l.customerAuthenticationDemoFeatured === true);
-    expect(featured.length).toBe(14);
+    expect(featured.length).toBe(16);
     expect(logins.length).toBeGreaterThan(featured.length);
   });
 

@@ -77,10 +77,11 @@ async function signIn(login: string, password: string) {
 
 describe('v39 P5.8: the population is what it was', () => {
   it('carries every principal the platform could sign in', () => {
-    // 68, and the count is asserted rather than "more than zero": a migration that silently dropped
-    // twelve people would pass any looser check.
-    expect(identities).toHaveLength(68);
-    expect(new Set(identities.map((identity) => identity.subjectId)).size).toBe(68);
+    // Asserted exactly rather than "more than zero": a migration that silently dropped twelve people
+    // would pass any looser check. 68 came across; the 69th was added afterwards so that every role
+    // offers two demo personas, and a change to this number belongs in a diff.
+    expect(identities).toHaveLength(69);
+    expect(new Set(identities.map((identity) => identity.subjectId)).size).toBe(69);
   });
 
   it('carries a credential for every principal that had one', () => {
@@ -107,7 +108,9 @@ describe('v39 P5.8: the population is what it was', () => {
       return counts;
     }, {});
     // These become assignments. A role that silently gained or lost a holder is a permission change
-    // nobody decided.
+    // nobody decided, which is why the histogram is exact and not a lower bound. `manager` went from
+    // one holder to two deliberately: a sign-in screen offering a single named person cannot
+    // demonstrate a role.
     expect(histogram).toEqual({
       customer: 56,
       level1_analyst: 2,
@@ -115,7 +118,7 @@ describe('v39 P5.8: the population is what it was', () => {
       security_auditor: 2,
       merchant_officer: 3,
       operations_officer: 2,
-      manager: 1,
+      manager: 2,
     });
   });
 

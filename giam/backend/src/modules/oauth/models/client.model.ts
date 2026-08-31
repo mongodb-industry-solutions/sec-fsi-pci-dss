@@ -43,6 +43,16 @@ export interface ClientRecord extends Scoped {
   logoUri?: string;
   clientUri?: string;
 
+  /**
+   * Which roles this client's sign-in screen offers as demo personas.
+   *
+   * Scoped per client because the useful set differs: an application's own staff are irrelevant on a
+   * third party's screen, and an oversight role has no business being offered on a screen meant to
+   * demonstrate an ordinary user. Roles rather than named people, so the list survives the demo
+   * population changing. Absent means every featured persona in the realm, which is the old behaviour.
+   */
+  demoRoster?: string[];
+
   backchannel?: {
     deliveryMode: BackchannelDeliveryMode;
     notificationEndpoint?: string;

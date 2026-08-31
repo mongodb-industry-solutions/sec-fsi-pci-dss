@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { SignInPanel, type SignedIn } from '../../components/SignInPanel';
-import { storedToken, clearSession } from '../../lib/session';
+import { storedToken, clearSession, CONSOLE_CLIENT_ID } from '../../lib/session';
 import { BRAND } from '../../config/brand';
 
 /**
@@ -88,7 +88,7 @@ export default function SystemPage() {
   if (!claims) {
     return (
       <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
-        <SignInPanel heading={`${BRAND.full} console`} onSignedIn={afterSignIn} />
+        <SignInPanel heading={`${BRAND.full} console`} clientId={CONSOLE_CLIENT_ID} onSignedIn={afterSignIn} />
       </main>
     );
   }

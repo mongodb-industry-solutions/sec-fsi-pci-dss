@@ -1,6 +1,7 @@
 'use client';
 
 import { apiUrl } from './env';
+import { storedToken } from './session';
 
 /**
  * The console's access to the administrative API.
@@ -30,6 +31,18 @@ export function clearAdminToken(): void {
   window.sessionStorage.removeItem(TOKEN_KEY);
 }
 
+/**
+ * What to present to the administrative surface: the SIGNED-IN person first.
+ *
+ * The console used to accept only the operator credential, so a manager who had already signed in was
+ * asked for a shared password to look at the realm they administer, and the act stopped having a name
+ * against it. The surface authorises by role now, so the person's own token is the better credential
+ * and is preferred. The operator token remains for break-glass, which is what it is for.
+ */
+function presentedToken(): string {
+  return storedToken() || adminToken();
+}
+
 export class AdminError extends Error {
   constructor(readonly status: number, message: string) {
     super(message);
@@ -38,7 +51,7 @@ export class AdminError extends Error {
 
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(apiUrl(path), {
-    headers: { authorization: `Bearer ${adminToken()}` },
+    headers: { authorization: `Bearer ${presentedToken()}` },
     cache: 'no-store',
   });
   if (!response.ok) {
