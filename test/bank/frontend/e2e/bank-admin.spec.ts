@@ -98,14 +98,16 @@ test.describe('the bank administration app', () => {
     expect(response, 'the bank frontend must be running for this to mean anything').not.toBeNull();
   });
 
-  // Every screen below is behind the sign-in gate now, so each one signs in first. The bank's
-  // administrative API requires a person with a role, so an unauthenticated sweep would only ever
-  // measure the login form.
-  test.beforeEach(async ({ context }) => {
-    const response = await context.request.post(`${BANK_UI}/api/auth/login`, {
-      data: { login: BANK_ADMIN, password: DEMO_PASSWORD },
-    });
-    expect(response.status(), `${BANK_ADMIN} could not sign in`).toBe(200);
+  // Every screen below is behind the sign-in gate now, so each one signs in first: an
+  // unauthenticated sweep would otherwise measure the same "sign in required" panel five times and
+  // call it responsive. Driven through the browser because the credential is entered at the
+  // AUTHORITY, which is the property under test everywhere else.
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`${BANK_UI}/api/auth/start`, { waitUntil: 'domcontentloaded' });
+    await page.getByLabel(/email or user name/i).fill(BANK_ADMIN);
+    await page.getByLabel(/^password$/i).fill(DEMO_PASSWORD);
+    await page.getByRole('button', { name: /^sign in$/i }).click();
+    await page.waitForURL(`${BANK_UI}/**`, { timeout: 20000 });
   });
 
   for (const viewport of VIEWPORTS) {

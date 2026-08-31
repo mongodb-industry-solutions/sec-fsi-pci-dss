@@ -1,16 +1,19 @@
 import 'server-only';
 import { cookies } from 'next/headers';
+import { createHash, randomBytes } from 'crypto';
 
 /**
- * Signing a person in at the identity authority, on this app's behalf.
+ * Signing a person in, by sending them to the authority and taking a code back.
  *
- * The bank's administrative API requires an interactive principal with the right role, so this app
- * cannot mint its own credential for it: what it needs is the token of the person using it. The
- * exchange runs server side and the token lands in an httpOnly cookie, which keeps the property this
- * app was built around, that the browser never holds a token.
+ * This app never sees a password. It starts an authorization code request with PKCE, the authority
+ * hosts the sign-in, and the code that comes back is exchanged here for a token that lands in an
+ * httpOnly cookie. Collecting the credential in this app, even to forward it, would make it a second
+ * place credentials are handled, which is exactly what moving identity out was for.
  */
 
 const SESSION_COOKIE = 'bankcore.session';
+const VERIFIER_COOKIE = 'bankcore.pkce';
+const STATE_COOKIE = 'bankcore.state';
 const REALM = 'bankcore';
 const CONSOLE_CLIENT_ID = 'bankcore-console';
 const TIMEOUT_MS = 10000;
@@ -22,71 +25,67 @@ function issuerBase(): string {
   return raw.replace(/\/$/, '');
 }
 
-// The console's registered redirect, which the authority checks even though no browser follows it here.
+// The browser-facing authority, which is a different address from the one this server calls: the
+// sign-in page is opened by a person, so it must be a host their browser can reach.
+function authorityUi(): string {
+  const raw = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_URL
+    ?? process.env.PSP_GIAM_UI_URL
+    ?? 'http://localhost:8086';
+  return raw.replace(/\/$/, '');
+}
+
+function appBase(): string {
+  return (process.env.PSP_BANKCORE_FRONTEND_URL ?? 'http://localhost:8084').replace(/\/$/, '');
+}
+
 function redirectUri(): string {
-  const base = process.env.PSP_BANKCORE_FRONTEND_URL ?? 'http://localhost:8084';
-  return `${base.replace(/\/$/, '')}/api/auth/callback`;
+  return `${appBase()}/api/auth/callback`;
 }
 
-function base64url(bytes: Buffer): string {
-  return bytes.toString('base64url');
+/** The URL to send the browser to, with the PKCE verifier and state kept server side. */
+export async function startSignIn(): Promise<string> {
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  const state = randomBytes(16).toString('base64url');
+
+  const store = await cookies();
+  const shortLived = { httpOnly: true as const, sameSite: 'lax' as const, path: '/', maxAge: 600 };
+  store.set(VERIFIER_COOKIE, verifier, shortLived);
+  store.set(STATE_COOKIE, state, shortLived);
+
+  const url = new URL(`${authorityUi()}/auth/login`);
+  url.searchParams.set('realm', REALM);
+  url.searchParams.set('client_id', CONSOLE_CLIENT_ID);
+  url.searchParams.set('redirect_uri', redirectUri());
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('scope', 'openid profile email');
+  url.searchParams.set('state', state);
+  url.searchParams.set('code_challenge', challenge);
+  url.searchParams.set('code_challenge_method', 'S256');
+  return url.toString();
 }
 
-async function pkce(): Promise<{ verifier: string; challenge: string }> {
-  const { randomBytes, createHash } = await import('crypto');
-  const verifier = base64url(randomBytes(32));
-  return { verifier, challenge: base64url(createHash('sha256').update(verifier).digest()) };
-}
-
-export interface SignInResult {
+export interface ExchangeResult {
   ok: boolean;
-  userName?: string;
   error?: string;
 }
 
-/** Password sign-in, then the ordinary authorization code exchange with PKCE. */
-export async function signIn(login: string, password: string): Promise<SignInResult> {
-  let sessionId: string;
-  let userName: string | undefined;
+/** Exchanges the returned code for a token, after checking the state this app itself issued. */
+export async function completeSignIn(code: string, state: string): Promise<ExchangeResult> {
+  const store = await cookies();
+  const expectedState = store.get(STATE_COOKIE)?.value;
+  const verifier = store.get(VERIFIER_COOKIE)?.value;
+
+  store.delete(STATE_COOKIE);
+  store.delete(VERIFIER_COOKIE);
+
+  // Without this the callback accepts a code obtained in somebody else's browser, which is the whole
+  // reason state exists.
+  if (!expectedState || state !== expectedState) return { ok: false, error: 'state_mismatch' };
+  if (!verifier) return { ok: false, error: 'missing_verifier' };
 
   try {
-    const response = await fetch(`${issuerBase()}/login`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ login, password }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    // One message for every failure: distinguishing an unknown person from a wrong password would be
-    // an enumeration oracle, and nobody signing in can act on the difference.
-    if (!response.ok) return { ok: false, error: 'That did not work. Check the details and try again.' };
-    const body = await response.json() as { sessionId: string; userName?: string };
-    sessionId = body.sessionId;
-    userName = body.userName;
-  } catch {
-    return { ok: false, error: 'The identity service could not be reached.' };
-  }
-
-  try {
-    const { verifier, challenge } = await pkce();
-
-    const authorize = await fetch(`${issuerBase()}/protocol/openid-connect/auth`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        client_id: CONSOLE_CLIENT_ID,
-        redirect_uri: redirectUri(),
-        response_type: 'code',
-        session_id: sessionId,
-        scope: 'openid profile email',
-        code_challenge: challenge,
-        code_challenge_method: 'S256',
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    if (!authorize.ok) return { ok: false, error: 'Signed in, but this console could not obtain a token.' };
-    const { code } = await authorize.json() as { code: string };
-
-    const token = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -98,24 +97,22 @@ export async function signIn(login: string, password: string): Promise<SignInRes
       }),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
-    if (!token.ok) return { ok: false, error: 'Signed in, but the token exchange was refused.' };
+    if (!response.ok) return { ok: false, error: 'token_refused' };
 
-    const { access_token: accessToken, expires_in: expiresIn } = await token.json() as {
+    const { access_token: accessToken, expires_in: expiresIn } = await response.json() as {
       access_token?: string; expires_in?: number;
     };
-    if (!accessToken) return { ok: false, error: 'The authority returned no access token.' };
+    if (!accessToken) return { ok: false, error: 'no_token' };
 
-    const store = await cookies();
     store.set(SESSION_COOKIE, accessToken, {
       httpOnly: true,
       sameSite: 'lax',
       path: '/',
       maxAge: expiresIn ?? 900,
     });
-
-    return { ok: true, ...(userName ? { userName } : {}) };
+    return { ok: true };
   } catch {
-    return { ok: false, error: 'The identity service could not be reached.' };
+    return { ok: false, error: 'authority_unreachable' };
   }
 }
 
@@ -151,9 +148,10 @@ export async function currentStaff(): Promise<StaffSession | null> {
     };
     if (!claims.sub) return null;
     if (claims.exp && claims.exp * 1000 < Date.now()) return null;
+    const userName = claims.preferred_username ?? claims.name;
     return {
       subjectId: claims.sub,
-      ...(claims.preferred_username ?? claims.name ? { userName: (claims.preferred_username ?? claims.name) as string } : {}),
+      ...(userName ? { userName } : {}),
       roles: Array.isArray(claims.roles) ? claims.roles.map(String) : [],
     };
   } catch {
