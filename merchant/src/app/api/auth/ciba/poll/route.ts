@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
   await setSession({
     accessToken: tokens.access_token,
     refreshToken: tokens.refresh_token,
-    idToken: tokens.id_token,
     expiresAt: expiresAtFrom(tokens.expires_in),
     grantedScopes,
     sub,

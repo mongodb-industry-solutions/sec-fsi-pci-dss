@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Landmark } from 'lucide-react';
 import './globals.css';
 import { AuthGate } from '../components/AuthGate';
-import { SignOut } from '../components/SignOut';
+import { UserMenu } from '../components/UserMenu';
 
 export const metadata: Metadata = {
   title: 'BankCore',
@@ -33,7 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="ml-auto rounded-full border border-bank-ink/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-bank-ink/70">
               ASPSP
             </span>
-            <SignOut />
+            {/* Right of the badge, and it renders nothing until somebody is signed in. */}
+            <UserMenu />
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
