@@ -106,31 +106,32 @@ export function assertLinks(assertions: LinkAssertion[]): Array<{ name: string; 
 }
 
 /**
- * The demo client secret for a client id, derived rather than written down.
+ * The demo client secret for a client id.
  *
- * A literal secret in a fixture is indistinguishable, to a scanner and to a reader, from a real
- * credential that leaked. Deriving it removes the literal without pretending the value is a secret:
- * it is a demo credential, reproducible on purpose, because the seeder and every client that presents
- * it have to arrive at the same string without a shared file to read it from.
+ * WHAT THIS IS FOR, because it decides everything below: preconfiguring the demo integration between
+ * the applications and the authority, and nothing else. In a real deployment these credentials are
+ * issued by the authority and delivered to each integrator out of band, and none of this runs.
  *
- * Domain separated on the client id, so two clients never share a secret and a client id cannot be
- * swapped for another without changing the credential. What is STORED remains a bcrypt hash; this is
- * only what gets presented.
+ * So the value is deliberately fixed and reproducible. A literal in a checked-in fixture is what this
+ * removes, because it is indistinguishable, to a scanner and to a reader, from a real credential that
+ * leaked. It does not pretend the result is secret: anyone with the source can compute it, and for a
+ * demo credential that is the correct trade. The alternative, generating one per seed, would mean the
+ * merchant, the wallet, the simulator and two backends could no longer know what to present, since
+ * every one of them reads its secret from its own configuration.
  *
- * `GIAM_CLIENT_SECRET_ROOT` moves every derived secret at once. Unset, the documented development
- * root is used and the caller is warned once, because a predictable credential is a real weakness and
- * a demo that refuses to start is not a demo. Hardening here is configuration, not a code path.
+ * Domain separated and length prefixed on the client id, so two clients never share a secret and no
+ * two ids collide. What is STORED remains a bcrypt hash; this is only what gets presented.
  */
-const DEVELOPMENT_SECRET_ROOT = 'giam-development-client-secret-root';
-let warnedAboutSecretRoot = false;
+const DEMO_SECRET_ROOT = 'giam-demo-client-secret-root';
 
 /**
- * Clients whose secret is already held somewhere outside the authority.
+ * Clients whose secret an operator may already have pinned outside the authority.
  *
- * These are not derived, because deriving them would mean the authority seeded one value while the
- * application presenting it read another, and that fails at the token endpoint with nothing on screen
- * to explain it. The table lives here rather than in the fixture so that the seeder and every caller
- * resolve a secret through one function: two copies of this precedence is how they drift.
+ * When one of these variables is set it WINS, because the application presenting the secret reads the
+ * same variable: deriving instead would seed one value and present another, and that fails at the
+ * token endpoint as `invalid_client`, which reads like a wrong password rather than a misconfiguration.
+ * The table lives here so the seeder and every caller resolve a secret through one function: two
+ * copies of this precedence is how they drift.
  */
 export const CLIENT_SECRET_REFS: Readonly<Record<string, string>> = {
   'oauth001-0000-4000-8000-000000000001': 'PSP_MERCHANT_OAUTH_CLIENT_SECRET',
@@ -142,17 +143,8 @@ export function clientSecretFor(clientId: string, env: NodeJS.ProcessEnv = proce
   const held = ref ? env[ref]?.trim() : undefined;
   if (held) return held;
 
-  const configured = env.GIAM_CLIENT_SECRET_ROOT?.trim();
-  if (!configured && !warnedAboutSecretRoot) {
-    warnedAboutSecretRoot = true;
-    console.warn(
-      '[giam] GIAM_CLIENT_SECRET_ROOT is not set, so client secrets derive from the published '
-      + 'development root and are predictable. Set it outside development.',
-    );
-  }
-  const root = configured || DEVELOPMENT_SECRET_ROOT;
   // Length-prefixed so no two different client ids can produce the same input to the hash.
   return createHash('sha256')
-    .update(`giam:client-secret:${clientId.length}:${clientId}:${root}`)
+    .update(`giam:client-secret:${clientId.length}:${clientId}:${DEMO_SECRET_ROOT}`)
     .digest('base64url');
 }

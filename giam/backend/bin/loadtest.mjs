@@ -9,10 +9,10 @@
  */
 const REALM = 'leafypay';
 const CLIENT_ID = 'leafypay-backend';
-// Derived, exactly as the seeder derives it, so the two cannot disagree and no credential is written
-// down here. An override is honoured for a deployment whose root differs from this machine's.
+// Derived exactly as the seeder derives it, so the two cannot disagree and no credential is written
+// down here.
 const { clientSecretFor } = await import('@leafypay/platform-links');
-const CLIENT_SECRET = process.env.GIAM_LOADTEST_CLIENT_SECRET ?? clientSecretFor(CLIENT_ID);
+const CLIENT_SECRET = clientSecretFor(CLIENT_ID);
 
 const replicas = process.argv.slice(2);
 if (replicas.length < 2) {

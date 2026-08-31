@@ -106,22 +106,6 @@ export function buildPostureReport(input: PostureInput): PostureReport {
     });
   }
 
-  // Demo client credentials are derived rather than written down, which removes the literal from the
-  // repository but does not make the value secret on its own: without a root of its own, every client
-  // secret on this deployment is computable by anyone who has read the source.
-  if (!config.clientSecretRoot) {
-    findings.push({
-      code: 'client_secret_root_unset',
-      level: 'degraded',
-      detail:
-        'GIAM_CLIENT_SECRET_ROOT is unset, so every confidential client secret is derived from the '
-        + 'published development root and is predictable from the client id alone.',
-      remedy:
-        'Set GIAM_CLIENT_SECRET_ROOT to a value of its own, and set the same value anywhere a client '
-        + 'presents a secret, or the two sides will disagree at the token endpoint.',
-    });
-  }
-
   // A publication grace shorter than a token lifetime signs live sessions out on a scale-down.
   if (config.keys.publicationGraceSeconds < config.keys.leaseSeconds) {
     findings.push({

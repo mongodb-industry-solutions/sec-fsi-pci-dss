@@ -71,12 +71,6 @@ export const config = {
     awsRegion: giamEnv('KMS_AWS_REGION') ?? env('AWS_REGION', 'us-east-1')!,
   },
 
-  // The root every demo client secret is derived from, so none is written down in the repository. Read
-  // here because this is where the service's environment is read, and reported by the posture endpoint
-  // because leaving it unset makes those credentials predictable. The derivation itself lives in the
-  // shared package, since the applications presenting a secret must reach the same value.
-  clientSecretRoot: giamEnv('CLIENT_SECRET_ROOT'),
-
   keys: {
     // Per-instance keys with one shared published key set. Correct on one replica and on twenty.
     provider: (giamEnv('KEY_PROVIDER', 'instance-local')!) as KeyProviderName,
