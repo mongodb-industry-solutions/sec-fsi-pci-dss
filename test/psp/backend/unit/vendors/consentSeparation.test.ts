@@ -17,9 +17,12 @@ import { describe, it, expect } from 'vitest';
 import { existsSync } from 'fs';
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { resolve, relative, sep } from 'path';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
 
 const PSP_SRC = resolve(__dirname, '../../../../../psp/backend/src');
-const GIAM_SRC = resolve(__dirname, '../../../../../giam/backend/src');
+// GIAM source lives in its own repository now, so this half of the rule needs a local checkout.
+const GIAM_SRC = giamPath('backend/src');
+const HAS_GIAM_SRC = hasGiam('backend/src');
 
 function sourceFiles(root: string): Array<{ path: string; text: string }> {
   const found: Array<{ path: string; text: string }> = [];
@@ -86,7 +89,7 @@ describe('v39 P3.2: the audit found nothing mixed to split', () => {
   });
 });
 
-describe('v39 P3.3: no account-access consent row is moved or altered', () => {
+describe.skipIf(!HAS_GIAM_SRC)('v39 P3.3: no account-access consent row is moved or altered', () => {
   it('never names the bank consent collections from the identity module', () => {
     // PSD2 account-access consent is regulated business data and evidence in a payment dispute. The
     // identity module has no basis to read it and no basis to write it, and the boundary is worth an

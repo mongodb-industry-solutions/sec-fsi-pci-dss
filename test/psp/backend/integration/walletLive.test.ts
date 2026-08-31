@@ -79,7 +79,12 @@ async function authorityLogin(userName: string): Promise<string> {
  */
 function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
   const raw = require('fs').readFileSync(
-    require('path').resolve(__dirname, '../../../../giam/backend/data/identities.json'),
+    require('path').resolve(
+      require('path').resolve(__dirname, '../../../..'),
+      // GIAM is a separate repository now, so its fixtures are read from a local checkout of it.
+      process.env.GIAM_REPO_PATH ?? '../sec-giam',
+      'backend/data/identities.json',
+    ),
     'utf8',
   );
   return JSON.parse(raw);

@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
 
 const SRC = resolve(__dirname, '../../../../../psp/backend/src');
 const DATA = resolve(__dirname, '../../../../../psp/backend/data');
@@ -21,10 +22,12 @@ const parties = JSON.parse(readFileSync(resolve(DATA, 'parties.json'), 'utf8')) 
 }>;
 // The pre-extraction logins, frozen. The live fixture went with the rest of the identity data; this
 // test is about whether the BRIDGE was removed cleanly, which is a question about that moment.
-const logins = JSON.parse(readFileSync(
-  resolve(__dirname, '../../../../giam/backend/fixtures/migration-source-logins.json'),
+// The fixture and the authority source both live in the GIAM repository now.
+const HAS_GIAM = hasGiam('test/backend/fixtures/migration-source-logins.json');
+const logins = (HAS_GIAM ? JSON.parse(readFileSync(
+  giamPath('test/backend/fixtures/migration-source-logins.json'),
   'utf8',
-)) as Array<{
+)) : []) as Array<{
   customerAuthenticationInstanceReference: string;
   partyInstanceReference: string;
 }>;
@@ -51,11 +54,11 @@ describe('v39 P3.1: the identity key lives on the business record', () => {
     expect(stripComments(bridge)).not.toMatch(/CUSTOMER_AUTHENTICATION_COLLECTION/);
   });
 
-  it('offers the inverse at the authority, which is the only place that can answer it', () => {
+  it.skipIf(!HAS_GIAM)('offers the inverse at the authority, which is the only place that can answer it', () => {
     // Naming the principal bound to a business reference is the authority's to answer: it holds the
     // binding. This application asks; it does not keep a copy of the mapping to answer from.
     const directory = readFileSync(
-      resolve(SRC, '../../../giam/backend/src/modules/directory/services/directory.service.ts'),
+      giamPath('backend/src/modules/directory/services/directory.service.ts'),
       'utf8',
     );
     expect(directory).toMatch(/findByAccountHolderRef/);
@@ -68,18 +71,18 @@ describe('v39 P3.1: the identity key lives on the business record', () => {
     expect(indexes).toMatch(/key: \{ subjectId: 1 \}, unique: true, partialFilterExpression/);
   });
 
-  it('stamps the key from the seeder, so it is rebuilt rather than migrated', () => {
+  it.skipIf(!HAS_GIAM)('stamps the key from the seeder, so it is rebuilt rather than migrated', () => {
     // Stamped by the AUTHORITY's seeder now, from its own fixtures. Reusing the pre-extraction
     // reference is what makes a historical audit row still resolve to the same principal.
     const seeder = readFileSync(
-      resolve(SRC, '../../../giam/backend/src/vendors/seed/seedIdentities.ts'),
+      giamPath('backend/src/vendors/seed/seedIdentities.ts'),
       'utf8',
     );
     expect(seeder).toMatch(/subjectId/);
   });
 });
 
-describe('v39 P3.1: the mapping is one to one, in both directions', () => {
+describe.skipIf(!HAS_GIAM)('v39 P3.1: the mapping is one to one, in both directions', () => {
   it('gives every login exactly one party', () => {
     const byParty = new Map<string, number>();
     for (const login of logins) {

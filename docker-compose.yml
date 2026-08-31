@@ -76,17 +76,19 @@ services:
   # GIAM: the identity and access authority. Every other service is a relying party or a resource
   # server against it. PUBLIC, and it has to be: a browser is redirected here to sign in, so a private
   # in-cluster host would work for a server-side call and be unreachable from the laptop doing the demo.
+  # GIAM lives in its own repository (mongodb-industry-solutions/sec-giam). Set GIAM_REPO_PATH to a
+  # local checkout of it; during the migration that checkout is at tmp/sec-giam.
   giam:
     build:
-      context: .
-      dockerfile: giam/backend/Dockerfile
+      context: ${GIAM_REPO_PATH:-../sec-giam}
+      dockerfile: backend/Dockerfile
     ports:
       - "8085:8080"
     env_file:
       - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
-      GIAM_SEED_DATA_DIR: /app/giam/backend/data
+      GIAM_SEED_DATA_DIR: /app/backend/data
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       GIAM_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       # In-network, for the services that resolve discovery server side.
@@ -100,7 +102,7 @@ services:
       # This replica's own private key. Mounted rather than baked: a signing key in an image is a
       # signing key in a registry. With the default provider each replica holds its own, and the
       # published key set is what they share, so this volume is per replica and never shared.
-      - ./giam/backend/keys:/app/giam/backend/keys
+      - ${GIAM_REPO_PATH:-../sec-giam}/backend/keys:/app/backend/keys
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
@@ -110,10 +112,12 @@ services:
 
   # The identity console: login, consent, registration, credentials, and the administration of realms,
   # providers, identities, roles, policies, clients, keys, sessions and audit.
+  # Also from the sec-giam repository: GIAM_REPO_PATH points at a local checkout of it, which during
+  # the migration is tmp/sec-giam.
   giam-frontend:
     build:
-      context: ./giam/frontend
-      dockerfile: Dockerfile
+      context: ${GIAM_REPO_PATH:-../sec-giam}
+      dockerfile: frontend/Dockerfile
     ports:
       # The plan reserves 8084 for this app, but bank-frontend already publishes there, so the console
       # takes 8086 and the collision is recorded rather than silently resolved.

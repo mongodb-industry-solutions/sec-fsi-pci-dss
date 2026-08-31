@@ -11,6 +11,10 @@
  * EBA/GL/2019/04 §31(a) "prevent unjustified access to a large set of data".
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
+
+// The role matrix is the authority's fixture, in its own repository now.
+const HAS_ROLES = hasGiam('backend/data/roles.json');
 
 const h = vi.hoisted(() => ({ getDbForRole: vi.fn() }));
 vi.mock('../../../../../psp/backend/src/vendors/encryption/roleClients', () => ({
@@ -121,7 +125,7 @@ describe('getBeneficiaryAggregates (A7)', () => {
   });
 });
 
-describe('role grants for beneficiaries (test 20)', () => {
+describe.skipIf(!HAS_ROLES)('role grants for beneficiaries (test 20)', () => {
   /**
    * The roles are the authority's now, so this reads its fixture rather than a table here.
    *
@@ -130,10 +134,9 @@ describe('role grants for beneficiaries (test 20)', () => {
    * somewhere else does not make it somebody else's rule to state. The catalog helper is still local,
    * because deciding whether a permission set contains a permission is a pure claim check.
    */
-  const roles = JSON.parse(readFileSync(
-    resolve(__dirname, '../../../../../giam/backend/data/roles.json'),
-    'utf8',
-  )) as Array<{ name: string; permissions: Record<string, string[]> }>;
+  const roles = (HAS_ROLES
+    ? JSON.parse(readFileSync(giamPath('backend/data/roles.json'), 'utf8'))
+    : []) as Array<{ name: string; permissions: Record<string, string[]> }>;
 
   const perms = (roleName: string) => {
     const role = roles.find((r) => r.name === roleName);

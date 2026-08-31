@@ -16,9 +16,9 @@ env:
 
   # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
   # Browser-facing sign-in → the PUBLIC GIAM console. Credential entry lives at the authority.
-  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-fsi-pci-dss-giam-console.industrysolutions.staging.corp.mongodb.com/auth/login"
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-console.industrysolutions.staging.corp.mongodb.com/auth/login"
   # Server-to-server discovery, token and introspection → PRIVATE in-cluster GIAM service.
-  PSP_MERCHANT_ISSUER_URL: "http://sec-fsi-pci-dss-giam-web-app:80/realms/leafypay"
+  PSP_MERCHANT_ISSUER_URL: "http://sec-giam-web-app:80/realms/leafypay"
   # Server-to-server BUSINESS API → PRIVATE in-cluster backend service. Unchanged: no business
   # endpoint moved, and this variable is the proof that authentication was separable from them.
   PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
@@ -56,22 +56,36 @@ env:
   # the bank's bcrypt verifier and one to write the PSP's provider credential.
   PSP_BANKCORE_TPP_CLIENT_ID: leafypay-psp
 
-  # ── GIAM, the identity and access authority (v39) ──────────────────────────────────────────────
-  # PRIVATE in-cluster service, for what a relying party calls server side: discovery, token,
-  # introspection, JWKS.
-  GIAM_BASE_URL: "http://sec-fsi-pci-dss-giam-web-app:80"
-  # PUBLIC, and it has to be. A realm issuer URL is built from this value and ends up inside every
-  # token as `iss`, and the browser is redirected here to sign in. A private in-cluster host would
-  # verify correctly server side and be unreachable from the browser doing the signing in, which
-  # reads as a broken login rather than as a wrong URL.
-  GIAM_PUBLIC_URL: "https://sec-fsi-pci-dss-giam.industrysolutions.staging.corp.mongodb.com"
-  GIAM_FRONTEND_URL: "https://sec-fsi-pci-dss-giam-console.industrysolutions.staging.corp.mongodb.com"
-  # The origins allowed to call the identity API from a browser: the console and each relying party.
-  GIAM_CORS_ORIGIN: "https://sec-fsi-pci-dss-giam-console.industrysolutions.staging.corp.mongodb.com,https://sec-fsi-pci-dss-frontend.industrysolutions.staging.corp.mongodb.com,https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com"
-  # Per-instance keys with one shared published key set: correct at any replica count, with no KMS,
-  # no shared volume and no shared secret. Not a development mode, it is the default everywhere.
-  GIAM_KEY_PROVIDER: instance-local
-  GIAM_KMS_PROVIDER: local
+  # ── GIAM, the identity and access authority ────────────────────────────────────────────
+  # GIAM is deployed from its own repository (sec-giam), which owns its pod configuration: its
+  # public and console URLs, its CORS allowlist, its key provider, its database and its key vault.
+  # This file sets only what THIS platform reads in order to reach it. Declaring GIAM's own values
+  # here too is how the two files drift, and the drift surfaces as a login or CORS failure that
+  # reads like an application bug.
+  #
+  # PRIVATE in-cluster service: discovery, token, introspection and JWKS, all called server side.
+  # Also the bare host the shared link resolver builds absolute endpoints on, so it carries NO realm.
+  GIAM_BASE_URL: "http://sec-giam-web-app:80"
+  # The platform realm issuer, private for the same reason. PSP_-prefixed deliberately: the shared
+  # link resolver reads the UNPREFIXED name as a bare host, and a realm URL there would be joined
+  # onto fixture paths that already carry their own realm, producing /realms/x/realms/y.
+  PSP_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/leafypay"
+  # What a token must name in its audience claim to be accepted here, and the name this platform
+  # registers its enforcement points under. Both are the realm GIAM seeds for this platform.
+  GIAM_AUDIENCE: "leafypay"
+  GIAM_RESOURCE_SERVER: "leafypay"
+  # This service's OWN client at GIAM, for the calls it makes as itself rather than for a person.
+  # Registered in GIAM's client fixtures; the matching secret is in envSecrets.
+  GIAM_CLIENT_ID: "leafypay-backend"
+  # How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old public
+  # key can only verify signatures GIAM itself produced.
+  GIAM_JWKS_CACHE_SECONDS: "900"
+  # The bank is a relying party in its OWN realm. A platform token carries a different issuer and is
+  # refused before any claim is read, which is what makes the institutional boundary structural.
+  PSP_BANKCORE_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/bankcore"
+  PSP_BANKCORE_GIAM_AUDIENCE: "bankcore"
+  PSP_BANKCORE_GIAM_RESOURCE_SERVER: "bankcore"
+  PSP_BANKCORE_GIAM_JWKS_CACHE_SECONDS: "900"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging
@@ -92,11 +106,14 @@ envSecrets:
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-staging
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-staging
   PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-staging
-  # GIAM's own database and its OWN key vault inside it. Never the vault the applications share: an
-  # identity system holding the same key material as what it protects cannot contain a breach.
-  GIAM_DB_NAME: sec-fsi-pci-dss-secrets-staging
-  GIAM_DB_KEYVAULT: sec-fsi-pci-dss-secrets-staging
-  GIAM_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
+  # This platform's own client secret at GIAM, presented for the client_credentials calls it makes
+  # as itself. GIAM derives it per client id, so the two sides must agree on one value.
+  GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
+  # Presented when registering this platform's enforcement points at GIAM's administration API. The
+  # same value GIAM holds as its admin token: the bank falls back to GIAM_ADMIN_TOKEN, the platform
+  # has no fallback and needs it under its own name.
+  GIAM_REGISTRATION_TOKEN: sec-fsi-pci-dss-secrets-staging
+  # The credential the bank presents to GIAM's administration API. Ours to hold, GIAM's to issue.
   GIAM_ADMIN_TOKEN: sec-fsi-pci-dss-secrets-staging
 
 resources:

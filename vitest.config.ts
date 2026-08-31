@@ -22,8 +22,6 @@ export default defineConfig({
       ['test/psp/backend/**', 'node'],
       // v37: bankcore is a second Fastify service, so its suites run in node like the backend's.
       ['test/bank/backend/**', 'node'],
-      // v39: GIAM is a third Fastify service, so its suites run in node like the others.
-      ['test/giam/backend/**', 'node'],
     ],
     include: [
       'test/psp/frontend/unit/**/*.test.{ts,tsx}',
@@ -32,13 +30,11 @@ export default defineConfig({
       'test/psp/backend/integration/**/*.test.ts',
       'test/bank/backend/unit/**/*.test.ts',
       'test/bank/backend/integration/**/*.test.ts',
-      'test/giam/backend/unit/**/*.test.ts',
-      'test/giam/backend/integration/**/*.test.ts',
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['psp/frontend/src/**', 'psp/backend/src/**', 'bank/backend/src/**', 'giam/backend/src/**'],
+      include: ['psp/frontend/src/**', 'psp/backend/src/**', 'bank/backend/src/**'],
       exclude: ['**/__tests__/**', '**/node_modules/**'],
     },
   },

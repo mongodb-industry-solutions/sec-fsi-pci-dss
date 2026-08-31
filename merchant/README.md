@@ -33,7 +33,7 @@ PSP `frontend/`), and docker-compose maps host `8082:8080`. The port is env-driv
 | Field | Value |
 |---|---|
 | client_id | `oauth001-0000-4000-8000-000000000001` |
-| client_secret | not written down; read it with `npm run clients:credentials --prefix giam/backend` |
+| client_secret | not written down; read it with `npm run clients:credentials --prefix backend` in the sec-giam repository |
 | redirect_uri | `http://localhost:8082/api/auth/callback` |
 | scopes (user SSO) | `openid profile read:beneficiaries write:beneficiaries read:transactions read:accounts read:merchant_profile read:notifications write:transfers` |
 | grant types | `authorization_code`, `refresh_token` (user SSO) + `client_credentials` (server-to-server API payment) |

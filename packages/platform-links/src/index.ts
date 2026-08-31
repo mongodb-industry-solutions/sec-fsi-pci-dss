@@ -122,6 +122,8 @@ export const CLIENT_SECRET_REFS: Readonly<Record<string, string>> = {
   'leafypay-simulator': 'NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET',
 };
 
+// Cross-repo contract: this package is vendored into sec-giam, which derives the same secrets. Changing
+// this derivation on one side alone breaks every client credentials flow between the two repositories.
 export function clientSecretFor(clientId: string, env: NodeJS.ProcessEnv = process.env): string {
   const ref = CLIENT_SECRET_REFS[clientId];
   const held = ref ? env[ref]?.trim() : undefined;

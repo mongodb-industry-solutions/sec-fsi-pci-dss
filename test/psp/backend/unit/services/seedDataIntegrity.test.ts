@@ -21,6 +21,7 @@
  *     which is what makes the KYC administration list's count explainable (v32 Track E).
  */
 import { describe, it, expect } from 'vitest';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
@@ -45,10 +46,13 @@ const transactions = read<TransactionSeed>('cardTransactions.json');
 // The logins are the identity authority's fixtures now. Read from there, because the integrity
 // question they answer (does every customer party have exactly one principal) spans both sides and
 // has to be asked against whichever file is actually seeded.
-const logins = (JSON.parse(readFileSync(
-  join(__dirname, '../../../../../giam/backend/data/identities.json'),
+// GIAM is a separate repository now, so the fixture is read from a local checkout of it and the
+// login rules skip when there is none.
+const HAS_LOGINS = hasGiam('backend/data/identities.json');
+const logins = (HAS_LOGINS ? JSON.parse(readFileSync(
+  giamPath('backend/data/identities.json'),
   'utf-8',
-)) as Array<Record<string, unknown>>).map((identity) => ({
+)) as Array<Record<string, unknown>> : []).map((identity) => ({
   customerAuthenticationInstanceReference: identity.subjectId as string,
   customerAuthenticationEmailAddress: identity.email as string | undefined,
   partyInstanceReference: identity.accountHolderRef as string,
@@ -121,7 +125,6 @@ describe('v33 seed-data integrity: referential integrity', () => {
 
   it.each([
     ['agreement → party', () => agreements.map((a) => a.partyInstanceReference), () => partyRefs],
-    ['login → party', () => logins.map((l) => l.partyInstanceReference), () => partyRefs],
     [
       'card → agreement',
       () => cards.map((c) => c.customerAgreementInstanceReference),
@@ -150,6 +153,9 @@ describe('v33 seed-data integrity: referential integrity', () => {
       () => new Set(fraudCases.map((c) => c.fraudDiagnosisInstanceReference as string)),
     ],
     ['merchant → owner party', () => merchants.map((m) => m.merchantOwnerPartyReference as string), () => partyRefs],
+    ...(HAS_LOGINS
+      ? [['login → party', () => logins.map((l) => l.partyInstanceReference), () => partyRefs] as const]
+      : []),
   ])('%s has no orphans', (_label, values, targets) => {
     const target = targets();
     expect(values().filter((v) => !target.has(v))).toEqual([]);
@@ -175,9 +181,6 @@ describe('v33 seed-data integrity: uniqueness', () => {
     ['party primary key', () => parties.map((p) => p.partyInstanceReference)],
     ['party email', () => parties.map((p) => String(p.partyEmailAddress ?? '').toLowerCase())],
     ['party phone', () => parties.map((p) => p.partyMobilePhoneNumber as string)],
-    ['login primary key', () => logins.map((l) => l.customerAuthenticationInstanceReference)],
-    ['login email', () => logins.map((l) => String(l.customerAuthenticationEmailAddress ?? '').toLowerCase())],
-    ['login owner party (one login per party)', () => logins.map((l) => l.partyInstanceReference)],
     ['agreement primary key', () => agreements.map((a) => a.customerAgreementInstanceReference)],
     ['agreement business reference', () => agreements.map((a) => a.customerAgreementReference)],
     ['agreement owner party (one agreement per party)', () => agreements.map((a) => a.partyInstanceReference)],
@@ -192,6 +195,13 @@ describe('v33 seed-data integrity: uniqueness', () => {
     ['card holder + token pair', () => cards.map((c) => `${c.customerAgreementInstanceReference}|${c.paymentCardReference}`)],
     ['transaction primary key', () => transactions.map((t) => t.cardTransactionInstanceReference)],
     ['fraud case primary key', () => fraudCases.map((c) => c.fraudDiagnosisInstanceReference as string)],
+    ...(HAS_LOGINS
+      ? [
+          ['login primary key', () => logins.map((l) => l.customerAuthenticationInstanceReference)] as const,
+          ['login email', () => logins.map((l) => String(l.customerAuthenticationEmailAddress ?? '').toLowerCase())] as const,
+          ['login owner party (one login per party)', () => logins.map((l) => l.partyInstanceReference)] as const,
+        ]
+      : []),
   ])('%s is unique', (_label, values) => {
     const present = values().filter((v) => v !== undefined && v !== '');
     const seen = new Map<string, number>();
@@ -210,12 +220,12 @@ describe('v33 seed-data integrity: uniqueness', () => {
 });
 
 describe('v33 seed-data integrity: a complete population (D-3)', () => {
-  it('every customer party has exactly one login (F1)', () => {
+  it.skipIf(!HAS_LOGINS)('every customer party has exactly one login (F1)', () => {
     const without = customers.filter((p) => (loginsByParty.get(p.partyInstanceReference) ?? []).length !== 1);
     expect(without.map((p) => p.partyName)).toEqual([]);
   });
 
-  it('every employee party is complete and has exactly one login', () => {
+  it.skipIf(!HAS_LOGINS)('every employee party is complete and has exactly one login', () => {
     const REQUIRED = ['partyName', 'partyEmailAddress', 'partyMobilePhoneNumber'] as const;
     const incomplete = employees
       .map((p) => ({
@@ -269,7 +279,7 @@ describe('v33 seed-data integrity: a complete population (D-3)', () => {
     }
   });
 
-  it('the curated login picker stays short while every customer is reachable', () => {
+  it.skipIf(!HAS_LOGINS)('the curated login picker stays short while every customer is reachable', () => {
     // v39: two personas per role rather than one, so a sign-in screen can offer a ROLE instead of a
     // named person. Sixteen is still a curated fraction of the population, which is the property.
     const featured = logins.filter((l) => l.customerAuthenticationDemoFeatured === true);

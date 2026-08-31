@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
+import { existsSync } from 'fs';
 import { resolve } from 'path';
 
 /**
@@ -13,7 +14,9 @@ import { resolve } from 'path';
  * does what it does in production: discovery over HTTP, a key set fetched from a URL, and a token it
  * did not mint.
  */
-const GIAM_DIR = resolve(__dirname, '../../../../giam/backend');
+// GIAM lives in its own repository now, so its checkout is located rather than assumed.
+const REPO_ROOT = resolve(__dirname, '../../../..');
+const GIAM_DIR = resolve(REPO_ROOT, process.env.GIAM_REPO_PATH ?? '../sec-giam', 'backend');
 
 export interface Authority {
   baseUrl: string;
@@ -50,6 +53,9 @@ export async function startAuthority(port = 8085): Promise<Authority | null> {
   if (await waitForHealth(baseUrl, 1500)) {
     return { baseUrl, stop: async () => {} };
   }
+
+  // No local checkout of the authority repository, so there is nothing to spawn: the caller skips.
+  if (!existsSync(GIAM_DIR)) return null;
 
   const child: ChildProcess = spawn(
     process.platform === 'win32' ? 'npx.cmd' : 'npx',
