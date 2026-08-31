@@ -52,7 +52,7 @@ async function reachable(): Promise<boolean> {
 async function signIn(login: string): Promise<{ jar: Jar; codeIssued: boolean }> {
   const jar: Jar = {};
 
-  const start = await fetch(`${CONSOLE}/api/auth/start`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
+  const start = await fetch(`${CONSOLE}/api/auth/login`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
   collect(jar, start);
   const params = new URL(start.headers.get('location') ?? '').searchParams;
 
@@ -104,7 +104,7 @@ describe('v39: the bank console signs in at the authority and authorises by role
 
   it('collects no credential of its own, and starts a code request instead', async () => {
     if (!live) return;
-    const start = await fetch(`${CONSOLE}/api/auth/start`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
+    const start = await fetch(`${CONSOLE}/api/auth/login`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
     expect(start.status).toBe(307);
 
     const location = new URL(start.headers.get('location') ?? '');
@@ -119,7 +119,7 @@ describe('v39: the bank console signs in at the authority and authorises by role
     expect(cookies, 'the verifier must not be readable by script').toMatch(/httponly/i);
   });
 
-  it('has no password endpoint of its own', async () => {
+  it('accepts no credential of its own, on the very route that starts the flow', async () => {
     if (!live) return;
     const response = await fetch(`${CONSOLE}/api/auth/login`, {
       method: 'POST',
@@ -127,12 +127,14 @@ describe('v39: the bank console signs in at the authority and authorises by role
       body: JSON.stringify({ login: ADMIN, password: DEMO_PASSWORD }),
       signal: AbortSignal.timeout(20000),
     });
-    expect(response.status, 'a credential must not be postable to this app').toBe(404);
+    // 405, not 404: the route exists to START the flow and implements no POST at all, so there is
+    // nowhere in this app a password can be sent even by an honest mistake.
+    expect(response.status, 'a credential must not be postable to this app').toBe(405);
   });
 
   it('refuses a callback whose state it did not issue', async () => {
     if (!live) return;
-    const start = await fetch(`${CONSOLE}/api/auth/start`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
+    const start = await fetch(`${CONSOLE}/api/auth/login`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
     const jar: Jar = {};
     collect(jar, start);
 

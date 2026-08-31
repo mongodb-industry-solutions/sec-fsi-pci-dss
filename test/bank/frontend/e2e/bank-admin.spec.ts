@@ -103,7 +103,7 @@ test.describe('the bank administration app', () => {
   // call it responsive. Driven through the browser because the credential is entered at the
   // AUTHORITY, which is the property under test everywhere else.
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BANK_UI}/api/auth/start`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`${BANK_UI}/api/auth/login`, { waitUntil: 'domcontentloaded' });
     await page.getByLabel(/email or user name/i).fill(BANK_ADMIN);
     await page.getByLabel(/^password$/i).fill(DEMO_PASSWORD);
     await page.getByRole('button', { name: /^sign in$/i }).click();

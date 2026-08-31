@@ -50,7 +50,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
         {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
 
         <a
-          href="/api/auth/start"
+          href="/api/auth/login"
           className="mt-6 inline-block rounded-md bg-accent px-4 py-2 font-medium text-bank-ink"
         >
           Sign in

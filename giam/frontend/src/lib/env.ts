@@ -9,3 +9,10 @@ export const env = {
 export function apiUrl(path: string): string {
   return `${env.apiBaseUrl}${path.startsWith('/') ? path : `/${path}`}`;
 }
+
+// The BROWSER-reachable API host, for links a person clicks rather than calls the console makes. An
+// empty apiBaseUrl means same origin, which a rewrite serves but a new tab cannot open.
+export const API_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_GIAM_API_PUBLIC_URL
+  || process.env.NEXT_PUBLIC_GIAM_API_URL
+  || 'http://localhost:8085';

@@ -42,16 +42,25 @@ function redirectUri(): string {
   return `${appBase()}/api/auth/callback`;
 }
 
-/** The URL to send the browser to, with the PKCE verifier and state kept server side. */
-export async function startSignIn(): Promise<string> {
+export interface LoginStart {
+  url: string;
+  /** Attached to the redirect response by the caller, never through next/headers. */
+  cookies: Array<{ name: string; value: string }>;
+}
+
+/**
+ * Where to send the browser, and the short-lived state to attach to that same response.
+ *
+ * The cookies are returned rather than set here because a mutation through `next/headers` is not
+ * reliably merged into a returned redirect across Next versions, and the merchant's flow already
+ * carries that scar. A verifier that silently fails to persist produces an invalid_state on the way
+ * back, which reads like an attack rather than a framework detail.
+ */
+export function startSignIn(): LoginStart {
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const state = randomBytes(16).toString('base64url');
-
-  const store = await cookies();
-  const shortLived = { httpOnly: true as const, sameSite: 'lax' as const, path: '/', maxAge: 600 };
-  store.set(VERIFIER_COOKIE, verifier, shortLived);
-  store.set(STATE_COOKIE, state, shortLived);
+  const nonce = randomBytes(16).toString('base64url');
 
   const url = new URL(`${authorityUi()}/auth/login`);
   url.searchParams.set('realm', REALM);
@@ -60,10 +69,26 @@ export async function startSignIn(): Promise<string> {
   url.searchParams.set('response_type', 'code');
   url.searchParams.set('scope', 'openid profile email');
   url.searchParams.set('state', state);
+  url.searchParams.set('nonce', nonce);
   url.searchParams.set('code_challenge', challenge);
   url.searchParams.set('code_challenge_method', 'S256');
-  return url.toString();
+
+  return {
+    url: url.toString(),
+    cookies: [
+      { name: VERIFIER_COOKIE, value: verifier },
+      { name: STATE_COOKIE, value: state },
+    ],
+  };
 }
+
+/** The attributes the short-lived login cookies carry, in one place. */
+export const LOGIN_COOKIE_OPTIONS = {
+  httpOnly: true as const,
+  sameSite: 'lax' as const,
+  path: '/',
+  maxAge: 600,
+};
 
 export interface ExchangeResult {
   ok: boolean;
