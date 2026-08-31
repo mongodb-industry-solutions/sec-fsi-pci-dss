@@ -9,5 +9,7 @@ export const BRAND = {
   get full() {
     return [this.primary, this.secondary].filter(Boolean).join(' ');
   },
+  // GIAM: General Identity and Access Manager.
+  expansion: 'General Identity and Access Manager',
   tagline: 'Identity and access for people and systems',
 } as const;

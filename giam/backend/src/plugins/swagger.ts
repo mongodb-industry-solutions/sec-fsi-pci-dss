@@ -25,7 +25,7 @@ async function swaggerPlugin(fastify: FastifyInstance) {
     openapi: {
       openapi: '3.1.0',
       info: {
-        title: 'GIAM (Global Identity and Access Management)',
+        title: 'GIAM (General Identity and Access Manager)',
         version: '1.0.0',
         description: `
 ## Overview

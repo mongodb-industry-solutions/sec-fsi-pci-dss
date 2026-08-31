@@ -87,7 +87,7 @@ export default function SystemPage() {
 
   if (!claims) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
         <SignInPanel heading={`${BRAND.full} console`} onSignedIn={afterSignIn} />
       </main>
     );
@@ -97,8 +97,8 @@ export default function SystemPage() {
   const cards = [...OWN_IDENTITY, ...(administersIdentity(claims) ? OVERSIGHT : [])];
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
-      <div className="mb-8 flex items-start justify-between gap-4">
+    <main className="mx-auto w-full max-w-4xl p-4 sm:p-6 lg:p-8">
+      <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-semibold text-mongodb-dark">{who}</h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -136,13 +136,13 @@ export default function SystemPage() {
       )}
 
       <div className="mt-10 rounded-xl border bg-gray-50 p-5">
-        <p className="text-xs font-medium uppercase tracking-wide text-gray-400">Your token</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-gray-600">Your token</p>
         <dl className="mt-2 grid gap-1 text-sm text-gray-600 sm:grid-cols-2">
-          <div><dt className="inline text-gray-400">subject </dt><dd className="inline">{claims.sub}</dd></div>
-          <div><dt className="inline text-gray-400">issuer </dt><dd className="inline">{claims.iss ?? 'n/a'}</dd></div>
-          <div><dt className="inline text-gray-400">scope </dt><dd className="inline">{claims.scope ?? 'n/a'}</dd></div>
+          <div><dt className="inline text-gray-600">subject </dt><dd className="inline">{claims.sub}</dd></div>
+          <div><dt className="inline text-gray-600">issuer </dt><dd className="inline">{claims.iss ?? 'n/a'}</dd></div>
+          <div><dt className="inline text-gray-600">scope </dt><dd className="inline">{claims.scope ?? 'n/a'}</dd></div>
           <div>
-            <dt className="inline text-gray-400">expires </dt>
+            <dt className="inline text-gray-600">expires </dt>
             <dd className="inline">{claims.exp ? new Date(claims.exp * 1000).toLocaleTimeString() : 'n/a'}</dd>
           </div>
         </dl>

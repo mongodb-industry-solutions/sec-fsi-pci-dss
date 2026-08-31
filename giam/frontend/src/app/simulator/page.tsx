@@ -18,7 +18,7 @@ const FLOWS = [
 
 export default function SimulatorPage() {
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="mx-auto w-full max-w-3xl p-4 sm:p-6 lg:p-8">
       <h1 className="text-2xl font-semibold text-mongodb-dark">Simulator Mode</h1>
       <p className="mt-2 text-gray-600">
         A guided walk through an authentication flow as a chosen persona, showing the real request and

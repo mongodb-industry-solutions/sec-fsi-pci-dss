@@ -73,7 +73,7 @@ export default function AboutPage() {
             <span className="about-divider" />
           </div>
           <p className="mx-auto mt-6 max-w-3xl text-sm leading-relaxed text-gray-300 sm:text-base">
-            These are the main contact points for the <span className="text-[#00ED64]">{BRAND.full}</span> (Identity and Access)
+            These are the main contact points for the <span className="text-[#00ED64]">{BRAND.full}</span> ({BRAND.expansion})
             demo, by area. Reach out through your enterprise account or your usual MongoDB channels to book a deeper
             technical conversation, a workshop or a tailored deep dive with us, or to get support on anything you see
             here. You can also scan a QR to connect on LinkedIn and follow the content we publish.
@@ -82,7 +82,7 @@ export default function AboutPage() {
 
         <div className="about-rise mt-10 flex items-center justify-between gap-4" style={{ '--about-delay': '80ms' } as React.CSSProperties}>
           <h2 className="text-sm font-semibold uppercase tracking-wider text-gray-400">
-            Contacts <span className="text-gray-600">({contacts.length})</span>
+            Contacts <span className="text-gray-400">({contacts.length})</span>
           </h2>
           {/* Layout switch: only meaningful where two columns fit */}
           <div className="hidden items-center gap-1 rounded-lg border border-gray-700 bg-white/5 p-1 lg:flex">
@@ -127,7 +127,7 @@ export default function AboutPage() {
           ))}
         </ul>
 
-        <p className="mt-12 text-center text-xs text-gray-600">
+        <p className="mt-12 text-center text-xs text-gray-400">
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'} · MongoDB Industry Solutions Team
         </p>
       </div>
@@ -163,7 +163,7 @@ function ContactCard({ contact, wide }: { contact: TeamContact; wide: boolean })
           </span>
         ) : null}
         <p className={`mt-3 text-sm leading-relaxed text-gray-400 ${wide ? 'lg:max-w-2xl' : ''}`}>
-          <span className="text-gray-500">Ask me about: </span>
+          <span className="text-gray-400">Ask me about: </span>
           {contact.ask}
         </p>
         {/* Wraps on narrow screens so both links stay tappable */}

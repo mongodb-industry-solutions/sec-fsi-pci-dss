@@ -1,15 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Bug, Eye, EyeOff } from 'lucide-react';
 import { apiUrl } from '../lib/env';
 import { tokenFromSession } from '../lib/session';
+import { BRAND } from '../config/brand';
+import { Tooltip } from './Tooltip';
 
 /**
- * The sign-in experience, in one place.
+ * THE sign-in form for the whole platform.
  *
- * Used by the standalone sign-in page a relying party redirects to, and by this console's own
- * Application Mode. One component because they are the same act: a second copy would be a second
- * place for the roster, the realm picker and the error handling to drift.
+ * Every application redirects here, so this is the only screen on which a credential is ever typed.
+ * One component rather than one per application: a second copy would be a second place for the
+ * roster, the directory picker and the error handling to drift, and the point of moving identity out
+ * was to have one.
  */
 
 interface Provider {
@@ -46,7 +50,7 @@ export interface SignedIn {
 // Plaintext behind the seed fixture's credential hashes, so it belongs to the demo data.
 const DEMO_PASSWORD = 'demo-password';
 
-/** Personas grouped by the role they hold, so the screen offers a ready-made user per role. */
+/** Personas grouped by the role they hold, so the picker offers a ready-made user per role. */
 function byRole(roster: RosterEntry[]): Array<[string, RosterEntry[]]> {
   const groups = new Map<string, RosterEntry[]>();
   for (const entry of roster) {
@@ -71,9 +75,10 @@ export function SignInPanel({
   const [realm, setRealm] = useState(defaultRealm);
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [debugMode, setDebugMode] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showRoster, setShowRoster] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,14 +99,14 @@ export function SignInPanel({
         body: JSON.stringify(credentials),
       });
       if (!response.ok) {
-        // One message for every failure. Distinguishing an unknown principal from a wrong password
-        // is an enumeration oracle, and the person signing in cannot act on the difference anyway.
+        // One message for every failure. Distinguishing an unknown principal from a wrong password is
+        // an enumeration oracle, and the person signing in cannot act on the difference anyway.
         setError('That did not work. Check the details and try again.');
         return;
       }
       const body = await response.json();
-      // The console then obtains a token for itself the ordinary way, so the screens that need one
-      // work. A failure here does not undo the sign-in: the person IS signed in.
+      // A token for the console itself, obtained the ordinary way. Failing here does not undo the
+      // sign-in: the person IS signed in, and only the screens needing a token are affected.
       await tokenFromSession(realm, body.sessionId);
       onSignedIn?.({ userName: body.userName, sessionId: body.sessionId, realm });
     } catch {
@@ -111,138 +116,179 @@ export function SignInPanel({
     }
   }
 
-  const accent = context?.branding.primaryColor ?? '#00ED64';
+  function pick(entry: RosterEntry) {
+    setLogin(entry.userName);
+    setPassword(DEMO_PASSWORD);
+    setError(null);
+  }
+
+  const grouped = context ? byRole(context.roster) : [];
 
   return (
-    <div className="w-full max-w-md rounded-xl border bg-white p-8 shadow-sm">
-      <div className="mb-6 text-center">
-        <h1 className="text-2xl font-semibold text-mongodb-dark">
-          {heading ?? context?.branding.displayName ?? context?.displayName ?? 'Sign in'}
-        </h1>
-        <p className="mt-1 text-sm text-gray-500">Sign in to continue</p>
-      </div>
-
-      {context && context.providers.length > 0 && (
-        <div className="mb-6">
-          <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="realm-picker">
-            Directory
-          </label>
-          <select
-            id="realm-picker"
-            value={realm}
-            onChange={(event) => setRealm(event.target.value)}
-            className="w-full rounded-md border px-3 py-2"
+    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl sm:p-8">
+      <div className="relative mb-6 text-center">
+        <Tooltip text={debugMode
+          ? 'Debug mode is on: a ready-made user is offered for each role so you can sign in with one click. Click to turn it off.'
+          : 'Turn on debug mode. It offers a ready-made user for each role, so you can sign in with one click instead of typing credentials.'}>
+          <button
+            type="button"
+            onClick={() => setDebugMode(!debugMode)}
+            aria-label={debugMode ? 'Disable debug mode' : 'Enable debug mode'}
+            className={`absolute right-0 top-0 rounded-lg p-1.5 transition-colors ${
+              debugMode
+                ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
+                : 'text-gray-300 hover:bg-gray-100 hover:text-gray-500'
+            }`}
           >
-            <option value={context.realm}>{context.displayName}</option>
-            {context.providers.map((provider) => (
-              <option key={provider.name} value={context.realm} disabled={!provider.enabled}>
-                {provider.displayName}
-                {provider.enabled ? '' : ' (not active in this build)'}
-              </option>
-            ))}
-          </select>
+            <Bug size={14} />
+          </button>
+        </Tooltip>
+
+        <div className="mb-2 text-4xl">
+          <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="mx-auto h-20 w-20" />
         </div>
-      )}
+        <h1 className="text-2xl font-bold text-[#001E2B]">
+          {heading ?? context?.branding.displayName ?? context?.displayName ?? BRAND.full}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">Application Mode: Sign In</p>
+      </div>
 
       <form
         onSubmit={(event) => { event.preventDefault(); submit({ login, password }); }}
         className="space-y-4"
       >
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="login">
+          <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700" htmlFor="realm-picker">
+            Authentication Domain
+            <Tooltip text="The domain decides how you are signed in and who manages the accounts. Pick the one your account belongs to." />
+          </label>
+          {context === null ? (
+            <div className="w-full animate-pulse rounded-lg border bg-gray-50 px-3 py-2 text-sm text-gray-600">
+              Loading domains…
+            </div>
+          ) : (
+            <select
+              id="realm-picker"
+              value={realm}
+              onChange={(event) => { setRealm(event.target.value); setLogin(''); setPassword(''); setError(null); }}
+              className="w-full rounded-lg border bg-white px-3 py-2 text-sm"
+            >
+              <option value={context.realm}>{context.displayName}</option>
+              {context.providers.map((provider) => (
+                <option key={provider.name} value={context.realm} disabled={!provider.enabled}>
+                  {provider.displayName}
+                  {provider.enabled ? '' : ' (not active in this build)'}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {debugMode && grouped.length > 0 && (
+          <div>
+            <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700" htmlFor="persona-picker">
+              Select User
+              <Tooltip text="Ready-made accounts, grouped by role, so you can see the platform through different eyes. Pick one and its credentials are filled in for you." />
+            </label>
+            <select
+              id="persona-picker"
+              value={login}
+              onChange={(event) => {
+                const entry = context?.roster.find((candidate) => candidate.userName === event.target.value);
+                if (entry) pick(entry);
+              }}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+            >
+              <option value="">Select a user…</option>
+              {grouped.map(([role, entries]) => (
+                <optgroup key={role} label={role}>
+                  {entries.map((entry) => (
+                    <option key={entry.subjectId} value={entry.userName}>{entry.userName}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700" htmlFor="login">
             Email or user name
+            <Tooltip text={<>
+              What identifies your account.
+              {' '}Short on time? Turn on debug mode
+              {' '}<Bug size={11} className="mx-0.5 inline align-[-1px] text-amber-400" />
+              {' '}and pick a ready-made user for any role instead of typing credentials.
+            </>} />
           </label>
           <input
             id="login"
             value={login}
-            onChange={(event) => setLogin(event.target.value)}
+            onChange={(event) => { setLogin(event.target.value); setError(null); }}
             autoComplete="username"
-            className="w-full rounded-md border px-3 py-2"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-gray-500" htmlFor="password">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete="current-password"
-            className="w-full rounded-md border px-3 py-2"
+            placeholder="user@example.com"
+            className="w-full rounded-lg border px-3 py-2 text-sm"
           />
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        <div>
+          <label className="mb-1 flex items-center gap-1 text-sm font-medium text-gray-700" htmlFor="password">
+            Password
+            <Tooltip text="Your secret. Never share it with anyone." />
+          </label>
+          <div className="relative">
+            <input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete="current-password"
+              placeholder={debugMode ? 'Auto-filled on user selection' : 'Enter password'}
+              className="w-full rounded-lg border px-3 py-2 pr-10 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((visible) => !visible)}
+              tabIndex={-1}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 transition-colors hover:text-gray-600"
+            >
+              {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         <button
           type="submit"
-          disabled={busy}
-          style={{ backgroundColor: accent }}
-          className="w-full rounded-md px-4 py-2 font-medium text-mongodb-dark disabled:opacity-50"
+          disabled={!login || !password || busy}
+          className="w-full rounded-lg bg-[#001E2B] py-2.5 font-semibold text-[#00ED64] transition-colors hover:bg-[#00ED64] hover:text-[#001E2B] disabled:opacity-40"
         >
-          {busy ? 'Signing in…' : 'Sign in'}
+          {busy ? 'Signing in…' : 'Sign In'}
         </button>
       </form>
 
-      {context && context.roster.length > 0 && (
-        <div className="mt-8 border-t pt-6">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
-              Debug mode: personas by role
-            </p>
-            <button
-              type="button"
-              onClick={() => setShowRoster(!showRoster)}
-              className="text-xs text-gray-500 underline"
-            >
-              {showRoster ? 'Hide' : `Show ${context.roster.length}`}
-            </button>
-          </div>
-
-          {showRoster && (
-            <div className="max-h-80 space-y-4 overflow-y-auto pr-1">
-              {byRole(context.roster).map(([role, entries]) => (
-                <div key={role}>
-                  <p className="mb-1 text-xs font-semibold text-gray-600">{role}</p>
-                  <div className="grid gap-1">
-                    {entries.map((entry) => (
-                      <div key={entry.subjectId} className="flex items-center gap-1">
-                        {/* Fills the form without signing in, so the credential is visible first. */}
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => { setLogin(entry.userName); setPassword(DEMO_PASSWORD); }}
-                          className="flex-1 rounded-md border px-3 py-2 text-left text-sm hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          <span className="block">{entry.userName}</span>
-                          {entry.email && <span className="block text-xs text-gray-500">{entry.email}</span>}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          title={`Sign in as ${entry.userName}`}
-                          onClick={() => {
-                            setLogin(entry.userName);
-                            setPassword(DEMO_PASSWORD);
-                            submit({ login: entry.userName, password: DEMO_PASSWORD });
-                          }}
-                          className="rounded-md border px-2 py-2 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
-                        >
-                          Go
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {context?.registrationEnabled && (
+        <p className="mt-3 text-center text-xs text-gray-500">
+          Don&apos;t have an account?{' '}
+          <a href={`/auth/register?realm=${encodeURIComponent(realm)}`} className="font-semibold text-[#001E2B] underline hover:text-[#00684A]">
+            Register
+          </a>
+        </p>
       )}
 
-      {context?.notice && <p className="mt-6 text-xs text-gray-500">{context.notice}</p>}
+      <p className="mt-4 text-center text-xs text-gray-600">
+        {debugMode && grouped.length > 0
+          ? 'Select a user to fill in their credentials. Every preloaded account shares the same password.'
+          : 'Enter the credentials managed by the selected domain.'}
+      </p>
+
+      {context?.notice && <p className="mt-3 text-center text-xs text-gray-500">{context.notice}</p>}
     </div>
   );
 }

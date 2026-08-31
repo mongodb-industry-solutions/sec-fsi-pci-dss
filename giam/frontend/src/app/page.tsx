@@ -6,10 +6,10 @@ import { BRAND } from '../config/brand';
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-[#001E2B] text-white flex flex-col items-center justify-center p-6">
+    <div className="min-h-screen bg-[#001E2B] text-white flex flex-col items-center justify-center p-4 sm:p-6">
       <div className="max-w-3xl w-full text-center">
         <div className="text-6xl mb-4"><div className="text-4xl mb-2"> <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-24 h-24 mx-auto" /> </div></div>
-        <h1 className="text-3xl font-bold mb-2">{BRAND.primary} <span className="text-[#00ED64]">{BRAND.secondary}</span> <span className="text-gray-400 font-medium text-md">(Identity and Access)</span></h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">{BRAND.primary} <span className="text-[#00ED64]">{BRAND.secondary}</span> <span className="text-gray-400 font-medium text-md">({BRAND.expansion})</span></h1>
         <p className="text-[#00ED64] text-lg mb-8 font-medium">
           OAuth 2.0 · OpenID Connect · SCIM 2.0
         </p>
@@ -78,7 +78,7 @@ export default function LandingPage() {
           </Link>
         </div>
 
-        <p className="mt-3 text-gray-600 text-xs">
+        <p className="mt-3 text-gray-400 text-xs">
           v{process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0'} · Identity Authority · OAuth 2.0 · OpenID Connect · SCIM 2.0
         </p>
         <Link
@@ -94,7 +94,7 @@ export default function LandingPage() {
               className="scale-110"
             />
           </div>
-          <span className="text-gray-500 text-xs tracking-wide group-hover:text-gray-300 transition-colors">Built on MongoDB Atlas</span>
+          <span className="text-gray-400 text-xs tracking-wide group-hover:text-gray-300 transition-colors">Built on MongoDB Atlas</span>
         </Link>
       </div>
     </div>

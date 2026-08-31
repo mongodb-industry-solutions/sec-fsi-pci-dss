@@ -1,7 +1,7 @@
 {
   "name": "giam-backend",
   "version": "1.0.0",
-  "description": "GIAM: Global Identity and Access Management. The identity authority for people and systems. Industry neutral: no financial concept in its model, API or policy vocabulary.",
+  "description": "GIAM: General Identity and Access Manager. The identity authority for people and systems. Industry neutral: no financial concept in its model, API or policy vocabulary.",
   "private": true,
   "engines": {
     "node": ">=22"

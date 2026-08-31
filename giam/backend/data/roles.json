@@ -186,7 +186,51 @@
         "action": "manage",
         "reason": "The role is documented as read-only oversight, and it previously held manage while the interface rendered add and remove for it. A read-only auditor able to delete a beneficiary is a separation-of-duties finding. investigate gives it the cross-party search it actually needs."
       }
-    ]
+    ],
+    "authorityPermissions": {
+      "realms": [
+        "view"
+      ],
+      "tenants": [
+        "view"
+      ],
+      "providers": [
+        "view"
+      ],
+      "identities": [
+        "view"
+      ],
+      "credentials": [
+        "view"
+      ],
+      "clients": [
+        "view"
+      ],
+      "roles": [
+        "view"
+      ],
+      "assignments": [
+        "view"
+      ],
+      "policies": [
+        "view"
+      ],
+      "permissions": [
+        "view"
+      ],
+      "resourceServers": [
+        "view"
+      ],
+      "sessions": [
+        "view"
+      ],
+      "grants": [
+        "view"
+      ],
+      "keys": [
+        "view"
+      ]
+    }
   },
   {
     "realm": "leafypay",
@@ -289,13 +333,56 @@
         "view",
         "manage"
       ],
-      "roles": [
+      "tenants": [
+        "view",
+        "manage"
+      ],
+      "providers": [
         "view",
         "manage"
       ],
       "identities": [
         "view",
         "manage"
+      ],
+      "credentials": [
+        "view",
+        "manage"
+      ],
+      "clients": [
+        "view",
+        "manage"
+      ],
+      "roles": [
+        "view",
+        "manage"
+      ],
+      "assignments": [
+        "view",
+        "manage"
+      ],
+      "policies": [
+        "view",
+        "manage"
+      ],
+      "permissions": [
+        "view",
+        "manage"
+      ],
+      "resourceServers": [
+        "view",
+        "manage"
+      ],
+      "sessions": [
+        "view",
+        "manage"
+      ],
+      "grants": [
+        "view",
+        "manage"
+      ],
+      "keys": [
+        "view"
       ]
     },
     "denialRationale": [

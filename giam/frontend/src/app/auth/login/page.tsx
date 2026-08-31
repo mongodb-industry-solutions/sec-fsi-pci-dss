@@ -40,7 +40,7 @@ export default function LoginPage() {
 
   if (returning) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8 text-sm text-gray-500">
+      <main className="flex min-h-screen items-center justify-center p-4 sm:p-8 text-sm text-gray-500">
         Returning you to the application…
       </main>
     );
@@ -48,7 +48,7 @@ export default function LoginPage() {
 
   if (signedIn) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
         <div className="w-full max-w-md rounded-xl border bg-white p-8 text-center shadow-sm">
           <h1 className="text-2xl font-semibold text-mongodb-dark">Signed in</h1>
           <p className="mt-2 text-gray-600">{signedIn.userName}</p>
@@ -65,11 +65,11 @@ export default function LoginPage() {
   // Held until the realm is known: the panel reads its roster on mount, and starting on the wrong
   // directory would show the wrong people and then quietly correct itself.
   if (realm === null) {
-    return <main className="flex min-h-screen items-center justify-center p-8 text-sm text-gray-500">Loading…</main>;
+    return <main className="flex min-h-screen items-center justify-center p-4 sm:p-8 text-sm text-gray-500">Loading…</main>;
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
+    <main className="flex min-h-screen items-center justify-center p-4 sm:p-8">
       <SignInPanel defaultRealm={realm} onSignedIn={handleSignedIn} />
     </main>
   );

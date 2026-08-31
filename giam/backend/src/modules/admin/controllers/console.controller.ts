@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { requireAdmin } from '../../../vendors/middleware/adminAuth';
+import { requireAuthorityCaller } from '../../../vendors/middleware/authorityAuth';
 import { problem } from '../../../shared/models/problem';
 import {
   REALM_COLLECTION, IDENTITY_PROVIDER_COLLECTION, IDENTITY_COLLECTION, CREDENTIAL_COLLECTION,
@@ -137,7 +138,7 @@ export async function consoleController(fastify: FastifyInstance) {
   const names = Object.keys(VIEWS);
 
   fastify.get('/admin/views', {
-    preHandler: requireAdmin,
+    preHandler: requireAuthorityCaller,
     schema: {
       operationId: 'listConsoleViews',
       tags: ['admin'],
@@ -164,6 +165,7 @@ export async function consoleController(fastify: FastifyInstance) {
                   summary: { type: 'string' },
                   note: { type: 'string' },
                   realmScoped: { type: 'boolean' },
+                  canManage: { type: 'boolean' },
                   fields: { type: 'array', items: { type: 'string' } },
                 },
               },
@@ -182,8 +184,10 @@ export async function consoleController(fastify: FastifyInstance) {
         503: { $ref: 'Problem#', description: 'The administrative surface is not configured.' },
       },
     },
-  }, async (_request, reply) => reply.send({
-    views: names.map((name) => {
+  }, async (request, reply) => reply.send({
+    // Only what this caller may read. A catalog that advertises a view the caller's role would refuse
+    // builds a console full of screens that answer 403, which reads as broken rather than as scoped.
+    views: names.filter((name) => request.authorityCaller?.can(name, 'view')).map((name) => {
       const view = VIEWS[name];
       return {
         name,
@@ -191,12 +195,14 @@ export async function consoleController(fastify: FastifyInstance) {
         ...(view.note ? { note: view.note } : {}),
         realmScoped: view.realmScoped,
         fields: Object.keys(view.projection).filter((field) => field !== '_id'),
+        // What the console may offer beyond reading, so it renders no control the API would refuse.
+        canManage: Boolean(request.authorityCaller?.can(name, 'manage')),
       };
     }),
   }));
 
   fastify.get('/admin/views/:view', {
-    preHandler: requireAdmin,
+    preHandler: requireAuthorityCaller,
     schema: {
       operationId: 'readConsoleView',
       tags: ['admin'],
@@ -233,6 +239,7 @@ export async function consoleController(fastify: FastifyInstance) {
           examples: [{ records: [{ subjectId: 'sub-4821', userName: 'ada' }], total: 1 }],
         },
         401: { $ref: 'Problem#', description: 'No administrative credential.' },
+        403: { $ref: 'Problem#', description: 'The caller holds no role permitting this view.' },
         404: { $ref: 'Problem#', description: 'No such view.' },
         503: { $ref: 'Problem#', description: 'The administrative surface is not configured.' },
       },
@@ -241,6 +248,12 @@ export async function consoleController(fastify: FastifyInstance) {
     const { view: viewName } = request.params as { view: string };
     const view = VIEWS[viewName];
     if (!view) return reply.status(404).send(problem(404, 'No such view', `Known views: ${names.join(', ')}`));
+
+    // Checked here rather than in a preHandler because the permission depends on which view was asked
+    // for, which is not known until the parameters are read.
+    if (!request.authorityCaller?.can(viewName, 'view')) {
+      return reply.status(403).send(problem(403, 'Forbidden', `Your role does not permit view on ${viewName}.`));
+    }
 
     const { realm, q, limit, skip } = request.query as { realm?: string; q?: string; limit?: number; skip?: number };
     const filter: Record<string, unknown> = {};
