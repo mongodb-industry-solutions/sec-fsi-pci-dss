@@ -171,6 +171,9 @@ services:
         # Private only for the API: the admin monitoring page probes bankcore through the Next.js proxy, so
         # the browser never leaves the frontend origin and the bank's API needs no published port.
         NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+        # In-network authority, for the same reason: the monitoring panel probes it through the proxy,
+        # so the browser stays on this origin and needs no CORS entry for a health check.
+        NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE: ${GIAM_BASE_URL:-http://giam:8080}
         # PUBLIC, and it has to be: the simulator LINKS to the bank's own app, so a browser navigates there.
         # A private in-cluster host would work for a server-side probe and be unreachable from a laptop.
         NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}

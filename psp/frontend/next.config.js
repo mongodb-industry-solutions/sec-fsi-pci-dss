@@ -65,6 +65,14 @@ const nextConfig = {
             process.env.NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE ||
             'http://localhost:8083'
         ).replace(/\/+$/, '');
+        // The identity authority is probed the same way. It does have a public host (a token's issuer
+        // has to be reachable by a browser), but the probe runs server side, so the private one is
+        // preferred and the issuer origin is only the fallback.
+        const authorityUrl = (
+            process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE ||
+            (process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER || 'http://localhost:8085/realms/leafypay')
+                .replace(/\/realms\/.*$/, '')
+        ).replace(/\/+$/, '');
         return [
             { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
             { source: '/health', destination: `${backendUrl}/health` },
@@ -73,6 +81,7 @@ const nextConfig = {
             // the path the deploy platform probes.
             { source: '/health/merchant', destination: `${merchantUrl}/health` },
             { source: '/health/bankcore', destination: `${bankcoreUrl}/health` },
+            { source: '/health/giam', destination: `${authorityUrl}/health` },
             // Swagger UI of the bank, same-origin so it works in every environment. The API behind it
             // needs a registered TPP's credentials, so publishing the docs opens nothing.
             { source: '/doc/bankcore', destination: `${bankcoreUrl}/doc` },

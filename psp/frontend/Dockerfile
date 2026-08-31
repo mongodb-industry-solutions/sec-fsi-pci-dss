@@ -19,6 +19,11 @@ ENV NEXT_PUBLIC_PSP_URL_MERCHANT=$NEXT_PUBLIC_PSP_URL_MERCHANT
 ARG NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE
 ENV NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=$NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE
 
+# AUTHORITY_PRIVATE = in-cluster identity authority URL, used server-side by the next.config rewrites
+# so the admin monitoring page probes /health/giam same-origin.
+ARG NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE
+ENV NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=$NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE
+
 # Install dependencies (layer cached unless package.json changes)
 COPY package*.json ./
 RUN npm install

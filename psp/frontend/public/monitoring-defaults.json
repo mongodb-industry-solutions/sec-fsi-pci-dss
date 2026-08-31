@@ -53,6 +53,20 @@
       "timeoutMs": 10000,
       "expectedStatus": 200,
       "useApiBase": false
+    },
+    {
+      "id": "giam",
+      "name": "GIAM (Identity Authority)",
+      "description": "Identity authority: realms, tokens, sessions and signing keys. Probed at its own /health through the frontend proxy, which also reports its datastore",
+      "type": "http",
+      "url": "/health/giam",
+      "detailUrl": "/health/giam",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": false
     }
   ]
 }
