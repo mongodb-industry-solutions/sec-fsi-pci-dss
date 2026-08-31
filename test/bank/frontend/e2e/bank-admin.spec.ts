@@ -16,6 +16,11 @@ import { test, expect, Page } from '@playwright/test';
 
 const BANK_UI = process.env.BANK_UI_URL ?? 'http://localhost:8084';
 
+// A seeded persona holding the bank's administrator role, and the demo password behind the seed
+// fixture's credential hashes.
+const BANK_ADMIN = 'Samuel Adeyemi';
+const DEMO_PASSWORD = 'demo-password';
+
 // Small, medium, large. The small one is a 380px phone, which is narrower than most and therefore the honest
 // floor; the medium is a tablet in portrait, where a table has to give way to cards.
 const VIEWPORTS = [
@@ -91,6 +96,16 @@ test.describe('the bank administration app', () => {
   test.beforeAll(async ({ request }) => {
     const response = await request.get(`${BANK_UI}/`).catch(() => null);
     expect(response, 'the bank frontend must be running for this to mean anything').not.toBeNull();
+  });
+
+  // Every screen below is behind the sign-in gate now, so each one signs in first. The bank's
+  // administrative API requires a person with a role, so an unauthenticated sweep would only ever
+  // measure the login form.
+  test.beforeEach(async ({ context }) => {
+    const response = await context.request.post(`${BANK_UI}/api/auth/login`, {
+      data: { login: BANK_ADMIN, password: DEMO_PASSWORD },
+    });
+    expect(response.status(), `${BANK_ADMIN} could not sign in`).toBe(200);
   });
 
   for (const viewport of VIEWPORTS) {

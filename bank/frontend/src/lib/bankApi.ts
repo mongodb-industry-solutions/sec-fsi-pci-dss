@@ -1,6 +1,5 @@
 import 'server-only';
-import jwt from 'jsonwebtoken';
-import { createHash } from 'crypto';
+import { sessionToken } from './authority';
 
 // The only place this app talks to the bank, and it is SERVER side.
 //
@@ -20,29 +19,6 @@ function baseUrl(): string {
     ?? process.env.BANKCORE_BASE_URL
     ?? 'http://localhost:8083';
   return raw.replace(/\/$/, '');
-}
-
-// v39 P4: the BANK's own diagnostics credential, not the platform secret.
-//
-// This app administers a separate institution, so it presents a credential issued by that
-// institution. Reading the platform secret here meant the bank trusted anything the platform could
-// sign, which made the boundary between them a matter of documentation rather than of key material.
-function adminCredential(): string {
-  const configured = process.env.PSP_BANKCORE_ADMIN_SECRET ?? process.env.BANKCORE_ADMIN_SECRET;
-  if (configured) return configured;
-  const root = process.env.PSP_BANKCORE_SECRET ?? 'bankcore-local-secret-change-in-production';
-  return createHash('sha256').update('bankcore:admin:' + root).digest('hex');
-}
-
-/**
- * A short-lived admin token for one hop.
- *
- * The bank verifies its OWN admin credential on its administrative API. Minted per request and valid for a
- * minute: a long-lived service token held in memory is a credential with no expiry, and this one only has to
- * survive a single call.
- */
-function hopToken(actor = 'bank-admin-app'): string {
-  return jwt.sign({ role: 'admin', sub: actor, act: 'bank-admin-app' }, adminCredential(), { expiresIn: 60 });
 }
 
 // Only the bank's ADMINISTRATIVE resources are reachable through this app. A generic forwarder would let the
@@ -89,11 +65,16 @@ export async function callBankAdmin(
   }
   const url = `${baseUrl()}/api/v1/admin/${resource}${search.size ? `?${search.toString()}` : ''}`;
 
+  // The SIGNED-IN person's token. The bank's administrative API requires an interactive principal
+  // with the right role, so a credential this app minted for itself is refused, and should be.
+  const token = await sessionToken();
+  if (!token) return { status: 401, body: null, error: 'Not signed in.' };
+
   try {
     const response = await fetch(url, {
       method: init.method ?? 'GET',
       headers: {
-        Authorization: `Bearer ${hopToken()}`,
+        Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },
