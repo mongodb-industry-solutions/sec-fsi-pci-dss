@@ -53,6 +53,26 @@ export const verifierMetrics = {
   failuresByCause: new Map<string, number>(),
 };
 
+let lastUnreachableWarning = 0;
+
+/** Rate limited to one a minute: this is reached per request, and a flooded log hides its own cause. */
+function warnUnreachable(err: unknown): void {
+  if (Date.now() - lastUnreachableWarning < 60_000) return;
+  lastUnreachableWarning = Date.now();
+  const reason = err instanceof Error ? err.message : 'unknown error';
+  console.warn(`[giam] no key set available from ${config.giam.issuerUrl}: ${reason}`);
+  console.warn('[giam] every token will be refused as unknown_kid until this resolves; check GIAM_ISSUER_URL is reachable from this process');
+}
+
+const mismatchedIssuersSeen = new Set<string>();
+
+/** Once per distinct issuer, so a scripted probe cannot grow the log without bound. */
+function warnIssuerMismatch(seen: string): void {
+  if (mismatchedIssuersSeen.has(seen) || mismatchedIssuersSeen.size > 20) return;
+  mismatchedIssuersSeen.add(seen);
+  console.warn(`[giam] token issuer "${seen}" does not match the expected "${config.giam.issuerUrl}"`);
+}
+
 function recordFailure(cause: string): null {
   verifierMetrics.failuresByCause.set(cause, (verifierMetrics.failuresByCause.get(cause) ?? 0) + 1);
   return null;
@@ -115,7 +135,7 @@ async function resolveKey(kid: string): Promise<{ key: KeyObject; alg: string } 
   if (!cache || !fresh) {
     try {
       await ensureKeySet();
-    } catch {
+    } catch (err) {
       // Serve from a stale cache rather than failing closed. The alternative is a total outage of
       // this application every time the authority blinks, and it is safe: an old public key can only
       // validate signatures the authority itself produced.
@@ -123,6 +143,9 @@ async function resolveKey(kid: string): Promise<{ key: KeyObject; alg: string } 
         cache.stale = true;
         verifierMetrics.staleServes += 1;
       } else {
+        // Nothing cached and nothing fetchable means every token is about to be refused as
+        // unknown_kid, which reads like a forgery. Say so once, or the cause stays invisible.
+        warnUnreachable(err);
         return null;
       }
     }
@@ -142,7 +165,8 @@ async function resolveKey(kid: string): Promise<{ key: KeyObject; alg: string } 
 
   try {
     await ensureKeySet();
-  } catch {
+  } catch (err) {
+    warnUnreachable(err);
     return null;
   }
   const found = cache?.keys.get(kid);
@@ -195,7 +219,12 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
   const claims = decodeSegment(parts[1]);
   if (!claims) return recordFailure('malformed_payload');
 
-  if (claims.iss !== config.giam.issuerUrl) return recordFailure('wrong_issuer');
+  if (claims.iss !== config.giam.issuerUrl) {
+    // A signature this key set validated, from an issuer this service does not expect, is far more
+    // often a misconfigured issuer URL than a forgery. Report both spellings so it is one look.
+    warnIssuerMismatch(String(claims.iss));
+    return recordFailure('wrong_issuer');
+  }
 
   /**
    * The audience is the client the token was issued to, and it is CHECKED, not merely required.

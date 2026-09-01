@@ -59,3 +59,37 @@ export async function registerResourceServer(): Promise<{ registered: boolean; r
     return { registered: false, reason: err instanceof Error ? err.message : 'registration failed' };
   }
 }
+
+export interface IssuerCheck {
+  ok: boolean;
+  reason?: string;
+}
+
+/**
+ * Checks, at boot, that the configured issuer is both reachable and the one the authority claims.
+ *
+ * The configured URL does two jobs: it is where discovery is fetched from, and it is what every
+ * token's `iss` is compared against. When it satisfies only one of them, nothing fails at boot and
+ * every request afterwards returns 401, which reads as an authorisation bug anywhere but here. One
+ * request at startup turns that into a single line naming the mismatch.
+ */
+export async function checkIssuerCoherence(): Promise<IssuerCheck> {
+  const issuer = config.giam.issuerUrl?.replace(/\/+$/, '');
+  if (!issuer) return { ok: false, reason: 'no authority issuer is configured' };
+
+  try {
+    const response = await fetch(`${issuer}/.well-known/openid-configuration`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return { ok: false, reason: `discovery answered ${response.status}` };
+    const metadata = await response.json() as { issuer?: string };
+    if (!metadata.issuer) return { ok: false, reason: 'discovery document carries no issuer' };
+    if (metadata.issuer.replace(/\/+$/, '') !== issuer) {
+      return { ok: false, reason: `the authority issues "${metadata.issuer}", this service expects "${issuer}"` };
+    }
+    return { ok: true };
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'discovery failed';
+    return { ok: false, reason: `${issuer} is not reachable from this process (${reason})` };
+  }
+}

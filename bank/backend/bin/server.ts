@@ -21,7 +21,7 @@ import { cardAuthorizationModule } from '../src/modules/card-authorization';
 import { cardIssuerModule } from '../src/modules/card-issuer';
 import { creditBureauModule } from '../src/modules/credit-bureau';
 import { config } from '../src/config';
-import { registerResourceServer } from '../src/vendors/setup/registerResourceServer';
+import { registerResourceServer, checkIssuerCoherence } from '../src/vendors/setup/registerResourceServer';
 
 export async function buildApp(): Promise<FastifyInstance> {
   mirrorConsoleToLogBuffer();
@@ -203,6 +203,15 @@ async function start() {
       console.log(line);
       appendLog(`[${new Date().toISOString()}] STARTUP ${line.trim()}`);
     }
+    // The issuer is both the discovery origin and the expected `iss`; a value good for only one of
+    // the two produces a 401 on every request and no error here.
+    const issuerCheck = await checkIssuerCoherence();
+    const issuerLine = issuerCheck.ok
+      ? `  authority issuer confirmed: ${config.giam.issuerUrl}`
+      : `  ! authority issuer NOT usable: ${issuerCheck.reason}`;
+    console.log(issuerLine);
+    appendLog(`[${new Date().toISOString()}] STARTUP ${issuerLine.trim()}`);
+
     // v39 P7: declare this bank enforcement points to the authority. Non-fatal by design.
     const registration = await registerResourceServer();
     const registrationLine = registration.registered

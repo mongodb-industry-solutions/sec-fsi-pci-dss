@@ -5,7 +5,7 @@ import { resolve } from 'path';
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 import Fastify, { FastifyInstance } from 'fastify';
 import { config } from '../src/config';
-import { registerResourceServer } from '../src/vendors/setup/registerResourceServer';
+import { registerResourceServer, checkIssuerCoherence } from '../src/vendors/setup/registerResourceServer';
 import corsPlugin from '../src/plugins/cors';
 import mongodbPlugin from '../src/plugins/mongodb';
 import { swaggerPlugin } from '../src/plugins/swagger';
@@ -253,6 +253,13 @@ async function start() {
     // After listening, and non-fatal. The catalog is what the authority grants FROM; failing to
     // register it does not stop this application serving requests carrying already-valid tokens,
     // because those verify against a cached key set and need the authority for nothing.
+    // Before registering: the issuer is both the discovery origin and the expected `iss`, and a value
+    // that satisfies only one of the two produces a 401 on every request and no error here.
+    const issuerCheck = await checkIssuerCoherence();
+    console.log(issuerCheck.ok
+      ? `  authority issuer confirmed: ${config.giam.issuerUrl}`
+      : `  ! authority issuer NOT usable: ${issuerCheck.reason}`);
+
     const registration = await registerResourceServer();
     console.log(registration.registered
       ? `  permission catalog registered with ${config.giam.issuerUrl}`

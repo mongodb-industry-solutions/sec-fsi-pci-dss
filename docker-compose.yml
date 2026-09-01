@@ -33,6 +33,15 @@ services:
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       # Used by the merchant seeder to resolve the OIDC branding URLs (logo_uri/client_uri).
       PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
+      # Must match GIAM_PUBLIC_URL byte for byte: it is both the discovery origin and the expected
+      # `iss`. Spelling it differently (localhost vs 127.0.0.1) is refused as wrong_issuer.
+      PSP_GIAM_ISSUER_URL: ${PSP_GIAM_ISSUER_URL:-http://giam:8080/realms/leafypay}
+      # The bare authority host, for the shared link resolver. No realm: it joins its own paths.
+      GIAM_BASE_URL: ${GIAM_BASE_URL:-http://giam:8080}
+      GIAM_AUDIENCE: ${GIAM_AUDIENCE:-leafypay}
+      GIAM_RESOURCE_SERVER: ${GIAM_RESOURCE_SERVER:-leafypay}
+      # Secret left to .env: the authority derives it from the client id when unset.
+      GIAM_CLIENT_ID: ${GIAM_CLIENT_ID:-leafypay-backend}
       # In-network bank host. Private by construction: no host port is published for bankcore.
       PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
       # The credential the PSP presents to the bank diagnostics surface: the bank issued it.
@@ -40,6 +49,9 @@ services:
     depends_on:
       bankcore:
         condition: service_started
+      # So the catalog registration at boot finds an authority already answering.
+      giam:
+        condition: service_healthy
     volumes:
       - ./psp/backend/keys:/app/psp/backend/keys:ro
     healthcheck:
@@ -66,6 +78,14 @@ services:
       PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
       # In-network PSP host, for the consent status callbacks bankcore delivers to its TPP.
       PSP_BASE_URL: ${PSP_BASE_URL:-http://backend:8080}
+      # The bank is a relying party in its OWN realm: a platform token carries a different issuer and
+      # is refused before any claim is read.
+      PSP_BANKCORE_GIAM_ISSUER_URL: ${PSP_BANKCORE_GIAM_ISSUER_URL:-http://giam:8080/realms/bankcore}
+      PSP_BANKCORE_GIAM_AUDIENCE: ${PSP_BANKCORE_GIAM_AUDIENCE:-bankcore}
+      PSP_BANKCORE_GIAM_RESOURCE_SERVER: ${PSP_BANKCORE_GIAM_RESOURCE_SERVER:-bankcore}
+    depends_on:
+      giam:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 10s
@@ -93,9 +113,10 @@ services:
       GIAM_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       # In-network, for the services that resolve discovery server side.
       GIAM_BASE_URL: ${GIAM_BASE_URL:-http://giam:8080}
-      # Browser facing, and what a realm issuer URL is built from: it ends up inside every token as
-      # `iss`, so it must be the address a relying party can actually reach.
-      GIAM_PUBLIC_URL: ${GIAM_PUBLIC_URL:-http://localhost:8085}
+      # Every token's `iss`, compared by exact equality. In-network: relying parties also fetch
+      # discovery and JWKS from it server side, and a laptop address is unreachable from a container.
+      # Persisted onto the realm record at seed time, so changing it requires reseeding the authority.
+      GIAM_PUBLIC_URL: ${GIAM_PUBLIC_URL:-http://giam:8080}
       GIAM_FRONTEND_URL: ${GIAM_FRONTEND_URL:-http://localhost:8086}
       GIAM_CORS_ORIGIN: ${GIAM_CORS_ORIGIN:-http://localhost:8086,http://localhost:8080,http://localhost:8082,http://localhost:8084}
     volumes:
@@ -129,6 +150,8 @@ services:
       # Server side only: the console proxies the API same-origin, so the browser never learns this
       # address and no CORS entry is needed for the console to work.
       GIAM_API_PRIVATE_URL: ${GIAM_BASE_URL:-http://giam:8080}
+      # Only for the API docs link the console renders, which a browser opens directly.
+      NEXT_PUBLIC_GIAM_API_PUBLIC_URL: ${GIAM_BROWSER_URL:-http://localhost:8085}
     depends_on:
       giam:
         condition: service_healthy
@@ -152,8 +175,17 @@ services:
       # institution and presents a credential that institution issued; passing the platform secret
       # here is what made the boundary between them documentation rather than key material.
       PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
+      # This app exchanges the authorization code server side, so it uses the private realm URL.
+      PSP_BANKCORE_GIAM_ISSUER_URL: ${PSP_BANKCORE_GIAM_ISSUER_URL:-http://giam:8080/realms/bankcore}
+      # Where the BROWSER is sent to sign in, which is why it is the published console and not a
+      # service name.
+      NEXT_PUBLIC_BANKCORE_AUTHORITY_URL: ${GIAM_FRONTEND_URL:-http://localhost:8086}
+      # This app's own public address: the authority redirects the browser back to it.
+      PSP_BANKCORE_FRONTEND_URL: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
     depends_on:
       bankcore:
+        condition: service_healthy
+      giam:
         condition: service_healthy
 
   frontend:
@@ -174,6 +206,12 @@ services:
         # In-network authority, for the same reason: the monitoring panel probes it through the proxy,
         # so the browser stays on this origin and needs no CORS entry for a health check.
         NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE: ${GIAM_BASE_URL:-http://giam:8080}
+        # PUBLIC, and it must be: the simulator calls the realm's token endpoint from the page itself,
+        # so this is the published authority port and not its service name. The realm is resolved from
+        # the path, so the token still carries the private issuer the backend expects.
+        NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: ${GIAM_BROWSER_URL:-http://localhost:8085}/realms/leafypay
+        # PUBLIC for the same reason: a person is redirected to the console to sign in.
+        NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: ${GIAM_FRONTEND_URL:-http://localhost:8086}
         # PUBLIC, and it has to be: the simulator LINKS to the bank's own app, so a browser navigates there.
         # A private in-cluster host would work for a server-side probe and be unreachable from a laptop.
         NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
@@ -188,6 +226,8 @@ services:
         condition: service_healthy
       bankcore:
         condition: service_started
+      giam:
+        condition: service_healthy
 
   # External merchant demo (Espresso Works). Autonomous Next.js app, NO database.
   # Integrates with the PSP purely via OAuth2/OIDC SSO + API. Container on 8080, host 8082.
@@ -231,4 +271,6 @@ services:
       start_period: 15s
     depends_on:
       backend:
+        condition: service_healthy
+      giam:
         condition: service_healthy

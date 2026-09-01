@@ -3012,7 +3012,58 @@ PSP_BANKCORE_EVENT_BUS_ENGINE=
 PSP_BANKCORE_EVENT_BUS_TOPIC_PREFIX=
 PSP_BANKCORE_KEY_VAULT_NAMESPACE=
 PSP_BANKCORE_SEED_DATA_DIR=
+
+# ── Identity authority (GIAM, v39) ─────────────────────────────────
+# The authority is a separate deployment with its own repository (sec-giam). It owns its public URL,
+# console URL, CORS allowlist, key provider and database; this file sets only what THIS platform reads
+# in order to reach it.
+
+# The platform realm issuer. PRIVATE, in-network. It does two jobs at once, and both must hold:
+#   1. discovery, JWKS, introspection and catalog registration are fetched from it, server side;
+#   2. it is compared, by EXACT string equality, against the `iss` claim of every token.
+# A browser-facing host satisfies only (2) and is unreachable from inside a container; a differently
+# spelled one (localhost vs 127.0.0.1) satisfies only (1) and every token is refused as wrong_issuer.
+# PSP_-prefixed deliberately: the shared link resolver reads the unprefixed name as a bare host, and a
+# realm URL there is joined onto paths that already carry their own realm.
+PSP_GIAM_ISSUER_URL=http://giam:8080/realms/leafypay
+# The bare authority host, no realm, for the shared link resolver.
+GIAM_BASE_URL=http://giam:8080
+# What a token must name in `aud`, and the name this platform registers its enforcement points under.
+GIAM_AUDIENCE=leafypay
+GIAM_RESOURCE_SERVER=leafypay
+# This service's OWN client, for the calls it makes as itself. The authority derives the secret from
+# the client id when unset, so leaving both unset is coherent and setting only one is not.
+GIAM_CLIENT_ID=leafypay-backend
+GIAM_CLIENT_SECRET=
+# Presented when registering the permission catalog at boot. Registration is non-fatal when absent.
+GIAM_REGISTRATION_TOKEN=
+GIAM_JWKS_CACHE_SECONDS=900
+
+# The bank is a relying party in its OWN realm: a platform token carries a different issuer and is
+# refused before any claim is read, which is what makes the institutional boundary structural.
+PSP_BANKCORE_GIAM_ISSUER_URL=http://giam:8080/realms/bankcore
+PSP_BANKCORE_GIAM_AUDIENCE=bankcore
+PSP_BANKCORE_GIAM_RESOURCE_SERVER=bankcore
+
+# Browser-facing authority addresses. Separate variables on purpose: these are navigated to or fetched
+# from the page, so they are published addresses, never service names. The realm is resolved from the
+# request path, so a token minted through a public host still carries the private issuer above.
+NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=http://localhost:8085/realms/leafypay
+NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=http://localhost:8086
+NEXT_PUBLIC_BANKCORE_AUTHORITY_URL=http://localhost:8086
+# docker-compose only: the one knob the three variables above are derived from.
+GIAM_BROWSER_URL=http://localhost:8085
 ```
+
+**The issuer is persisted, not recomputed.** The authority writes each realm's issuer onto the realm
+record at seed time, composed from its own public URL. Changing that URL therefore requires re-running
+the authority's seeder before the new value reaches any token; until then the deployed services and the
+tokens disagree, and every request returns 401.
+
+**Both backends check this at boot.** `checkIssuerCoherence()` fetches discovery from the configured
+issuer and compares the `issuer` it reports against the configured value, printing one startup line
+either way. Without it, an incoherent issuer fails nothing at boot and returns 401 on every subsequent
+request, which reads as an authorisation bug rather than a configuration one.
 
 **Signing keys on disk.** The bank persists its notification signing key under `bank/backend/keys/`, explicitly
 git-ignored, with the `kid` derived from the key itself. A deployment therefore pins `replicaCount=1`: two
