@@ -196,17 +196,29 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   // Dual-auth capability route (v23): accept a first-party session JWT OR a merchant OAuth Bearer.
   // Authenticate here; the route's dualPermission() preHandler authorizes (RBAC action or scope).
   if (routeConfig.dualAuth) {
-    const sessionPayload = await tryVerifyToken(request.headers.authorization);
-    if (sessionPayload) {
-      (request as FastifyRequest & { user: AuthenticatedUser }).user = sessionPayload;
-      attachRbacContext(request);
-      return;
-    }
-    // Not a valid session token → try the merchant OAuth channel (RS256). tryMerchantContext never
-    // throws and enforces client/merchant active status; scope is enforced per-route by dualPermission.
+    /**
+     * The channel is chosen by WHO obtained the token, not by which verifier answers first.
+     *
+     * It used to try the session channel first and fall through only when verification failed. That
+     * worked while the two channels used different signatures: a merchant's OAuth token could not
+     * verify as a first-party session JWT, so it fell through. Since v39 both are the same RS256
+     * token from the same authority, so the session channel matched everything and the merchant
+     * channel became unreachable, silently. The merchant then met the first-party contract, which
+     * expects the party in the URL instead of resolving the owner from the token.
+     *
+     * The merchant channel is asked first because it is the SPECIFIC one: it matches only when the
+     * token names a registered, active OAuth client belonging to an active merchant. Anything else is
+     * a first-party session by elimination.
+     */
     const merchant = await tryMerchantContext(request);
     if (merchant) {
       request.merchantContext = merchant;
+      attachRbacContext(request);
+      return;
+    }
+    const sessionPayload = await tryVerifyToken(request.headers.authorization);
+    if (sessionPayload) {
+      (request as FastifyRequest & { user: AuthenticatedUser }).user = sessionPayload;
       attachRbacContext(request);
       return;
     }

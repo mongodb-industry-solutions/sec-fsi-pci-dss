@@ -103,8 +103,9 @@ export async function resolveOwner(
       return null;
     }
     // Read from the token the authority issued, rather than looked up here: this application no
-    // longer holds the records that mapping used to live in.
-    const ownerPartyRef = partyReferenceFrom(merchant as never);
+    // longer holds the records that mapping used to live in. The context carries the claim through,
+    // so this no longer reads a field the context never had.
+    const ownerPartyRef = merchant.accountHolderRef ?? partyReferenceFrom(merchant as never);
     return { channel: 'oauth', ownerPartyRef, actingSubject: merchant.sub };
   }
 
