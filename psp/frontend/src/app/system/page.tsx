@@ -1,22 +1,19 @@
 'use client';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
-  Eye, EyeOff, Bug,
+  LogIn, ArrowLeft,
   BriefcaseMedical, CreditCard, Users, BarChart3, ClipboardList, User,
   PlusCircle, Store, ClipboardCheck,
   Plug, LayoutGrid, ShieldCheck,
   Activity, Network, Landmark, ArrowLeftRight,
   type LucideIcon,
 } from 'lucide-react';
-import { api, AuthUser, AuthDomain } from '../../lib/api';
+import { api } from '../../lib/api';
 import { BRAND } from '../../config/brand';
-import { getToken, setToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
+import { getToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { ROLE_LABELS } from '../../lib/constants';
-import demoRoster from '../../config/demoRoster.json';
-import { Tooltip } from '../../components/Tooltip';
 import { useDebugMode } from '../../lib/debugMode';
-import { useDebugHint } from '../../lib/debugHint';
 import { UserMenu } from '../../components/UserMenu';
 import { NotificationBell } from '../../components/NotificationBell';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
@@ -24,37 +21,6 @@ import { RoleStats } from '../../components/dashboard/RoleStats';
 import { SectionHeader } from '../../components/SectionHeader';
 
 type DecodedUser = NonNullable<ReturnType<typeof decodeToken>>;
-
-// ── Role order (user dropdown in login form) ──────────────────────────────────
-
-const ROLE_ORDER: Record<string, number> = {
-  customer:            0,
-  level1_analyst:      1,
-  level2_investigator: 2,
-  security_auditor:    3,
-  merchant_officer:    4,
-  operations_officer:  5,
-  manager:             6,
-};
-
-// ── Login form constants ──────────────────────────────────────────────────────
-
-const FLOW_TYPE_LABELS: Record<string, string> = {
-  client_credentials: 'Client Credentials',
-  authorization_code: 'Authorization Code (OIDC)',
-  saml:               'SAML 2.0',
-  oidc:               'OIDC',
-};
-
-const FLOW_TYPE_COLORS: Record<string, string> = {
-  client_credentials: 'bg-gray-100 text-gray-600',
-  authorization_code: 'bg-blue-100 text-blue-700',
-  saml:               'bg-purple-100 text-purple-700',
-  oidc:               'bg-blue-100 text-blue-700',
-};
-
-// Plaintext behind the seed fixture's credential hashes, so it belongs to the demo data.
-const DEMO_PASSWORD = 'demo-password';
 
 // ── Dashboard card definitions ────────────────────────────────────────────────
 
@@ -122,222 +88,46 @@ const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: str
 
 // ── Login form ────────────────────────────────────────────────────────────────
 
-function LoginForm({ onLogin }: { onLogin: () => void }) {
-  const { debugMode, toggleDebug } = useDebugMode();
-  const { pulsing, dismissHint } = useDebugHint();
-  const showPulse = pulsing && !debugMode;
-  const [users, setUsers]       = useState<AuthUser[]>([]);
-  const [domains, setDomains]   = useState<AuthDomain[]>([]);
-  const [selectedDomain, setSelectedDomain] = useState('leafypay');
-  const [selectedEmail, setSelectedEmail]   = useState('');
-  const [password, setPassword]             = useState('');
-  const [showPassword, setShowPassword]     = useState(false);
-  const [submitting, setSubmitting]         = useState(false);
-  const [error, setError]                   = useState<string | null>(null);
+function LoginForm() {
+  const [error, setError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
 
-  // The API already returns the curated roster (config/demoRoster.json criteria) in a deterministic
-  // order shared with the simulator. We only group by role for display; no hardcoded user cap.
-  const displayUsers = useMemo(
-    () => [...users].sort((a, b) => (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99)),
-    [users],
-  );
-
+  // The callback route can only redirect, so it reports a failed exchange by query string.
   useEffect(() => {
-    setSelectedEmail(''); setPassword(''); setSubmitting(false); setError(null);
+    const reported = new URLSearchParams(window.location.search).get('signin_error');
+    if (reported) setError(reported);
   }, []);
-
-  useEffect(() => {
-    api.system.users(demoRoster.login).then((r) => setUsers(r.users)).catch(() => {});
-    api.auth.domains()
-      .then((r) => { setDomains(r.domains); if (r.domains.length > 0) setSelectedDomain(r.domains[0].name); })
-      .catch(() => setDomains([{ name: 'leafypay', displayName: 'LeafyPay', type: 'local', flowType: 'client_credentials' }]));
-  }, []);
-
-  function handleDomainChange(name: string) {
-    setSelectedDomain(name); setSelectedEmail(''); setPassword(''); setError(null); setShowPassword(false);
-  }
-
-  function handleUserSelect(email: string) {
-    // Both fields, which is what debug mode's own tooltip promises: one click instead of typing.
-    setSelectedEmail(email); setPassword(DEMO_PASSWORD); setError(null);
-  }
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      const { token } = await api.auth.login({ email: selectedEmail, password, domain: selectedDomain });
-      setToken(token);
-      onLogin();
-    } catch (err) {
-      setError((err as Error).message ?? 'Login failed');
-      setSubmitting(false);
-    }
-  }
-
-  const currentDomain  = domains.find((d) => d.name === selectedDomain);
-  const flowType       = currentDomain?.flowType ?? (currentDomain?.type === 'local' ? 'client_credentials' : currentDomain?.type);
-  const isCredentialFlow = !flowType || flowType === 'client_credentials';
-  // The platform realm, by name. `local` is still accepted so a session started before the rename keeps
-  // showing the credential form rather than a redirect button.
-  const isLocalDomain    = selectedDomain === 'leafypay' || selectedDomain === 'local';
 
   return (
     <div className="min-h-screen bg-[#001E2B] flex items-center justify-center p-6">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
-        <div className="relative text-center mb-6">
-          <Tooltip text={debugMode
-            ? 'Debug mode is on: a ready-made user is offered for each role so you can sign in with one click, and some screens show extra notes explaining what you are looking at. Click to turn it off.'
-            : 'Turn on debug mode. It offers a ready-made user for each role, so you can sign in with one click instead of typing credentials, and it adds short explanations on some screens to help you understand what each part of the system does.'}>
-            <button type="button" onClick={() => { dismissHint(); toggleDebug(); }}
-              aria-label={debugMode ? 'Disable debug mode' : 'Enable debug mode'}
-              className={`absolute top-0 right-0 p-1.5 rounded-lg transition-colors ${
-                debugMode ? 'bg-amber-100 text-amber-600 hover:bg-amber-200'
-                : showPulse ? 'debug-hint-pulse'
-                : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
-              <Bug size={14} />
-            </button>
-          </Tooltip>
-
+        <div className="text-center mb-6">
           <div className="text-4xl mb-2"> <img src="/app-icon.png" alt={`${BRAND.full} Icon`} className="w-20 h-20 mx-auto" /> </div>
           <h1 className="text-2xl font-bold">{BRAND.primary} {BRAND.secondary}</h1>
           <p className="text-gray-500 text-sm mt-1">Application Mode: Sign In</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-4">
-          {/* Authentication Domain */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="flex items-center gap-1 text-sm font-medium text-gray-700">
-                Authentication Domain
-                <Tooltip text="The domain decides how you are signed in and who manages the accounts. Pick the one your account belongs to." />
-              </label>
-              {flowType && (
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${FLOW_TYPE_COLORS[flowType] ?? 'bg-gray-100 text-gray-600'}`}>
-                  {FLOW_TYPE_LABELS[flowType] ?? flowType}
-                </span>
-              )}
-            </div>
-            {domains.length === 0 ? (
-              <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">Loading domains…</div>
-            ) : (
-              <select value={selectedDomain} onChange={(e) => handleDomainChange(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm bg-white">
-                {domains.map((d) => <option key={d.name} value={d.name}>{d.displayName}</option>)}
-              </select>
-            )}
-            {currentDomain?.alertMessage && <p className="text-xs text-amber-600 mt-0.5">{currentDomain.alertMessage}</p>}
-          </div>
-
-          {/* Redirect-based flow */}
-          {!isCredentialFlow && currentDomain && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 space-y-3">
-              <p className="text-sm text-blue-800">
-                <strong>{currentDomain.displayName}</strong> uses <strong>{FLOW_TYPE_LABELS[flowType ?? ''] ?? flowType}</strong>. You will be redirected to the provider to complete login.
-              </p>
-              <button type="button" className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-                onClick={() => setError('External SSO redirect is not active in this build.')}>
-                Sign in with {currentDomain.displayName} →
-              </button>
-            </div>
-          )}
-
-          {/* Client-credentials form */}
-          {isCredentialFlow && (
-            <>
-              {isLocalDomain && debugMode && (
-                <div>
-                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
-                    Select User
-                    <Tooltip text="Ready-made accounts, one per role, so you can see the platform through different eyes. Pick one and its credentials are filled in for you." />
-                  </label>
-                  {users.length === 0 ? (
-                    <div className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400 animate-pulse">Loading users…</div>
-                  ) : (
-                    <select value={displayUsers.some((u) => u.email === selectedEmail) ? selectedEmail : ''} onChange={(e) => handleUserSelect(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-                      <option value="">Select a user…</option>
-                      {displayUsers.map((u) => (
-                        <option key={u.email} value={u.email}>
-                          {u.name} ({ROLE_LABELS[u.role] ?? u.role}{u.merchant ? ` · 🏬 ${u.merchant.name}` : ''})
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
-
-              {isLocalDomain && (
-                <div>
-                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
-                    Email
-                    <Tooltip text={<>
-                      Your email address is also your username: it is what identifies your account.
-                      {' '}Short on time? Turn on debug mode
-                      {' '}<Bug size={11} className="mx-0.5 inline align-[-1px] text-amber-400" />
-                      {' '}and pick a ready-made user for any role instead of typing credentials.
-                    </>} />
-                  </label>
-                  <input type="email" value={selectedEmail}
-                    onChange={(e) => { setSelectedEmail(e.target.value); setError(null); }}
-                    placeholder="user@example.com" className="w-full border rounded-lg px-3 py-2 text-sm" />
-                </div>
-              )}
-
-              {!isLocalDomain && (
-                <div>
-                  <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
-                    Email
-                    <Tooltip text="Your email address is also your username: it is what identifies your account." />
-                  </label>
-                  <input type="email" value={selectedEmail} onChange={(e) => { setSelectedEmail(e.target.value); setError(null); }} placeholder="user@example.com" className="w-full border rounded-lg px-3 py-2 text-sm" required />
-                </div>
-              )}
-
-              <div>
-                <label className="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1">
-                  Password
-                  <Tooltip text="Your secret key. Never share it with anyone." />
-                </label>
-                <div className="relative">
-                  <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isLocalDomain ? 'Auto-filled on user selection' : 'Enter password'} className="w-full border rounded-lg px-3 py-2 pr-10 text-sm" />
-                  <button type="button" onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors" tabIndex={-1}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}>
-                    {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-
-          {error && <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>}
-
-          {isCredentialFlow && (
-            <button type="submit" disabled={!selectedEmail || !password || submitting} suppressHydrationWarning
-              className="w-full bg-[#001E2B] text-[#00ED64] py-2.5 rounded-lg font-semibold hover:bg-[#00ED64] hover:text-[#001E2B] transition-colors disabled:opacity-40">
-              {submitting ? 'Signing in…' : 'Sign In'}
-            </button>
-          )}
-        </form>
-
-        {currentDomain?.selfRegistration && (
-          <p className="mt-3 text-xs text-gray-500 text-center">
-            Don&apos;t have an account?{' '}
-            <Link href={`/auth/register?domain=${encodeURIComponent(selectedDomain)}`} className="font-semibold text-[#001E2B] hover:text-[#00684A] underline">
-              Register
-            </Link>
-          </p>
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>
         )}
 
+        <a
+          href="/api/auth/login"
+          onClick={() => setRedirecting(true)}
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#001E2B] py-2.5 font-semibold text-[#00ED64] transition-colors hover:bg-[#00ED64] hover:text-[#001E2B]"
+        >
+          <LogIn size={16} />
+          {redirecting ? 'Redirecting...' : 'Sign in'}
+        </a>
+
         <p className="mt-4 text-xs text-gray-400 text-center">
-          {isLocalDomain && debugMode ? 'Select a user to fill in their credentials. Every preloaded account shares the same password.'
-            : isLocalDomain ? 'Enter your credentials to sign in.'
-            : isCredentialFlow ? 'Enter the credentials managed by the selected domain.'
-            : 'You will be redirected to complete authentication.'}
+          You will be redirected to the identity service to sign in. Your credentials are never entered here.
         </p>
         <div className="mt-4 text-center">
-          <Link href="/" className="text-xs text-gray-400 hover:text-[#001E2B] transition-colors">← Back to Mode Selection</Link>
+          <Link href="/" className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-[#001E2B] transition-colors">
+            <ArrowLeft size={12} />
+            Back to Mode Selection
+          </Link>
         </div>
       </div>
     </div>
@@ -521,5 +311,5 @@ export default function SystemPage() {
 
   if (!checked) return <div className="min-h-screen bg-[#001E2B]" suppressHydrationWarning />;
   if (user)    return <RoleDashboard user={user} onSignOut={signOut} />;
-  return <LoginForm onLogin={checkAuth} />;
+  return <LoginForm />;
 }

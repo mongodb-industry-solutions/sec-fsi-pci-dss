@@ -38,11 +38,6 @@ export interface BankDestination {
   correspondentBic?: string;
 }
 
-export interface LoginResponse {
-  token: string;
-  user: { partyAuthenticationInstanceReference: string; name: string; email: string; role: string };
-}
-
 export interface AuthUser {
   email: string;
   name: string;
@@ -842,11 +837,8 @@ export const api = {
   },
 
   auth: {
-    login: (body: { email: string; password: string; domain: string }) =>
-      apiFetch<LoginResponse>('/api/v1/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
+    // There is no `login` here. A credential is entered at the identity authority and never in this
+    // app, so the sign-in is a redirect (see app/api/auth/login) rather than a call.
     // Server-side logout: invalidates all of the caller's session tokens (advances their epoch).
     logout: (token: string) =>
       apiFetch<{ loggedOut: boolean }>('/api/v1/auth/logout', { method: 'POST' }, token),
@@ -876,14 +868,8 @@ export const api = {
         { method: 'PATCH', body: JSON.stringify(body) },
         token
       ),
-    // Change own password: requires the current password + new one. Returns a fresh token (the
-    // current session survives; all other sessions are invalidated server-side).
-    changePassword: (body: { currentPassword: string; newPassword: string }, token: string) =>
-      apiFetch<{ token: string }>(
-        '/api/v1/auth/password/change',
-        { method: 'POST', body: JSON.stringify(body) },
-        token
-      ),
+    // No `changePassword` either: a password is held by the identity authority and changed on its own
+    // credentials page, which is the only place one is ever entered.
     me: (token: string) =>
       apiFetch<{
         sub: string;

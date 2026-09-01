@@ -2,15 +2,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, type ConsentGrant } from '../../../lib/api';
-import { getToken, decodeToken, setToken as persistToken } from '../../../lib/auth';
-import { ROLE_LABELS } from '../../../lib/constants';
+import { getToken, decodeToken } from '../../../lib/auth';
+import { ROLE_LABELS, AUTHORITY_UI_PUBLIC_URL } from '../../../lib/constants';
 import { useDebugMode } from '../../../lib/debugMode';
 import { DisplayMask } from '../../../components/record/DisplayMask';
-import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight, Info, IdCard } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Save, X, Lock, ShieldCheck, User, Layers, Trash2, Copy, Check, KeyRound, ChevronRight, Info, IdCard, ExternalLink } from 'lucide-react';
 import { RawMongoPanel } from '../../../components/RawMongoPanel';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { DebugChip } from '../../../components/DebugChip';
-import { PasswordFields, passwordFieldsValid } from '../../../components/PasswordFields';
 
 type KycCheckStatus = 'initiated' | 'verified' | 'rejected' | 'expired';
 
@@ -285,37 +284,6 @@ export default function ProfilePage() {
   // QE reference accordion state
   const [qeExpanded, setQeExpanded] = useState<Record<string, boolean>>({});
   const toggleQe = (key: string) => setQeExpanded(p => ({ ...p, [key]: !p[key] }));
-
-  // Change-password state
-  const [pwOpen, setPwOpen] = useState(false);
-  const [pwCurrent, setPwCurrent] = useState('');
-  const [pwNew, setPwNew] = useState('');
-  const [pwConfirm, setPwConfirm] = useState('');
-  const [pwSaving, setPwSaving] = useState(false);
-  const [pwMsg, setPwMsg] = useState<string | null>(null);
-  const pwValid = pwCurrent.length > 0 && passwordFieldsValid(pwNew, pwConfirm) && pwNew !== pwCurrent;
-
-  function resetPwForm() {
-    setPwCurrent(''); setPwNew(''); setPwConfirm(''); setPwMsg(null);
-  }
-
-  async function handleChangePassword() {
-    setPwSaving(true);
-    setPwMsg(null);
-    try {
-      const { token: fresh } = await api.auth.changePassword({ currentPassword: pwCurrent, newPassword: pwNew }, token);
-      // Persist + swap the reissued token so the current session stays authenticated.
-      persistToken(fresh);
-      setToken(fresh);
-      resetPwForm();
-      setPwOpen(false);
-      setPwMsg('Password changed. Other sessions have been signed out.');
-    } catch (e) {
-      setPwMsg(`Error: ${e instanceof Error ? e.message : 'Could not change password.'}`);
-    } finally {
-      setPwSaving(false);
-    }
-  }
 
   async function reload(t: string) {
     const data = await api.auth.me(t).catch(() => null);
@@ -802,77 +770,26 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Change password: local accounts only (remote IdP accounts manage their own credentials) */}
+      {/* Credentials live at the identity service, which is the only place a password is entered. */}
       {(profile.domain === 'leafypay' || profile.domain === 'local') && (
         <div className="bg-white rounded-xl border p-5 space-y-3">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2 min-w-0">
               <KeyRound size={16} className="text-gray-500 shrink-0" />
-              <h2 className="font-semibold text-gray-800 text-sm">Password</h2>
+              <h2 className="font-semibold text-gray-800 text-sm">Password and sign-in</h2>
             </div>
-            {!pwOpen && (
-              <button
-                onClick={() => { resetPwForm(); setPwOpen(true); }}
-                className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1.5"
-              >
-                <Lock size={13} /> Change password
-              </button>
-            )}
+            <a
+              href={`${AUTHORITY_UI_PUBLIC_URL}/profile/credentials`}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1.5"
+            >
+              <ExternalLink size={13} /> Manage credentials
+            </a>
           </div>
-
-          {!pwOpen ? (
-            <p className="text-xs text-gray-500">
-              Change your password. You will be asked for your current password, and all other active sessions will be signed out.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="pw-current" className="block text-xs text-gray-500 mb-1">Current password</label>
-                <input
-                  id="pw-current"
-                  type="password"
-                  autoComplete="current-password"
-                  value={pwCurrent}
-                  onChange={(e) => setPwCurrent(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#00ED64]/40 focus:border-[#00ED64]"
-                />
-              </div>
-
-              <PasswordFields
-                password={pwNew}
-                confirm={pwConfirm}
-                onPasswordChange={setPwNew}
-                onConfirmChange={setPwConfirm}
-                label="New password"
-                idPrefix="pw-new"
-              />
-
-              {pwNew.length > 0 && pwNew === pwCurrent && (
-                <p className="text-xs text-amber-600">New password must be different from the current one.</p>
-              )}
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleChangePassword}
-                  disabled={!pwValid || pwSaving}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-[#00ED64] text-black hover:brightness-95 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                >
-                  <Save size={13} /> {pwSaving ? 'Saving…' : 'Update password'}
-                </button>
-                <button
-                  onClick={() => { resetPwForm(); setPwOpen(false); }}
-                  disabled={pwSaving}
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-1.5"
-                >
-                  <X size={13} /> Cancel
-                </button>
-              </div>
-            </div>
-          )}
-
-          {pwMsg && (
-            <p className={`text-xs ${pwMsg.startsWith('Error') ? 'text-red-600' : 'text-green-600'}`}>{pwMsg}</p>
-          )}
+          <p className="text-xs text-gray-500">
+            Your password and your authenticators are held by the identity service, not by this
+            application. This application never receives a credential, which is why changing one
+            happens there.
+          </p>
         </div>
       )}
 

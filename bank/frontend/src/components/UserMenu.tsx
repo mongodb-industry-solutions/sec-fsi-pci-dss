@@ -124,15 +124,15 @@ export function UserMenu() {
           role="menu"
           // Full width on a phone, anchored to the trigger from `sm` up: a 256px panel pinned to the
           // right edge of a 380px screen goes off it.
-          className="fixed inset-x-2 top-14 z-50 w-auto overflow-hidden rounded-xl border border-white/10 bg-[#0b3d5c] shadow-2xl shadow-black/40 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64"
+          className="fixed inset-x-2 top-14 z-50 w-auto overflow-hidden rounded-xl border border-line bg-surface shadow-2xl shadow-black/20 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64"
         >
-          <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3.5">
+          <div className="flex items-center gap-3 border-b border-line px-4 py-3.5">
             <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold text-white ${avatar}`}>
               {initials(name)}
             </span>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">{name}</p>
-              <span className="mt-0.5 inline-block rounded border border-white/20 px-1.5 py-0.5 text-[10px] font-medium text-white/80">
+              <p className="truncate text-sm font-semibold text-ink">{name}</p>
+              <span className="mt-0.5 inline-block rounded border border-line px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">
                 {ROLE_LABEL[role] ?? (role || 'no role')}
               </span>
             </div>
@@ -145,34 +145,34 @@ export function UserMenu() {
                 href={item.href}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink-soft transition-colors hover:bg-surface-alt hover:text-ink"
               >
-                <item.icon size={15} className="shrink-0 text-white/60" />
+                <item.icon size={15} className="shrink-0 text-ink-soft" />
                 <span>{item.label}</span>
               </Link>
             ))}
 
-            <div className="mx-3 my-1 border-t border-white/10" />
+            <div className="mx-3 my-1 border-t border-line" />
 
             <a
               href={`${AUTHORITY_UI}/profile/credentials`}
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-3 px-4 py-2.5 text-sm text-white/85 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink-soft transition-colors hover:bg-surface-alt hover:text-ink"
             >
-              <KeyRound size={15} className="shrink-0 text-white/60" />
+              <KeyRound size={15} className="shrink-0 text-ink-soft" />
               <span>Your credentials</span>
             </a>
 
-            <div className="mx-3 my-1 border-t border-white/10" />
+            <div className="mx-3 my-1 border-t border-line" />
 
             <button
               type="button"
               role="menuitem"
               onClick={signOut}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-white/85 transition-colors hover:bg-red-500/20 hover:text-red-200"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink-soft transition-colors hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300"
             >
-              <LogOut size={15} className="shrink-0 text-white/60" />
+              <LogOut size={15} className="shrink-0 text-ink-soft" />
               <span>Sign out</span>
             </button>
           </div>

@@ -248,7 +248,7 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
               items: {
                 type: 'object',
                 properties: {
-                  email: { type: 'string', format: 'email', description: 'Login email; submit to POST /api/v1/auth/login.' },
+                  email: { type: 'string', format: 'email', description: 'Login email, entered at the identity authority sign-in page.' },
                   name: { type: 'string', description: 'Display name.' },
                   role: {
                     type: 'string',

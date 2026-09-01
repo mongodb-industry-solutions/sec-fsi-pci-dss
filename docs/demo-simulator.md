@@ -1049,13 +1049,20 @@ Role-based routing is enforced in `demo/layout.tsx`. After JWT verification, the
 
 ### 7.1 Token flow
 
+Since v39 this application issues no tokens and has no login endpoint. Signing in is a redirect to
+the identity authority, exactly as in the bank's console and the merchant app:
+
 ```
-POST /api/v1/auth/login
-Body: { username, password, domain }
-Response: { token: "<JWT>", user: { name, role, email } }
+GET /api/auth/login              (this app)   -> 302 to the authority console, with PKCE + state
+GET /api/auth/callback?code=...  (this app)   -> exchanges the code, sets the session cookie
 ```
 
-The JWT is a signed HS256 token (secret from `JWT_SECRET` env var). Payload:
+The exchange runs server side in the Next.js route handler, against
+`PSP_GIAM_ISSUER_URL/protocol/openid-connect/token`. The registered client is `leafypay-console`
+(public, PKCE required), whose redirect URI is `<app>/api/auth/callback`.
+
+The resulting access token is RS256, signed by the authority and verified against its published key
+set. Its payload carries the claims the authority asserts:
 
 ```json
 {
@@ -1070,13 +1077,16 @@ The JWT is a signed HS256 token (secret from `JWT_SECRET` env var). Payload:
 
 The `domain` field is the extension point. When domain is `msentra`, the backend delegates token validation to the MS Entra ID endpoint instead of verifying locally. In v1, only `local` is active.
 
-### 7.2 Pre-populated user selector
+### 7.2 The demo roster
 
-`GET /api/v1/system/users` returns the list of demo users (name, email, role) without passwords. The login screen calls this endpoint on mount to populate the dropdown. Selecting a user auto-fills the email and a known test password.
+`GET /api/v1/system/users` returns the demo accounts (name, email, role) without passwords. The
+sign-in screen no longer calls it: the roster is offered by the authority's own sign-in page, scoped
+by the `demoRoster` field of the client that started the flow. A password is never entered in this
+application, so there is nothing here to pre-fill.
 
 ### 7.3 API security
 
-All `/api/v1/*` endpoints except `/api/v1/auth/login`, `/api/v1/system/users`, and `/api/v1/health` require a valid `Authorization: Bearer <JWT>` header. Missing or invalid tokens return HTTP 401. Role enforcement (e.g., L2 collections) returns HTTP 403.
+All `/api/v1/*` endpoints except `/api/v1/system/users` and `/api/v1/health` require a valid `Authorization: Bearer <token>` header. Missing or invalid tokens return HTTP 401. Role enforcement (e.g., L2 collections) returns HTTP 403.
 
 In the Simulator mode, requests include a synthetic `X-Demo-Role` header instead of a JWT. The backend treats this header as trusted in demo/simulator mode. The role controls which collections are queried.
 
@@ -1354,6 +1364,11 @@ The panel shows the live MongoDB document with encrypted fields displayed as `Bi
 
 ## 12. Login UX: Enhanced (Ch-05)
 
+> **Superseded by v39.** Both variants below described a credential form owned by this application.
+> The application no longer has one: its sign-in screen is a single button that redirects to the
+> authority, and the roster and debug conveniences described here now belong to the authority's own
+> sign-in page. Kept as the record of what the screen used to do.
+
 ### 12.1 Business Mode Login (Debug OFF)
 
 Standard credential form: unchanged from the current implementation. A subtle "Demo hints?" toggle reveals available usernames without passwords.
@@ -1399,7 +1414,7 @@ The **featured roster** (13 users, `customerAuthenticationDemoFeatured: true`) d
 All passwords: `demo-password` (shared bcrypt hash; the plaintext is a fixed demo convention, centralized as `DEMO_PASSWORD` in the frontend).
 
 **Simulator merchant:** Okafor Digital Services (`m0000002`), owned by Amara Okafor (`b0000058`, KYB-verified). All simulator payments are processed through this merchant.  
-**Simulator authentication:** the Simulator obtains a **real JWT per role** via `POST /api/v1/auth/login` (no auth bypass). Escalate (L1) → approve (L2) → resolve actions hit the real `/api/v1/fraud/*` endpoints and persist, a case escalated in the Simulator appears as `escalated` when logging into Application mode as an L2 user.  
+**Simulator authentication:** the Simulator obtains a **real token per role** from the authority, by exchanging its own client credential for a token carrying an `act` claim that names the Simulator (no auth bypass, and every simulated action reads as "the Simulator, acting as X"). Escalate (L1) → approve (L2) → resolve actions hit the real `/api/v1/fraud/*` endpoints and persist, a case escalated in the Simulator appears as `escalated` when logging into Application mode as an L2 user.  
 **Simulator history:** after a simulator payment, the payer (`luis`/`julia`/`amara`) can log in to `/system/payment/history` and see the transaction, read from the real API (`GET /api/v1/transactions/all`, scoped to their own account). The previous `localStorage` mirror was removed.
 
 ---

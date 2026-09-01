@@ -221,6 +221,12 @@ services:
       - .env
     environment:
       NODE_ENV: ${NODE_ENV:-development}
+      # Read at RUNTIME by the sign-in route handlers, not baked into the bundle: the code exchange
+      # happens on this server, so it uses the private realm URL and the secret never reaches a page.
+      PSP_GIAM_ISSUER_URL: ${PSP_GIAM_ISSUER_URL:-http://giam:8080/realms/leafypay}
+      # This app's own public address: the authority redirects the browser back to it, so it must be
+      # the address a browser uses and must match a registered redirect URI of leafypay-console.
+      PSP_URL_FRONTEND: ${PSP_URL_FRONTEND:-http://localhost:8080}
     depends_on:
       backend:
         condition: service_healthy

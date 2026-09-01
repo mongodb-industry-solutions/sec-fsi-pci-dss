@@ -3053,7 +3053,26 @@ NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=http://localhost:8086
 NEXT_PUBLIC_BANKCORE_AUTHORITY_URL=http://localhost:8086
 # docker-compose only: the one knob the three variables above are derived from.
 GIAM_BROWSER_URL=http://localhost:8085
+
+# This app's own public address. The authority redirects the browser back to it after sign-in, so it
+# must match a registered redirect URI of the `leafypay-console` client (`<this>/api/auth/callback`).
+PSP_URL_FRONTEND=http://localhost:8080
 ```
+
+**Sign-in is a redirect, in all three apps.** The platform console, the bank console and the merchant
+app each register a client at the authority and run an authorization code flow with PKCE; none of them
+has a login endpoint or ever receives a password. The clients are:
+
+| App | Client id | Type | Redirect URI |
+|---|---|---|---|
+| Platform console (`psp/frontend`) | `leafypay-console` | public, PKCE | `http://localhost:8080/api/auth/callback` |
+| Bank console (`bank/frontend`) | `bankcore-console` | public, PKCE | `http://localhost:8084/api/auth/callback` |
+| Identity console | `giam-console` | public, PKCE | `http://localhost:8086/auth/callback` |
+| Merchant app | `oauth001-…-0001` | confidential | `http://localhost:8082/api/auth/callback` |
+
+The client fixtures live in the authority's repository (`sec-giam`, `backend/data/clients.json`), which
+owns them. A redirect URI is matched exactly and never by prefix, so a new host means a fixture change
+and a reseed there, not a configuration change here.
 
 **The issuer is persisted, not recomputed.** The authority writes each realm's issuer onto the realm
 record at seed time, composed from its own public URL. Changing that URL therefore requires re-running

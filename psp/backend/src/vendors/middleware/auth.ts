@@ -42,7 +42,6 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/health',
   '/api/v1/system/health',
   '/api/v1/system/users',
-  '/api/v1/auth/login',
   '/api/v1/auth/register',
   '/api/v1/auth/domains',
   // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,

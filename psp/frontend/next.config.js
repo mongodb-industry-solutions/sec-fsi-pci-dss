@@ -74,6 +74,8 @@ const nextConfig = {
                 .replace(/\/realms\/.*$/, '')
         ).replace(/\/+$/, '');
         return [
+            // This array form is applied AFTER the filesystem, so the app's own /api/auth/* route
+            // handlers (the sign-in redirect and its callback) win over this catch-all.
             { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
             { source: '/health', destination: `${backendUrl}/health` },
             // Per-service health aliases. They exist only because bare /health on this origin is
