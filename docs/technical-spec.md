@@ -3074,6 +3074,21 @@ The client fixtures live in the authority's repository (`sec-giam`, `backend/dat
 owns them. A redirect URI is matched exactly and never by prefix, so a new host means a fixture change
 and a reseed there, not a configuration change here.
 
+**Three cookies on the platform console, because they answer three different questions.**
+
+| Cookie | Holds | httpOnly | Lifetime |
+|---|---|---|---|
+| `demo_token` | the access token, sent as the bearer by `apiFetch` | no, script has to send it | the token's own, 15 min |
+| `demo_identity` | the id_token, the only source of name and email | no, the screens read it | same as above |
+| `demo_refresh` | the refresh token | **yes**, it is a credential | 30 days |
+
+The access token lasts fifteen minutes and a demo lasts hours, so `SessionKeeper` (mounted at the root
+layout) renews it through `POST /api/auth/refresh` two minutes before expiry. The renewal is server
+side because the authority ROTATES the refresh token as it redeems it, and the replacement has to be
+written to a cookie script cannot reach. `POST /api/auth/logout` exists for the same reason: clearing
+only the readable cookies would leave a live refresh token behind, and the next renewal would sign the
+person back in after they asked to leave.
+
 **The issuer is persisted, not recomputed.** The authority writes each realm's issuer onto the realm
 record at seed time, composed from its own public URL. Changing that URL therefore requires re-running
 the authority's seeder before the new value reaches any token; until then the deployed services and the

@@ -10,5 +10,8 @@ export async function logoutSession(): Promise<void> {
   if (token) {
     try { await api.auth.logout(token); } catch { /* best-effort: still clear locally below */ }
   }
+  // The refresh token is httpOnly, so script cannot reach it. Leaving it behind would let the next
+  // renewal sign the person back in after they asked to leave.
+  try { await fetch('/api/auth/logout', { method: 'POST' }); } catch { /* cleared locally below */ }
   clearToken();
 }

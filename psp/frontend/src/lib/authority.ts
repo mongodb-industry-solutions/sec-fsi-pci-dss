@@ -13,6 +13,14 @@ import { createHash, randomBytes } from 'crypto';
 
 const SESSION_COOKIE = 'demo_token';
 const IDENTITY_COOKIE = 'demo_identity';
+/**
+ * The refresh token, and the only cookie here that is httpOnly.
+ *
+ * It IS a credential: it mints access tokens, so script must not be able to read it. The access token
+ * beside it is readable because `apiFetch` sends it from the browser, and that asymmetry is the point
+ * rather than an inconsistency.
+ */
+const REFRESH_COOKIE = 'demo_refresh';
 const VERIFIER_COOKIE = 'leafypay.pkce';
 const STATE_COOKIE = 'leafypay.state';
 const REALM = 'leafypay';
@@ -96,6 +104,100 @@ export interface ExchangeResult {
   error?: string;
 }
 
+type CookieStore = Awaited<ReturnType<typeof cookies>>;
+
+/**
+ * Writes a freshly issued set of tokens, in one place so signing in and refreshing cannot disagree.
+ *
+ * The access token cookie lives exactly as long as the token does. Making it outlive its own contents
+ * is what the old 24-hour session cookie did, and it produced a browser that believed it was signed in
+ * while every API call was refused.
+ */
+function persistSession(
+  store: CookieStore,
+  tokens: { accessToken: string; idToken?: string; refreshToken?: string; expiresIn?: number },
+): void {
+  const readable = {
+    httpOnly: false,
+    sameSite: 'lax' as const,
+    path: '/',
+    maxAge: tokens.expiresIn ?? 900,
+  };
+  store.set(SESSION_COOKIE, tokens.accessToken, readable);
+  // The access token carries no name and no email, by design. The id_token is the only answer to
+  // "who is this", so the screens get it too; it is never sent anywhere as a credential.
+  if (tokens.idToken) store.set(IDENTITY_COOKIE, tokens.idToken, readable);
+  if (tokens.refreshToken) {
+    store.set(REFRESH_COOKIE, tokens.refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      // The authority's refresh lifetime is thirty days. A shorter cookie would sign a person out
+      // while the credential it holds is still perfectly valid.
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+}
+
+/**
+ * Trades the refresh token for a new access token, and rotates the stored one.
+ *
+ * Needed because the access token lives fifteen minutes while a demo session lasts hours. Without
+ * this the browser simply stopped being signed in mid-flow, and the screens that ask "is somebody
+ * here" answered no: the hosted checkout stopped offering the buyer's saved cards, which reads as a
+ * checkout bug rather than an expiry.
+ *
+ * The authority RETIRES the presented token as it redeems it, so the new one has to be written or the
+ * next refresh fails. That is why this cannot happen in the browser: the credential is httpOnly.
+ */
+export async function refreshSession(): Promise<ExchangeResult> {
+  const store = await cookies();
+  const presented = store.get(REFRESH_COOKIE)?.value;
+  if (!presented) return { ok: false, error: 'no_refresh_token' };
+
+  try {
+    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: presented,
+        client_id: CONSOLE_CLIENT_ID,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      // A refused refresh is a finished session, so nothing is left behind pretending otherwise.
+      clearSession(store);
+      return { ok: false, error: 'refresh_refused' };
+    }
+
+    const {
+      access_token: accessToken, id_token: idToken, refresh_token: refreshToken,
+      expires_in: expiresIn,
+    } = await response.json() as {
+      access_token?: string; id_token?: string; refresh_token?: string; expires_in?: number;
+    };
+    if (!accessToken) {
+      clearSession(store);
+      return { ok: false, error: 'no_token' };
+    }
+    persistSession(store, { accessToken, idToken, refreshToken, expiresIn });
+    return { ok: true };
+  } catch {
+    // Left alone on a transport failure: the session is probably still valid and the next attempt
+    // will say so. Clearing it here would sign somebody out because a network blinked.
+    return { ok: false, error: 'authority_unreachable' };
+  }
+}
+
+/** Removes every cookie this module owns, including the one script cannot reach. */
+export function clearSession(store: CookieStore): void {
+  store.delete(SESSION_COOKIE);
+  store.delete(IDENTITY_COOKIE);
+  store.delete(REFRESH_COOKIE);
+}
+
 /** Exchanges the returned code for a token, after checking the state this app itself issued. */
 export async function completeSignIn(code: string, state: string): Promise<ExchangeResult> {
   const store = await cookies();
@@ -125,30 +227,14 @@ export async function completeSignIn(code: string, state: string): Promise<Excha
     if (!response.ok) return { ok: false, error: 'token_refused' };
 
     const {
-      access_token: accessToken, id_token: idToken, expires_in: expiresIn,
+      access_token: accessToken, id_token: idToken, refresh_token: refreshToken,
+      expires_in: expiresIn,
     } = await response.json() as {
-      access_token?: string; id_token?: string; expires_in?: number;
+      access_token?: string; id_token?: string; refresh_token?: string; expires_in?: number;
     };
     if (!accessToken) return { ok: false, error: 'no_token' };
 
-    /**
-     * NOT httpOnly, unlike the bank's.
-     *
-     * This app is a browser client: every call goes through `apiFetch`, which reads the bearer from
-     * `document.cookie`. An httpOnly cookie here would be invisible to the code that has to send it.
-     * Marked rather than hidden: closing it means routing the API through this server, which is a
-     * larger change than a sign-in flow.
-     */
-    const cookieOptions = {
-      httpOnly: false,
-      sameSite: 'lax' as const,
-      path: '/',
-      maxAge: expiresIn ?? 900,
-    };
-    store.set(SESSION_COOKIE, accessToken, cookieOptions);
-    // The access token carries no name and no email, by design. The id_token is the only answer to
-    // "who is this", so the screens get it too; it is never sent anywhere as a credential.
-    if (idToken) store.set(IDENTITY_COOKIE, idToken, cookieOptions);
+    persistSession(store, { accessToken, idToken, refreshToken, expiresIn });
     return { ok: true };
   } catch {
     return { ok: false, error: 'authority_unreachable' };
