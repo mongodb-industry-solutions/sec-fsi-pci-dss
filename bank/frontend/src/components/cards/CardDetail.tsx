@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CreditCard, Landmark, User } from 'lucide-react';
 import { admin, AdminError } from '../../lib/adminClient';
+import { useDebugMode } from '../../lib/debugMode';
 import { Field, Panel, Reveal } from '../Reveal';
 import { Action } from '../ui/Action';
 import { StatusBadge } from '../data/StatusBadge';
@@ -54,6 +55,7 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
   const [holder, setHolder] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
+  const { debugMode } = useDebugMode();
 
   const reload = useCallback(() => setReloads((count) => count + 1), []);
 
@@ -246,9 +248,11 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
         </Panel>
       )}
 
-      <Panel title="The record as the bank holds it" description="What the registry stores, with no decrypted value in it.">
-        <JsonView data={card} title="Card record" collapsed={1} />
-      </Panel>
+      {debugMode && (
+        <Panel title="The record as the bank holds it" description="What the registry stores, with no decrypted value in it.">
+          <JsonView data={card} title="Card record" collapsed={1} />
+        </Panel>
+      )}
     </div>
   );
 }

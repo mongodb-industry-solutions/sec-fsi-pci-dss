@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, CreditCard, Landmark, User } from 'lucide-react';
 import { admin, AdminError } from '../../lib/adminClient';
+import { useDebugMode } from '../../lib/debugMode';
 import { Field, Panel, Reveal } from '../Reveal';
 import { Action } from '../ui/Action';
 import { StatusBadge } from '../data/StatusBadge';
@@ -48,6 +49,7 @@ export function AccountDetail({ accountReference }: { accountReference: string }
   const [holder, setHolder] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
+  const { debugMode } = useDebugMode();
 
   const reload = useCallback(() => setReloads((count) => count + 1), []);
 
@@ -216,9 +218,11 @@ export function AccountDetail({ accountReference }: { accountReference: string }
         />
       </section>
 
-      <Panel title="The record as the bank holds it" description="What the account record stores, with no decrypted value in it.">
-        <JsonView data={account} title="Account record" collapsed={1} />
-      </Panel>
+      {debugMode && (
+        <Panel title="The record as the bank holds it" description="What the account record stores, with no decrypted value in it.">
+          <JsonView data={account} title="Account record" collapsed={1} />
+        </Panel>
+      )}
     </div>
   );
 }

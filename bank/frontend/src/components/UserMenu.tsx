@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  ChevronDown, CreditCard, FileClock, Home, KeyRound, Landmark, LogOut, ScrollText, Users,
+  Bug, ChevronDown, CreditCard, FileClock, Home, KeyRound, Landmark, LogOut, ScrollText, Users,
 } from 'lucide-react';
+import { useDebugMode } from '../lib/debugMode';
 
 /**
  * The signed-in person, and everything they can reach, in the header.
@@ -58,6 +59,7 @@ export function UserMenu() {
   const [session, setSession] = useState<Session | null>(null);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { debugMode, toggleDebug } = useDebugMode();
 
   useEffect(() => {
     fetch('/api/auth/session')
@@ -163,6 +165,25 @@ export function UserMenu() {
               <KeyRound size={15} className="shrink-0 text-ink-soft" />
               <span>Your credentials</span>
             </a>
+
+            <div className="mx-3 my-1 border-t border-line" />
+
+            <button
+              type="button"
+              role="menuitem"
+              onClick={toggleDebug}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink-soft transition-colors hover:bg-surface-alt hover:text-ink"
+            >
+              <Bug size={15} className={`shrink-0 ${debugMode ? 'text-accent' : 'text-ink-soft'}`} />
+              <span className="flex-1">Debug mode</span>
+              <span
+                className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold ${
+                  debugMode ? 'border-accent/30 bg-accent/15 text-accent' : 'border-line bg-surface-alt text-ink-soft'
+                }`}
+              >
+                {debugMode ? 'ON' : 'OFF'}
+              </span>
+            </button>
 
             <div className="mx-3 my-1 border-t border-line" />
 

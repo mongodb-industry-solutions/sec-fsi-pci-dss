@@ -4,6 +4,7 @@ import { Landmark } from 'lucide-react';
 import './globals.css';
 import { AuthGate } from '../components/AuthGate';
 import { UserMenu } from '../components/UserMenu';
+import { DebugModeProvider } from '../lib/debugMode';
 
 export const metadata: Metadata = {
   title: 'BankCore',
@@ -21,6 +22,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className="min-h-screen antialiased">
+        {/* Wraps header and page: the toggle lives in the menu, the panels it reveals live in the page. */}
+        <DebugModeProvider>
         {/* Sticky, so on a long audit table the way back is always one tap away rather than a scroll away. */}
         <header className="sticky top-0 z-20 border-b border-line bg-bank text-bank-ink">
           <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
@@ -40,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
           <AuthGate>{children}</AuthGate>
         </main>
+        </DebugModeProvider>
       </body>
     </html>
   );
