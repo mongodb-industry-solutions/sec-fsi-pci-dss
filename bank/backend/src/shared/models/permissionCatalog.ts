@@ -39,10 +39,12 @@ export interface BankPermissionDeclaration {
   description: string;
 }
 
-export const BANK_PERMISSION_CATALOG_VERSION = '1';
+export const BANK_PERMISSION_CATALOG_VERSION = '2';
 
 export const BANK_PERMISSION_CATALOG: BankPermissionDeclaration[] = [
   { resource: 'accountHolders', action: 'view', description: 'Read the people and businesses this bank holds accounts for' },
+  // Enforced by the holder disclosure route, so it has to be declarable or no role could ever hold it.
+  { resource: 'accountHolders', action: 'viewSensitive', description: 'Reveal an account holder name and contact details' },
   { resource: 'accountHolders', action: 'manage', description: 'Administer account holder records' },
   { resource: 'accounts', action: 'view', description: 'Read accounts and balances' },
   { resource: 'accounts', action: 'viewSensitive', description: 'Reveal a full account number' },

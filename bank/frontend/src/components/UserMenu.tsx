@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bug, ChevronDown, CreditCard, FileClock, Home, KeyRound, Landmark, LogOut, ScrollText, Users,
+  Bug, ChevronDown, CreditCard, FileClock, Home, KeyRound, Landmark, LifeBuoy, LogOut, ScrollText, Users,
 } from 'lucide-react';
 import { useDebugMode } from '../lib/debugMode';
 
@@ -155,6 +155,18 @@ export function UserMenu() {
             ))}
 
             <div className="mx-3 my-1 border-t border-line" />
+
+            {/* Grouped with credentials rather than with the record screens: both answer a question about
+                yourself, not about a customer. */}
+            <Link
+              href="/help"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink-soft transition-colors hover:bg-surface-alt hover:text-ink"
+            >
+              <LifeBuoy size={15} className="shrink-0 text-ink-soft" />
+              <span>Help and roles</span>
+            </Link>
 
             <a
               href={`${AUTHORITY_UI}/profile/credentials`}
