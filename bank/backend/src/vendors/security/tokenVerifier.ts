@@ -1,5 +1,6 @@
 import { createPublicKey, verify as cryptoVerify, KeyObject } from 'crypto';
 import { config } from '../../config';
+import { expandRoles } from './roleCatalog';
 
 /**
  * Local verification against the authority's published keys, for the BANK's realm.
@@ -181,6 +182,10 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
   if (typeof claims.exp === 'number' && claims.exp + skew < now) return null;
   if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return null;
 
+  const roles = Array.isArray(claims.roles) ? claims.roles as string[] : [];
+  const explicit = Array.isArray(claims.permissions) ? claims.permissions as string[] : [];
+  const expanded = await expandRoles(token, roles, explicit);
+
   return {
     ...claims,
     sub: String(claims.sub ?? ''),
@@ -198,7 +203,19 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
           : `${(entry as { resource?: string }).resource ?? ''}:${(entry as { action?: string }).action ?? ''}`))
         .filter((entry) => entry.length > 1 && !entry.startsWith(':') && !entry.endsWith(':'))
       : [],
-    roles: Array.isArray(claims.roles) ? claims.roles as string[] : [],
+    roles,
+    /**
+     * The roles, expanded into the permissions this bank enforces.
+     *
+     * Set HERE because this is the one edge every guard reads through, staff and third party alike.
+     * Without it the guards resolved the explicit `permissions` claim, which an ordinary token has
+     * not carried since v40, so every guarded route refused every caller including a bank
+     * administrator. It failed closed, and it failed completely.
+     *
+     * Absent when the catalog has never resolved, which the guards treat as "fall back to the
+     * explicit claim" and therefore still deny.
+     */
+    ...(expanded ? { effectivePermissions: expanded } : {}),
     clientId: typeof claims.client_id === 'string' ? claims.client_id : undefined,
     sessionId: typeof claims.sid === 'string' ? claims.sid : undefined,
   };

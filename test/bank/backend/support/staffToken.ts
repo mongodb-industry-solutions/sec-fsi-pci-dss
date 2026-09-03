@@ -9,7 +9,11 @@
 // is slower than minting one and it is the path a person walks.
 import { startAuthority, interactiveToken, type Authority } from './authorityProcess';
 
-const REALM = 'bankcore';
+/**
+ * The SHARED realm (ADR-003). The bank is a client in it, not a directory of its own: what keeps it
+ * separate is its own resource server, its own roles and its own token audience.
+ */
+const REALM = 'leafypay';
 const CONSOLE_CLIENT = 'bankcore-console';
 const REDIRECT_URI = 'http://localhost:8084/api/auth/callback';
 const DEMO_PASSWORD = 'demo-password';

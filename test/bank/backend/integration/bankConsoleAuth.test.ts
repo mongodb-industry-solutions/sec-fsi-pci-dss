@@ -56,7 +56,7 @@ async function signIn(login: string): Promise<{ jar: Jar; codeIssued: boolean }>
   collect(jar, start);
   const params = new URL(start.headers.get('location') ?? '').searchParams;
 
-  const session = await fetch(`${AUTHORITY}/realms/bankcore/login`, {
+  const session = await fetch(`${AUTHORITY}/realms/leafypay/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ login, password: DEMO_PASSWORD }),
@@ -65,7 +65,7 @@ async function signIn(login: string): Promise<{ jar: Jar; codeIssued: boolean }>
   if (!session.ok) return { jar, codeIssued: false };
   const { sessionId } = await session.json() as { sessionId: string };
 
-  const authorize = await fetch(`${AUTHORITY}/realms/bankcore/protocol/openid-connect/auth`, {
+  const authorize = await fetch(`${AUTHORITY}/realms/leafypay/protocol/openid-connect/auth`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -111,7 +111,9 @@ describe('v39: the bank console signs in at the authority and authorises by role
     expect(location.pathname, 'the sign-in page belongs to the authority').toBe('/auth/login');
     expect(location.searchParams.get('response_type')).toBe('code');
     expect(location.searchParams.get('code_challenge_method'), 'PKCE is not optional here').toBe('S256');
-    expect(location.searchParams.get('realm')).toBe('bankcore');
+    // The realm the bank sends people to is the shared one (ADR-003); the COOKIE prefix stays
+    // `bankcore`, because that names the application holding the session and not the directory.
+    expect(location.searchParams.get('realm')).toBe('leafypay');
 
     // The verifier stays with this app; only its hash travels.
     const cookies = (start.headers.getSetCookie?.() ?? []).join(' ');

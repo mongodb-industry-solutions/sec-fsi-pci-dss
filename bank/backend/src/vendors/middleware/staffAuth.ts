@@ -56,7 +56,15 @@ export function requireStaff(resource: BankResource, action: BankAction) {
       return refuse(reply, 403, 'This endpoint requires a signed-in person, not a machine credential');
     }
 
-    if (!hasBankPermission(claims.permissions, resource, action)) {
+    /**
+     * The EXPANDED set where the verifier resolved one, the explicit claim otherwise.
+     *
+     * Since v40 an ordinary token carries roles and no permissions, so reading the explicit claim
+     * alone denied every caller. Absence still denies: an unresolved authority must never read as
+     * an unrestricted one.
+     */
+    const held = claims.effectivePermissions ?? claims.permissions;
+    if (!hasBankPermission(held, resource, action)) {
       return refuse(reply, 403, `Access denied: your role does not permit ${action} on ${resource}`);
     }
 
@@ -67,7 +75,8 @@ export function requireStaff(resource: BankResource, action: BankAction) {
     request.staff = {
       subjectId: claims.sub,
       roles: claims.roles,
-      permissions: claims.permissions,
+      // The same set the guard decided on, so a downstream check cannot disagree with the gate.
+      permissions: held,
       ...(typeof claims.account_holder === 'string' ? { accountHolderRef: claims.account_holder } : {}),
     };
   };

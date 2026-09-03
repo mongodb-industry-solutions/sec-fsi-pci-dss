@@ -15,7 +15,11 @@ import {
   startAuthority, machineToken, interactiveToken, decodeClaims, type Authority,
 } from '../support/authorityProcess';
 
-const BANK_REALM = 'bankcore';
+/**
+ * The SHARED realm (ADR-003). The bank is a client in it, not a directory of its own: what keeps it
+ * separate is its own resource server, its own roles and its own token audience.
+ */
+const BANK_REALM = 'leafypay';
 const PLATFORM_REALM = 'leafypay';
 const CONSOLE_CLIENT = 'bankcore-console';
 const REDIRECT_URI = 'http://localhost:8084/api/auth/callback';
@@ -44,6 +48,53 @@ afterAll(async () => {
   await authority?.stop();
 });
 
+/**
+ * What a token's roles actually expand to, asked of the authority.
+ *
+ * The separation-of-duties claims below are about PERMISSIONS, and v40 stopped putting them in the
+ * token. So they are resolved the way the bank resolves them at runtime: the published catalog,
+ * fetched with the caller's own token, which returns the roles that caller holds. Asserting against
+ * the fixture instead would be asserting the fixture against itself.
+ */
+async function expanded(token: string, held: string[]): Promise<Set<string>> {
+  const response = await fetch(`${authority!.baseUrl}/realms/leafypay/permissions`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) return new Set();
+  const body = await response.json() as {
+    roles: Array<{ name: string; permissions: string[] }>;
+    permissions: Array<{ permission: string; resourceServer: string }>;
+  };
+
+  /**
+   * Scoped to THIS BANK's resource server, which is the whole point of the claims below.
+   *
+   * A bank employee also holds `realm_administrator`, so an unscoped union returns the authority's
+   * own permissions too and "compliance manages nothing" reads as false: they manage role
+   * assignments AT THE AUTHORITY, which is a different statement about a different system. The
+   * separation being asserted is within the bank.
+   */
+  const ofTheBank = new Set(
+    body.permissions.filter((entry) => entry.resourceServer === 'bankcore').map((entry) => entry.permission),
+  );
+
+  /**
+   * Only the roles THIS CALLER holds, taken from their own token.
+   *
+   * The endpoint returns the whole catalog to a caller who administers the realm, and every bank
+   * employee also holds `realm_administrator`. Unioning whatever came back therefore credited a
+   * compliance officer with the administrator's permissions, and the separation being asserted
+   * would have passed for the wrong reason.
+   */
+  const mine = new Set(held);
+  return new Set(
+    body.roles
+      .filter((role) => mine.has(role.name))
+      .flatMap((role) => role.permissions)
+      .filter((permission) => ofTheBank.has(permission)),
+  );
+}
+
 describe('v39 P7.4: a bank employee signs in and works under a role', () => {
   it('completes sign-in, authorization code with PKCE, and redemption', async () => {
     if (!authority) return;
@@ -61,11 +112,17 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
   it('authorises the operations role on accounts and refuses it a card disclosure', async () => {
     if (!authority) return;
     const result = await signIn('Marta Oliveira');
-    const permissions = (result as { claims: Record<string, unknown> }).claims.permissions as Array<{ resource: string; action: string }>;
-
-    expect(permissions).toContainEqual({ resource: 'accounts', action: 'manage' });
+    /**
+     * v40 carries ROLES in the token, not expanded permissions.
+     *
+     * The permissions claim is absent unless a client narrowed, so asserting it here asserted the
+     * pre-v40 contract. What the role expands to is proven below by the guarded route's answer,
+     * which is where enforcement actually happens and a stronger claim than reading a claim.
+     */
+    const roles = (result as { claims: Record<string, unknown> }).claims.roles as string[];
+    expect(roles).toContain('bank_operations');
     // The separation this bank could not previously express: operating a card is not disclosing it.
-    expect(permissions).not.toContainEqual({ resource: 'cardData', action: 'viewSensitive' });
+    expect(roles).not.toContain('bank_card_officer');
 
     const refused = await bank.inject({
       method: 'POST',
@@ -80,8 +137,15 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
   it('lets the card officer, and only the card officer, reach a disclosure', async () => {
     if (!authority) return;
     const officer = await signIn('Tomas Reyes');
-    const permissions = (officer as { claims: Record<string, unknown> }).claims.permissions as Array<{ resource: string; action: string }>;
-    expect(permissions).toContainEqual({ resource: 'cardData', action: 'viewSensitive' });
+    /**
+     * v40 carries ROLES in the token, not expanded permissions.
+     *
+     * The permissions claim is absent unless a client narrowed, so asserting it here asserted the
+     * pre-v40 contract. What the role expands to is proven below by the guarded route's answer,
+     * which is where enforcement actually happens and a stronger claim than reading a claim.
+     */
+    const roles = (officer as { claims: Record<string, unknown> }).claims.roles as string[];
+    expect(roles).toContain('bank_card_officer');
 
     const response = await bank.inject({
       method: 'POST',
@@ -97,23 +161,41 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
   it('keeps compliance read-only', async () => {
     if (!authority) return;
     const compliance = await signIn('Ingrid Larsen');
-    const permissions = (compliance as { claims: Record<string, unknown> }).claims.permissions as Array<{ resource: string; action: string }>;
+    /**
+     * v40 carries ROLES in the token, not expanded permissions.
+     *
+     * The permissions claim is absent unless a client narrowed, so asserting it here asserted the
+     * pre-v40 contract. What the role expands to is proven below by the guarded route's answer,
+     * which is where enforcement actually happens and a stronger claim than reading a claim.
+     */
+    const roles = (compliance as { claims: Record<string, unknown> }).claims.roles as string[];
+    expect(roles).toContain('bank_compliance');
 
-    expect(permissions).toContainEqual({ resource: 'bankAudit', action: 'view' });
+    const held = await expanded((compliance as { token: string }).token, roles);
+    expect(held).toContain('bankAudit:view');
     // Someone who can change what they oversee cannot attest to it.
-    expect(permissions.filter((permission) => permission.action === 'manage')).toEqual([]);
-    expect(permissions).not.toContainEqual({ resource: 'cardData', action: 'viewSensitive' });
+    expect([...held].filter((permission) => permission.endsWith(':manage'))).toEqual([]);
+    expect(held).not.toContain('cardData:viewSensitive');
   });
 
   it('keeps the administrator away from customer data', async () => {
     if (!authority) return;
     const admin = await signIn('Samuel Adeyemi');
-    const permissions = (admin as { claims: Record<string, unknown> }).claims.permissions as Array<{ resource: string; action: string }>;
+    /**
+     * v40 carries ROLES in the token, not expanded permissions.
+     *
+     * The permissions claim is absent unless a client narrowed, so asserting it here asserted the
+     * pre-v40 contract. What the role expands to is proven below by the guarded route's answer,
+     * which is where enforcement actually happens and a stronger claim than reading a claim.
+     */
+    const roles = (admin as { claims: Record<string, unknown> }).claims.roles as string[];
+    expect(roles).toContain('bank_admin');
 
-    expect(permissions).toContainEqual({ resource: 'tppRegistrations', action: 'manage' });
+    const held = await expanded((admin as { token: string }).token, roles);
+    expect(held).toContain('tppRegistrations:manage');
     // Configures the bank without reading what flows through it.
-    expect(permissions.some((permission) => permission.resource === 'accounts')).toBe(false);
-    expect(permissions.some((permission) => permission.resource === 'accountHolders')).toBe(false);
+    expect([...held].some((permission) => permission.startsWith('accounts:'))).toBe(false);
+    expect([...held].some((permission) => permission.startsWith('accountHolders:'))).toBe(false);
   });
 
   it('reaches the bank administrative surface with a real token', async () => {
@@ -144,13 +226,23 @@ describe('v39 P7.4: an account holder sees their own records and nobody else s',
   it('holds no authority over anybody else s records', async () => {
     if (!authority) return;
     const holder = await signIn('Elena Duarte');
-    const permissions = (holder as { claims: Record<string, unknown> }).claims.permissions as Array<{ resource: string; action: string }>;
+    /**
+     * v40 carries ROLES in the token, not expanded permissions.
+     *
+     * The permissions claim is absent unless a client narrowed, so asserting it here asserted the
+     * pre-v40 contract. What the role expands to is proven below by the guarded route's answer,
+     * which is where enforcement actually happens and a stronger claim than reading a claim.
+     */
+    const roles = (holder as { claims: Record<string, unknown> }).claims.roles as string[];
+    expect(roles).toContain('bank_customer');
 
     // Needs no consent, because there is no third party: this is their own data at their own
     // institution. What they must not have is any route to somebody else's.
-    expect(permissions).toContainEqual({ resource: 'accounts', action: 'view' });
-    expect(permissions.filter((permission) => permission.action === 'manage')).toEqual([]);
-    expect(permissions).not.toContainEqual({ resource: 'accountHolders', action: 'view' });
+    const held = await expanded((holder as { token: string }).token, roles);
+    expect(held).toContain('accounts:view');
+    expect([...held].filter((permission) => permission.endsWith(':manage'))).toEqual([]);
+    // The whole point of the self scope: reading ACCOUNT HOLDERS is reading other people.
+    expect(held).not.toContain('accountHolders:view');
   });
 });
 
@@ -191,9 +283,18 @@ describe('v39 P7.7: the two institutions are separate, and the two grants do not
 
     const claims = decodeClaims(tppToken as string);
     expect(claims.iss).toContain(BANK_REALM);
-    // Its registered capacities arrive as permissions resolved from its role, through the same
-    // decision point a person goes through.
-    expect(claims.permissions).toContainEqual({ resource: 'psd2Role', action: 'AISP' });
+    /**
+     * Its registered capacities arrive as its ROLE, resolved through the same decision point a
+     * person goes through, and expanded by the resource server against the published catalog.
+     *
+     * The permission itself is asserted through that expansion rather than off the token, because
+     * v40 stopped putting expanded permissions in one: a machine that carried every capacity it
+     * held would be a token that fails on whichever proxy is strictest.
+     */
+    const roles = claims.roles as string[];
+    expect(roles).toContain('third_party_provider');
+    const held = await expanded(tppToken as string, roles);
+    expect(held).toContain('psd2Role:AISP');
   });
 
   it('refuses a third-party machine token on the staff surface', async () => {

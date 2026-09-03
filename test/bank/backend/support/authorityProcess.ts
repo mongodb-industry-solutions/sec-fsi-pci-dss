@@ -130,7 +130,16 @@ export async function interactiveToken(
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
 
-  const authorize = await fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/auth`, {
+  /**
+   * Authorize, and ANSWER THE CONSENT QUESTION if it is asked.
+   *
+   * A first authorization for an application this person has not used before returns a consent
+   * prompt instead of a code, which is the documented two steps. Doing only the first made this
+   * helper depend on a grant already existing, so it worked on a machine where somebody had signed
+   * in before and returned null on a freshly seeded directory. Every suite that needs a staff token
+   * then failed with a message about permissions.
+   */
+  const requestCode = (consentGranted: boolean) => fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/auth`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
@@ -141,10 +150,20 @@ export async function interactiveToken(
       code_challenge: challenge,
       code_challenge_method: 'S256',
       session_id: sessionId,
+      ...(consentGranted ? { consent_granted: true } : {}),
     }),
   });
+
+  let authorize = await requestCode(false);
   if (!authorize.ok) return null;
-  const { code } = await authorize.json() as { code: string };
+  let granted = await authorize.json() as { code?: string; consent_required?: boolean };
+  if (granted.consent_required) {
+    authorize = await requestCode(true);
+    if (!authorize.ok) return null;
+    granted = await authorize.json() as { code?: string };
+  }
+  const code = granted.code;
+  if (!code) return null;
 
   const token = await fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/token`, {
     method: 'POST',

@@ -14,14 +14,21 @@ import { createHash, randomBytes } from 'crypto';
 const SESSION_COOKIE = 'bankcore.session';
 const VERIFIER_COOKIE = 'bankcore.pkce';
 const STATE_COOKIE = 'bankcore.state';
-const REALM = 'bankcore';
+/**
+ * The realm the bank's people live in, which is the SHARED one (ADR-003).
+ *
+ * The bank is a client here and not a directory of its own. What keeps it separate from the payment
+ * service is its own resource server, its own roles and its own token audience, none of which
+ * depends on a second realm. The gain is that a person exists once instead of twice.
+ */
+const REALM = 'leafypay';
 const CONSOLE_CLIENT_ID = 'bankcore-console';
 const TIMEOUT_MS = 10000;
 
 function issuerBase(): string {
   const raw = process.env.PSP_BANKCORE_GIAM_ISSUER_URL
     ?? process.env.BANKCORE_GIAM_ISSUER_URL
-    ?? 'http://127.0.0.1:8085/realms/bankcore';
+    ?? 'http://127.0.0.1:8085/realms/leafypay';
   return raw.replace(/\/$/, '');
 }
 
