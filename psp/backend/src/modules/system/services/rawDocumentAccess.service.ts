@@ -25,8 +25,10 @@ export const RAW_COLLECTION_RESOURCE: Readonly<Record<string, Resource>> = {
 
 export interface RawAccessCaller {
   role?: string;
-  /** Resolved by the authority at issuance and carried in the token. */
-  permissions?: Array<{ resource: string; action: string }>;
+  /** Permission strings the token carried explicitly, when a client narrowed. */
+  permissions?: string[];
+  /** The expanded set, where the verifier resolved the roles against the published catalog. */
+  effectivePermissions?: string[];
   partyRef?: string;
   sub?: string;
 }
@@ -129,8 +131,13 @@ export async function authorizeRawDocumentAccess(
     return { allowed: true };
   }
 
-  // The permissions the authority resolved, carried by the caller rather than looked up here.
-  if (!hasPermission(caller.permissions, resource, 'view')) {
+  /**
+   * The permissions the authority resolved, carried by the caller rather than looked up here.
+   *
+   * v40: `effectivePermissions` is the expanded set where the verifier could expand the roles, and
+   * the explicit claim otherwise. Both are permission strings; neither being present is a refusal.
+   */
+  if (!hasPermission(caller.effectivePermissions ?? caller.permissions, resource, 'view')) {
     return {
       allowed: false,
       status: 403,

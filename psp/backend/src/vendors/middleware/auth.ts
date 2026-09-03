@@ -2,6 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { attachRbacContext } from './rbac';
 import { tryMerchantContext } from './validateMerchantToken';
 import { verifyAccessToken, VerifiedClaims } from '../security/tokenVerifier';
+import { expandRoles } from '../security/roleCatalog';
 
 // Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
 // `dualAuth` accepts EITHER the PSP session JWT (HS256) OR a merchant OAuth Bearer (RS256): the route's
@@ -129,11 +130,31 @@ function blockedFromInvestigation(role: string | undefined, path: string): boole
 
 async function tryVerifyToken(authHeader: string | undefined): Promise<AuthenticatedUser | null> {
   if (!authHeader?.startsWith('Bearer ')) return null;
-  const claims = await verifyAccessToken(authHeader.slice(7));
+  const bearer = authHeader.slice(7);
+  const claims = await verifyAccessToken(bearer);
   if (!claims) return null;
+
+  const roles = Array.isArray(claims.roles) ? claims.roles as string[] : [];
+  const explicit = Array.isArray(claims.permissions) ? claims.permissions as string[] : [];
+
+  /**
+   * The roles, expanded into the permissions this application enforces.
+   *
+   * Done HERE, once, at the edge where the token is read, for the same reason `partyRef` is: every
+   * guard downstream reads the result, and a resolution that happens per call site is one that some
+   * call site will forget.
+   *
+   * Leaving this out was not cosmetic. Since v40 an ordinary token carries roles and NO explicit
+   * permissions, so the guard resolved an empty set and refused every caller on every guarded
+   * route, a realm administrator included. Null when the catalog has never resolved, which the
+   * guard treats as "fall back to the explicit claims" and therefore still denies.
+   */
+  const expanded = await expandRoles(bearer, roles, explicit);
+
   return {
     ...claims,
-    roles: Array.isArray(claims.roles) ? claims.roles as string[] : [],
+    roles,
+    ...(expanded ? { effectivePermissions: expanded } : {}),
     /**
      * The business record this principal owns, under the name the rest of this service already uses.
      *

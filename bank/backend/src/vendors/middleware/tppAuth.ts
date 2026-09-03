@@ -67,9 +67,17 @@ export function requireTpp(scope?: TppScope, role?: TppRole) {
 
     // The PSD2 capacities this third party is registered for, carried as permissions the authority
     // resolved from its role. The bank still decides what each capacity may reach.
-    const roles = claims.permissions
-      .filter((permission) => permission.resource === 'psd2Role')
-      .map((permission) => permission.action as TppRole);
+    /**
+     * The PSD2 capacities carried as permission STRINGS since v40, `psd2Role:<capacity>`.
+     *
+     * Read from the expanded set where the verifier had a catalog, because the explicit claim is
+     * absent on an ordinary token: a third party is registered through its ROLE, and the role is
+     * what the token now carries by default.
+     */
+    const held = claims.effectivePermissions ?? claims.permissions;
+    const roles = held
+      .filter((permission) => permission.startsWith('psd2Role:'))
+      .map((permission) => permission.slice('psd2Role:'.length) as TppRole);
     if (role && !roles.includes(role)) {
       return refuse(reply, 403, 'ROLE_INVALID', `This third party is not registered as ${role}`);
     }

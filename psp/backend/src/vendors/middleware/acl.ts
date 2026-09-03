@@ -22,12 +22,24 @@ import { canReadSensitive } from './rbac';
  * of trusting the claim.
  */
 
-/** Permissions the authority resolved, or an empty list. Default deny: absent is not unrestricted. */
-function permissionsOf(request: FastifyRequest): Array<{ resource: string; action: string }> {
+/**
+ * What the caller may do: the permissions carried explicitly, plus what their roles expand to.
+ *
+ * v40 made `roles` the default carrier, so reading `permissions` alone would deny everything on an
+ * ordinary token. The union is correct rather than convenient: a token that narrowed still carries
+ * its roles, and a caller holding either form holds the authority.
+ *
+ * Default deny throughout. An absent claim, an unexpanded role and an unloaded catalog all grant
+ * nothing, because an unresolved authority must never read as an unrestricted one.
+ */
+function permissionsOf(request: FastifyRequest): Set<string> {
   const user = (request as FastifyRequest & {
-    user?: { permissions?: Array<{ resource: string; action: string }> };
+    user?: { permissions?: string[]; roles?: string[]; effectivePermissions?: string[] };
   }).user;
-  return user?.permissions ?? [];
+  // `effectivePermissions` is set by the verifier when it has expanded the roles against the
+  // published catalog. Where it is present it already includes the explicit permissions.
+  if (user?.effectivePermissions) return new Set(user.effectivePermissions);
+  return new Set(user?.permissions ?? []);
 }
 
 function roleOf(request: FastifyRequest): string | undefined {

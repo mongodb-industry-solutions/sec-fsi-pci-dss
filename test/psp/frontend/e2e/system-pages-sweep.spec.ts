@@ -6,30 +6,27 @@
  * stub and is blank against the extracted system, because the capability behind it now resolves to the bank.
  * A stub would hide exactly the regression this phase is looking for.
  *
- * Requires the PSP, the bank and the frontend running. It fails rather than skips when they are not, because
- * a compatibility pass that silently passes on a dead environment is worse than no pass.
+ * Requires the PSP, the bank, the frontend AND the authority running, the last of these since v39 moved
+ * sign-in out: a page is reached by signing in for real, through the redirect, because that is now the only
+ * way to hold a session. It fails rather than skips when they are not up, because a compatibility pass that
+ * silently passes on a dead environment is worse than no pass.
  */
 import { test, expect, Page, BrowserContext } from '@playwright/test';
 import { readdirSync } from 'fs';
 import { join, resolve } from 'path';
+import { signIn } from './_signIn';
 
 const PSP = process.env.PSP_API_URL ?? 'http://localhost:8081';
 
-// A REAL token from the running backend, not the fake-signature one the mocked specs use: those pass the
-// frontend's decode and are rejected by every API call, which would leave every page here empty for a reason
-// that has nothing to do with the platform.
-async function loginForReal(context: BrowserContext): Promise<string> {
-  const response = await context.request.post(`${PSP}/api/v1/auth/login`, {
-    data: { email: 'alex.rivera@back.es', password: 'demo-password' },
-  });
-  expect(response.status(), 'the sweep needs a real session to mean anything').toBe(200);
-  const token = (await response.json()).token as string;
-  await context.addCookies([{
-    name: 'demo_token', value: token, domain: 'localhost', path: '/',
-    expires: Math.floor(Date.now() / 1000) + 86400,
-  }]);
-  return token;
-}
+/**
+ * The signed-in session, established ONCE and replayed into each test's fresh context.
+ *
+ * Sign-in is now an interactive redirect through the authority, so doing it per test would mean one
+ * real browser login for every page in the sweep. Held as cookies in a variable rather than through
+ * `test.use({ storageState })`, which reads its file when the context is built and so cannot be
+ * given a file that a `beforeAll` in the same suite is what creates.
+ */
+let sessionCookies: Awaited<ReturnType<BrowserContext['cookies']>> = [];
 
 // Derived from the filesystem rather than hand-listed, so a page added later is swept without anyone
 // remembering to add it here. Dynamic segments are excluded: sweeping `[id]` with an invented id would assert
@@ -72,9 +69,22 @@ async function assertRendered(page: Page, path: string) {
 }
 
 test.describe('v37 P11.5: the system pages against the running platform', () => {
-  test.beforeAll(async ({ request }) => {
-    const health = await request.get('http://localhost:8081/api/v1/health').catch(() => null);
+  test.beforeAll(async ({ browser, request }) => {
+    const health = await request.get(`${PSP}/api/v1/health`).catch(() => null);
     expect(health, 'the PSP must be running for this sweep to mean anything').not.toBeNull();
+
+    // A real interactive sign-in, once, kept for every page below.
+    const context = await browser.newContext();
+    try {
+      await signIn(await context.newPage());
+      sessionCookies = await context.cookies();
+      expect(
+        sessionCookies.some((cookie) => cookie.name === 'demo_token'),
+        'the sign-in left no session cookie, so every page below would redirect',
+      ).toBe(true);
+    } finally {
+      await context.close();
+    }
   });
 
   for (const path of PAGES) {
@@ -88,7 +98,7 @@ test.describe('v37 P11.5: the system pages against the running platform', () => 
       });
 
       // A manager sees every page; a customer would legitimately be refused most of the admin ones.
-      await loginForReal(page.context());
+      await page.context().addCookies(sessionCookies);
       const response = await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 45000 });
       expect(response?.status(), `${path} answered ${response?.status()}`).toBeLessThan(400);
       await page.waitForTimeout(1200);

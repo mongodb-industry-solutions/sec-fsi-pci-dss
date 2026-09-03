@@ -349,7 +349,8 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
         role?: string;
         partyRef?: string;
         sub?: string;
-        permissions?: Array<{ resource: string; action: string }>;
+        permissions?: string[];
+        effectivePermissions?: string[];
       };
     });
     const decision = await authorizeRawDocumentAccess(fastify.db, collection, id, {
@@ -357,7 +358,10 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
       ...(caller.user?.partyRef ? { partyRef: caller.user.partyRef } : {}),
       ...(caller.user?.sub ? { sub: caller.user.sub } : {}),
       // Resolved by the authority at issuance; this application decides with it, never about it.
+      // Both forms are passed: the expanded set where the verifier had a catalog, the explicit
+      // claim otherwise, and the service prefers the former.
       ...(caller.user?.permissions ? { permissions: caller.user.permissions } : {}),
+      ...(caller.user?.effectivePermissions ? { effectivePermissions: caller.user.effectivePermissions } : {}),
     });
     if (!decision.allowed) {
       return reply.status(decision.status).send({

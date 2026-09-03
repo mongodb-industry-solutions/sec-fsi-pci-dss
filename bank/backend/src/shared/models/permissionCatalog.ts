@@ -75,10 +75,12 @@ export const BANK_PERMISSION_CATALOG: BankPermissionDeclaration[] = [
 
 /** A pure claim check. Default deny: an absent claim is not an unrestricted one. */
 export function hasBankPermission(
-  permissions: ReadonlyArray<{ resource: string; action: string }> | undefined,
+  permissions: ReadonlyArray<string> | Set<string> | undefined,
   resource: BankResource,
   action: BankAction,
 ): boolean {
   if (!permissions) return false;
-  return permissions.some((permission) => permission.resource === resource && permission.action === action);
+  // A permission is the string `resource:action` since v40: one spelling everywhere it appears.
+  const held = permissions instanceof Set ? permissions : new Set(permissions);
+  return held.has(`${resource}:${action}`);
 }

@@ -89,11 +89,18 @@ export const PERMISSION_CATALOG: PermissionDeclaration[] = [
  * would put an access decision back on this side of the boundary.
  */
 export function hasPermission(
-  permissions: ReadonlyArray<{ resource: string; action: string }> | undefined,
+  permissions: ReadonlyArray<string> | Set<string> | undefined,
   resource: Resource,
   action: Action,
 ): boolean {
   // Default deny: an absent claim is not an unrestricted one.
   if (!permissions) return false;
-  return permissions.some((permission) => permission.resource === resource && permission.action === action);
+  /**
+   * A permission is the string `resource:action` since v40.
+   *
+   * One spelling on a role, on a policy and in a token, so there is nothing to convert between the
+   * three places it appears and no way for two of them to disagree about the same authority.
+   */
+  const held = permissions instanceof Set ? permissions : new Set(permissions);
+  return held.has(`${resource}:${action}`);
 }

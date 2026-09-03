@@ -674,7 +674,7 @@ export async function getDistinctMerchants(db: Db) {
 
 export async function getAllTransactions(
   db: Db,
-  filters: { status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string; transactionId?: string },
+  filters: { status?: string; merchant?: string; cardToken?: string; maskedPan?: string; email?: string; partyRef?: string; transactionId?: string },
   page: number,
   limit: number
 ) {
@@ -693,19 +693,33 @@ export async function getAllTransactions(
   // ones (normalized to ACC-xxx on write), regardless of saved-card linkage.
   // A QE-capable client is required for the equality token on the encrypted field.
   let readDb = db;
-  if (filters.email) {
+  if (filters.email || filters.partyRef) {
     const qeDb = await getDbForRole('level1_analyst', false);
     readDb = qeDb;
 
-    const party = await qeDb
-      .collection<PartyControlRecord>(PARTY_COLLECTION)
-      .findOne({ partyEmailAddress: filters.email } as Partial<PartyControlRecord>);
-    if (!party) return { results: [], total: 0, page, limit };
+    /**
+     * Two ways in, and `partyRef` is the one that scopes a CUSTOMER to their own movements.
+     *
+     * It exists because the email route stopped being available for that purpose: the access token
+     * no longer carries an `email` claim, so the caller's own address cannot be read from it. The
+     * authority carries the business binding instead, and `partyRef` is that binding, which makes
+     * this the same resolution with a different starting point rather than a second mechanism.
+     */
+    let partyInstanceReference = filters.partyRef;
+    if (!partyInstanceReference) {
+      const party = await qeDb
+        .collection<PartyControlRecord>(PARTY_COLLECTION)
+        .findOne({ partyEmailAddress: filters.email } as Partial<PartyControlRecord>);
+      if (!party) return { results: [], total: 0, page, limit };
+      partyInstanceReference = party.partyInstanceReference;
+    }
 
     const agreement = await qeDb
       .collection<{ customerAgreementReference?: string }>(CUSTOMER_AGREEMENT_COLLECTION)
-      .findOne({ partyInstanceReference: party.partyInstanceReference } as Record<string, unknown>);
+      .findOne({ partyInstanceReference } as Record<string, unknown>);
     const accRef = agreement?.customerAgreementReference;
+    // Fails CLOSED, and this is the property the whole branch turns on: an unresolvable owner
+    // yields no rows. Falling through would drop the filter and answer with everybody's movements.
     if (!accRef) return { results: [], total: 0, page, limit };
 
     query['cardTransactionAccountReference'] = accRef;

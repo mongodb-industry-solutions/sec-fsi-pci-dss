@@ -21,8 +21,21 @@ export interface VerifiedClaims {
   aud: string | string[];
   exp: number;
   scope: string[];
-  permissions: Array<{ resource: string; action: string }>;
+  /**
+   * Full permission strings, `resource:action`.
+   *
+   * v40: the shape changed AND the default did. This claim is absent unless the client asked to
+   * narrow, so `roles` plus the published catalog is the normal path. See `roles` below.
+   */
+  permissions: string[];
   roles: string[];
+  /**
+   * The roles expanded against the published catalog, plus anything carried explicitly.
+   *
+   * Set by the verifier where a catalog was available. ABSENT is a refusal, never an unrestricted
+   * grant: an authority that could not be resolved must deny.
+   */
+  effectivePermissions?: string[];
   clientId?: string;
   sessionId?: string;
   [claim: string]: unknown;
@@ -176,7 +189,14 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
     exp: Number(claims.exp ?? 0),
     scope: typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : [],
     permissions: Array.isArray(claims.permissions)
-      ? claims.permissions as Array<{ resource: string; action: string }>
+      ? (claims.permissions as unknown[])
+        // A v39-shaped entry is CONVERTED rather than dropped: a token minted minutes before the
+        // authority upgraded is still valid, and refusing it would turn a rolling deploy into an
+        // outage. It disappears on its own within one access-token lifetime.
+        .map((entry) => (typeof entry === 'string'
+          ? entry
+          : `${(entry as { resource?: string }).resource ?? ''}:${(entry as { action?: string }).action ?? ''}`))
+        .filter((entry) => entry.length > 1 && !entry.startsWith(':') && !entry.endsWith(':'))
       : [],
     roles: Array.isArray(claims.roles) ? claims.roles as string[] : [],
     clientId: typeof claims.client_id === 'string' ? claims.client_id : undefined,

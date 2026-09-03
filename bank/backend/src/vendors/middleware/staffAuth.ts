@@ -18,7 +18,8 @@ import { BankResource, BankAction, hasBankPermission } from '../../shared/models
 export interface StaffContext {
   subjectId: string;
   roles: string[];
-  permissions: Array<{ resource: string; action: string }>;
+  /** Full permission strings, `resource:action`. Absent unless the client narrowed. */
+  permissions: string[];
   /** Present when the person is an account holder acting on their own records. */
   accountHolderRef?: string;
 }

@@ -52,7 +52,8 @@ function validClaims(overrides: Record<string, unknown> = {}): Record<string, un
     client_id: AUDIENCE,
     // The one claim this platform relies on beyond the standard, and it is documented in the issuer
     // contract precisely so a foreign issuer can produce it.
-    permissions: [{ resource: 'transactions', action: 'view' }],
+    // v40: a permission is the string `resource:action`, one spelling everywhere it appears.
+    permissions: ['transactions:view'],
     ...overrides,
   };
 }
@@ -117,7 +118,7 @@ describe('v39 §10.11: the issuer contract is a contract, not a convention', () 
     expect(claims, 'a conforming foreign token was refused').not.toBeNull();
     expect(claims?.sub).toBe('sub-from-another-authority');
     // The permissions claim survives the crossing, which is what makes authorisation work at all.
-    expect(claims?.permissions).toEqual([{ resource: 'transactions', action: 'view' }]);
+    expect(claims?.permissions).toEqual(['transactions:view']);
   });
 
   it('fetches the key set from the issuer it was told to trust, and nowhere else', async () => {

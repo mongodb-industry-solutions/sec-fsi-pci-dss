@@ -311,8 +311,27 @@ export default function ProfilePage() {
     setToken(t);
     if (!t) { setLoading(false); setError('Session not found.'); return; }
 
+    /**
+     * Falls back to what the token itself says, and failing that, says so.
+     *
+     * Shared by both failure paths because there are two and they are easy to mistake for one:
+     * `reload` swallows a rejection into a null result, so a refused request does NOT reject here.
+     * Handling only the rejection left the page rendering nothing at all, with no data and no
+     * explanation, which is the one outcome worse than an error message.
+     */
+    const fallback = () => {
+      const user = decodeToken(t);
+      if (user) {
+        setProfile({ sub: user.sub, email: user.email, name: user.name, role: user.role, domain: user.domain, agreement: null });
+        setEditName(user.name ?? '');
+      } else {
+        setError('Could not load profile.');
+      }
+    };
+
     reload(t)
-      .then(() => {
+      .then((data) => {
+        if (!data) { fallback(); return; }
         // Load OAuth consent grants (authorized apps)
         setGrantsLoading(true);
         api.consentGrants.list(t)
@@ -320,15 +339,7 @@ export default function ProfilePage() {
           .catch(() => { /* not fatal */ })
           .finally(() => setGrantsLoading(false));
       })
-      .catch(() => {
-        const user = decodeToken(t);
-        if (user) {
-          setProfile({ sub: user.sub, email: user.email, name: user.name, role: user.role, domain: user.domain, agreement: null });
-          setEditName(user.name ?? '');
-        } else {
-          setError('Could not load profile.');
-        }
-      })
+      .catch(fallback)
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

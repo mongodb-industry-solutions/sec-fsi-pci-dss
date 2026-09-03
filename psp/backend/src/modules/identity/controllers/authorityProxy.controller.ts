@@ -25,10 +25,19 @@ import { config } from '../../../config';
  */
 
 /** PSP path to authority path. The left side is frozen: it is the contract the wallet already has. */
-const FORWARDED: Array<{ method: 'GET' | 'POST'; from: string; to: (params: Record<string, string>) => string }> = [
+const FORWARDED: Array<{ method: 'GET' | 'POST' | 'DELETE'; from: string; to: (params: Record<string, string>) => string }> = [
   { method: 'POST', from: '/enroll/challenge', to: () => '/credentials/challenge' },
   { method: 'POST', from: '/enroll', to: () => '/credentials' },
   { method: 'GET', from: '/enroll', to: () => '/credentials' },
+  /**
+   * Rotating and revoking ONE authenticator, which the credentials screen needs and could not reach.
+   *
+   * The collection was forwarded and the members were not, so a person could enrol a security key
+   * and then had no way to replace or remove it: both calls answered 404. Added deliberately, which
+   * is the only way anything becomes reachable through here.
+   */
+  { method: 'POST', from: '/enroll/:credentialId/rotate', to: (p) => `/credentials/${encodeURIComponent(p.credentialId)}/rotate` },
+  { method: 'DELETE', from: '/enroll/:credentialId', to: (p) => `/credentials/${encodeURIComponent(p.credentialId)}` },
   { method: 'POST', from: '/bc-authorize', to: () => '/protocol/openid-connect/ext/ciba/auth' },
   { method: 'GET', from: '/bc-authorize/pending', to: () => '/protocol/openid-connect/ext/ciba/auth/pending' },
   { method: 'GET', from: '/bc-authorize/:authReqId', to: (p) => `/protocol/openid-connect/ext/ciba/auth/${encodeURIComponent(p.authReqId)}` },
@@ -74,7 +83,16 @@ export async function authorityProxyController(fastify: FastifyInstance) {
      * Nothing is rewritten here in the sense that matters: the same fields go out that came in. What
      * changes is only the encoding, and it changes to match the header already being forwarded.
      */
-    const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+    /**
+     * A body is forwarded only when one ARRIVED.
+     *
+     * The method alone is not the test: a DELETE carries none, and defaulting to `{}` would invent
+     * a JSON body for a request that had none and send it under whatever content type was set.
+     */
+    const hasBody = request.method !== 'GET'
+      && request.method !== 'HEAD'
+      && request.body !== undefined
+      && request.body !== null;
     const requestContentType = String(request.headers['content-type'] ?? '');
     let body: string | undefined;
 
@@ -131,10 +149,9 @@ export async function authorityProxyController(fastify: FastifyInstance) {
         + 'base URL keeps working. It is removed when that client splits its base URL, and not before.',
     };
 
-    if (route.method === 'GET') {
-      fastify.get(route.from, { schema, config: { skipAuth: true } }, handler);
-    } else {
-      fastify.post(route.from, { schema, config: { skipAuth: true } }, handler);
-    }
+    const options = { schema, config: { skipAuth: true } };
+    if (route.method === 'GET') fastify.get(route.from, options, handler);
+    else if (route.method === 'DELETE') fastify.delete(route.from, options, handler);
+    else fastify.post(route.from, options, handler);
   }
 }

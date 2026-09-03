@@ -383,9 +383,34 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
     const page = Math.max(1, Number(q.page ?? 1));
     const limit = Math.min(200, Math.max(1, Number(q.limit ?? 20)));
     const { userRole } = request as unknown as AuthenticatedRequest;
-    const jwtEmail = (request as unknown as { user?: { email?: string } }).user?.email;
-    // Privacy: a customer may only list their OWN movements. Ignore any email they pass.
-    const effectiveEmail = userRole === 'customer' ? jwtEmail : q.email;
+    const callerPartyRef = (request as unknown as { user?: { partyRef?: string } }).user?.partyRef;
+
+    /**
+     * Privacy: a customer may only list their OWN movements, and the scoping is by PARTY now.
+     *
+     * It used to be by the token's `email` claim. That claim no longer exists, so the filter
+     * silently became `undefined`, the query lost its only narrowing term, and a customer would
+     * have been served everybody's card movements. The business binding is what survived the
+     * identity extraction, so it is what scopes here, and it is the same value the non-card path
+     * below already uses.
+     *
+     * Any email a customer passes is still ignored, exactly as before.
+     */
+    const effectiveEmail = userRole === 'customer' ? undefined : q.email;
+    const effectivePartyRef = userRole === 'customer' ? callerPartyRef : undefined;
+
+    /**
+     * Refused rather than answered broadly.
+     *
+     * A customer whose token carries no binding cannot be scoped, and the only safe answer is
+     * none. Returning an unscoped list would be the very failure this block exists to prevent, and
+     * an empty list would say "you have no movements", which is a different and untrue statement.
+     */
+    if (userRole === 'customer' && !effectivePartyRef) {
+      return reply.status(403).send({
+        error: 'This token carries no account binding, so your own movements cannot be identified. Sign in again.',
+      });
+    }
 
     // ONLY an explicit `kind=card` returns the card document shape (what card-specific consumers
     // expect). Everything else returns normalized movement rows, so the response shape depends on one
@@ -393,15 +418,13 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
     if (q.kind === 'card') {
       return reply.send(await getAllTransactions(
         fastify.db,
-        { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, transactionId: q.transactionId },
+        { status: q.status, merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan, email: effectiveEmail, partyRef: effectivePartyRef, transactionId: q.transactionId },
         page, limit,
       ));
     }
 
     // Every kind (default), or one non-card kind: normalized rows through the shared read-model.
-    const partyRef = userRole === 'customer'
-      ? (request as unknown as { user?: { partyRef?: string } }).user?.partyRef
-      : undefined;
+    const partyRef = effectivePartyRef;
     const canSeePayeeName = userRole === 'level2_investigator' || userRole === 'security_auditor';
     // A card-only filter (token / masked PAN / merchant name) cannot match a transfer or a request,
     // so those sources are skipped rather than queried and discarded.
@@ -419,7 +442,7 @@ Cardholder Data under PCI DSS v4.0, so it is matched on a plaintext index.`,
           // One state narrows the DB query; a list is resolved on the merged set (this matches one).
           { status: q.status?.includes(',') ? undefined : q.status,
             merchant: q.merchant, cardToken: q.cardToken, maskedPan: q.maskedPan,
-            email: effectiveEmail, transactionId: q.transactionId },
+            email: effectiveEmail, partyRef: effectivePartyRef, transactionId: q.transactionId },
           1, 500,
         )).results.map((r) => normalizeCardRow(r as Record<string, unknown>));
 

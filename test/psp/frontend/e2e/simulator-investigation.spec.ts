@@ -7,6 +7,32 @@
  * Mock fields: FraudCase uses caseStatus / riskSeverity (internal names, not BIAN names).
  */
 import { test, expect } from '@playwright/test';
+import { mintJwt, json } from './support/auth';
+
+/**
+ * The case detail page will not render ANYTHING until it holds real tokens for the two specialist
+ * roles, because its escalation actions use them. It obtains those by exchanging the simulator's own
+ * client credential at the authority.
+ *
+ * Stubbed here, and it has to be. This is a RENDERING spec: it asserts that a case shows its badges,
+ * its encryption markers and its raw document toggle. Making that assertion depend on a live client
+ * secret and a working token exchange tests the environment rather than the page, and fails for a
+ * reason that has nothing to do with what is being checked. The escalation flows that genuinely
+ * need real tokens are exercised where they belong.
+ */
+async function stubSpecialistTokens(page: import('@playwright/test').Page) {
+  await page.route('**/api/v1/system/users**', (route) => route.fulfill(json({
+    users: [
+      { email: 'sarah.chen@back.es', name: 'Sarah Chen', role: 'level1_analyst', featured: true },
+      { email: 'michael.obi@back.es', name: 'Michael Obi', role: 'level2_investigator', featured: true },
+    ],
+  })));
+  await page.route('**/protocol/openid-connect/token', (route) => route.fulfill(json({
+    access_token: mintJwt({ roles: ['level2_investigator'], sub: 'u-sim', email: 'michael.obi@back.es' }),
+    token_type: 'Bearer',
+    expires_in: 300,
+  })));
+}
 
 const MOCK_CASE = {
   fraudDiagnosisInstanceReference: 'case-sim-e2e',
@@ -64,6 +90,7 @@ test.describe('FR-v1-02: Case Detail Page', () => {
   const CASE_ID = 'case-sim-e2e';
 
   test.beforeEach(async ({ page }) => {
+    await stubSpecialistTokens(page);
     // api.fraud.getById calls GET /api/v1/fraud/:id (not /api/v1/fraud-cases/:id)
     await page.route(`**/api/v1/fraud/${CASE_ID}`, (route) => {
       route.fulfill({

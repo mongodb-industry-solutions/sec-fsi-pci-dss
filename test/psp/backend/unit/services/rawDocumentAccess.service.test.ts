@@ -79,7 +79,7 @@ describe('authorizeRawDocumentAccess: unknown collection', () => {
 
 describe('authorizeRawDocumentAccess: staff roles (scope all)', () => {
   it('allows a staff role holding view on the owning resource', async () => {
-    const d = await authorizeRawDocumentAccess(serverDb, 'party', 'party-other', { role: 'security_auditor', permissions: [{ resource: 'customers', action: 'view' }] });
+    const d = await authorizeRawDocumentAccess(serverDb, 'party', 'party-other', { role: 'security_auditor', permissions: ['customers:view'] });
     expect(d).toEqual({ allowed: true });
   });
 
