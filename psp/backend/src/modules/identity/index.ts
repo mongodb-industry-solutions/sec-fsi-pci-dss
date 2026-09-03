@@ -3,6 +3,7 @@ import { authorityProxyController } from './controllers/authorityProxy.controlle
 import { consentGrantsController } from './controllers/consentGrants.controller';
 import { selfProfileController } from './controllers/selfProfile.controller';
 import { directoryController } from './controllers/directory.controller';
+import { authDomainController } from './controllers/authDomain.controller';
 
 /**
  * What is left of identity here: a person's own profile, a view of their authorizations, and a shim.
@@ -26,6 +27,11 @@ export async function identityModule(fastify: FastifyInstance) {
    * by making another.
    */
   await fastify.register(directoryController);
+  /**
+   * Authentication domain administration, under `/modules` because that is where the console's
+   * contract puts it. The records live at the authority; this is the vocabulary translation.
+   */
+  await fastify.register(authDomainController, { prefix: '/modules' });
   // The user's own authorizations, read from the authority rather than from a local collection.
   await fastify.register(consentGrantsController, { prefix: '/auth' });
   // Registered last, so an explicit route above always wins over a forwarded one.
