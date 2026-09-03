@@ -39,11 +39,13 @@ export async function requestElevation(
   input: ElevationRequest,
 ): Promise<string | null> {
   try {
-    const created = await callAuthority<{ assignmentId: string }>(request, '/elevations', {
+    // The authority addresses an elevation by the (subjectId, roleId) pair, not a separate
+    // assignment identifier: that is the whole holding, not a claim about one.
+    const created = await callAuthority<{ subjectId: string; roleId: string }>(request, '/elevations', {
       method: 'POST',
       body: input,
     });
-    return created.assignmentId ?? null;
+    return created.roleId ? `${created.subjectId}:${created.roleId}` : null;
   } catch (error) {
     if (error instanceof AuthorityError) return null;
     throw error;
