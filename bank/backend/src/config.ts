@@ -90,11 +90,12 @@ export const config = {
     tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', clientSecretFor('leafypay-psp'))!,
   },
 
-  // v39 P7: this bank is a relying party and a resource server against the identity authority,
-  // in its OWN realm. It holds no user store, no token issuer and no signing key for access tokens.
+  // v39 P7: this bank is a relying party and a resource server against the identity authority. It
+  // holds no user store, no token issuer and no signing key for access tokens.
   giam: {
-    // The BANK realm issuer. A token from the platform realm carries a different one and is refused
-    // before any claim is read, which is what makes the institutional boundary structural.
+    // The SHARED realm (ADR-003): the bank is a client in it rather than a directory of its own, so
+    // a person who banks here and pays there exists once. The issuer no longer separates the two;
+    // the audience and the resource server below are what do.
     issuerUrl: pspEnv('BANKCORE_GIAM_ISSUER_URL', 'http://127.0.0.1:8085/realms/leafypay')!,
     audience: pspEnv('BANKCORE_GIAM_AUDIENCE', 'bankcore')!,
     resourceServerName: pspEnv('BANKCORE_GIAM_RESOURCE_SERVER', 'bankcore')!,

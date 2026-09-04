@@ -3,17 +3,28 @@ import { config } from '../../config';
 import { expandRoles } from './roleCatalog';
 
 /**
- * Local verification against the authority's published keys, for the BANK's realm.
+ * Local verification against the authority's published keys. Same mechanics as any resource server.
  *
- * Same mechanics as any other resource server, and the realm is the whole point. This bank verifies
- * against the key set of its OWN realm, so a token minted for the platform's realm fails the
- * signature check outright: it was signed by a different key, published at a different key set,
- * under a different issuer. That is what makes the institutional boundary structural rather than a
- * matter of the platform choosing not to mint one.
+ * WHAT SEPARATES THIS BANK FROM THE PAYMENT SERVICE, stated exactly, because it changed and the
+ * previous version of this comment now describes a protection that no longer exists.
  *
- * Before this, the bank verified a PSP-ISSUED token with a shared secret, so a token minted anywhere
- * on the platform opened part of the banking API. The boundary existed in the documentation and not
- * in the key material.
+ * It used to be the KEY MATERIAL: the bank had its own realm, so a token minted for the payment
+ * service was signed by a different key under a different issuer and failed the signature check
+ * outright. ADR-003 merged the two into one realm, so both are now signed by the same key and carry
+ * the same issuer, and that check no longer distinguishes them.
+ *
+ * The separation is the AUDIENCE and the RESOURCE SERVER instead. A token minted for the payment
+ * service names `leafypay` in `aud` and this bank requires its own audience, so it is refused after
+ * the signature rather than at it. Bank permissions are declared on the bank's own resource server,
+ * so a role naming them grants nothing on the payment service and the reverse holds.
+ *
+ * That is weaker in one respect and it is worth being plain about: a shared signing key means the
+ * authority could mint a bank-audience token, where before it could not. It is the correct trade
+ * for a group running one identity provider, and the thing to revisit if the bank ever has to be a
+ * separate trust boundary in earnest.
+ *
+ * Before ANY of this, the bank verified a payment-service-issued token with a shared symmetric
+ * secret, so a token minted anywhere on the platform opened part of the banking API.
  */
 
 export interface VerifiedClaims {

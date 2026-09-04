@@ -246,14 +246,32 @@ describe('v39 P7.4: an account holder sees their own records and nobody else s',
   });
 });
 
+/**
+ * The two institutions remain separate, by audience and resource server rather than by realm.
+ *
+ * ADR-003 merged the directories so a person exists once. What did NOT merge is what each
+ * application accepts: a token addressed to one is refused by the other, and their permissions are
+ * declared on different resource servers.
+ */
 describe('v39 P7.7: the two institutions are separate, and the two grants do not substitute', () => {
-  it('refuses a platform-realm token on the Open Banking surface', async () => {
+  it('refuses a payment service token on the Open Banking surface', async () => {
     if (!authority) return;
     const platformToken = await machineToken(authority, PLATFORM_REALM, 'leafypay-backend', clientSecretFor('leafypay-backend'));
-    expect(platformToken, 'the platform realm issued no token to test with').toBeTruthy();
-    // Genuine, unexpired and correctly signed. It is simply not this bank's, and no improvement to
-    // its claims could make it acceptable, because it fails at the signature.
-    expect(decodeClaims(platformToken as string).iss).toContain(PLATFORM_REALM);
+    expect(platformToken, 'no token to test with').toBeTruthy();
+    /**
+     * Genuine, unexpired and CORRECTLY SIGNED BY THE KEY THIS BANK TRUSTS.
+     *
+     * That is the part that changed. Both applications share one realm since ADR-003, so this
+     * token passes the signature check and the issuer check; what refuses it is the AUDIENCE. It
+     * names the payment service, and this bank accepts only its own.
+     *
+     * The test is the same claim as before and a slightly harder one: the refusal can no longer be
+     * explained away as "a different key", so it is proving the audience check rather than
+     * incidentally proving the key material.
+     */
+    const claims = decodeClaims(platformToken as string);
+    expect(claims.iss).toContain(PLATFORM_REALM);
+    expect(claims.aud, 'the token must name the payment service, not the bank').toContain('leafypay');
 
     const response = await bank.inject({
       method: 'GET',
