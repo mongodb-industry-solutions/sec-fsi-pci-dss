@@ -484,7 +484,7 @@ export default function MerchantSSOPage() {
   // OIDC endpoints. Discovery/token/jwks/userinfo/introspect/revoke are server-to-server: the
   // backend's actual public base URL (never derive it from window.location: frontend and backend
   // are different hosts in staging/prod). Authorize/logout are browser-facing PSP frontend PAGES
-  // (the backend's /api/v1/auth/authorize returns JSON, not UI): this page's own origin
+  // (the authority's authorization endpoint answers with a 302, so a browser must reach it):
   // (frontendBase state above, set post-mount to avoid a hydration mismatch).
   const issuerBase = usePrivateEndpoints ? privateBase : BACKEND_PUBLIC_URL;
   const endpoints = [

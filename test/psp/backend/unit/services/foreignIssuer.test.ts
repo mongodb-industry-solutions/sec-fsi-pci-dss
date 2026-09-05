@@ -53,7 +53,10 @@ function validClaims(overrides: Record<string, unknown> = {}): Record<string, un
     // The one claim this platform relies on beyond the standard, and it is documented in the issuer
     // contract precisely so a foreign issuer can produce it.
     // v40: a permission is the string `resource:action`, one spelling everywhere it appears.
-    permissions: ['transactions:view'],
+    // `entitlements`, the RFC 9068 2.2.3.1 name. This fixture is the ISSUER CONTRACT, so it
+    // carries what a conforming authority actually emits rather than what this repository used
+    // to read: the claim was `permissions`, a name no specification defines.
+    entitlements: ['transactions:view'],
     ...overrides,
   };
 }
@@ -117,7 +120,9 @@ describe('v39 §10.11: the issuer contract is a contract, not a convention', () 
 
     expect(claims, 'a conforming foreign token was refused').not.toBeNull();
     expect(claims?.sub).toBe('sub-from-another-authority');
-    // The permissions claim survives the crossing, which is what makes authorisation work at all.
+    // The entitlements claim survives the crossing, which is what makes authorisation work at
+    // all. The local name stays `permissions` because that is what this codebase calls the
+    // concept; only the wire name changed.
     expect(claims?.permissions).toEqual(['transactions:view']);
   });
 

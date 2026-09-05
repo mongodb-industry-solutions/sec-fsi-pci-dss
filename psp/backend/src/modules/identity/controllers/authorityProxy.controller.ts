@@ -116,6 +116,19 @@ export async function authorityProxyController(fastify: FastifyInstance) {
         method: request.method,
         headers,
         body,
+        /**
+         * A redirect is an ANSWER here, not a step to take on the caller's behalf.
+         *
+         * `fetch` follows redirects by default, which was harmless while the authorization endpoint
+         * returned JSON and is wrong now that it conforms: GIAM answers with a 302 carrying the
+         * authorization code in `Location`, and following it would fetch the relying party's
+         * callback from inside this process, discard the header the browser needs, and hand back
+         * whatever that page happened to return with a 200.
+         *
+         * The same applies to the sign-in and consent redirects the endpoint issues: the browser
+         * has to see them to go there.
+         */
+        redirect: 'manual',
         signal: AbortSignal.timeout(10000),
       });
     } catch {
@@ -130,6 +143,21 @@ export async function authorityProxyController(fastify: FastifyInstance) {
     const text = await upstream.text();
     const contentType = upstream.headers.get('content-type');
     if (contentType) reply.header('content-type', contentType);
+
+    /**
+     * `Location` and `Set-Cookie` travel back, because both belong to the browser.
+     *
+     * Neither was forwarded, and both became load-bearing when the authorization endpoint became
+     * conforming: the code arrives in `Location`, and the session GIAM establishes is a cookie that
+     * the browser must hold for the flow to continue. A proxy that drops them turns a working
+     * redirect into a blank 302 and every sign-in into an expired one.
+     */
+    const location = upstream.headers.get('location');
+    if (location) reply.header('location', location);
+
+    const setCookie = upstream.headers.getSetCookie?.() ?? [];
+    if (setCookie.length > 0) reply.header('set-cookie', setCookie);
+
     return reply.status(upstream.status).send(text);
   }
 

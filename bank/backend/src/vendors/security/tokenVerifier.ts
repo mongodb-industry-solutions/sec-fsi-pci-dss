@@ -194,7 +194,14 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
   if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return null;
 
   const roles = Array.isArray(claims.roles) ? claims.roles as string[] : [];
-  const explicit = Array.isArray(claims.permissions) ? claims.permissions as string[] : [];
+  /**
+   * `entitlements`, the RFC 9068 2.2.3.1 name that GIAM emits since v41 P1.
+   *
+   * Reading `permissions` here would yield an empty list without failing anything, so a token the
+   * client deliberately NARROWED would expand from its roles instead: wider than was asked for, and
+   * silent. That is the worst shape a break of this kind can take.
+   */
+  const explicit = Array.isArray(claims.entitlements) ? claims.entitlements as string[] : [];
   const expanded = await expandRoles(token, roles, explicit);
 
   return {
@@ -204,8 +211,8 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
     aud: claims.aud as string | string[],
     exp: Number(claims.exp ?? 0),
     scope: typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : [],
-    permissions: Array.isArray(claims.permissions)
-      ? (claims.permissions as unknown[])
+    permissions: Array.isArray(claims.entitlements)
+      ? (claims.entitlements as unknown[])
         // A v39-shaped entry is CONVERTED rather than dropped: a token minted minutes before the
         // authority upgraded is still valid, and refusing it would turn a rolling deploy into an
         // outage. It disappears on its own within one access-token lifetime.

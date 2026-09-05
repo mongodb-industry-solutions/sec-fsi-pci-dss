@@ -23,7 +23,12 @@ import { callAuthority, AuthorityError } from '../../../vendors/security/authori
 
 /** What the authority publishes. Already secret-free: its read is an allowlist. */
 interface AuthorityDomain {
-  providerId: string;
+  /**
+   * `domainId` since GIAM v41 D32, which finished a rename from provider to domain that had
+   * stopped halfway: the collection was keyed by `providerId` while every reference to it was
+   * already called `domainId`.
+   */
+  domainId: string;
   name: string;
   displayName: string;
   protocol: 'internal' | 'oidc' | 'saml' | 'ldap' | 'spiffe';
@@ -68,7 +73,7 @@ function flowType(protocol: AuthorityDomain['protocol']): string {
 
 function view(domain: AuthorityDomain): Record<string, unknown> {
   return {
-    partyAuthenticationDomainInstanceReference: domain.providerId,
+    partyAuthenticationDomainInstanceReference: domain.domainId,
     partyAuthenticationDomainName: domain.name,
     partyAuthenticationDomainDisplayName: domain.displayName,
     partyAuthenticationDomainType: consoleType(domain.protocol),

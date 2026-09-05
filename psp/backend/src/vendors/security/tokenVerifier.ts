@@ -276,8 +276,20 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
     aud: claims.aud as string | string[],
     exp: Number(claims.exp ?? 0),
     scope: typeof claims.scope === 'string' ? claims.scope.split(' ').filter(Boolean) : [],
-    permissions: Array.isArray(claims.permissions)
-      ? (claims.permissions as unknown[])
+    /**
+     * `entitlements`, which is what GIAM emits since v41 P1.
+     *
+     * RFC 9068 2.2.3.1 names the fine-grained authorization claim `entitlements`, with values per
+     * RFC 7643 4.1.2. It was `permissions`, a name no specification defines, so nothing generic
+     * looked for it. Reading the old name here would silently yield an empty list: every check
+     * that depends on a narrowed token would fall through to the roles, which is WIDER than the
+     * client asked for, and nothing would report it.
+     *
+     * The local name stays `permissions` because that is what this codebase calls the concept
+     * internally; only the wire name changed.
+     */
+    permissions: Array.isArray(claims.entitlements)
+      ? (claims.entitlements as unknown[])
         // A v39-shaped entry is CONVERTED rather than dropped: a token minted minutes before the
         // authority upgraded is still valid, and refusing it would turn a rolling deploy into an
         // outage. It disappears on its own within one access-token lifetime.
