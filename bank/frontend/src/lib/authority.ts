@@ -1,6 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { createHash, randomBytes } from 'crypto';
+import { cache } from 'react';
 
 /**
  * Signing a person in, by sending them to the authority and taking a code back.
@@ -14,14 +15,6 @@ import { createHash, randomBytes } from 'crypto';
 const SESSION_COOKIE = 'bankcore.session';
 const VERIFIER_COOKIE = 'bankcore.pkce';
 const STATE_COOKIE = 'bankcore.state';
-/**
- * The realm the bank's people live in, which is the SHARED one (ADR-003).
- *
- * The bank is a client here and not a directory of its own. What keeps it separate from the payment
- * service is its own resource server, its own roles and its own token audience, none of which
- * depends on a second realm. The gain is that a person exists once instead of twice.
- */
-const REALM = 'leafypay';
 const CONSOLE_CLIENT_ID = 'bankcore-console';
 const TIMEOUT_MS = 10000;
 
@@ -32,12 +25,22 @@ function issuerBase(): string {
   return raw.replace(/\/$/, '');
 }
 
-// The browser-facing authority, which is a different address from the one this server calls: the
-// sign-in page is opened by a person, so it must be a host their browser can reach.
-function authorityUi(): string {
-  const raw = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_URL
-    ?? process.env.PSP_GIAM_UI_URL
-    ?? 'http://localhost:8086';
+/**
+ * The authority's API as the BROWSER reaches it, which is not the address this server uses.
+ *
+ * The authorization request is followed by a person, so it cannot be sent to an in-network host.
+ * This is the issuer, not the console: since the endpoint became conforming the console is an
+ * ordinary client of it and no longer reads OAuth parameters out of its own URL.
+ *
+ * The realm in this path is the SHARED one (ADR-003). The bank is a client here and not a directory
+ * of its own: what keeps it separate from the payment service is its own resource server, its own
+ * roles and its own token audience, none of which depends on a second realm. The gain is that a
+ * person exists once instead of twice.
+ */
+function authorityIssuerPublic(): string {
+  const raw = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_ISSUER_URL
+    ?? process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER
+    ?? 'http://localhost:8085/realms/leafypay';
   return raw.replace(/\/$/, '');
 }
 
@@ -69,8 +72,18 @@ export function startSignIn(): LoginStart {
   const state = randomBytes(16).toString('base64url');
   const nonce = randomBytes(16).toString('base64url');
 
-  const url = new URL(`${authorityUi()}/auth/login`);
-  url.searchParams.set('realm', REALM);
+  /**
+   * The AUTHORIZATION ENDPOINT, not the authority's sign-in page.
+   *
+   * The sign-in page was the right target while the console owned the flow and read `client_id`,
+   * `redirect_uri` and the rest out of its own URL. It is a client of the endpoint now: the endpoint
+   * holds the pending request and sends the browser on to sign in carrying only a `request_id`. So a
+   * request arriving at the sign-in page with raw OAuth parameters reads as "somebody opened the
+   * sign-in page", and the person would be signed in and left there with no way back to the bank.
+   *
+   * The realm is not a parameter: it is in the path.
+   */
+  const url = new URL(`${authorityIssuerPublic()}/protocol/openid-connect/auth`);
   url.searchParams.set('client_id', CONSOLE_CLIENT_ID);
   url.searchParams.set('redirect_uri', redirectUri());
   url.searchParams.set('response_type', 'code');
@@ -164,6 +177,33 @@ export interface StaffSession {
 }
 
 /**
+ * The person's profile, from the authority's userinfo endpoint.
+ *
+ * An access token carries authority, not a profile. It names the subject, what it is good for and
+ * what the holder may do, and nothing about who they are, which is what keeps it small and is where
+ * a name belongs least: it is the credential presented on every call. So the name is asked for
+ * separately, by the one endpoint whose purpose is to answer that question.
+ *
+ * Deduplicated per request, because several server components render the header on one page and
+ * each one would otherwise ask again.
+ */
+const profileOf = cache(async (token: string): Promise<{ name?: string; preferred_username?: string }> => {
+  try {
+    const response = await fetch(`${issuerBase()}/protocol/openid-connect/userinfo`, {
+      headers: { authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      cache: 'no-store',
+    });
+    if (!response.ok) return {};
+    return await response.json();
+  } catch {
+    // An unreachable authority costs the display name, not the session: the token is still valid
+    // and every guarded call still works, so signing the person out here would be the worse answer.
+    return {};
+  }
+});
+
+/**
  * Who is signed in, read from the token's own claims.
  *
  * Unverified on purpose: this decides what the UI renders, never what it is allowed to do. Every
@@ -176,11 +216,17 @@ export async function currentStaff(): Promise<StaffSession | null> {
   if (segments.length !== 3) return null;
   try {
     const claims = JSON.parse(Buffer.from(segments[1], 'base64url').toString('utf8')) as {
-      sub?: string; name?: string; preferred_username?: string; roles?: unknown; exp?: number;
+      sub?: string; roles?: unknown; exp?: number;
     };
     if (!claims.sub) return null;
     if (claims.exp && claims.exp * 1000 < Date.now()) return null;
-    const userName = claims.preferred_username ?? claims.name;
+
+    /**
+     * The name came from `preferred_username` and `name` ON THE ACCESS TOKEN, which never carried
+     * either, so it was always absent and the console greeted everybody as "Signed in".
+     */
+    const profile = await profileOf(token);
+    const userName = profile.preferred_username ?? profile.name;
     return {
       subjectId: claims.sub,
       ...(userName ? { userName } : {}),

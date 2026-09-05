@@ -99,12 +99,21 @@ describe('v39: the bank console signs in at the authority and authorises by role
     expect(start.status).toBe(307);
 
     const location = new URL(start.headers.get('location') ?? '');
-    expect(location.pathname, 'the sign-in page belongs to the authority').toBe('/auth/login');
+    /**
+     * The AUTHORIZATION ENDPOINT, not the authority's sign-in page.
+     *
+     * This asserted `/auth/login`, which was correct while the console owned the flow and read the
+     * OAuth parameters out of its own URL. Since the endpoint became conforming, sending a person
+     * there with raw parameters signs them in and strands them, with no code and no way back to the
+     * bank. The realm is part of the PATH now rather than a parameter, which is what the shared
+     * realm (ADR-003) looks like from here; the cookie prefix stays `bankcore`, because that names
+     * the application holding the session and not the directory.
+     */
+    expect(location.pathname, 'the request must go to the authorization endpoint')
+      .toBe('/realms/leafypay/protocol/openid-connect/auth');
     expect(location.searchParams.get('response_type')).toBe('code');
     expect(location.searchParams.get('code_challenge_method'), 'PKCE is not optional here').toBe('S256');
-    // The realm the bank sends people to is the shared one (ADR-003); the COOKIE prefix stays
-    // `bankcore`, because that names the application holding the session and not the directory.
-    expect(location.searchParams.get('realm')).toBe('leafypay');
+    expect(location.searchParams.get('client_id')).toBe('bankcore-console');
 
     // The verifier stays with this app; only its hash travels.
     const cookies = (start.headers.getSetCookie?.() ?? []).join(' ');
