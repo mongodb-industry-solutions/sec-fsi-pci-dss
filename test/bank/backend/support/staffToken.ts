@@ -18,13 +18,21 @@ const CONSOLE_CLIENT = 'bankcore-console';
 const REDIRECT_URI = 'http://localhost:8084/api/auth/callback';
 const DEMO_PASSWORD = 'demo-password';
 
-/** Seeded employees, by the role each one holds. Named so a test asks for authority, not a person. */
+/**
+ * Seeded employees, by the role each one holds. Named so a test asks for authority, not a person.
+ *
+ * The values are USER NAMES, not display names. They were display names, which worked while the
+ * authority conflated the two fields and stopped when it separated them: a user name is a unique,
+ * stable, user-friendly identifier and a display name is neither unique nor stable. Every sign-in
+ * here failed, and the suites read it as "this employee lacks the permission" rather than "nobody
+ * signed in", which is the misleading shape this comment exists to prevent recurring.
+ */
 export const STAFF = {
-  administrator: 'Samuel Adeyemi',
-  compliance: 'Ingrid Larsen',
-  operations: 'Marta Oliveira',
-  cardOfficer: 'Tomas Reyes',
-  accountHolder: 'Elena Duarte',
+  administrator: 'samuel.adeyemi',
+  compliance: 'ingrid.larsen',
+  operations: 'marta.oliveira',
+  cardOfficer: 'tomas.reyes',
+  accountHolder: 'elena.duarte',
 } as const;
 
 let authority: Authority | null = null;

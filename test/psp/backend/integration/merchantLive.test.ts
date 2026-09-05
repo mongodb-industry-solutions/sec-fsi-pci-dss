@@ -10,6 +10,9 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPairSync, createSign, createHmac, randomUUID } from 'node:crypto';
 import { readSeedFile } from './support/contract';
 import { clientSecretFor } from '@leafypay/platform-links';
+import { interactiveToken } from '../../../support/authorizationFlow';
+import { readFileSync } from 'fs';
+import { giamPath } from '../../../support/giamRepo';
 
 /**
  * A real token for this customer, from the identity authority.
@@ -17,53 +20,18 @@ import { clientSecretFor } from '@leafypay/platform-links';
  * Signing in happens there now. These suites are about the BUSINESS endpoints behind the token, so
  * obtaining it is setup rather than the thing under test; the sign-in itself has its own coverage in
  * the authority's suite.
+ *
+ * The flow lives in the shared helper. This file, its neighbour and two bank suites each had a copy
+ * written against the shape the authorization endpoint used to have, so all four broke together
+ * when it became conforming.
  */
 async function authorityLogin(userName: string): Promise<string> {
-  const session = await fetch('http://127.0.0.1:8085/realms/leafypay/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ login: userName, password: 'demo-password' }),
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!session.ok) return '';
-  const { sessionId } = await session.json() as { sessionId: string };
-
-  const { createHash, randomBytes } = await import('crypto');
-  const verifier = randomBytes(32).toString('base64url');
-  const challenge = createHash('sha256').update(verifier).digest('base64url');
   // A URI the console client is actually registered for. The authority refuses an unregistered one,
   // which is correct and is why this is not simply whatever host the test happens to run against.
-  const redirectUri = 'http://localhost:8086/auth/callback';
-
-  const authorize = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/auth', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: 'giam-console',
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'openid profile',
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      session_id: sessionId,
-    }),
-  });
-  if (!authorize.ok) return '';
-  const { code } = await authorize.json() as { code: string };
-
-  const token = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: verifier,
-      client_id: 'giam-console',
-    }),
-  });
-  if (!token.ok) return '';
-  return (await token.json() as { access_token: string }).access_token;
+  return interactiveToken(
+    'http://127.0.0.1:8085', 'leafypay', userName, 'demo-password',
+    'giam-console', 'http://localhost:8086/auth/callback',
+  );
 }
 
 
@@ -75,16 +43,8 @@ async function authorityLogin(userName: string): Promise<string> {
  * belongs to, rather than a login carrying a party.
  */
 function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
-  const raw = require('fs').readFileSync(
-    require('path').resolve(
-      require('path').resolve(__dirname, '../../../..'),
-      // GIAM is a separate repository now, so its fixtures are read from a local checkout of it.
-      process.env.GIAM_REPO_PATH ?? '../sec-giam',
-      'backend/data/identities.json',
-    ),
-    'utf8',
-  );
-  return JSON.parse(raw);
+  // Located by the shared resolver, so there is one definition of where the checkout is.
+  return JSON.parse(readFileSync(giamPath('backend/data/identities.json'), 'utf8'));
 }
 
 

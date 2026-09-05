@@ -138,11 +138,17 @@ describe.skipIf(!HAS_ROLES)('role grants for beneficiaries (test 20)', () => {
     ? JSON.parse(readFileSync(giamPath('backend/data/roles.json'), 'utf8'))
     : []) as Array<{ name: string; permissions: Record<string, string[]> }>;
 
-  const perms = (roleName: string) => {
+  /**
+   * A permission is the string `resource:action`, which is the one spelling the catalog helper
+   * takes. This built `{ resource, action }` objects, the shape from before that spelling was
+   * settled, so every check below silently answered false. It went unnoticed because the block was
+   * skipped whenever the authority's checkout could not be located, which was always.
+   */
+  const perms = (roleName: string): string[] | undefined => {
     const role = roles.find((r) => r.name === roleName);
     if (!role) return undefined;
     return Object.entries(role.permissions).flatMap(
-      ([resource, actions]) => actions.map((action) => ({ resource, action })),
+      ([resource, actions]) => actions.map((action) => `${resource}:${action}`),
     );
   };
 
@@ -172,7 +178,8 @@ describe.skipIf(!HAS_ROLES)('role grants for beneficiaries (test 20)', () => {
 
   it('roles with no business need hold nothing on beneficiaries', () => {
     for (const role of ['merchant_officer', 'manager', 'operations_officer']) {
-      expect(perms(role)?.beneficiaries, role).toBeUndefined();
+      const held = (perms(role) ?? []).filter((entry) => entry.startsWith('beneficiaries:'));
+      expect(held, role).toEqual([]);
     }
   });
 });

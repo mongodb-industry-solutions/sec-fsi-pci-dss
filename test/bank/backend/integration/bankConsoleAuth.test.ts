@@ -9,6 +9,7 @@
  * Skipped unless the bank console and the authority are both listening.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
+import { signIn, authorizationCode } from '../../../support/authorizationFlow';
 
 const CONSOLE = process.env.BANK_UI_URL ?? 'http://localhost:8084';
 const AUTHORITY = process.env.GIAM_BASE_URL ?? 'http://127.0.0.1:8085';
@@ -56,32 +57,22 @@ async function signIn(login: string): Promise<{ jar: Jar; codeIssued: boolean }>
   collect(jar, start);
   const params = new URL(start.headers.get('location') ?? '').searchParams;
 
-  const session = await fetch(`${AUTHORITY}/realms/leafypay/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ login, password: DEMO_PASSWORD }),
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!session.ok) return { jar, codeIssued: false };
-  const { sessionId } = await session.json() as { sessionId: string };
+  /**
+   * The conforming flow, from the shared helper: the session is a COOKIE, the authorization
+   * endpoint is a `GET`, and the code arrives in the `Location` header of a 302. The code then goes
+   * back to the console, which holds the verifier for the challenge it put in the request.
+   */
+  const session = await signIn(AUTHORITY, 'leafypay', login, DEMO_PASSWORD);
+  if (!session) return { jar, codeIssued: false };
 
-  const authorize = await fetch(`${AUTHORITY}/realms/leafypay/protocol/openid-connect/auth`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      client_id: params.get('client_id'),
-      redirect_uri: params.get('redirect_uri'),
-      response_type: 'code',
-      scope: params.get('scope'),
-      state: params.get('state'),
-      session_id: sessionId,
-      code_challenge: params.get('code_challenge'),
-      code_challenge_method: 'S256',
-    }),
-    signal: AbortSignal.timeout(20000),
+  const code = await authorizationCode(AUTHORITY, 'leafypay', session.cookie, {
+    clientId: params.get('client_id') ?? '',
+    redirectUri: params.get('redirect_uri') ?? '',
+    scope: params.get('scope') ?? undefined,
+    state: params.get('state') ?? undefined,
+    codeChallenge: params.get('code_challenge') ?? undefined,
   });
-  if (!authorize.ok) return { jar, codeIssued: false };
-  const { code } = await authorize.json() as { code: string };
+  if (!code) return { jar, codeIssued: false };
 
   const callback = await fetch(
     `${CONSOLE}/api/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(params.get('state') ?? '')}`,

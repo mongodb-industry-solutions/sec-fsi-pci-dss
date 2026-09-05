@@ -1,4 +1,4 @@
-import { MongoClient, ClientEncryption } from 'mongodb';
+import { MongoClient, ClientEncryption, Document } from 'mongodb';
 import { buildKmsProviders, getKmsConfig } from '../encryption/kms';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';
@@ -25,6 +25,8 @@ export async function createCollections(
   const dbName = config.mongodb.dbName;
   const db = client.db(dbName);
   const maps = buildEncryptedFieldsMaps(deks);
+  // The same maps with the text query types removed, used only when a driver refuses them below.
+  const plain = buildEncryptedFieldsMaps(deks, 'level2', false);
 
   const clientEncryption = new ClientEncryption(client, {
     keyVaultNamespace: kmsConfig.namespace,
@@ -37,30 +39,30 @@ export async function createCollections(
   // they are returned as Binary ciphertext; Level 2 map includes them for auto-decryption.
   const qeCollections = [
     // Party Data Management  -  canonical PII store
-    { name: 'party',                            map: maps.party },
+    { name: 'party',                            map: maps.party, degraded: plain.party },
     // Card Transaction Log (includes sensitive gateway fields in unified doc)
-    { name: 'cardTransactionLog',               map: maps.cardTransactionLog },
+    { name: 'cardTransactionLog',               map: maps.cardTransactionLog, degraded: plain.cardTransactionLog },
     // Customer Agreement Procedure (includes sensitive address/govId in unified doc)
-    { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure },
+    { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure, degraded: plain.customerAgreementProcedure },
     // Payment Card Management
-    { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
+    { name: 'paymentCardManagement',            map: maps.paymentCardManagement, degraded: plain.paymentCardManagement },
     // v37: the issuer vault moved to the bank, so no collection here holds a PAN.
     // Customer Authentication
     // Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS)
     ...(maps.payoutAccountArrangement
-      ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
-      : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
+      ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement, degraded: plain.payoutAccountArrangement }]
+      : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] }, degraded: { fields: [] } }]
     ),
     // Payment Execution Procedure (destinationIban QE:none, L2 only, GDPR Art. 32 / PSD2)
     ...(maps.paymentExecutionProcedure
-      ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
-      : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
+      ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure, degraded: plain.paymentExecutionProcedure }]
+      : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] }, degraded: { fields: [] } }]
     ),
     // (v28): Request to Pay canonical record. Alias/remittance/address/payee-name QE:none, L2 only
     // (GDPR minimization). RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD).
     ...(maps.paymentRequestProcedure
-      ? [{ name: PAYMENT_REQUEST_COLLECTION, map: maps.paymentRequestProcedure }]
-      : [{ name: PAYMENT_REQUEST_COLLECTION, map: { fields: [] } }]
+      ? [{ name: PAYMENT_REQUEST_COLLECTION, map: maps.paymentRequestProcedure, degraded: plain.paymentRequestProcedure }]
+      : [{ name: PAYMENT_REQUEST_COLLECTION, map: { fields: [] }, degraded: { fields: [] } }]
     ),
   ];
 
@@ -81,7 +83,7 @@ export async function createCollections(
 
   const existingNames = new Set(existingList.map((c) => c.name));
 
-  for (const { name, map } of qeCollections) {
+  for (const { name, map, degraded } of qeCollections) {
     if (existingNames.has(name)) {
       if (reset) {
         await db.collection(name).drop();
@@ -98,12 +100,41 @@ export async function createCollections(
         ? { key: config.kms.awsCmkArn!, region: config.kms.awsRegion }
         : undefined;
 
-    await clientEncryption.createEncryptedCollection(db, name, {
+    /**
+     * A driver that refuses the declared text query type falls back to equality, rather than
+     * leaving the collection uncreated.
+     *
+     * The text-search query types are a preview, and a newer crypt_shared rejects the ones this map
+     * declares. Setup then failed here, so the collection was never created, and because setup
+     * skips whatever already exists the database stayed in a state no rerun could repair. Worse,
+     * the collections that HAD been created that way keep answering every encrypted query with the
+     * same refusal, which reads as an unrelated 500 far from here.
+     *
+     * The environment flag was supposed to cover this, but a static flag cannot know what the
+     * driver in front of it will accept. The loss of capability is stated rather than silent:
+     * search by name FRAGMENT stops working, and somebody has to know that rather than discover it.
+     */
+    const create = (fields: Document) => clientEncryption.createEncryptedCollection(db, name, {
       provider,
-      createCollectionOptions: { encryptedFields: map },
+      createCollectionOptions: { encryptedFields: fields },
       ...(masterKey && { masterKey }),
     });
-    console.log(`  created: ${name}`);
+
+    try {
+      await create(map);
+      console.log(`  created: ${name}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/queryType|substring|prefix|suffix/i.test(message)) throw err;
+
+      console.warn(
+        `  warn:    ${name}: this driver refuses the declared text query type, so the encrypted `
+        + 'fields fall back to equality. Search by FRAGMENT will not work until crypt_shared and '
+        + 'the server support it.',
+      );
+      await create(degraded ?? { fields: [] });
+      console.log(`  created: ${name} (equality only)`);
+    }
   }
 
   // v39: authenticationDomain belonged to the login screen and moved with it. A realm at the

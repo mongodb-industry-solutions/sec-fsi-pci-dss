@@ -154,7 +154,12 @@ describe('v33 seed-data integrity: referential integrity', () => {
     ],
     ['merchant → owner party', () => merchants.map((m) => m.merchantOwnerPartyReference as string), () => partyRefs],
     ...(HAS_LOGINS
-      ? [['login → party', () => logins.map((l) => l.partyInstanceReference), () => partyRefs] as const]
+      // Only the logins that NAME a party. An administrator belongs to no account holder, so it
+      // carries no party reference, and that is a principal without a business party rather than an
+      // orphan pointing at one that is missing.
+      ? [['login → party',
+        () => logins.map((l) => l.partyInstanceReference).filter(Boolean),
+        () => partyRefs] as const]
       : []),
   ])('%s has no orphans', (_label, values, targets) => {
     const target = targets();

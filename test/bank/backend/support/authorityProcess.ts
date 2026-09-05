@@ -1,6 +1,8 @@
 import { spawn, ChildProcess } from 'child_process';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+import { interactiveToken as runFlow } from '../../../support/authorizationFlow';
+import { giamPath } from '../../../support/giamRepo';
 
 /**
  * Runs the identity authority as a real process for the duration of a suite.
@@ -14,9 +16,7 @@ import { resolve } from 'path';
  * does what it does in production: discovery over HTTP, a key set fetched from a URL, and a token it
  * did not mint.
  */
-// GIAM lives in its own repository now, so its checkout is located rather than assumed.
-const REPO_ROOT = resolve(__dirname, '../../../..');
-const GIAM_DIR = resolve(REPO_ROOT, process.env.GIAM_REPO_PATH ?? '../sec-giam', 'backend');
+const GIAM_DIR = giamPath('backend');
 
 export interface Authority {
   baseUrl: string;
@@ -108,7 +108,14 @@ export async function machineToken(
   return (await response.json() as { access_token: string }).access_token;
 }
 
-/** The full interactive flow: sign in, authorize with PKCE, redeem. Exactly as a console does it. */
+/**
+ * The full interactive flow: sign in, authorize with PKCE, redeem. Exactly as a console does it.
+ *
+ * DELEGATED to the shared helper, which drives the conforming flow: a `GET`, a session cookie, and
+ * the code read out of a 302. This function had its own copy of the flow in the shape the endpoint
+ * used to have, and three other suites had the same copy, so the authority making the endpoint
+ * conforming broke all four identically.
+ */
 export async function interactiveToken(
   authority: Authority,
   realm: string,
@@ -117,67 +124,8 @@ export async function interactiveToken(
   clientId: string,
   redirectUri: string,
 ): Promise<string | null> {
-  const { createHash, randomBytes } = await import('crypto');
-
-  const session = await fetch(`${authority.baseUrl}/realms/${realm}/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ login, password }),
-  });
-  if (!session.ok) return null;
-  const { sessionId } = await session.json() as { sessionId: string };
-
-  const verifier = randomBytes(32).toString('base64url');
-  const challenge = createHash('sha256').update(verifier).digest('base64url');
-
-  /**
-   * Authorize, and ANSWER THE CONSENT QUESTION if it is asked.
-   *
-   * A first authorization for an application this person has not used before returns a consent
-   * prompt instead of a code, which is the documented two steps. Doing only the first made this
-   * helper depend on a grant already existing, so it worked on a machine where somebody had signed
-   * in before and returned null on a freshly seeded directory. Every suite that needs a staff token
-   * then failed with a message about permissions.
-   */
-  const requestCode = (consentGranted: boolean) => fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/auth`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'code',
-      scope: 'openid profile',
-      code_challenge: challenge,
-      code_challenge_method: 'S256',
-      session_id: sessionId,
-      ...(consentGranted ? { consent_granted: true } : {}),
-    }),
-  });
-
-  let authorize = await requestCode(false);
-  if (!authorize.ok) return null;
-  let granted = await authorize.json() as { code?: string; consent_required?: boolean };
-  if (granted.consent_required) {
-    authorize = await requestCode(true);
-    if (!authorize.ok) return null;
-    granted = await authorize.json() as { code?: string };
-  }
-  const code = granted.code;
-  if (!code) return null;
-
-  const token = await fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/token`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      code,
-      redirect_uri: redirectUri,
-      code_verifier: verifier,
-      client_id: clientId,
-    }),
-  });
-  if (!token.ok) return null;
-  return (await token.json() as { access_token: string }).access_token;
+  const token = await runFlow(authority.baseUrl, realm, login, password, clientId, redirectUri);
+  return token || null;
 }
 
 export function decodeClaims(token: string): Record<string, unknown> {

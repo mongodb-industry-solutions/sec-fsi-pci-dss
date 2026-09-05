@@ -9,10 +9,9 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { existsSync } from 'fs';
 import { resolve } from 'path';
+import { giamPath } from '../../../../support/giamRepo';
 
-// GIAM lives in its own repository now, so its checkout is located rather than assumed.
-const REPO_ROOT = resolve(__dirname, '../../../../..');
-const GIAM_DIR = resolve(REPO_ROOT, process.env.GIAM_REPO_PATH ?? '../sec-giam', 'backend');
+const GIAM_DIR = giamPath('backend');
 const REALM = 'leafypay';
 const DEFAULT_PORT = 8085;
 

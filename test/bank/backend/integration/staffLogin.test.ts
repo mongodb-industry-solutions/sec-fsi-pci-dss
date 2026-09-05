@@ -28,6 +28,14 @@ const DEMO_PASSWORD = 'demo-password';
 let bank: FastifyInstance;
 let authority: Authority | null = null;
 
+/**
+ * The login is the USER NAME, not the person's display name.
+ *
+ * These call sites passed the display name, which worked while the two fields were conflated and
+ * stopped when the authority separated them: a user name is a unique, stable, user-friendly
+ * identifier, and a display name is neither unique nor stable. Every persona here failed to sign in
+ * for that reason alone.
+ */
 async function signIn(login: string): Promise<{ token: string; claims: Record<string, unknown> } | null> {
   const token = await interactiveToken(
     authority as Authority, BANK_REALM, login, DEMO_PASSWORD, CONSOLE_CLIENT, REDIRECT_URI,
@@ -98,7 +106,7 @@ async function expanded(token: string, held: string[]): Promise<Set<string>> {
 describe('v39 P7.4: a bank employee signs in and works under a role', () => {
   it('completes sign-in, authorization code with PKCE, and redemption', async () => {
     if (!authority) return;
-    const result = await signIn('Marta Oliveira');
+    const result = await signIn('marta.oliveira');
     expect(result, 'the interactive flow produced no token').toBeTruthy();
 
     const { claims } = result as { claims: Record<string, unknown> };
@@ -111,7 +119,7 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
 
   it('authorises the operations role on accounts and refuses it a card disclosure', async () => {
     if (!authority) return;
-    const result = await signIn('Marta Oliveira');
+    const result = await signIn('marta.oliveira');
     /**
      * v40 carries ROLES in the token, not expanded permissions.
      *
@@ -136,7 +144,7 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
 
   it('lets the card officer, and only the card officer, reach a disclosure', async () => {
     if (!authority) return;
-    const officer = await signIn('Tomas Reyes');
+    const officer = await signIn('tomas.reyes');
     /**
      * v40 carries ROLES in the token, not expanded permissions.
      *
@@ -160,7 +168,7 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
 
   it('keeps compliance read-only', async () => {
     if (!authority) return;
-    const compliance = await signIn('Ingrid Larsen');
+    const compliance = await signIn('ingrid.larsen');
     /**
      * v40 carries ROLES in the token, not expanded permissions.
      *
@@ -180,7 +188,7 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
 
   it('keeps the administrator away from customer data', async () => {
     if (!authority) return;
-    const admin = await signIn('Samuel Adeyemi');
+    const admin = await signIn('samuel.adeyemi');
     /**
      * v40 carries ROLES in the token, not expanded permissions.
      *
@@ -200,7 +208,7 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
 
   it('reaches the bank administrative surface with a real token', async () => {
     if (!authority) return;
-    const admin = await signIn('Samuel Adeyemi');
+    const admin = await signIn('samuel.adeyemi');
     const response = await bank.inject({
       method: 'GET',
       url: '/api/v1/admin/module/config',
@@ -214,7 +222,7 @@ describe('v39 P7.4: a bank employee signs in and works under a role', () => {
 describe('v39 P7.4: an account holder sees their own records and nobody else s', () => {
   it('is bound to their own account holder reference', async () => {
     if (!authority) return;
-    const holder = await signIn('Elena Duarte');
+    const holder = await signIn('elena.duarte');
     const claims = (holder as { claims: Record<string, unknown> }).claims;
 
     expect(claims.roles).toContain('bank_customer');
@@ -225,7 +233,7 @@ describe('v39 P7.4: an account holder sees their own records and nobody else s',
 
   it('holds no authority over anybody else s records', async () => {
     if (!authority) return;
-    const holder = await signIn('Elena Duarte');
+    const holder = await signIn('elena.duarte');
     /**
      * v40 carries ROLES in the token, not expanded permissions.
      *
@@ -334,7 +342,7 @@ describe('v39 P7.7: the two institutions are separate, and the two grants do not
     // A bank administrator, the strongest interactive principal there is, still refused: a
     // third-party operation carries a consent obligation that being an administrator does not
     // satisfy, and the two grants must not substitute in either direction.
-    const admin = await signIn('Samuel Adeyemi');
+    const admin = await signIn('samuel.adeyemi');
     const response = await bank.inject({
       method: 'GET',
       url: '/v1/accounts?holderId=hld00001-0000-4000-8000-000000000001',

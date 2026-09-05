@@ -10,6 +10,8 @@ import {
   buildContractApp, closeContractApp, requireLive, mintOAuthToken, readSeedFile, routeExists, requiredBlocks,
   responseSchema, schemaKeepsField,
 } from '../support/contract';
+import { readFileSync } from 'fs';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
 
 /**
  * The seeded principals, read from the identity authority's fixtures.
@@ -18,17 +20,13 @@ import {
  * identity, and the binding now runs the other way: a principal carries the business reference it
  * belongs to, rather than a login carrying a party.
  */
+const HAS_IDENTITIES = hasGiam('backend/data/identities.json');
+
 function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
-  const raw = require('fs').readFileSync(
-    require('path').resolve(
-      require('path').resolve(__dirname, '../../../../..'),
-      // GIAM is a separate repository now, so its fixtures are read from a local checkout of it.
-      process.env.GIAM_REPO_PATH ?? '../sec-giam',
-      'backend/data/identities.json',
-    ),
-    'utf8',
-  );
-  return JSON.parse(raw);
+  // Located by the shared resolver, so there is one definition of where the checkout is, and an
+  // absent checkout skips honestly instead of throwing a path nobody in this repo can create.
+  if (!HAS_IDENTITIES) return [];
+  return JSON.parse(readFileSync(giamPath('backend/data/identities.json'), 'utf8'));
 }
 
 // A seeded customer with payout accounts, beneficiaries and executions. Deterministic ids.
