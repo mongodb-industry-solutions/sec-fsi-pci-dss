@@ -72,7 +72,7 @@ sandbox, so add the following block **manually** to the repo-root `.env`:
 PSP_MERCHANT_BASE_URL=http://localhost:8082
 PSP_MERCHANT_PORT=8082
 PSP_MERCHANT_PSP_BASE_URL=http://localhost:8081
-PSP_MERCHANT_AUTHORIZE_URL=http://localhost:8080/auth/authorize
+PSP_MERCHANT_AUTHORIZE_URL=http://localhost:8086/realms/leafypay/protocol/openid-connect/auth
 PSP_MERCHANT_OAUTH_CLIENT_ID=oauth001-0000-4000-8000-000000000001
 PSP_MERCHANT_OAUTH_CLIENT_SECRET=
 PSP_MERCHANT_SESSION_SECRET=change-me-to-a-32-byte-random-secret-value

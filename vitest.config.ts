@@ -22,6 +22,8 @@ export default defineConfig({
       ['test/psp/backend/**', 'node'],
       // v37: bankcore is a second Fastify service, so its suites run in node like the backend's.
       ['test/bank/backend/**', 'node'],
+      // The merchant is a third app, driven over HTTP like the others.
+      ['test/merchant/**', 'node'],
     ],
     include: [
       'test/psp/frontend/unit/**/*.test.{ts,tsx}',
@@ -30,6 +32,7 @@ export default defineConfig({
       'test/psp/backend/integration/**/*.test.ts',
       'test/bank/backend/unit/**/*.test.ts',
       'test/bank/backend/integration/**/*.test.ts',
+      'test/merchant/integration/**/*.test.ts',
     ],
     coverage: {
       provider: 'v8',

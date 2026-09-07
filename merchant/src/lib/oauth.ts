@@ -58,11 +58,8 @@ export function generatePkce(): { verifier: string; challenge: string } {
 
 export const randomToken = () => b64url(randomBytes(16));
 
-/**
- * Build the browser-facing authorize URL. We point the user at the PSP frontend
- * consent page (PSP_AUTHORIZE_URL), which renders login+consent and then hands off
- * to the backend authorization endpoint to issue the code.
- */
+// Browser-facing authorize URL, addressed to the authorization ENDPOINT: the authority parks the
+// request, hosts sign-in and consent, and returns to the callback with a code.
 export function buildAuthorizeUrl(params: {
   state: string;
   nonce: string;

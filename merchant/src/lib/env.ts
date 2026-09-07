@@ -97,8 +97,11 @@ export const ENV = {
    * makes the authority replaceable.
    */
   issuerUrl: () => envVar('PSP_MERCHANT_ISSUER_URL') ?? 'http://localhost:8085/realms/leafypay',
-  // Browser-facing sign-in, at the authority. Credential entry belongs there and nowhere else.
-  pspAuthorizeUrl: () => envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8086/auth/login',
+  // The authorization ENDPOINT as the BROWSER reaches it: the authority's sign-in page is a client of
+  // that endpoint now and ignores OAuth parameters, so a request sent there strands the person.
+  pspAuthorizeUrl: () =>
+    envVar('PSP_MERCHANT_AUTHORIZE_URL')
+    ?? 'http://localhost:8086/realms/leafypay/protocol/openid-connect/auth',
   // Browser-facing PSP front-channel logout page (single sign-out): clears the PSP portal session
   // cookie same-origin, then bounces back to this app. Derived from the authorize URL by default.
   pspLogoutUrl: () => envVar('PSP_MERCHANT_LOGOUT_URL') ?? `${applicationFrontend()}/auth/logout`,

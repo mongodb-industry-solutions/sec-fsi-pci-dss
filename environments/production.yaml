@@ -20,8 +20,8 @@ env:
   PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
 
   # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
-  # Browser-facing sign-in → the PUBLIC GIAM console. Credential entry lives at the authority.
-  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-console.industrysolutions.prod.corp.mongodb.com/auth/login"
+  # Browser-facing sign-in → the authorization ENDPOINT on the PUBLIC GIAM console origin.
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-console.industrysolutions.prod.corp.mongodb.com/realms/leafypay/protocol/openid-connect/auth"
   # Server-to-server discovery, token and introspection → PRIVATE in-cluster GIAM service.
   PSP_MERCHANT_ISSUER_URL: "http://sec-giam-web-app:80/realms/leafypay"
   # Server-to-server BUSINESS API → PRIVATE in-cluster backend service. Unchanged: no business
