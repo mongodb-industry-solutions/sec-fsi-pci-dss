@@ -91,8 +91,12 @@ export function UserMenu() {
 
   async function signOut() {
     setOpen(false);
+    // Ends this app's own cookie; the shared authority session is separate and needs a top-level
+    // navigation there too (its cookie is SameSite=Lax, a fetch would not carry it).
     await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.assign('/');
+    const authority = new URL('/auth/logout', AUTHORITY_UI);
+    authority.searchParams.set('post_logout_redirect_uri', window.location.origin);
+    window.location.assign(authority.toString());
   }
 
   return (

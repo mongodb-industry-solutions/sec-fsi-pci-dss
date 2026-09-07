@@ -2,7 +2,7 @@
 import { Suspense, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { logoutSession } from '../../../lib/logout';
-import { MERCHANT_PUBLIC_URL } from '../../../lib/constants';
+import { MERCHANT_PUBLIC_URL, AUTHORITY_UI_PUBLIC_URL } from '../../../lib/constants';
 
 // Resolve the post-logout redirect safely. Allowing any absolute http(s) URL is an open redirect
 // (?redirect=https://evil.example). Permit only: (1) a same-origin relative path (single leading '/',
@@ -33,6 +33,11 @@ function safeRedirect(raw: string | null): string {
 // SECURITY: without this, logging out of the merchant left the PSP session alive,
 // so a hosted checkout (same origin) still recognised the "logged-in" viewer and
 // surfaced their saved cards. Clearing the token here closes that gap.
+//
+// The shared GIAM session (`giam_session`) is a separate gap: clearing this cookie never touched it,
+// so the next authorization request found it still live and skipped sign-in entirely. Ending it needs
+// a top-level navigation to the authority (its cookie is SameSite=Lax, a fetch would not carry it),
+// so this hop continues there before returning to the RP.
 // ---------------------------------------------------------------------------
 function LogoutInner() {
   const searchParams = useSearchParams();
@@ -41,12 +46,13 @@ function LogoutInner() {
     let cancelled = false;
     (async () => {
       // Terminate the PSP session: invalidate the token server-side (epoch bump), then clear the
-      // same-origin cookie. Both happen before we redirect back to the RP.
+      // same-origin cookie. Both happen before we redirect onward.
       await logoutSession();
       if (cancelled) return;
-      // Bounce back to the RP's post-logout URL, restricted to same-origin paths + an allowlist of
-      // known RP origins (see safeRedirect) so ?redirect= cannot be abused as an open redirect.
-      window.location.replace(safeRedirect(searchParams.get('redirect')));
+      const back = safeRedirect(searchParams.get('redirect'));
+      const authority = new URL('/auth/logout', AUTHORITY_UI_PUBLIC_URL);
+      authority.searchParams.set('post_logout_redirect_uri', back);
+      window.location.replace(authority.toString());
     })();
     return () => { cancelled = true; };
   }, [searchParams]);
