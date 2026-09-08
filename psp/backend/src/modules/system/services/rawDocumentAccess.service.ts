@@ -23,6 +23,24 @@ export const RAW_COLLECTION_RESOURCE: Readonly<Record<string, Resource>> = {
   fraudDiagnosisCase: 'fraudCases',            // Fraud Diagnosis
 };
 
+/**
+ * Collection to its own unique `*InstanceReference` field (see `createIndexes.ts`).
+ *
+ * The raw-document lookup used to `$or` all five field names against whichever collection was
+ * asked for. MongoDB can only serve an `$or` from indexes when EVERY branch is indexed on that
+ * collection; since only one of the five ever is, that turned a unique-index point lookup into a
+ * full collection scan on every call, on collections (`cardTransactionLog`, `fraudDiagnosisCase`)
+ * that grow without bound in this demo. Naming the one real field per collection restores the
+ * point lookup the unique index was already there to serve.
+ */
+export const RAW_COLLECTION_ID_FIELD: Readonly<Record<string, string>> = {
+  party: 'partyInstanceReference',
+  [CUSTOMER_AGREEMENT_COLLECTION]: 'customerAgreementInstanceReference',
+  [CARD_TRANSACTION_COLLECTION]: 'cardTransactionInstanceReference',
+  [PAYMENT_CARD_COLLECTION]: 'paymentCardInstanceReference',
+  [FRAUD_DIAGNOSIS_COLLECTION]: 'fraudDiagnosisInstanceReference',
+};
+
 export interface RawAccessCaller {
   role?: string;
   /** Permission strings the token carried explicitly, when a client narrowed. */
