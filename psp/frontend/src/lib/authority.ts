@@ -1,6 +1,7 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { createHash, randomBytes } from 'crypto';
+import { AUTHORITY_ISSUER_URL } from './constants';
 
 /**
  * Signing a person in, by sending them to the authority and taking a code back.
@@ -23,7 +24,6 @@ const IDENTITY_COOKIE = 'demo_identity';
 const REFRESH_COOKIE = 'demo_refresh';
 const VERIFIER_COOKIE = 'leafypay.pkce';
 const STATE_COOKIE = 'leafypay.state';
-const REALM = 'leafypay';
 const CONSOLE_CLIENT_ID = 'leafypay-console';
 const TIMEOUT_MS = 10000;
 
@@ -32,14 +32,6 @@ function issuerBase(): string {
   const raw = process.env.PSP_GIAM_ISSUER_URL
     ?? process.env.GIAM_ISSUER_URL
     ?? 'http://127.0.0.1:8085/realms/leafypay';
-  return raw.replace(/\/$/, '');
-}
-
-// The browser-facing console, which is a different address: the sign-in page is opened by a person.
-function authorityUi(): string {
-  const raw = process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC
-    ?? process.env.PSP_GIAM_UI_URL
-    ?? 'http://localhost:8086';
   return raw.replace(/\/$/, '');
 }
 
@@ -64,6 +56,15 @@ export interface LoginStart {
  * reliably merged into a returned redirect across Next versions. A verifier that silently fails to
  * persist produces an invalid_state on the way back, which reads like an attack rather than a
  * framework detail.
+ *
+ * The AUTHORIZATION ENDPOINT, not the authority's sign-in page. The sign-in page was the right
+ * target while the console owned the flow and read `client_id`, `redirect_uri` and the rest out of
+ * its own URL; GIAM's v41 P4 made the endpoint conforming, so this app is an ordinary client of it
+ * now, same as the bank's own `startSignIn`. A request arriving at the sign-in page with raw OAuth
+ * parameters instead reads as "somebody opened the sign-in page": the person is signed in and left
+ * there on the authority's own console, with no way back to this app, which is exactly the failure
+ * this endpoint used to produce before it read `AUTHORITY_ISSUER_URL` here. The realm is not a
+ * parameter: it is in that URL's path.
  */
 export function startSignIn(): LoginStart {
   const verifier = randomBytes(32).toString('base64url');
@@ -71,8 +72,7 @@ export function startSignIn(): LoginStart {
   const state = randomBytes(16).toString('base64url');
   const nonce = randomBytes(16).toString('base64url');
 
-  const url = new URL(`${authorityUi()}/auth/login`);
-  url.searchParams.set('realm', REALM);
+  const url = new URL(`${AUTHORITY_ISSUER_URL}/protocol/openid-connect/auth`);
   url.searchParams.set('client_id', CONSOLE_CLIENT_ID);
   url.searchParams.set('redirect_uri', redirectUri());
   url.searchParams.set('response_type', 'code');
