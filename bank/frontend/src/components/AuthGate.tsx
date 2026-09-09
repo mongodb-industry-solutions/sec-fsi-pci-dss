@@ -11,7 +11,12 @@ import { Landing } from './Landing';
  * one Sign In action. There is no form here on purpose, credentials are entered at the authority, which
  * hosts the one sign-in page every application in the platform uses; this app starts the authorization
  * request and receives the code.
+ *
+ * The help section is the one exception. It explains the system, its roles and its use of MongoDB, and
+ * none of that is back-office data: it is written for whoever is deciding whether to sign in at all, so
+ * requiring a session to read it would defeat its own purpose.
  */
+const PUBLIC_PREFIX = '/help';
 
 interface Session {
   signedIn: boolean;
@@ -23,6 +28,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pathname = usePathname();
+  const isPublic = pathname === PUBLIC_PREFIX || pathname.startsWith(`${PUBLIC_PREFIX}/`);
 
   useEffect(() => {
     setError(new URLSearchParams(window.location.search).get('signin_error'));
@@ -31,6 +37,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       .then(setSession)
       .catch(() => setSession({ signedIn: false }));
   }, []);
+
+  if (isPublic) return <>{children}</>;
 
   if (session === null) {
     return (

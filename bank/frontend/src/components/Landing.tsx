@@ -1,4 +1,5 @@
-import { CreditCard, FileSearch, Landmark, LogIn, Lock, ScrollText, ShieldCheck, TriangleAlert } from 'lucide-react';
+import Link from 'next/link';
+import { BookOpen, CreditCard, FileSearch, Landmark, LogIn, Lock, ScrollText, ShieldCheck, TriangleAlert } from 'lucide-react';
 
 /**
  * What BankCore is, for whoever arrives before signing in.
@@ -63,12 +64,20 @@ export function Landing({ error, gated }: { error?: string | null; gated?: boole
           </div>
         )}
 
-        <a
-          href="/api/auth/login"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-semibold text-white transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
-        >
-          <LogIn size={16} aria-hidden /> Sign in
-        </a>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <a
+            href="/api/auth/login"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 font-semibold text-white transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+          >
+            <LogIn size={16} aria-hidden /> Sign in
+          </a>
+          <Link
+            href="/help"
+            className="inline-flex items-center gap-2 rounded-lg border border-bank-ink/20 px-5 py-2.5 font-semibold text-bank-ink transition hover:border-bank-ink/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50"
+          >
+            <BookOpen size={16} aria-hidden /> How this works
+          </Link>
+        </div>
         <p className="mt-3 flex items-center gap-2 text-xs text-bank-ink/60">
           <ShieldCheck size={13} aria-hidden />
           You sign in at the identity authority, the only place on this platform that accepts a credential. What you
