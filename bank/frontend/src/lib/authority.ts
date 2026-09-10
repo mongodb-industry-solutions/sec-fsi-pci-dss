@@ -52,6 +52,26 @@ function redirectUri(): string {
   return `${appBase()}/api/auth/callback`;
 }
 
+/**
+ * The identity console's own address, for the one other thing besides sign-in a browser is sent to
+ * it for: ending the session every application here shares, not just this one's.
+ *
+ * Read at request time inside a route handler, same as `authorityIssuerPublic` above, never inlined:
+ * this app builds with no `NEXT_PUBLIC_*` argument, so nothing about the authority's address is ever
+ * in the bundle the browser downloads. A redirect's `Location` header carries it instead.
+ */
+export function authorityUiPublic(): string {
+  const raw = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_FRONTEND_PUBLIC_URL
+    ?? process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC
+    ?? 'http://localhost:8086';
+  return raw.replace(/\/$/, '');
+}
+
+/** This app's own public origin, the only address its post-logout redirect is ever registered for. */
+export function appPublicBase(): string {
+  return appBase();
+}
+
 export interface LoginStart {
   url: string;
   /** Attached to the redirect response by the caller, never through next/headers. */

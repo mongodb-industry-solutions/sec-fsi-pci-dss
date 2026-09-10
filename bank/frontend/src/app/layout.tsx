@@ -5,6 +5,7 @@ import './globals.css';
 import { AuthGate } from '../components/AuthGate';
 import { UserMenu } from '../components/UserMenu';
 import { DebugModeProvider } from '../lib/debugMode';
+import { authorityUiPublic } from '../lib/authority';
 
 export const metadata: Metadata = {
   title: 'BankCore',
@@ -36,8 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="ml-auto rounded-full border border-bank-ink/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-bank-ink/70">
               ASPSP
             </span>
-            {/* Right of the badge, and it renders nothing until somebody is signed in. */}
-            <UserMenu />
+            {/* Right of the badge, and it renders nothing until somebody is signed in. Resolved here,
+                server side, because this app inlines no NEXT_PUBLIC_* address into the browser bundle. */}
+            <UserMenu authorityUi={authorityUiPublic()} />
           </div>
         </header>
         <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">

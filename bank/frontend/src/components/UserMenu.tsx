@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bug, ChevronDown, CreditCard, FileClock, Home, KeyRound, Landmark, LifeBuoy, LogOut, ScrollText, Users,
+  Bug, ChevronDown, CreditCard, FileClock, Globe2, Home, KeyRound, Laptop, Landmark, LifeBuoy, LogOut,
+  ScrollText, Users,
 } from 'lucide-react';
 import { useDebugMode } from '../lib/debugMode';
 
@@ -20,8 +21,6 @@ interface Session {
   userName?: string;
   roles?: string[];
 }
-
-const AUTHORITY_UI = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_URL ?? 'http://localhost:8086';
 
 // One colour per bank role. A role with no entry falls back rather than rendering an empty circle.
 const ROLE_AVATAR: Record<string, string> = {
@@ -55,9 +54,10 @@ const ITEMS: Array<{ href: string; label: string; icon: typeof Home; external?: 
   { href: '/records/tpp/registrations', label: 'Third-party registrations', icon: FileClock },
 ];
 
-export function UserMenu() {
+export function UserMenu({ authorityUi }: { authorityUi: string }) {
   const [session, setSession] = useState<Session | null>(null);
   const [open, setOpen] = useState(false);
+  const [choosingSignOut, setChoosingSignOut] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { debugMode, toggleDebug } = useDebugMode();
 
@@ -89,14 +89,22 @@ export function UserMenu() {
   const role = session.roles?.[0] ?? '';
   const avatar = ROLE_AVATAR[role] ?? 'bg-gray-600';
 
-  async function signOut() {
+  /** This app only. The authority's own session, and every other app sharing it, stays live. */
+  async function signOutHere() {
     setOpen(false);
-    // Ends this app's own cookie; the shared authority session is separate and needs a top-level
-    // navigation there too (its cookie is SameSite=Lax, a fetch would not carry it).
+    setChoosingSignOut(false);
     await fetch('/api/auth/logout', { method: 'POST' });
-    const authority = new URL('/auth/logout', AUTHORITY_UI);
-    authority.searchParams.set('post_logout_redirect_uri', window.location.origin);
-    window.location.assign(authority.toString());
+    window.location.reload();
+  }
+
+  /**
+   * Everywhere. A full navigation to this app's own `/auth/logout` route, which clears this app's
+   * cookie server side and then redirects the browser on to the authority's own sign-out page: its
+   * session cookie is `SameSite=Lax`, so only a top-level navigation carries it, never a fetch.
+   */
+  function signOutEverywhere() {
+    setChoosingSignOut(false);
+    window.location.assign('/auth/logout');
   }
 
   return (
@@ -173,7 +181,7 @@ export function UserMenu() {
             </Link>
 
             <a
-              href={`${AUTHORITY_UI}/profile/credentials`}
+              href={`${authorityUi}/profile/credentials`}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="flex items-center gap-3 px-4 py-2.5 text-sm text-ink-soft transition-colors hover:bg-surface-alt hover:text-ink"
@@ -206,7 +214,7 @@ export function UserMenu() {
             <button
               type="button"
               role="menuitem"
-              onClick={signOut}
+              onClick={() => { setOpen(false); setChoosingSignOut(true); }}
               className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink-soft transition-colors hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300"
             >
               <LogOut size={15} className="shrink-0 text-ink-soft" />
@@ -215,6 +223,58 @@ export function UserMenu() {
           </div>
         </div>
       )}
+
+      {choosingSignOut && (
+        <SignOutChoiceDialog
+          onHere={() => void signOutHere()}
+          onEverywhere={signOutEverywhere}
+          onCancel={() => setChoosingSignOut(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * One identity session behind every application here, which is what lets signing in once reach
+ * every one of them. Asked rather than assumed: assuming "everywhere" signs a person out of a tab
+ * they meant to leave open, assuming "just here" is the usability problem this dialog exists to
+ * fix, where switching accounts silently resumed the one that was never signed out anywhere else.
+ */
+function SignOutChoiceDialog({ onHere, onEverywhere, onCancel }: {
+  onHere: () => void;
+  onEverywhere: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onCancel} />
+      <div role="dialog" aria-modal="true" className="relative w-full max-w-sm overflow-hidden rounded-xl border border-line bg-surface shadow-xl">
+        <div className="px-5 py-4">
+          <h2 className="text-sm font-semibold text-ink">Sign out</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            You are signed into one identity across every application here. Signing out of just this
+            one leaves the others open; if you mean to switch who you are, sign out everywhere.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 border-t border-line bg-surface-alt px-5 py-3">
+          <button
+            onClick={onEverywhere}
+            className="flex items-center justify-center gap-2 rounded-lg bg-bank px-3 py-2 text-sm font-semibold text-bank-ink transition-colors hover:brightness-110"
+          >
+            <Globe2 size={14} /> Sign out everywhere
+          </button>
+          <button
+            onClick={onHere}
+            className="flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-ink transition-colors hover:bg-surface"
+          >
+            <Laptop size={14} /> This app only
+          </button>
+          <button onClick={onCancel} className="px-3 py-1.5 text-xs text-ink-soft hover:text-ink">
+            Cancel
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
