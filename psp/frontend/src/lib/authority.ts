@@ -22,8 +22,18 @@ const IDENTITY_COOKIE = 'demo_identity';
  * rather than an inconsistency.
  */
 const REFRESH_COOKIE = 'demo_refresh';
-const VERIFIER_COOKIE = 'leafypay.pkce';
-const STATE_COOKIE = 'leafypay.state';
+/**
+ * Named per attempt, `leafypay.pkce.<state>`, not one fixed name.
+ *
+ * A fixed name is a shared mailbox: starting a second sign-in before the first finishes (a second
+ * tab, a double click, the SSO landing page opened twice) overwrites it, and whichever attempt's
+ * callback arrives LAST reads a verifier that was never its own and fails with `state_mismatch`
+ * even though nothing was actually wrong with it. Keying the cookie by the state this attempt itself
+ * generated means concurrent attempts get their own cookie and never collide, and the state
+ * returned in the callback is what looks the right one up: it is not compared to a remembered
+ * value, its cookie existing IS the proof.
+ */
+const VERIFIER_COOKIE_PREFIX = 'leafypay.pkce.';
 const CONSOLE_CLIENT_ID = 'leafypay-console';
 const TIMEOUT_MS = 10000;
 
@@ -85,8 +95,7 @@ export function startSignIn(): LoginStart {
   return {
     url: url.toString(),
     cookies: [
-      { name: VERIFIER_COOKIE, value: verifier },
-      { name: STATE_COOKIE, value: state },
+      { name: `${VERIFIER_COOKIE_PREFIX}${state}`, value: verifier },
     ],
   };
 }
@@ -198,18 +207,17 @@ export function clearSession(store: CookieStore): void {
   store.delete(REFRESH_COOKIE);
 }
 
-/** Exchanges the returned code for a token, after checking the state this app itself issued. */
+/** Exchanges the returned code for a token, after finding the verifier this attempt itself stored. */
 export async function completeSignIn(code: string, state: string): Promise<ExchangeResult> {
   const store = await cookies();
-  const expectedState = store.get(STATE_COOKIE)?.value;
-  const verifier = store.get(VERIFIER_COOKIE)?.value;
+  const verifierCookie = `${VERIFIER_COOKIE_PREFIX}${state}`;
+  const verifier = store.get(verifierCookie)?.value;
+  store.delete(verifierCookie);
 
-  store.delete(STATE_COOKIE);
-  store.delete(VERIFIER_COOKIE);
-
-  // Without this the callback accepts a code obtained in somebody else's browser.
-  if (!expectedState || state !== expectedState) return { ok: false, error: 'state_mismatch' };
-  if (!verifier) return { ok: false, error: 'missing_verifier' };
+  // No cookie under this state: either this state was never issued (a code obtained in somebody
+  // else's browser), or it expired. A concurrent sign-in elsewhere no longer causes this, because it
+  // never touches this cookie.
+  if (!verifier) return { ok: false, error: 'state_mismatch' };
 
   try {
     const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
