@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { oauthController } from './controllers/oauth.controller';
 import { jwksController } from './controllers/jwks.controller';
 
 // TPP trust: registration records and the token endpoint that turns a registered client into a scoped
@@ -19,7 +18,11 @@ export async function tppTrustModule(fastify: FastifyInstance) {
         }
       },
     );
-    await scope.register(oauthController, { prefix: '/v1' });
+    // v39 P7.1: the token endpoint is gone. The identity authority issues the access tokens a
+    // registered third party presents here, in this bank REALM, and this bank verifies them
+    // against that realm published key set. A bank that mints its own tokens is a second
+    // authority, and two authorities is how a platform ends up unable to say who is signed in.
+    void scope;
   });
   // At the root, not under /v1: a well-known path is where it is or it is not well known.
   await fastify.register(jwksController);

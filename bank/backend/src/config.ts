@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
@@ -18,6 +19,19 @@ function env(name: string, fallback?: string): string | undefined {
 // mechanisms never end up accepting each other's tokens.
 function deriveKey(purpose: string, secret: string): string {
   return createHash('sha256').update(`${purpose}:${secret}`).digest('hex');
+}
+
+/**
+ * The bank's OWN root secret. It never reads the platform's.
+ *
+ * This is the institutional boundary made real rather than declared. A bank is a separate
+ * institution, and a key it derives from the platform's secret is a key the platform holds; the
+ * refusal it is supposed to produce would then be a matter of the platform choosing not to mint a
+ * token rather than being unable to. The default differs from the platform's default too, so a
+ * deployment that configures nothing at all still has two distinct keys.
+ */
+function bankcoreRoot(): string {
+  return pspEnv('BANKCORE_SECRET', 'bankcore-local-secret-change-in-production')!;
 }
 
 export const config = {
@@ -63,18 +77,49 @@ export const config = {
     // the whole point is that a token minted elsewhere on the platform cannot open the banking API. The
     // default derives a distinct key from it, so a deployment is secure without extra configuration
     // while still being able to set a genuinely independent one.
+    // v39 P4: derived from the BANK's own root, never from the platform secret.
+    //
+    // It used to derive from `PSP_JWT_SECRET`, which meant the platform's session key ultimately
+    // controlled the bank's access tokens: whoever could mint a platform token held the material
+    // behind this one. A derivation is not a boundary when both sides share the input.
     accessTokenSecret: pspEnv('BANKCORE_ACCESS_TOKEN_SECRET')
-      ?? deriveKey('bankcore-tpp-access-token', pspEnv('JWT_SECRET', 'dev-secret-change-me')!),
+      ?? deriveKey('bankcore-tpp-access-token', bankcoreRoot()),
     // Read at SEED time only, to write the bank's verifier and the PSP's credential. At runtime the
     // bank reads the hash from its registration record and never this value.
     tppSeedClientId: pspEnv('BANKCORE_TPP_CLIENT_ID', 'leafypay-psp')!,
-    tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', 'dev-bankcore-tpp-secret')!,
+    tppSeedClientSecret: pspEnv('BANKCORE_TPP_CLIENT_SECRET', clientSecretFor('leafypay-psp'))!,
+  },
+
+  // v39 P7: this bank is a relying party and a resource server against the identity authority. It
+  // holds no user store, no token issuer and no signing key for access tokens.
+  giam: {
+    // The SHARED realm (ADR-003): the bank is a client in it rather than a directory of its own, so
+    // a person who banks here and pays there exists once. The issuer no longer separates the two;
+    // the audience and the resource server below are what do.
+    issuerUrl: pspEnv('BANKCORE_GIAM_ISSUER_URL', 'http://127.0.0.1:8085/realms/leafypay')!,
+    audience: pspEnv('BANKCORE_GIAM_AUDIENCE', 'bankcore')!,
+    resourceServerName: pspEnv('BANKCORE_GIAM_RESOURCE_SERVER', 'bankcore')!,
+    registrationToken: pspEnv('BANKCORE_GIAM_REGISTRATION_TOKEN') ?? pspEnv('GIAM_ADMIN_TOKEN'),
+    jwksCacheSeconds: parseInt(pspEnv('BANKCORE_GIAM_JWKS_CACHE_SECONDS', '900')!, 10),
   },
 
   app: {
-    // Shared with the PSP so bankcore can verify the platform admin token on its diagnostics. The
-    // Open Banking surface is protected by TPP client credentials instead (P3.7b).
-    jwtSecret: pspEnv('JWT_SECRET', 'dev-secret-change-me')!,
+    /**
+     * The bank's own diagnostics credential (v39 P4).
+     *
+     * It used to be the platform's `JWT_SECRET`, so a token minted anywhere on the platform opened
+     * part of this bank's surface. That is the defect the institutional boundary was supposed to
+     * prevent and did not: the boundary existed in the documentation and not in the key material.
+     *
+     * The PSP holds this the way any client holds a credential for a service it calls, configured
+     * under the same name on both sides. That is a credential, not a shared identity, and the
+     * difference is that a platform session token can no longer stand in for it.
+     *
+     * It goes away entirely when the bank verifies the authority's tokens instead.
+     */
+    // v39: no admin secret. A shared symmetric secret between two services means either of them can
+    // mint a token the other accepts; the diagnostics surface now verifies against the authority
+    // published key set, and the authority holds the only private key.
     eventBusEngine: (pspEnv('BANKCORE_EVENT_BUS_ENGINE', 'in-process')!) as 'in-process' | 'kafka' | 'rabbitmq',
     eventBusTopicPrefix: pspEnv('BANKCORE_EVENT_BUS_TOPIC_PREFIX', 'bankcore')!,
     seedDataDir: pspEnv('BANKCORE_SEED_DATA_DIR'),

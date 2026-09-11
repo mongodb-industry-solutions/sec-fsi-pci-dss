@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { requireAdmin } from '../../../vendors/middleware/adminAuth';
+import { requireStaff } from '../../../vendors/middleware/staffAuth';
 import {
   searchIssuedCards, countCardsByStatus, searchAccounts, countAccountsByStatus,
   searchHolders, countHoldersByStatus, MAX_LIMIT, DEFAULT_LIMIT,
@@ -50,7 +50,7 @@ const PAGED_RESPONSE = {
 export async function bankDataAdminController(fastify: FastifyInstance) {
   // ── Cards ──────────────────────────────────────────────────────────────────────────────────────
   fastify.get('/cards', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List the cards this bank issued',
@@ -90,7 +90,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.get('/cards/:cardToken', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'Read one issued card',
@@ -108,7 +108,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/cards', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Issue a card',
@@ -143,7 +143,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.put('/cards/:cardToken/status', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Activate, block or revoke a card',
@@ -172,7 +172,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.put('/cards/:cardToken/limits', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Set the limits an authorisation is judged against',
@@ -196,7 +196,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/cards/:cardToken/renewals', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Renew a card to a later expiry',
@@ -222,7 +222,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/cards/:cardToken/replacements', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Replace a card, revoking the old one',
@@ -254,7 +254,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
 
   // ── Accounts ───────────────────────────────────────────────────────────────────────────────────
   fastify.get('/accounts', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accounts', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List the accounts this bank holds',
@@ -289,7 +289,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.patch('/accounts/:accountReference/status', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accounts', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Approve, block or close an account',
@@ -332,7 +332,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   // nothing, and the retention the card rules require would be unmeetable. So the card is revoked, which is
   // terminal, and the row survives for the audit.
   fastify.delete('/cards/:cardToken', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Withdraw a card from use',
@@ -362,7 +362,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   // that arrives with a detail response. That shape is what stops a list of a hundred accounts decrypting a
   // hundred IBANs, and it puts one audit row against one act rather than one against "opened a page".
   fastify.post('/cards/:cardToken/disclosures', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('cardData', 'viewSensitive'),
     schema: {
       tags: ['admin'],
       summary: 'Reveal a card\'s protected values',
@@ -401,7 +401,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/accounts/:accountReference/disclosures', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accounts', 'viewSensitive'),
     schema: {
       tags: ['admin'],
       summary: 'Reveal an account\'s full IBAN',
@@ -436,7 +436,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
 
   // ── Accounts, one at a time ────────────────────────────────────────────────────────────────────
   fastify.get('/accounts/:accountReference', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accounts', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'Read one account',
@@ -462,7 +462,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/accounts', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accounts', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Open an account',
@@ -501,7 +501,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   // Closing an account is the delete, and closing is terminal. The record survives because the payments that
   // settled to it refer to it, and a statement that cannot name its own account is not a statement.
   fastify.delete('/accounts/:accountReference', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accounts', 'manage'),
     schema: {
       tags: ['admin'],
       summary: 'Close an account',
@@ -530,7 +530,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
 
   // ── The holder behind an account and a card ────────────────────────────────────────────────────
   fastify.get('/holders', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accountHolders', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'List account holders, masked',
@@ -559,7 +559,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.get('/holders/:holderReference', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accountHolders', 'view'),
     schema: {
       tags: ['admin'],
       summary: 'Read an account holder, masked',
@@ -583,7 +583,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   });
 
   fastify.post('/holders/:holderReference/disclosures', {
-    preValidation: requireAdmin,
+    preValidation: requireStaff('accountHolders', 'viewSensitive'),
     schema: {
       tags: ['admin'],
       summary: 'Reveal an account holder\'s name and contact',

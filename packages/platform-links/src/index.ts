@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 // Environment aware service links, resolved once and shared by both seeders.
 //
 // The environment is read at SEED time to write an absolute endpoint into a record; at runtime only
@@ -16,12 +18,17 @@ export interface PlatformLinks {
   pspBaseUrl: string;
   // Public PSP frontend, the only browser facing link in this set.
   pspFrontendUrl: string;
+  // The identity authority. Every token in the platform is issued here, by any application, for any
+  // audience, so a seeded token endpoint resolves against this and never against the resource server
+  // it will later be presented to.
+  authorityBaseUrl: string;
 }
 
 const DEFAULTS = {
   bankcoreBaseUrl: 'http://localhost:8083',
   pspBaseUrl: 'http://127.0.0.1:8081',
   pspFrontendUrl: 'http://localhost:3000',
+  authorityBaseUrl: 'http://127.0.0.1:8085',
 };
 
 type Env = Record<string, string | undefined>;
@@ -36,6 +43,9 @@ export function resolvePlatformLinks(env: Env = process.env): PlatformLinks {
     bankcoreBaseUrl: stripTrailingSlash(read(env, 'BANKCORE_BASE_URL', DEFAULTS.bankcoreBaseUrl)),
     pspBaseUrl: stripTrailingSlash(read(env, 'BASE_URL', DEFAULTS.pspBaseUrl)),
     pspFrontendUrl: stripTrailingSlash(read(env, 'URL_FRONTEND', DEFAULTS.pspFrontendUrl)),
+    authorityBaseUrl: stripTrailingSlash(
+      env.GIAM_ISSUER_URL?.trim() || read(env, 'GIAM_BASE_URL', DEFAULTS.authorityBaseUrl),
+    ),
   };
 }
 
@@ -93,4 +103,34 @@ export function assertLinks(assertions: LinkAssertion[]): Array<{ name: string; 
     }
     return { name, ok: true, detail: `${kind}: ${value}` };
   });
+}
+
+/**
+ * The demo client secret for a client id: preconfiguration only, never a production credential.
+ *
+ * Fixed and reproducible on purpose. It removes the literal from the fixture, where it is
+ * indistinguishable from a leaked credential, without pretending the result is secret. Generating one
+ * per seed was rejected: every consumer reads its secret from its own configuration, so none of them
+ * would know what to present. Domain separated and length prefixed, so no two ids collide.
+ */
+const DEMO_SECRET_ROOT = 'giam-demo-client-secret-root';
+
+// Clients an operator may have pinned by env var: it wins, because the app presenting the secret
+// reads that same variable. Kept here so the seeder and every caller share one precedence.
+export const CLIENT_SECRET_REFS: Readonly<Record<string, string>> = {
+  'oauth001-0000-4000-8000-000000000001': 'PSP_MERCHANT_OAUTH_CLIENT_SECRET',
+  'leafypay-simulator': 'NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET',
+};
+
+// Cross-repo contract: this package is vendored into sec-giam, which derives the same secrets. Changing
+// this derivation on one side alone breaks every client credentials flow between the two repositories.
+export function clientSecretFor(clientId: string, env: NodeJS.ProcessEnv = process.env): string {
+  const ref = CLIENT_SECRET_REFS[clientId];
+  const held = ref ? env[ref]?.trim() : undefined;
+  if (held) return held;
+
+  // Length-prefixed so no two different client ids can produce the same input to the hash.
+  return createHash('sha256')
+    .update(`giam:client-secret:${clientId.length}:${clientId}:${DEMO_SECRET_ROOT}`)
+    .digest('base64url');
 }

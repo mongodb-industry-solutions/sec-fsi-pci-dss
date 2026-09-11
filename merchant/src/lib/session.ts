@@ -9,10 +9,17 @@ import { ENV } from './env';
 const COOKIE_NAME = 'ew_session';
 const ALG = 'aes-256-gcm';
 
+/**
+ * What rides in the cookie, and nothing more.
+ *
+ * A browser drops a cookie over 4096 bytes SILENTLY, so every field here costs. The id_token used to
+ * be kept and was read by nothing: it is verified during the callback, its claims are copied into
+ * `name` and `email` below, and no later request needs it. Keeping it pushed the encrypted blob to
+ * 4249 bytes once the authority's tokens grew, and the whole session vanished with no error anywhere.
+ */
 export interface Session {
   accessToken: string;
   refreshToken?: string;
-  idToken?: string;
   /** Epoch ms when the access token expires. */
   expiresAt: number;
   /** Scopes actually granted by the user (may be a subset: granular consent, E-12). */
@@ -36,12 +43,31 @@ function key(): Buffer {
   return createHash('sha256').update(ENV.sessionSecret()).digest();
 }
 
+/**
+ * The size past which a browser stops storing a cookie, minus room for its attributes.
+ *
+ * Worth naming because the failure has no symptom: the server sets the cookie, the browser drops it
+ * without a word, and the next request simply looks unauthenticated. That is indistinguishable from
+ * never having signed in, and it is what a growing token silently caused here.
+ */
+const COOKIE_BUDGET = 3800;
+
 function encrypt(payload: unknown): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv(ALG, key(), iv);
   const data = Buffer.concat([cipher.update(JSON.stringify(payload), 'utf8'), cipher.final()]);
   const tag = cipher.getAuthTag();
-  return `${iv.toString('base64url')}.${tag.toString('base64url')}.${data.toString('base64url')}`;
+  const blob = `${iv.toString('base64url')}.${tag.toString('base64url')}.${data.toString('base64url')}`;
+
+  if (blob.length > COOKIE_BUDGET) {
+    console.error(
+      `[session] the encrypted session is ${blob.length} bytes, over the ${COOKIE_BUDGET} byte budget. `
+      + 'A browser will DISCARD it and every request will look unauthenticated. Remove a field from '
+      + 'the Session interface rather than raising this number.',
+    );
+  }
+
+  return blob;
 }
 
 function decrypt<T>(blob: string): T | null {

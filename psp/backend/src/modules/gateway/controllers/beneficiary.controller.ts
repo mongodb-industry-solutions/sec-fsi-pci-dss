@@ -21,11 +21,11 @@ import {
   updateBeneficiaryLabel,
   removeBeneficiary,
   registerBeneficiary,
-} from '../../identity/services/counterpartyArrangement.service';
+} from '../../customer/services/counterpartyArrangement.service';
 import { executeP2PTransfer } from '../services/p2pTransfer.service';
 import { getDefaultPayoutAccount, listPayoutAccounts } from '../services/payoutAccount.service';
 import { emitProcessEvent, emitComplianceEvent, attributionFromMerchantContext } from '../../provider/services/businessProcessEvent.service';
-import type { CounterpartyArrangement } from '../../identity/models/counterpartyArrangement.model';
+import type { CounterpartyArrangement } from '../../customer/models/counterpartyArrangement.model';
 import type { Db } from 'mongodb';
 
 function getUser(request: unknown): JwtUserPayload | undefined {
@@ -121,7 +121,7 @@ export async function beneficiaryController(fastify: FastifyInstance) {
     // beneficiaries:investigate. ADR-048.
     const effectiveOwner = ownerRef ?? q.ownerRef;
     if (!effectiveOwner) {
-      const maySearch = await can(fastify.db, user?.role, 'beneficiaries', 'investigate');
+      const maySearch = can(request, 'beneficiaries', 'investigate');
       if (!maySearch) {
         return reply.status(403).send({
           error: 'Cross-party beneficiary search requires the investigate capability; provide an owner party reference instead.',

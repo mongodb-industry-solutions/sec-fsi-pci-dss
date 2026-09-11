@@ -1,3 +1,5 @@
+import { holdsElevation } from '../security/elevation';
+import type { Elevation } from '../../shared/models/identity.model';
 import { FastifyRequest } from 'fastify';
 import type { JwtUserPayload, UserRole, AuthenticatedRequest } from '../../shared/models/identity.model';
 
@@ -72,8 +74,30 @@ export function canStaffMutate(role: UserRole): boolean {
   return role === 'level2_investigator';
 }
 
-export function attachRbacContext(request: FastifyRequest): void {
+/**
+ * Resolves the caller's role and whether they currently hold an elevation.
+ *
+ * The elevation is decided HERE, once, because this is where the request is. It used to be a signed
+ * token each service verified for itself, which meant every service was making an authorisation
+ * decision about a credential, and any of them could get it wrong differently.
+ *
+ * The header carries the elevation the authority issued. It is checked against the authority rather
+ * than trusted, and an unreachable authority yields no elevation, so an outage narrows access.
+ */
+export async function attachRbacContext(request: FastifyRequest): Promise<void> {
   const demoReq = request as unknown as AuthenticatedRequest;
   demoReq.userRole = extractUserRole(request);
-  demoReq.escalationToken = request.headers['x-escalation-token'] as string | undefined;
+
+  const claimed = request.headers['x-elevation'] as string | undefined;
+  if (!claimed) return;
+
+  const separator = claimed.indexOf(':');
+  if (separator <= 0) return;
+  const scopeKind = claimed.slice(0, separator);
+  const scopeRef = claimed.slice(separator + 1);
+  if (!scopeRef) return;
+
+  if (await holdsElevation(request, { scopeKind, scopeRef })) {
+    demoReq.elevation = { caseRef: scopeRef };
+  }
 }

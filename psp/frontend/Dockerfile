@@ -19,6 +19,20 @@ ENV NEXT_PUBLIC_PSP_URL_MERCHANT=$NEXT_PUBLIC_PSP_URL_MERCHANT
 ARG NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE
 ENV NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=$NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE
 
+# AUTHORITY_PRIVATE = in-cluster identity authority URL, used server-side by the next.config rewrites
+# so the admin monitoring page probes /health/giam same-origin.
+ARG NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE
+ENV NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=$NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE
+
+# AUTHORITY_ISSUER = the realm's token endpoint as the BROWSER reaches it: the simulator exchanges its
+# own credential there from the page, so it cannot be the in-cluster host.
+ARG NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER
+ENV NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=$NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER
+
+# AUTHORITY_FRONTEND_PUBLIC = the identity console, where a person is redirected to sign in.
+ARG NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC
+ENV NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=$NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC
+
 # Install dependencies (layer cached unless package.json changes)
 COPY package*.json ./
 RUN npm install

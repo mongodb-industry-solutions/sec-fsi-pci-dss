@@ -36,20 +36,45 @@ export function mintJwt(payload: Record<string, unknown>): string {
   return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ iat: now, exp: now + 86400, domain: 'leafypay', ...payload })}.fake-signature`;
 }
 
-/** Mint a JWT for a known demo role. `extra` overrides/augments claims (e.g. partyRef). */
+/**
+ * Mint a JWT for a known demo role. `extra` overrides/augments claims (e.g. partyRef).
+ *
+ * The claim is `roles`, an ARRAY, because that is what the authority issues and what the app reads:
+ * `decodeToken` collapses `roles[0]` into the single `role` the screens use. This used to mint the
+ * singular `role`, which decoded to an empty string and left every role dashboard unable to tell
+ * who was looking at it.
+ */
 export function roleJwt(role: DemoRole, extra: Record<string, unknown> = {}): string {
-  return mintJwt({ role, ...ROLE_USER[role], ...extra });
+  return mintJwt({ roles: [role], ...ROLE_USER[role], ...extra });
 }
 
-/** Inject a role by setting the demo_token cookie on the context (localhost:3000). */
+/**
+ * Inject a signed-in session, as BOTH cookies, the way the real callback leaves it.
+ *
+ * Two cookies because OIDC separates two questions, and the app reads them separately:
+ * `demo_token` is the access token, which carries authority (`roles`, `account_holder`), and
+ * `demo_identity` is the id token, which carries who the person is (`name`, `email`).
+ *
+ * Setting only the access token is not a smaller version of signing in, it is a different state.
+ * Profile claims do not belong in an access token, so `decodeToken` does not look for them there,
+ * and a session missing the id token renders every greeting and user menu as the raw email address.
+ */
 export async function loginAs(context: BrowserContext, role: DemoRole, extra: Record<string, unknown> = {}) {
-  await context.addCookies([{
-    name: 'demo_token',
-    value: roleJwt(role, extra),
-    domain: 'localhost',
-    path: '/',
-    expires: Math.floor(Date.now() / 1000) + 86400,
-  }]);
+  const user = ROLE_USER[role];
+  const expires = Math.floor(Date.now() / 1000) + 86400;
+  const cookie = (name: string, value: string) => ({
+    name, value, domain: 'localhost', path: '/', expires,
+  });
+
+  await context.addCookies([
+    cookie('demo_token', roleJwt(role, extra)),
+    cookie('demo_identity', mintJwt({
+      sub: user.sub,
+      name: user.name,
+      preferred_username: user.name,
+      email: user.email,
+    })),
+  ]);
 }
 
 /** Standard JSON fulfill helper for page.route handlers. */

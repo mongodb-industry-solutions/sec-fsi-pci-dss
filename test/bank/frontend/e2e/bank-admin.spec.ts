@@ -16,6 +16,11 @@ import { test, expect, Page } from '@playwright/test';
 
 const BANK_UI = process.env.BANK_UI_URL ?? 'http://localhost:8084';
 
+// A seeded persona holding the bank's administrator role, and the demo password behind the seed
+// fixture's credential hashes.
+const BANK_ADMIN = 'Samuel Adeyemi';
+const DEMO_PASSWORD = 'demo-password';
+
 // Small, medium, large. The small one is a 380px phone, which is narrower than most and therefore the honest
 // floor; the medium is a tablet in portrait, where a table has to give way to cards.
 const VIEWPORTS = [
@@ -91,6 +96,18 @@ test.describe('the bank administration app', () => {
   test.beforeAll(async ({ request }) => {
     const response = await request.get(`${BANK_UI}/`).catch(() => null);
     expect(response, 'the bank frontend must be running for this to mean anything').not.toBeNull();
+  });
+
+  // Every screen below is behind the sign-in gate now, so each one signs in first: an
+  // unauthenticated sweep would otherwise measure the same "sign in required" panel five times and
+  // call it responsive. Driven through the browser because the credential is entered at the
+  // AUTHORITY, which is the property under test everywhere else.
+  test.beforeEach(async ({ page }) => {
+    await page.goto(`${BANK_UI}/api/auth/login`, { waitUntil: 'domcontentloaded' });
+    await page.getByLabel(/email or user name/i).fill(BANK_ADMIN);
+    await page.getByLabel(/^password$/i).fill(DEMO_PASSWORD);
+    await page.getByRole('button', { name: /^sign in$/i }).click();
+    await page.waitForURL(`${BANK_UI}/**`, { timeout: 20000 });
   });
 
   for (const viewport of VIEWPORTS) {

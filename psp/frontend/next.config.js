@@ -13,8 +13,28 @@ try {
 } catch {
     APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || FRONTEND_VERSION;
 }
+// The simulator's client secret is inlined into the browser bundle, so it cannot be derived in the
+// bundle itself: node crypto is not there. It is derived HERE, where Node is available, from the one
+// shared function the authority's seeder also uses, so the two always agree without a literal being
+// written down. Guarded like the requires above, and for the same reason: this image builds from its
+// OWN directory, not the repo root, so packages/ is not in the build context and must not become a
+// declared dependency. In local dev the require resolves from the repo-root node_modules; in a
+// container it throws, and the value comes from the environment instead.
+let SIMULATOR_CLIENT_SECRET = process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
+if (!SIMULATOR_CLIENT_SECRET) {
+    try {
+        SIMULATOR_CLIENT_SECRET = require('@leafypay/platform-links').clientSecretFor(
+            process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_ID || 'leafypay-simulator',
+        );
+    } catch {
+        // Left empty on purpose: the authority declines the flow, which is the correct outcome for an
+        // unconfigured simulator, and is a far clearer failure than a fabricated credential.
+    }
+}
+
 const nextConfig = {
     env: {
+        NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET: SIMULATOR_CLIENT_SECRET,
         NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
         NEXT_PUBLIC_APP_VERSION: APP_VERSION,
         // Product name (compound, two words). Inlined so the client bundle picks up the value from the
@@ -45,7 +65,17 @@ const nextConfig = {
             process.env.NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE ||
             'http://localhost:8083'
         ).replace(/\/+$/, '');
+        // The identity authority is probed the same way. It does have a public host (a token's issuer
+        // has to be reachable by a browser), but the probe runs server side, so the private one is
+        // preferred and the issuer origin is only the fallback.
+        const authorityUrl = (
+            process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE ||
+            (process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER || 'http://localhost:8085/realms/leafypay')
+                .replace(/\/realms\/.*$/, '')
+        ).replace(/\/+$/, '');
         return [
+            // This array form is applied AFTER the filesystem, so the app's own /api/auth/* route
+            // handlers (the sign-in redirect and its callback) win over this catch-all.
             { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
             { source: '/health', destination: `${backendUrl}/health` },
             // Per-service health aliases. They exist only because bare /health on this origin is
@@ -53,6 +83,7 @@ const nextConfig = {
             // the path the deploy platform probes.
             { source: '/health/merchant', destination: `${merchantUrl}/health` },
             { source: '/health/bankcore', destination: `${bankcoreUrl}/health` },
+            { source: '/health/giam', destination: `${authorityUrl}/health` },
             // Swagger UI of the bank, same-origin so it works in every environment. The API behind it
             // needs a registered TPP's credentials, so publishing the docs opens nothing.
             { source: '/doc/bankcore', destination: `${bankcoreUrl}/doc` },

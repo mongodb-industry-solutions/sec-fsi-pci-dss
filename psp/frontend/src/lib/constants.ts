@@ -49,11 +49,23 @@ export function demoPublicUrl(path = ''): string {
   return `${base}${path}`;
 }
 
-// All seeded demo accounts share the same bcrypt-hashed credential.
-// The plaintext is a fixed demo convention (documented in auth.controller.ts);
-// the seed stores only the hash. Used to auto-fill the login form (debug mode)
-// and by the simulator to obtain a real JWT per role via POST /api/v1/auth/login.
-export const DEMO_PASSWORD = 'demo-password';
+// The identity authority this application trusts. The simulator exchanges its own credential
+// here for a token that acts as a demo persona, so no password for any demo account exists in this
+// bundle any more.
+export const AUTHORITY_ISSUER_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER || 'http://localhost:8085/realms/leafypay';
+
+// The simulator's OWN credential, and only its own. It authorises acting as a declared demo persona
+// and nothing else: the token it receives carries the persona's permissions, never this client's.
+// The authority refuses the exchange outright unless the realm is a demonstration realm, so this
+// pair is useless against a real deployment even if it leaks.
+export const SIMULATOR_CLIENT_ID =
+  process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_ID || 'leafypay-simulator';
+// Read from the environment with no literal fallback. This value is inlined into the browser bundle,
+// so it cannot be derived here: the derivation is done in next.config, which runs in Node, and the
+// result is injected as this variable. One source, and nothing secret written down in the repository.
+export const SIMULATOR_CLIENT_SECRET =
+  process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
 
 export const ROLE_LABELS: Record<string, string> = {
   customer: 'Customer',
@@ -148,3 +160,9 @@ export function formatRiskIndicator(indicator: string): string {
 
   return indicator.replace(/[._]+/g, ' ');
 }
+
+// The identity authority's browser-facing console. A browser NAVIGATES here to sign in and to sign
+// out, so it needs a genuinely public address for the same reason the bank's app does: a private
+// in-cluster host works from a server and is unreachable from a laptop.
+export const AUTHORITY_UI_PUBLIC_URL =
+  process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC || 'http://localhost:8086';

@@ -4,7 +4,7 @@
  * Replaces the legacy demo-auth.spec.ts which targeted the removed /demo/* routes.
  */
 import { test, expect } from '@playwright/test';
-import { loginAs, json, mintJwt, DemoRole } from './support/auth';
+import { loginAs, json, DemoRole } from './support/auth';
 // Brand name is a single source of truth (frontend/src/config/brand.ts); read it here so the auth
 // assertions survive a rebrand instead of hard-coding the product name.
 import { BRAND } from '../../../../psp/frontend/src/config/brand';
@@ -24,33 +24,47 @@ async function stubCommon(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/providers/vendors**', (r) => r.fulfill(json({ integrations: [] })));
 }
 
-test.describe('FR-v1-05: login form', () => {
+test.describe('FR-v1-05: sign-in is handed to the authority', () => {
+  /**
+   * This console has NO password form, and that is the property under test.
+   *
+   * These three cases used to fill an email and a password on `/system` and stub a POST to
+   * `/api/v1/auth/login`. Both are gone: the identity extraction left this application with no
+   * route that accepts a credential, and `/api/auth/login` is GET only because it starts an
+   * authorization code flow. Asserting the old form would be asserting a capability the app
+   * deliberately gave up, so these assert the giving up instead.
+   */
   test.beforeEach(async ({ page, context }) => { await context.clearCookies(); await stubCommon(page); });
 
-  test('renders the branded sign-in form', async ({ page }) => {
+  test('offers to sign in, and says where the credential goes', async ({ page }) => {
     await page.goto('/system');
-    await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `${BRAND.primary} ${BRAND.secondary}` })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByRole('link', { name: /Sign in/i })).toBeVisible();
+    // The promise made to the person signing in, kept where they can read it.
+    await expect(page.getByText(/credentials are never entered here/i)).toBeVisible();
   });
 
-  test('successful login renders the role dashboard inline', async ({ page }) => {
-    await page.route('**/api/v1/auth/login', (r) =>
-      r.fulfill(json({ token: mintJwt({ role: 'customer', sub: 'u1', email: 'luis.fernandez@back.es', name: 'Luis Fernandez' }) })));
+  test('asks for no credential anywhere on the page', async ({ page }) => {
+    // The regression that matters: a password box reappearing here would mean this app had started
+    // handling credentials again, whatever it then did with them.
     await page.goto('/system');
-    await page.locator('input[type="email"]').fill('luis.fernandez@back.es');
-    await page.locator('input[type="password"]').fill('demo-password');
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page.getByRole('heading', { name: /Welcome, Luis/ })).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('input[type="password"]')).toHaveCount(0);
+    await expect(page.locator('input[type="email"]')).toHaveCount(0);
   });
 
-  test('invalid credentials show an error and stay on the form', async ({ page }) => {
-    await page.route('**/api/v1/auth/login', (r) => r.fulfill(json({ error: 'Invalid credentials' }, 401)));
+  test('sends the browser to the authority, not to a local form', async ({ page }) => {
     await page.goto('/system');
-    await page.locator('input[type="email"]').fill('luis.fernandez@back.es');
-    await page.locator('input[type="password"]').fill('wrong');
-    await page.getByRole('button', { name: 'Sign In' }).click();
-    await expect(page.locator('text=/invalid|error|failed/i').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible();
+    // Followed only as far as the redirect target: the authority's own sign-in page is its suite to
+    // test, and requiring it up would make this spec fail for a reason it is not about.
+    const target = await page.getByRole('link', { name: /Sign in/i }).getAttribute('href');
+    expect(target).toBe('/api/auth/login');
+
+    const response = await page.request.get('/api/auth/login', { maxRedirects: 0 });
+    expect(response.status(), 'sign-in did not redirect').toBeGreaterThanOrEqual(300);
+    const location = response.headers()['location'] ?? '';
+    expect(location, 'the redirect did not name an authorization request').toContain('response_type=code');
+    // PKCE, so an intercepted code is not redeemable on its own.
+    expect(location).toContain('code_challenge=');
   });
 });
 

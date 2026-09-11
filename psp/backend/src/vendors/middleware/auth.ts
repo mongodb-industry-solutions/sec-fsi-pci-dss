@@ -1,8 +1,8 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
-import * as jwt from 'jsonwebtoken';
 import { attachRbacContext } from './rbac';
-import { getCurrentSessionEpoch } from '../../modules/identity/services/auth.service';
 import { tryMerchantContext } from './validateMerchantToken';
+import { verifyAccessToken, VerifiedClaims } from '../security/tokenVerifier';
+import { expandRoles } from '../security/roleCatalog';
 
 // Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
 // `dualAuth` accepts EITHER the PSP session JWT (HS256) OR a merchant OAuth Bearer (RS256): the route's
@@ -14,7 +14,28 @@ declare module 'fastify' {
   }
 }
 
-const JWT_SECRET = process.env.PSP_JWT_SECRET ?? 'demo-local-secret-change-in-production';
+/**
+ * v39 P6.4: this application no longer authenticates anyone.
+ *
+ * What used to happen here was a signature check against a secret this application held, a lookup in
+ * a user collection it owned, and a session-epoch read from that collection. All three are gone. What
+ * remains is what a resource server does: verify a signature against the authority's PUBLISHED key
+ * set, check the issuer and the expiry, and read the claims.
+ *
+ * The public-path allowlist, the method-scoped public paths and the customer-blocked prefixes STAY.
+ * Those are this application's policy about its own routes, not identity, and moving them to the
+ * authority would make it responsible for a route list it has no way to know.
+ *
+ * The session-epoch read is gone rather than relocated. The epoch travels IN the token now, so a
+ * whole generation can be refused without a lookup; until the revocation stream lands, the bound on a
+ * withdrawn session is the access-token lifetime, which is short for exactly this reason.
+ */
+
+/** What a verified caller looks like to a route handler. */
+export interface AuthenticatedUser extends VerifiedClaims {
+  /** The role names the authority resolved, for the checks that still reason in roles. */
+  roles: string[];
+}
 
 // Exact URL matches that bypass JWT auth
 const PUBLIC_EXACT: Set<string> = new Set([
@@ -22,13 +43,11 @@ const PUBLIC_EXACT: Set<string> = new Set([
   '/health',
   '/api/v1/system/health',
   '/api/v1/system/users',
-  '/api/v1/auth/login',
   '/api/v1/auth/register',
   '/api/v1/auth/domains',
   // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
   // or their own RS256 access token, NOT the PSP session JWT. Exact paths only, so the
   // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
-  '/.well-known/openid-configuration',
   '/api/v1/auth/jwks',
   '/api/v1/auth/authorize',
   '/api/v1/auth/token',
@@ -109,31 +128,74 @@ function blockedFromInvestigation(role: string | undefined, path: string): boole
   return path.startsWith(INVESTIGATION_PREFIX) && !!role && !INVESTIGATION_ROLES.has(role);
 }
 
-function tryVerifyToken(authHeader: string | undefined): jwt.JwtPayload | null {
+async function tryVerifyToken(authHeader: string | undefined): Promise<AuthenticatedUser | null> {
   if (!authHeader?.startsWith('Bearer ')) return null;
-  try {
-    return jwt.verify(authHeader.slice(7), JWT_SECRET) as jwt.JwtPayload;
-  } catch {
-    return null;
-  }
+  const bearer = authHeader.slice(7);
+  const claims = await verifyAccessToken(bearer);
+  if (!claims) return null;
+
+  const roles = Array.isArray(claims.roles) ? claims.roles as string[] : [];
+  const explicit = Array.isArray(claims.permissions) ? claims.permissions as string[] : [];
+
+  /**
+   * The roles, expanded into the permissions this application enforces.
+   *
+   * Done HERE, once, at the edge where the token is read, for the same reason `partyRef` is: every
+   * guard downstream reads the result, and a resolution that happens per call site is one that some
+   * call site will forget.
+   *
+   * Leaving this out was not cosmetic. Since v40 an ordinary token carries roles and NO explicit
+   * permissions, so the guard resolved an empty set and refused every caller on every guarded
+   * route, a realm administrator included. Null when the catalog has never resolved, which the
+   * guard treats as "fall back to the explicit claims" and therefore still denies.
+   */
+  const expanded = await expandRoles(bearer, roles, explicit);
+
+  return {
+    ...claims,
+    roles,
+    ...(expanded ? { effectivePermissions: expanded } : {}),
+    /**
+     * The business record this principal owns, under the name the rest of this service already uses.
+     *
+     * The authority carries the binding as `account_holder`, which is its vocabulary and correctly
+     * says nothing about what the reference means. Everything here calls it `partyRef`, in hundreds
+     * of places, and renaming those would be a large change for no behavioural gain.
+     *
+     * So the translation happens ONCE, here, at the edge where the token is read. Leaving it out was
+     * a real defect and not a cosmetic one: own-scope resolution silently found nothing, so a
+     * customer asking for their own beneficiaries looked like a cross-party search and was refused
+     * for lacking an investigator's permission. The failure blamed authorisation for a binding that
+     * was never populated.
+     */
+    partyRef: typeof claims.account_holder === 'string' ? claims.account_holder : undefined,
+    /**
+     * The single role, under the name the rest of this service reads.
+     *
+     * The authority resolves every role a principal holds and carries them as a list, which is the
+     * honest shape. Much of this codebase still asks "what role is this" in the singular, and those
+     * checks are the ones own-scope resolution depends on: a customer whose role did not resolve
+     * fell through to the cross-party branch and was refused for lacking an investigator permission,
+     * which is a confusing way to be told a claim was never read.
+     *
+     * Narrowing a list to its first element is a real loss of information, so it is done here, once,
+     * and only for the checks that have not yet been rewritten as permission checks.
+     */
+    role: Array.isArray(claims.roles) && claims.roles.length > 0
+      ? String(claims.roles[0])
+      : undefined,
+  };
 }
 
-// Server-side logout enforcement: a session JWT stamps the epoch current at sign time; if the user's
-// epoch has since advanced (they logged out), the token is stale and must be rejected. Tokens with no
-// `sub`/`epoch` (legacy) compare against epoch 0. On a DB error the posture is environment-dependent:
-// PRODUCTION fails CLOSED (reject) so a logged-out token cannot be accepted during a DB blip and
-// server-side logout semantics hold; non-prod fails OPEN so a transient outage doesn't lock every
-// user out mid-demo.
-async function sessionEpochOk(request: FastifyRequest, payload: jwt.JwtPayload): Promise<boolean> {
-  const sub = (payload as { sub?: string }).sub;
-  if (!sub) return true;
-  const tokenEpoch = typeof (payload as { epoch?: unknown }).epoch === 'number' ? (payload as { epoch: number }).epoch : 0;
-  try {
-    const current = await getCurrentSessionEpoch(request.server.db, sub);
-    return tokenEpoch >= current;
-  } catch {
-    return process.env.NODE_ENV !== 'production'; // prod: fail closed; else fail open
-  }
+/**
+ * The role a check reasons about.
+ *
+ * Read from the token rather than from a collection. Several route checks are still expressed in
+ * terms of a single role name, and rewriting all of them into permission checks is a larger change
+ * than this phase should carry; what matters here is that the value is one the AUTHORITY asserted.
+ */
+function roleOf(user: AuthenticatedUser | undefined): string | undefined {
+  return user?.roles?.[0];
 }
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
@@ -155,20 +217,29 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   // Dual-auth capability route (v23): accept a first-party session JWT OR a merchant OAuth Bearer.
   // Authenticate here; the route's dualPermission() preHandler authorizes (RBAC action or scope).
   if (routeConfig.dualAuth) {
-    const sessionPayload = tryVerifyToken(request.headers.authorization);
-    if (sessionPayload) {
-      if (!(await sessionEpochOk(request, sessionPayload))) {
-        return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
-      }
-      (request as FastifyRequest & { user: jwt.JwtPayload }).user = sessionPayload;
-      attachRbacContext(request);
-      return;
-    }
-    // Not a valid session token → try the merchant OAuth channel (RS256). tryMerchantContext never
-    // throws and enforces client/merchant active status; scope is enforced per-route by dualPermission.
+    /**
+     * The channel is chosen by WHO obtained the token, not by which verifier answers first.
+     *
+     * It used to try the session channel first and fall through only when verification failed. That
+     * worked while the two channels used different signatures: a merchant's OAuth token could not
+     * verify as a first-party session JWT, so it fell through. Since v39 both are the same RS256
+     * token from the same authority, so the session channel matched everything and the merchant
+     * channel became unreachable, silently. The merchant then met the first-party contract, which
+     * expects the party in the URL instead of resolving the owner from the token.
+     *
+     * The merchant channel is asked first because it is the SPECIFIC one: it matches only when the
+     * token names a registered, active OAuth client belonging to an active merchant. Anything else is
+     * a first-party session by elimination.
+     */
     const merchant = await tryMerchantContext(request);
     if (merchant) {
       request.merchantContext = merchant;
+      attachRbacContext(request);
+      return;
+    }
+    const sessionPayload = await tryVerifyToken(request.headers.authorization);
+    if (sessionPayload) {
+      (request as FastifyRequest & { user: AuthenticatedUser }).user = sessionPayload;
       attachRbacContext(request);
       return;
     }
@@ -187,13 +258,10 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => path.startsWith(p))) {
     // Simulator mode: allow unauthenticated GET requests.
     // But if a Bearer token is present, validate it and enforce customer block.
-    const payload = tryVerifyToken(request.headers.authorization);
+    const payload = await tryVerifyToken(request.headers.authorization);
     if (payload) {
-      if (!(await sessionEpochOk(request, payload))) {
-        return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
-      }
-      (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
-      const role = (payload as { role?: string }).role;
+      (request as FastifyRequest & { user: AuthenticatedUser }).user = payload;
+      const role = roleOf(payload);
       if (isCustomerBlocked(role, url)) {
         return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
       }
@@ -211,23 +279,15 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(401).send({ error: 'Authorization header required' });
   }
 
-  const token = authHeader.slice(7);
-  let payload: jwt.JwtPayload;
-  try {
-    payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
-    (request as FastifyRequest & { user: jwt.JwtPayload }).user = payload;
-  } catch {
+  const payload = await tryVerifyToken(authHeader);
+  if (!payload) {
     return reply.status(401).send({ error: 'Invalid or expired token' });
   }
-
-  // Reject tokens invalidated by a logout (session epoch advanced past the token's stamp).
-  if (!(await sessionEpochOk(request, payload))) {
-    return reply.status(401).send({ error: 'Session ended. Please sign in again.' });
-  }
+  (request as FastifyRequest & { user: AuthenticatedUser }).user = payload;
 
   // Customers are blocked from investigation, customer-search, and audit endpoints (but may
   // manage their own stored cards: see isCustomerBlocked). They use /api/v1/auth/me otherwise.
-  const role = (payload as { role?: string }).role;
+  const role = roleOf(payload);
   if (isCustomerBlocked(role, url)) {
     return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
   }
@@ -237,6 +297,6 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
     return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
   }
 
-  // Always populate userRole and escalationToken after auth resolves
-  attachRbacContext(request);
+  // The role and any elevation are resolved once, here, rather than by each service for itself.
+  await attachRbacContext(request);
 }

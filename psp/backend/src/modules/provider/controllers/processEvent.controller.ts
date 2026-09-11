@@ -26,12 +26,12 @@ export async function processEventController(fastify: FastifyInstance) {
   fastify.get('/audit', {
     schema: {
       tags: ['events'],
-      summary: 'Unified audit event stream (business + compliance + integration)',
+      summary: 'Unified audit event stream (business + compliance + integration + security)',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
         properties: {
-          source:     { type: 'string', enum: ['all', 'business', 'compliance', 'integration'] },
+          source:     { type: 'string', enum: ['all', 'business', 'compliance', 'integration', 'security'] },
           type:       { type: 'string' },
           entityType: { type: 'string', enum: ['fraud_case', 'transaction', 'customer', 'merchant', 'integration'] },
           outcome:    { type: 'string' },
@@ -64,6 +64,8 @@ export async function processEventController(fastify: FastifyInstance) {
         to:         q.to   ? new Date(q.to)   : undefined,
         page:       q.page  ? parseInt(q.page,  10) : 1,
         limit:      q.limit ? parseInt(q.limit, 10) : 20,
+        // Forwarded so the identity slice is fetched with the CALLER's authority, not this service's.
+        request,
       });
       return reply.send(result);
     },

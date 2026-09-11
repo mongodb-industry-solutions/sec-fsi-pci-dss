@@ -68,14 +68,15 @@ Service Domains. Field names follow the BIAN compound naming convention
 
 ## Authentication
 
-All routes except \`POST /api/v1/auth/login\` and \`GET /health\` require a
-**Bearer JWT** in the \`Authorization\` header:
+Almost every route requires a **Bearer JWT** in the \`Authorization\` header:
 
 \`\`\`
 Authorization: Bearer <token>
 \`\`\`
 
-Obtain a token via \`POST /api/v1/auth/login\`.
+This service does not issue tokens and has no login endpoint. A token comes from the identity
+authority: a person signs in there through the authorization code flow, and a service obtains one
+with its own client credentials.
 
 ## Role-based access
 
@@ -112,7 +113,7 @@ Obtain a token via \`POST /api/v1/auth/login\`.
             type: 'http',
             scheme: 'bearer',
             bearerFormat: 'JWT',
-            description: 'JWT token obtained from POST /api/v1/auth/login',
+            description: 'RS256 access token issued by the identity authority',
           },
           adminAuth: {
             type: 'http',

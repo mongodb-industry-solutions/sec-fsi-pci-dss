@@ -18,7 +18,20 @@ import {
 import { sanitizeDeep } from '../../../vendors/eventbus';
 export { sanitizeDeep };
 import { getEventBus, makeEvent, type BusinessProcess, type EventBus, type DomainEvent } from '../../../vendors/eventbus';
-import { CUSTOMER_AUTHENTICATION_COLLECTION, CustomerAuthenticationAssessmentRecord } from '../../identity/models/customerAuthentication.model';
+import type { FastifyRequest } from 'fastify';
+import { callAuthority } from '../../../vendors/security/authorityApi';
+
+/** The identity slice, as the authority returns it. */
+interface AuthoritySecurityEvent {
+  ts: string;
+  action: string;
+  outcome: string;
+  category?: string;
+  cause?: string;
+  subjectId?: string;
+  clientId?: string;
+  correlationId?: string;
+}
 
 // Maps the per-event processType to the EDA business-process class used to group a journey (dev.v8).
 export const PROCESS_TO_BUSINESS: Record<string, BusinessProcess> = {
@@ -255,7 +268,19 @@ export async function listProcessEvents(
 // Normalized row across the three event sources so manager/auditor can audit the whole
 // system in one place: business process events, compliance events, and integration
 // (inbound/outbound test + dispatch/callback) events.
-export type AuditSource = 'business' | 'compliance' | 'integration';
+/**
+ * The four things an investigator has to see on ONE timeline.
+ *
+ * Business, compliance and integration events are this product's and are read from its own
+ * collections. Identity and access events are the authority's: this product no longer produces them,
+ * and it fetches rather than mirrors them. A local copy would be a second source of truth for access
+ * decisions, which is exactly what moving them out was meant to end.
+ *
+ * They stay on one timeline because an investigator has to see a payment, a verification decision and
+ * a sign-in attempt together. Splitting the screen by who stores the data would make the platform
+ * harder to audit, not easier.
+ */
+export type AuditSource = 'business' | 'compliance' | 'integration' | 'security';
 export interface AuditEventRow {
   id: string;
   source: AuditSource;
@@ -289,6 +314,10 @@ export async function listAuditEvents(
     to?: Date;
     page?: number;
     limit?: number;
+    // Present when the caller can be forwarded to the authority. Without it the identity slice is
+    // simply absent: this service has no credential of its own to ask with, and acquiring one would
+    // let it read more than the person in front of it is entitled to.
+    request?: FastifyRequest;
   }
 ): Promise<{ events: AuditEventRow[]; total: number; page: number; limit: number; capped: boolean }> {
   const page = Math.max(1, opts.page ?? 1);
@@ -369,6 +398,42 @@ export async function listAuditEvents(
           ...meta,
         },
       });
+    }
+  }
+
+  // Identity and access events, from the authority. Fetched with the CALLER's token, so what comes
+  // back is what that person is entitled to see and nothing is filtered here afterwards.
+  if ((source === 'all' || source === 'security') && opts.request) {
+    try {
+      const { events } = await callAuthority<{ events: AuthoritySecurityEvent[] }>(opts.request, '/security-events', {
+        query: {
+          ...(opts.outcome === 'success' || opts.outcome === 'failure' ? { outcome: opts.outcome } : {}),
+          ...(opts.from ? { from: opts.from.toISOString() } : {}),
+          ...(opts.to ? { to: opts.to.toISOString() } : {}),
+          limit: AUDIT_FETCH_CAP,
+        },
+      });
+      for (const event of events) {
+        rows.push({
+          id: `${event.ts}-${event.action}`,
+          source: 'security',
+          eventDateTime: new Date(event.ts),
+          type: event.category ?? 'authentication',
+          action: event.action,
+          outcome: event.outcome,
+          entityType: 'principal',
+          entityId: event.subjectId,
+          performedByRole: null,
+          summary: {
+            ...(event.clientId ? { clientId: event.clientId } : {}),
+            ...(event.cause ? { cause: event.cause } : {}),
+            ...(event.correlationId ? { correlationId: event.correlationId } : {}),
+          },
+        });
+      }
+    } catch {
+      // The rest of the timeline still renders. An identity service that is down must not blank an
+      // investigator's whole screen, and the absence is visible because the slice is empty.
     }
   }
 
@@ -457,14 +522,13 @@ export async function listMerchantActivity(
     col.find(query).sort({ eventDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
-  // Resolve display-safe acting-user names in one batch: name only, no CHD, no IBAN.
-  const subs = [...new Set(docs.map((d) => d.actingPartyReference).filter((s): s is string => !!s))];
-  const users = subs.length
-    ? await db.collection<CustomerAuthenticationAssessmentRecord>(CUSTOMER_AUTHENTICATION_COLLECTION)
-        .find({ customerAuthenticationInstanceReference: { $in: subs } })
-        .toArray()
-    : [];
-  const nameBySub = new Map(users.map((u) => [u.customerAuthenticationInstanceReference, u.customerAuthenticationUserName]));
+  // The acting party is shown by its reference rather than resolved to a name.
+  //
+  // The names live at the identity authority now, and this listing deliberately does not fetch them:
+  // it would mean a call per page render, on a screen that is a business activity log rather than a
+  // directory, and the reference is what actually identifies the actor in every other record here.
+  // A screen that needs the name asks the authority for that one principal.
+  const nameBySub = new Map<string, string | undefined>();
 
   const events: MerchantActivityRow[] = docs.map((d) => ({
     id: d.businessProcessEventInstanceReference,

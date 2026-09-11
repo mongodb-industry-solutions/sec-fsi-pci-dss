@@ -1,29 +1,39 @@
 import { FastifyInstance } from 'fastify';
-import { authController } from './controllers/auth.controller';
-import { aclController } from './controllers/acl.controller';
-import { rolesController } from './controllers/roles.controller';
-import { usersController } from './controllers/users.controller';
-import { oauthController } from './controllers/oauth.controller';
-import { tokenIntrospectionController } from './controllers/tokenIntrospection.controller';
-import { keyManagementController } from './controllers/keyManagement.controller';
+import { authorityProxyController } from './controllers/authorityProxy.controller';
 import { consentGrantsController } from './controllers/consentGrants.controller';
-import { enrollmentController } from './controllers/enrollment.controller';
-import { cibaController } from './controllers/ciba.controller';
-import { cibaStubReceiverController } from './controllers/cibaStubReceiver.controller';
+import { selfProfileController } from './controllers/selfProfile.controller';
+import { directoryController } from './controllers/directory.controller';
+import { authDomainController } from './controllers/authDomain.controller';
 
+/**
+ * What is left of identity here: a person's own profile, a view of their authorizations, and a shim.
+ *
+ * This application no longer authenticates anyone. It holds no user store, no role table, no signing
+ * key and no session, and the controllers that used to provide them are gone from the routing table.
+ * The authority owns all of it.
+ *
+ * The proxy is registered instead, because one client resolves business and authentication calls
+ * from a single base URL and repointing that base would take the business endpoints with it. It
+ * forwards and does nothing else.
+ */
 export async function identityModule(fastify: FastifyInstance) {
-  await fastify.register(authController, { prefix: '/auth' });
-  await fastify.register(aclController, { prefix: '/acl' });         // ADR-030: GET /api/v1/acl/effective
-  await fastify.register(rolesController, { prefix: '/roles' });     // ADR-030: RBAC roles CRUD
-  await fastify.register(usersController, { prefix: '/users' });     // ADR-030: local user CRUD
-  // v16: OAuth 2.0 Authorization Server (ADR-033, ADR-034)
-  await fastify.register(oauthController, { prefix: '/auth' });      // POST /api/v1/auth/token, etc.
-  await fastify.register(tokenIntrospectionController, { prefix: '/auth' }); // POST /api/v1/auth/introspect
-  await fastify.register(keyManagementController, { prefix: '/auth' }); // GET/POST /api/v1/auth/keys/*
-  await fastify.register(consentGrantsController, { prefix: '/auth' }); // GET/DELETE /api/v1/auth/grants
-  // passwordless enrollment (session-gated) + CIBA backchannel auth
-  await fastify.register(enrollmentController, { prefix: '/auth' });  // /api/v1/auth/enroll*
-  await fastify.register(cibaController, { prefix: '/auth' });        // /api/v1/auth/bc-authorize*
-  // demo-only ping/push notification receiver (skipAuth, self-authenticated by Bearer token)
-  await fastify.register(cibaStubReceiverController, { prefix: '/auth' }); // /api/v1/auth/ciba/notify
+  // A person's own profile: identity from the token, agreement and party from this product's data.
+  await fastify.register(selfProfileController, { prefix: '/auth' });
+  /**
+   * The console's directory reads, at the paths the console already calls.
+   *
+   * No prefix: `/acl/effective`, `/roles` and `/users` are not under `/auth` and never were. The
+   * console's contract is the thing being repaired here, so moving it would be repairing one break
+   * by making another.
+   */
+  await fastify.register(directoryController);
+  /**
+   * Authentication domain administration, under `/modules` because that is where the console's
+   * contract puts it. The records live at the authority; this is the vocabulary translation.
+   */
+  await fastify.register(authDomainController, { prefix: '/modules' });
+  // The user's own authorizations, read from the authority rather than from a local collection.
+  await fastify.register(consentGrantsController, { prefix: '/auth' });
+  // Registered last, so an explicit route above always wins over a forwarded one.
+  await fastify.register(authorityProxyController, { prefix: '/auth' });
 }

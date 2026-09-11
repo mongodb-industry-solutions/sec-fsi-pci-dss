@@ -21,10 +21,10 @@
  *     which is what makes the KYC administration list's count explainable (v32 Track E).
  */
 import { describe, it, expect } from 'vitest';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  deriveCustomerLogins,
   repointTransactionsToCards,
   deterministicReference,
   type AgreementSeed,
@@ -43,7 +43,21 @@ const parties = read<PartySeed>('parties.json');
 const agreements = read<AgreementSeed>('customerAgreements.json');
 const cards = read<CardSeed>('paymentCards.json');
 const transactions = read<TransactionSeed>('cardTransactions.json');
-const logins = read<AuthenticationSeed>('customerAuthentications.json');
+// The logins are the identity authority's fixtures now. Read from there, because the integrity
+// question they answer (does every customer party have exactly one principal) spans both sides and
+// has to be asked against whichever file is actually seeded.
+// GIAM is a separate repository now, so the fixture is read from a local checkout of it and the
+// login rules skip when there is none.
+const HAS_LOGINS = hasGiam('backend/data/identities.json');
+const logins = (HAS_LOGINS ? JSON.parse(readFileSync(
+  giamPath('backend/data/identities.json'),
+  'utf-8',
+)) as Array<Record<string, unknown>> : []).map((identity) => ({
+  customerAuthenticationInstanceReference: identity.subjectId as string,
+  customerAuthenticationEmailAddress: identity.email as string | undefined,
+  partyInstanceReference: identity.accountHolderRef as string,
+  customerAuthenticationDemoFeatured: identity.demoFeatured === true,
+})) as AuthenticationSeed[];
 const payoutAccounts = read<PayoutAccountSeed>('payoutAccounts.json');
 const fraudCases = read<Record<string, unknown>>('fraudCases.json');
 const fraudCaseEvents = read<Record<string, unknown>>('fraudCaseEvents.json');
@@ -111,7 +125,6 @@ describe('v33 seed-data integrity: referential integrity', () => {
 
   it.each([
     ['agreement → party', () => agreements.map((a) => a.partyInstanceReference), () => partyRefs],
-    ['login → party', () => logins.map((l) => l.partyInstanceReference), () => partyRefs],
     [
       'card → agreement',
       () => cards.map((c) => c.customerAgreementInstanceReference),
@@ -140,6 +153,14 @@ describe('v33 seed-data integrity: referential integrity', () => {
       () => new Set(fraudCases.map((c) => c.fraudDiagnosisInstanceReference as string)),
     ],
     ['merchant → owner party', () => merchants.map((m) => m.merchantOwnerPartyReference as string), () => partyRefs],
+    ...(HAS_LOGINS
+      // Only the logins that NAME a party. An administrator belongs to no account holder, so it
+      // carries no party reference, and that is a principal without a business party rather than an
+      // orphan pointing at one that is missing.
+      ? [['login → party',
+        () => logins.map((l) => l.partyInstanceReference).filter(Boolean),
+        () => partyRefs] as const]
+      : []),
   ])('%s has no orphans', (_label, values, targets) => {
     const target = targets();
     expect(values().filter((v) => !target.has(v))).toEqual([]);
@@ -165,9 +186,6 @@ describe('v33 seed-data integrity: uniqueness', () => {
     ['party primary key', () => parties.map((p) => p.partyInstanceReference)],
     ['party email', () => parties.map((p) => String(p.partyEmailAddress ?? '').toLowerCase())],
     ['party phone', () => parties.map((p) => p.partyMobilePhoneNumber as string)],
-    ['login primary key', () => logins.map((l) => l.customerAuthenticationInstanceReference)],
-    ['login email', () => logins.map((l) => String(l.customerAuthenticationEmailAddress ?? '').toLowerCase())],
-    ['login owner party (one login per party)', () => logins.map((l) => l.partyInstanceReference)],
     ['agreement primary key', () => agreements.map((a) => a.customerAgreementInstanceReference)],
     ['agreement business reference', () => agreements.map((a) => a.customerAgreementReference)],
     ['agreement owner party (one agreement per party)', () => agreements.map((a) => a.partyInstanceReference)],
@@ -182,6 +200,13 @@ describe('v33 seed-data integrity: uniqueness', () => {
     ['card holder + token pair', () => cards.map((c) => `${c.customerAgreementInstanceReference}|${c.paymentCardReference}`)],
     ['transaction primary key', () => transactions.map((t) => t.cardTransactionInstanceReference)],
     ['fraud case primary key', () => fraudCases.map((c) => c.fraudDiagnosisInstanceReference as string)],
+    ...(HAS_LOGINS
+      ? [
+          ['login primary key', () => logins.map((l) => l.customerAuthenticationInstanceReference)] as const,
+          ['login email', () => logins.map((l) => String(l.customerAuthenticationEmailAddress ?? '').toLowerCase())] as const,
+          ['login owner party (one login per party)', () => logins.map((l) => l.partyInstanceReference)] as const,
+        ]
+      : []),
   ])('%s is unique', (_label, values) => {
     const present = values().filter((v) => v !== undefined && v !== '');
     const seen = new Map<string, number>();
@@ -200,12 +225,12 @@ describe('v33 seed-data integrity: uniqueness', () => {
 });
 
 describe('v33 seed-data integrity: a complete population (D-3)', () => {
-  it('every customer party has exactly one login (F1)', () => {
+  it.skipIf(!HAS_LOGINS)('every customer party has exactly one login (F1)', () => {
     const without = customers.filter((p) => (loginsByParty.get(p.partyInstanceReference) ?? []).length !== 1);
     expect(without.map((p) => p.partyName)).toEqual([]);
   });
 
-  it('every employee party is complete and has exactly one login', () => {
+  it.skipIf(!HAS_LOGINS)('every employee party is complete and has exactly one login', () => {
     const REQUIRED = ['partyName', 'partyEmailAddress', 'partyMobilePhoneNumber'] as const;
     const incomplete = employees
       .map((p) => ({
@@ -259,9 +284,11 @@ describe('v33 seed-data integrity: a complete population (D-3)', () => {
     }
   });
 
-  it('the curated login picker stays short while every customer is reachable', () => {
+  it.skipIf(!HAS_LOGINS)('the curated login picker stays short while every customer is reachable', () => {
+    // v39: two personas per role rather than one, so a sign-in screen can offer a ROLE instead of a
+    // named person. Sixteen is still a curated fraction of the population, which is the property.
     const featured = logins.filter((l) => l.customerAuthenticationDemoFeatured === true);
-    expect(featured.length).toBe(14);
+    expect(featured.length).toBe(16);
     expect(logins.length).toBeGreaterThan(featured.length);
   });
 
@@ -347,9 +374,6 @@ describe('v33 seed-data integrity: the deprecated government-ID field is gone (F
 });
 
 describe('v33 seed-data integrity: the shared repair functions are idempotent', () => {
-  it('deriveCustomerLogins finds nothing left to derive on the current fixtures (F1)', () => {
-    expect(deriveCustomerLogins(parties, logins)).toEqual([]);
-  });
 
   it('repointTransactionsToCards changes nothing on the current fixtures (F3)', () => {
     const copy = JSON.parse(JSON.stringify(transactions)) as TransactionSeed[];
@@ -358,42 +382,7 @@ describe('v33 seed-data integrity: the shared repair functions are idempotent', 
     expect(copy).toEqual(transactions);
   });
 
-  it('a derived login takes its identity from the party, never invents it', () => {
-    const party: PartySeed = {
-      partyInstanceReference: 'party-under-test',
-      partyType: 'customer',
-      partyName: 'Ada Lovelace',
-      partyEmailAddress: 'Ada.Lovelace@back.es',
-    };
-    const [derived] = deriveCustomerLogins([party], logins);
-    expect(derived.customerAuthenticationEmailAddress).toBe('ada.lovelace@back.es');
-    expect(derived.customerAuthenticationUserName).toBe('Ada Lovelace');
-    expect(derived.customerAuthenticationUserRole).toBe('customer');
-    expect(derived.customerAuthenticationAccountStatus).toBe('active');
-    // Not featured: the curated picker must stay short.
-    expect(derived.customerAuthenticationDemoFeatured).toBe(false);
-    // The shared demo credential, so a derived login accepts the same password as a curated one.
-    expect(derived.customerAuthenticationCredentialHash).toBe(logins[0].customerAuthenticationCredentialHash);
-    // Deterministic: the same party always yields the same login reference.
-    expect(deriveCustomerLogins([party], logins)[0].customerAuthenticationInstanceReference).toBe(
-      derived.customerAuthenticationInstanceReference,
-    );
-  });
 
-  it('deriveCustomerLogins skips a party with no email, no name, or a colliding email', () => {
-    const cases: PartySeed[] = [
-      { partyInstanceReference: 'no-email', partyType: 'customer', partyName: 'No Email' },
-      { partyInstanceReference: 'no-name', partyType: 'customer', partyEmailAddress: 'no.name@back.es' },
-      {
-        partyInstanceReference: 'collides',
-        partyType: 'customer',
-        partyName: 'Impostor',
-        partyEmailAddress: logins[0].customerAuthenticationEmailAddress,
-      },
-      { partyInstanceReference: 'employee', partyType: 'employee', partyName: 'Staff', partyEmailAddress: 's@back.es' },
-    ];
-    expect(deriveCustomerLogins(cases, logins)).toEqual([]);
-  });
 
   it('repointing prefers a token unique to the holder over a shared one, so a token lookup is unambiguous', () => {
     const agreement: AgreementSeed = {

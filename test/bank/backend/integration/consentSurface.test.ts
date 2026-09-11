@@ -8,12 +8,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 
-const AISP_TOKEN = () => issueAccessToken(
-  { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP'] } as never,
-  ['accounts', 'balances', 'transactions'],
-).accessToken;
+const AISP_TOKEN = () => tppToken(['accounts', 'balances', 'transactions']);
 
 describe('v37 P3.1: the consent surface', () => {
   let app: FastifyInstance;
@@ -25,7 +22,8 @@ describe('v37 P3.1: the consent surface', () => {
     paths = (app as unknown as { swagger: () => { paths: typeof paths } }).swagger().paths;
   });
 
-  afterAll(async () => { if (app) await app.close(); });
+  afterAll(async () => {
+    await stopTppAuthority(); if (app) await app.close(); });
 
   it('exposes the four consent operations at the standard paths', () => {
     expect(Object.keys(paths)).toEqual(expect.arrayContaining([
@@ -61,7 +59,7 @@ describe('v37 P3.1: the consent surface', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/accounts/acc-1/balances',
-      headers: { authorization: `Bearer ${AISP_TOKEN()}` },
+      headers: { authorization: `Bearer ${await AISP_TOKEN()}` },
     });
     expect(response.statusCode).toBe(400);
     // A `required` header schema would have Fastify answer {statusCode, error, message} instead.

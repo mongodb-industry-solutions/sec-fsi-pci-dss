@@ -14,12 +14,13 @@ import supertest from 'supertest';
 import * as crypto from 'crypto';
 import { buildApp } from '../../../../../psp/backend/bin/server';
 import type { FastifyInstance } from 'fastify';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;
 
 const CLIENT_ID = 'oauth001-0000-4000-8000-000000000001';
-const CLIENT_SECRET = 'espresso-demo-secret-2026';
+const CLIENT_SECRET = clientSecretFor('oauth001-0000-4000-8000-000000000001');
 const DEMO_EMAIL = 'luis.fernandez@back.es';
 const DEMO_PASSWORD = 'demo-password';
 

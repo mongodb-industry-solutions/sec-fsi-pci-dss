@@ -1,0 +1,133 @@
+import { spawn, ChildProcess } from 'child_process';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+import { interactiveToken as runFlow } from '../../../support/authorizationFlow';
+import { giamPath } from '../../../support/giamRepo';
+
+/**
+ * Runs the identity authority as a real process for the duration of a suite.
+ *
+ * Not a convenience. Two services cannot both hold an encrypted client in ONE node process: the
+ * encryption library is loaded once, and whichever service builds second comes up degraded and
+ * answers 503 to everything it would otherwise authorise. Building both in a single test would
+ * therefore test the build order rather than the behaviour.
+ *
+ * Running the authority as a separate process is also how it actually runs, so the bank's verifier
+ * does what it does in production: discovery over HTTP, a key set fetched from a URL, and a token it
+ * did not mint.
+ */
+const GIAM_DIR = giamPath('backend');
+
+export interface Authority {
+  baseUrl: string;
+  stop(): Promise<void>;
+}
+
+async function waitForHealth(baseUrl: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(2000) });
+      if (response.ok) return true;
+    } catch {
+      // Not up yet. Retrying is the whole point of a readiness wait.
+    }
+    await new Promise((done) => setTimeout(done, 500));
+  }
+  return false;
+}
+
+/**
+ * Started on the authority own default port, deliberately.
+ *
+ * A token carries the issuer recorded on the REALM, not whatever the process was told at startup,
+ * so an authority reachable at a different address mints tokens naming an address the resource
+ * server does not expect and every verification fails. Matching the seeded issuer is what makes the
+ * test exercise verification rather than a URL mismatch.
+ */
+export async function startAuthority(port = 8085): Promise<Authority | null> {
+  const baseUrl = `http://127.0.0.1:${port}`;
+
+  // Already running, which is the common case on a developer machine. Reuse it rather than fighting
+  // over the port.
+  if (await waitForHealth(baseUrl, 1500)) {
+    return { baseUrl, stop: async () => {} };
+  }
+
+  // No local checkout of the authority repository, so there is nothing to spawn: the caller skips.
+  if (!existsSync(GIAM_DIR)) return null;
+
+  const child: ChildProcess = spawn(
+    process.platform === 'win32' ? 'npx.cmd' : 'npx',
+    ['tsx', 'bin/server.ts'],
+    {
+      cwd: GIAM_DIR,
+      env: { ...process.env, GIAM_PORT: String(port) },
+      stdio: 'ignore',
+      shell: process.platform === 'win32',
+    },
+  );
+
+  const ready = await waitForHealth(baseUrl, 90_000);
+  if (!ready) {
+    child.kill();
+    return null;
+  }
+
+  return {
+    baseUrl,
+    async stop() {
+      child.kill();
+      // A moment to let the port close, so a following suite does not race it.
+      await new Promise((done) => setTimeout(done, 300));
+    },
+  };
+}
+
+/** Mints a machine token from the running authority, over HTTP. */
+export async function machineToken(
+  authority: Authority,
+  realm: string,
+  clientId: string,
+  clientSecret: string,
+  scope?: string,
+): Promise<string | null> {
+  const response = await fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/token`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    // A narrower scope than the client holds is how a test proves a scope gate rather than asserting
+    // it: the authority issues exactly what was asked for, within what the client is registered for.
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+      ...(scope ? { scope } : {}),
+    }),
+  });
+  if (!response.ok) return null;
+  return (await response.json() as { access_token: string }).access_token;
+}
+
+/**
+ * The full interactive flow: sign in, authorize with PKCE, redeem. Exactly as a console does it.
+ *
+ * DELEGATED to the shared helper, which drives the conforming flow: a `GET`, a session cookie, and
+ * the code read out of a 302. This function had its own copy of the flow in the shape the endpoint
+ * used to have, and three other suites had the same copy, so the authority making the endpoint
+ * conforming broke all four identically.
+ */
+export async function interactiveToken(
+  authority: Authority,
+  realm: string,
+  login: string,
+  password: string,
+  clientId: string,
+  redirectUri: string,
+): Promise<string | null> {
+  const token = await runFlow(authority.baseUrl, realm, login, password, clientId, redirectUri);
+  return token || null;
+}
+
+export function decodeClaims(token: string): Record<string, unknown> {
+  return JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+}

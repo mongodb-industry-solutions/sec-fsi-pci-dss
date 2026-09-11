@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-frontend",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "private": true,
   "scripts": {
     "dev": "next dev -p 8080",
@@ -22,7 +22,8 @@
     "next": "^16.2.10",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "react-dom": "^19.2.7",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",

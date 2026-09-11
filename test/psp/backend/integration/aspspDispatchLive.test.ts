@@ -103,7 +103,7 @@ describe('v37 P6.2d: a live ASPSP read through dispatchProvider', () => {
     // Sent, and to the BANK. An error here is the finding: it means the pipeline still cannot reach it.
     expect(result.status, `dispatch: ${JSON.stringify(result)}`).not.toBe('error');
     expect(result.provider, 'the call must leave the PSP').toBe('external');
-    expect(result.responseCode).toBe(200);
+    expect(result.responseCode, `dispatch: ${JSON.stringify(result)}`).toBe(200);
 
     // And it answered with a BALANCE. "not an error" would also be true of an empty 200, which would leave
     // the claim resting on nothing.

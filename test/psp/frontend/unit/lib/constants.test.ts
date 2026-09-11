@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, vi } from 'vitest';
 import {
-  DEMO_PASSWORD,
+  AUTHORITY_ISSUER_URL,
+  SIMULATOR_CLIENT_ID,
   ROLE_LABELS,
   SEVERITY_COLORS,
   STATUS_COLORS,
@@ -12,16 +13,22 @@ import {
   demoPublicUrl,
 } from '../../../../../psp/frontend/src/lib/constants';
 
-// All seeded demo accounts now share one bcrypt-hashed credential exposed via the
-// single DEMO_PASSWORD constant (the per-user DEMO_USERS_PASSWORDS map was removed).
-describe('DEMO_PASSWORD', () => {
-  it('is the fixed demo-password convention', () => {
-    expect(DEMO_PASSWORD).toBe('demo-password');
+// v39: no password for any demo account exists in this bundle. The simulator holds its OWN
+// credential and exchanges it for a token that ACTS AS a persona, so what ships here is a client id
+// and an issuer rather than a working password for every seeded user.
+describe('the simulator credential', () => {
+  it('ships no demo account password', async () => {
+    const constants = await import('../../../../../psp/frontend/src/lib/constants');
+    expect('DEMO_PASSWORD' in constants).toBe(false);
   });
 
-  it('is a non-empty string', () => {
-    expect(typeof DEMO_PASSWORD).toBe('string');
-    expect(DEMO_PASSWORD.length).toBeGreaterThan(0);
+  it('names the authority it exchanges against', () => {
+    expect(AUTHORITY_ISSUER_URL).toContain('/realms/');
+  });
+
+  it('identifies itself as its own client rather than as a person', () => {
+    expect(SIMULATOR_CLIENT_ID).toBeTruthy();
+    expect(SIMULATOR_CLIENT_ID).not.toContain('@');
   });
 });
 

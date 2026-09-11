@@ -12,12 +12,30 @@ const h = vi.hoisted(() => {
   const insertOne = vi.fn().mockResolvedValue({ insertedId: 'mock-id' });
   const findOne = vi.fn().mockResolvedValue(null);
   const updateOne = vi.fn().mockResolvedValue({ matchedCount: 1 });
-  const qeDb = { collection: vi.fn(() => ({ insertOne, findOne, updateOne })) };
+  /**
+   * `find` is here so a SCOPED read can be asserted at all.
+   *
+   * Without it the QE double could only be written to, so no test could reach the branch that
+   * narrows a customer's own movements, which is exactly how that narrowing was lost unnoticed.
+   */
+  const qeFind = vi.fn(() => ({
+    sort: vi.fn().mockReturnThis(),
+    skip: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    toArray: vi.fn().mockResolvedValue([]),
+  }));
+  const qeDb = {
+    collection: vi.fn(() => ({
+      insertOne, findOne, updateOne, find: qeFind,
+      countDocuments: vi.fn().mockResolvedValue(0),
+    })),
+  };
   return {
     insertOne,
     findOne,
     updateOne,
     qeDb,
+    qeFind,
     getDbForRole: vi.fn().mockResolvedValue(qeDb),
     validateToken: vi.fn().mockReturnValue({ valid: false }),
     getCardByToken: vi.fn(async () => null as unknown),
@@ -103,6 +121,7 @@ beforeEach(() => {
   h.updateOne.mockClear();
   h.createFraudCase.mockClear();
   h.getDbForRole.mockClear();
+  h.qeFind.mockClear();
   process.env.PSP_FRAUD_AMOUNT_THRESHOLD = '500';
   process.env.PSP_RISK_MCC_LIST = '5812,6011,7995';
   // dev.v8 F3: authorization is event-driven. A fresh in-process bus + the saga drive it; the issuer
@@ -361,5 +380,41 @@ describe('a hosted payment resolves its payer through the card on file', () => {
     await createTransaction(txDb(), { ...baseInput, accountReference: 'ACC-OTHER' });
     const doc = h.insertOne.mock.calls[0][0] as Record<string, unknown>;
     expect(doc.cardTransactionAccountReference).toBe('ACC-OTHER');
+  });
+});
+
+
+/**
+ * A customer must see only their OWN card movements, and the mechanism that guarantees it changed.
+ *
+ * It used to be the token's `email` claim. That claim went away with the identity extraction, and
+ * because an absent filter is not an error, the narrowing term simply vanished from the query and
+ * the endpoint would have answered with everybody's movements. These tests pin the replacement and,
+ * more importantly, pin that an unresolvable owner returns NOTHING.
+ */
+describe('scoping a read to one account holder', () => {
+  it('narrows the query to the account reference the party owns', async () => {
+    h.findOne.mockReset().mockResolvedValue({ customerAgreementReference: 'ACC-777' });
+    const db = makeDb();
+
+    await getAllTransactions(db, { partyRef: 'party-1' }, 1, 20);
+
+    // The agreement was resolved from the party, not from an email.
+    expect(h.findOne).toHaveBeenCalledWith({ partyInstanceReference: 'party-1' });
+    // And the read carries the resulting account reference as its filter.
+    const query = h.qeFind.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(query).toMatchObject({ cardTransactionAccountReference: 'ACC-777' });
+  });
+
+  it('returns nothing when the party resolves to no agreement, rather than everything', async () => {
+    // The failure that matters. An unscoped read here is a disclosure, so the branch must not
+    // fall through to a query with no owner term in it.
+    h.findOne.mockReset().mockResolvedValue(null);
+    const db = makeDb();
+
+    const result = await getAllTransactions(db, { partyRef: 'party-unbound' }, 1, 20);
+
+    expect(result).toEqual({ results: [], total: 0, page: 1, limit: 20 });
+    expect(h.qeFind, 'an unresolvable owner still ran a query').not.toHaveBeenCalled();
   });
 });

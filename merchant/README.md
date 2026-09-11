@@ -33,7 +33,7 @@ PSP `frontend/`), and docker-compose maps host `8082:8080`. The port is env-driv
 | Field | Value |
 |---|---|
 | client_id | `oauth001-0000-4000-8000-000000000001` |
-| client_secret | `espresso-demo-secret-2026` |
+| client_secret | not written down; read it with `npm run clients:credentials --prefix backend` in the sec-giam repository |
 | redirect_uri | `http://localhost:8082/api/auth/callback` |
 | scopes (user SSO) | `openid profile read:beneficiaries write:beneficiaries read:transactions read:accounts read:merchant_profile read:notifications write:transfers` |
 | grant types | `authorization_code`, `refresh_token` (user SSO) + `client_credentials` (server-to-server API payment) |
@@ -72,9 +72,9 @@ sandbox, so add the following block **manually** to the repo-root `.env`:
 PSP_MERCHANT_BASE_URL=http://localhost:8082
 PSP_MERCHANT_PORT=8082
 PSP_MERCHANT_PSP_BASE_URL=http://localhost:8081
-PSP_MERCHANT_AUTHORIZE_URL=http://localhost:8080/auth/authorize
+PSP_MERCHANT_AUTHORIZE_URL=http://localhost:8086/realms/leafypay/protocol/openid-connect/auth
 PSP_MERCHANT_OAUTH_CLIENT_ID=oauth001-0000-4000-8000-000000000001
-PSP_MERCHANT_OAUTH_CLIENT_SECRET=espresso-demo-secret-2026
+PSP_MERCHANT_OAUTH_CLIENT_SECRET=
 PSP_MERCHANT_SESSION_SECRET=change-me-to-a-32-byte-random-secret-value
 ```
 

@@ -1,5 +1,5 @@
 import 'server-only';
-import jwt from 'jsonwebtoken';
+import { sessionToken } from './authority';
 
 // The only place this app talks to the bank, and it is SERVER side.
 //
@@ -19,21 +19,6 @@ function baseUrl(): string {
     ?? process.env.BANKCORE_BASE_URL
     ?? 'http://localhost:8083';
   return raw.replace(/\/$/, '');
-}
-
-function jwtSecret(): string {
-  return process.env.PSP_JWT_SECRET ?? process.env.JWT_SECRET ?? 'dev-secret-change-me';
-}
-
-/**
- * A short-lived admin token for one hop.
- *
- * The bank verifies the platform admin JWT on its administrative API. Minted per request and valid for a
- * minute: a long-lived service token held in memory is a credential with no expiry, and this one only has to
- * survive a single call.
- */
-function hopToken(actor = 'bank-admin-app'): string {
-  return jwt.sign({ role: 'admin', sub: actor, act: 'bank-admin-app' }, jwtSecret(), { expiresIn: 60 });
 }
 
 // Only the bank's ADMINISTRATIVE resources are reachable through this app. A generic forwarder would let the
@@ -80,11 +65,16 @@ export async function callBankAdmin(
   }
   const url = `${baseUrl()}/api/v1/admin/${resource}${search.size ? `?${search.toString()}` : ''}`;
 
+  // The SIGNED-IN person's token. The bank's administrative API requires an interactive principal
+  // with the right role, so a credential this app minted for itself is refused, and should be.
+  const token = await sessionToken();
+  if (!token) return { status: 401, body: null, error: 'Not signed in.' };
+
   try {
     const response = await fetch(url, {
       method: init.method ?? 'GET',
       headers: {
-        Authorization: `Bearer ${hopToken()}`,
+        Authorization: `Bearer ${token}`,
         Accept: 'application/json',
         ...(init.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       },

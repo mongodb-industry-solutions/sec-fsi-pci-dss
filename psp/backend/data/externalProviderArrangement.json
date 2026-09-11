@@ -437,7 +437,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "/v1/oauth/token",
+        "tokenEndpoint": "/realms/bankcore/protocol/openid-connect/token",
         "scopes": [
           "card-authorisations"
         ],
@@ -592,7 +592,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "/v1/oauth/token",
+        "tokenEndpoint": "/realms/bankcore/protocol/openid-connect/token",
         "scopes": [
           "card-authorisations",
           "card-data"
@@ -611,7 +611,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "/v1/oauth/token",
+        "tokenEndpoint": "/realms/bankcore/protocol/openid-connect/token",
         "scopes": [
           "accounts",
           "balances",
@@ -720,7 +720,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "/v1/oauth/token",
+        "tokenEndpoint": "/realms/bankcore/protocol/openid-connect/token",
         "scopes": [
           "payments",
           "funds-confirmations"

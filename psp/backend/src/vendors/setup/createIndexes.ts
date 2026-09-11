@@ -1,12 +1,9 @@
 import { MongoClient, Db, IndexSpecification, CreateIndexesOptions, IndexDescription, MongoServerError } from 'mongodb';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
-import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
-import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/customer/models/counterpartyArrangement.model';
 import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
-import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
-import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
 import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
@@ -124,6 +121,12 @@ export async function createIndexes(client: MongoClient) {
     // Partial: phone is optional (self-registered parties may omit it). Only documents that
     // actually carry a digest participate in the uniqueness constraint.
     { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
+    // v39 P3: the identity key on the business record, which is how a token resolves to a party
+    // without consulting the login collection. Partial for the same reason as the phone digest: a
+    // party that cannot sign in has no subject, and the internal ledger owner is one of those.
+    // Unique because two business records answering to one subject would make that resolution
+    // ambiguous in a way no caller could detect.
+    { key: { subjectId: 1 }, unique: true, partialFilterExpression: { subjectId: { $exists: true } } },
   ]);
 
   // Card Transaction Log
@@ -223,31 +226,9 @@ export async function createIndexes(client: MongoClient) {
     { key: { partitionKey: 1, occurredAt: 1 } },
   ]);
 
-  // Customer Authentication Assessment
-  await ensureIndexes(db, 'customerAuthenticationAssessment', [
-    { key: { customerAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { partyInstanceReference: 1 } },
-    { key: { customerAuthenticationUserRole: 1 } },
-  ]);
 
-  // Party Authentication Assessment
-  await ensureIndexes(db, 'partyAuthenticationAssessment', [
-    { key: { partyAuthenticationInstanceReference: 1 }, unique: true },
-    { key: { partyInstanceReference: 1 } },
-  ]);
 
-  // Authentication Domain config
-  await ensureIndexes(db, 'authenticationDomain', [
-    { key: { partyAuthenticationDomainInstanceReference: 1 }, unique: true },
-    { key: { partyAuthenticationDomainName: 1 }, unique: true },
-    { key: { partyAuthenticationDomainEnabled: 1 } },
-  ]);
 
-  // ADR-030: RBAC role definitions (data-driven ACL)
-  await ensureIndexes(db, 'role', [
-    { key: { roleName: 1 }, unique: true },
-    { key: { roleIsBuiltin: 1 } },
-  ]);
 
   // Customer Credit Rating State
   await ensureIndexes(db, 'customerCreditRatingState', [
@@ -392,57 +373,29 @@ export async function createIndexes(client: MongoClient) {
     { key: { processType: 1, eventDateTime: -1 } },
   ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
 
-  // v16 (ADR-036): RSA public key registry, unique kid, status filter for JWKS
-  await ensureIndexes(db, 'partyAuthenticationKey', [
+
+
+
+  // v39 P2: the OAuth client registry, now a collection of its own.
+  //
+  // The client id is unique globally rather than per owner: it is the identity a presented token
+  // resolves back to, and it is resolved without an owner in hand, so a duplicate would make that
+  // resolution ambiguous rather than merely untidy.
+  await ensureIndexes(db, 'oauthClient', [
+    { key: { oauthClientId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { merchantAgreementInstanceReference: 1, oauthClientStatus: 1 } },
+  ]);
+
+  // Integration keys. Verification loads an owner's active keys and compares, because bcrypt is
+  // salted and a presented key cannot be looked up by its hash, so the owner-and-status pair is the
+  // index that matters.
+  await ensureIndexes(db, 'apiKey', [
     { key: { keyId: 1 }, unique: true },
-    { key: { keyStatus: 1 } },
+    { key: { merchantAgreementInstanceReference: 1, keyStatus: 1 } },
   ]);
 
-  // v16 (ADR-033): OAuth authorization codes, unique code, TTL 5min on expiresAt
-  await ensureIndexes(db, 'partyAuthorizationCode', [
-    { key: { code: 1 }, unique: true },
-    { key: { clientId: 1 } },
-    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
-  ]);
-
-  // v16 (ADR-033): Issued OAuth tokens, unique tokenId, TTL on expiresAt, accessTokenJti lookup
-  await ensureIndexes(db, 'partyIssuedToken', [
-    { key: { tokenId: 1 }, unique: true },
-    { key: { accessTokenJti: 1 }, sparse: true },
-    { key: { clientId: 1, tokenType: 1 } },
-    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
-  ]);
-
-  // v16 (ADR-037): OAuth client lookup on merchantAgreementProcedure
-  await ensureIndex(
-    db,
-    'merchantAgreementProcedure',
-    { 'merchantOAuthClient.oauthClientId': 1 },
-    { sparse: true },
-  );
-
-  // v16 (ADR-038): PartyAuthentication, ConsentGrant, unique per-user+client pair, sub lookup, revocation
-  await ensureIndexes(db, PARTY_AUTH_CONSENT_COLLECTION, [
-    { key: { consentId: 1 }, unique: true },
-    { key: { partyAuthenticationInstanceReference: 1, oauthClientId: 1 }, unique: true },
-    { key: { partyAuthenticationInstanceReference: 1, consentStatus: 1 } },
-    { key: { oauthClientId: 1, consentStatus: 1 } },
-  ]);
-
-  // PartyEnrolledCredential, unique credentialId, owner+status lookup
-  await ensureIndexes(db, PARTY_ENROLLED_CREDENTIAL_COLLECTION, [
-    { key: { partyEnrolledCredentialInstanceReference: 1 }, unique: true },
-    { key: { credentialId: 1 }, unique: true },
-    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
-  ]);
-
-  // PartyBackchannelAuthentication, unique authReqId, TTL on expiresAt, client+status lookup
-  await ensureIndexes(db, PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION, [
-    { key: { authReqId: 1 }, unique: true },
-    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
-    { key: { clientId: 1, status: 1 } },
-    { key: { customerAuthenticationInstanceReference: 1, status: 1 } },
-  ]);
+  // v39: indexes for the identity collections live with those collections, at the authority.
 
   // merchantWebhookDeliveryLog indexes (ADR-038)
   await ensureIndexes(db, MERCHANT_WEBHOOK_LOG_COLLECTION, [

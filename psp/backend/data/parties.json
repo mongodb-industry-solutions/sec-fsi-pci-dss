@@ -1497,5 +1497,28 @@
       "postalCode": "28013",
       "countryCode": "ES"
     }
+  },
+  {
+    "partyInstanceReference": "b0000101-0000-4000-8000-000000000101",
+    "partyEmailAddress": "priya.nair@back.es",
+    "partyMobilePhoneNumber": "+1 323 555 0101",
+    "partyName": "Priya Nair",
+    "partyType": "employee",
+    "partyDepartment": "Technology Operations",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-10T10:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-10T10:00:00.000Z",
+    "schemaVersion": 1,
+    "partyNationality": "US",
+    "partyPlaceOfBirth": "Chicago",
+    "partySex": "unspecified",
+    "partyDateOfBirth": "1979-05-14",
+    "partyPostalAddress": {
+      "line1": "1600 Market Street",
+      "city": "San Francisco",
+      "postalCode": "94102",
+      "countryCode": "US"
+    }
   }
 ]

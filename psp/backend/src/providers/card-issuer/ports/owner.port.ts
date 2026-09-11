@@ -4,7 +4,7 @@
 // The party master data stays owned by the customer/party domain; these ports only READ a
 // single display field and never mutate the party.
 import { Db } from 'mongodb';
-import { PARTY_COLLECTION, PartyControlRecord } from '../../../modules/identity/models/party.model';
+import { PARTY_COLLECTION, PartyControlRecord } from '../../../modules/customer/models/party.model';
 import { CUSTOMER_AGREEMENT_COLLECTION, CustomerAgreementControlRecord } from '../../../modules/customer/models/customerAgreement.model';
 
 function esc(s: string): string {

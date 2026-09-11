@@ -3012,7 +3012,92 @@ PSP_BANKCORE_EVENT_BUS_ENGINE=
 PSP_BANKCORE_EVENT_BUS_TOPIC_PREFIX=
 PSP_BANKCORE_KEY_VAULT_NAMESPACE=
 PSP_BANKCORE_SEED_DATA_DIR=
+
+# ── Identity authority (GIAM, v39) ─────────────────────────────────
+# The authority is a separate deployment with its own repository (sec-giam). It owns its public URL,
+# console URL, CORS allowlist, key provider and database; this file sets only what THIS platform reads
+# in order to reach it.
+
+# The platform realm issuer. PRIVATE, in-network. It does two jobs at once, and both must hold:
+#   1. discovery, JWKS, introspection and catalog registration are fetched from it, server side;
+#   2. it is compared, by EXACT string equality, against the `iss` claim of every token.
+# A browser-facing host satisfies only (2) and is unreachable from inside a container; a differently
+# spelled one (localhost vs 127.0.0.1) satisfies only (1) and every token is refused as wrong_issuer.
+# PSP_-prefixed deliberately: the shared link resolver reads the unprefixed name as a bare host, and a
+# realm URL there is joined onto paths that already carry their own realm.
+PSP_GIAM_ISSUER_URL=http://giam:8080/realms/leafypay
+# The bare authority host, no realm, for the shared link resolver.
+GIAM_BASE_URL=http://giam:8080
+# What a token must name in `aud`, and the name this platform registers its enforcement points under.
+GIAM_AUDIENCE=leafypay
+GIAM_RESOURCE_SERVER=leafypay
+# This service's OWN client, for the calls it makes as itself. The authority derives the secret from
+# the client id when unset, so leaving both unset is coherent and setting only one is not.
+GIAM_CLIENT_ID=leafypay-backend
+GIAM_CLIENT_SECRET=
+# Presented when registering the permission catalog at boot. Registration is non-fatal when absent.
+GIAM_REGISTRATION_TOKEN=
+GIAM_JWKS_CACHE_SECONDS=900
+
+# The bank is a relying party in its OWN realm: a platform token carries a different issuer and is
+# refused before any claim is read, which is what makes the institutional boundary structural.
+PSP_BANKCORE_GIAM_ISSUER_URL=http://giam:8080/realms/bankcore
+PSP_BANKCORE_GIAM_AUDIENCE=bankcore
+PSP_BANKCORE_GIAM_RESOURCE_SERVER=bankcore
+
+# Browser-facing authority addresses. Separate variables on purpose: these are navigated to or fetched
+# from the page, so they are published addresses, never service names. The realm is resolved from the
+# request path, so a token minted through a public host still carries the private issuer above.
+NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=http://localhost:8085/realms/leafypay
+NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=http://localhost:8086
+NEXT_PUBLIC_BANKCORE_AUTHORITY_URL=http://localhost:8086
+# docker-compose only: the one knob the three variables above are derived from.
+GIAM_BROWSER_URL=http://localhost:8085
+
+# This app's own public address. The authority redirects the browser back to it after sign-in, so it
+# must match a registered redirect URI of the `leafypay-console` client (`<this>/api/auth/callback`).
+PSP_URL_FRONTEND=http://localhost:8080
 ```
+
+**Sign-in is a redirect, in all three apps.** The platform console, the bank console and the merchant
+app each register a client at the authority and run an authorization code flow with PKCE; none of them
+has a login endpoint or ever receives a password. The clients are:
+
+| App | Client id | Type | Redirect URI |
+|---|---|---|---|
+| Platform console (`psp/frontend`) | `leafypay-console` | public, PKCE | `http://localhost:8080/api/auth/callback` |
+| Bank console (`bank/frontend`) | `bankcore-console` | public, PKCE | `http://localhost:8084/api/auth/callback` |
+| Identity console | `giam-console` | public, PKCE | `http://localhost:8086/auth/callback` |
+| Merchant app | `oauth001-…-0001` | confidential | `http://localhost:8082/api/auth/callback` |
+
+The client fixtures live in the authority's repository (`sec-giam`, `backend/data/clients.json`), which
+owns them. A redirect URI is matched exactly and never by prefix, so a new host means a fixture change
+and a reseed there, not a configuration change here.
+
+**Three cookies on the platform console, because they answer three different questions.**
+
+| Cookie | Holds | httpOnly | Lifetime |
+|---|---|---|---|
+| `demo_token` | the access token, sent as the bearer by `apiFetch` | no, script has to send it | the token's own, 15 min |
+| `demo_identity` | the id_token, the only source of name and email | no, the screens read it | same as above |
+| `demo_refresh` | the refresh token | **yes**, it is a credential | 30 days |
+
+The access token lasts fifteen minutes and a demo lasts hours, so `SessionKeeper` (mounted at the root
+layout) renews it through `POST /api/auth/refresh` two minutes before expiry. The renewal is server
+side because the authority ROTATES the refresh token as it redeems it, and the replacement has to be
+written to a cookie script cannot reach. `POST /api/auth/logout` exists for the same reason: clearing
+only the readable cookies would leave a live refresh token behind, and the next renewal would sign the
+person back in after they asked to leave.
+
+**The issuer is persisted, not recomputed.** The authority writes each realm's issuer onto the realm
+record at seed time, composed from its own public URL. Changing that URL therefore requires re-running
+the authority's seeder before the new value reaches any token; until then the deployed services and the
+tokens disagree, and every request returns 401.
+
+**Both backends check this at boot.** `checkIssuerCoherence()` fetches discovery from the configured
+issuer and compares the `issuer` it reports against the configured value, printing one startup line
+either way. Without it, an incoherent issuer fails nothing at boot and returns 401 on every subsequent
+request, which reads as an authorisation bug rather than a configuration one.
 
 **Signing keys on disk.** The bank persists its notification signing key under `bank/backend/keys/`, explicitly
 git-ignored, with the `kid` derived from the key itself. A deployment therefore pins `replicaCount=1`: two
@@ -4693,7 +4778,7 @@ built-in KYC/KYB engines own NO collections (stateless verification ports; only 
 | `customer` (SD-53 KYC) | `customerAgreementProcedure` | `party`, `complianceProcessEvent` | YES: QE identity fields (govID, address, source of funds); L1/L2 tiers |
 | `gateway` (SD-89 KYB) | `merchantAgreementProcedure`, `merchantAgreementEvents`, `paymentExecutionProcedure` (SD-65), `payoutAccountArrangement` (SD-66 balance PROJECTION; the balance and its credit log are the bank's from v37) | `party`, `customerAgreementProcedure` (owner KYC compose), `cardTransactionLog`, `complianceProcessEvent` | Merchant/UBO PII via `party` refs; legal-entity data (GDPR, not PCI CHD); payout IBAN QE:none (GDPR Art. 32 / PSD2). No CHD in the ledger |
 | `gateway` (SD-65 RTP + QR) | `paymentRequestProcedure`, `paymentRequestEvent`, `qrPaymentRepresentation`, `rtpAliasDirectoryCache` | `party`, `payoutAccountArrangement`, `counterpartyArrangement`, `complianceProcessEvent` | Account/alias based, NOT PCI scope (no PAN/CHD). QE:none on the request (payee name, aliases, remittance, address); the QR record holds no PII at all, its EPC form is derived on read (GDPR Art. 32 / PSD2). Aliases indexed by SHA-256 hash only |
-| `identity` (SD-13) | `party` | - | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34) |
+| `customer` (SD-13 party) | `party`, `consentAgreement`, `consentAccessLog`, `counterpartyArrangement` | `complianceProcessEvent` | YES: PII owner surface (QE tiers). Includes the `service_account` party holding the PSP revenue ledger (v34). Re-homed out of `identity` in v39: a party is a business record about a person, and account-access consent is regulated data belonging to the account-holding institution. Neither is a credential |
 | `provider` (SD-193) | `externalProviderArrangement`, `capabilityModuleConfiguration`, `businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog` | capability registry (code) | NO CHD (SoD: manager) |
 | `providers/kyc` (`kyc_identity`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
 | `providers/kyb` (`kyb_business`) | none (stateless; config in `capabilityModuleConfiguration`) | payload passed by port | NO persistence |
@@ -4714,30 +4799,31 @@ appears in at least one row" was a rule someone had to remember, and it is now a
 in either `createCollections.ts` is missing from it. A collection nobody claims here is undocumented
 ownership, which is the state the rule exists to prevent.
 
-**Two services, two databases.** The PSP owns the payment service provider's records; bankcore owns the
-bank's. Nothing is shared except the key vault. `domainEvent`, `counters` and `idempotencyKey` appear on both
-sides because each service keeps its OWN instance, not because either reaches into the other.
+**Three services, three databases.** LeafyPay owns the payment service provider records; BankCore owns the
+bank records; the identity authority owns every principal, credential, role and token on the platform.
+Nothing is shared. From v39 the authority keeps its OWN key vault as well, because two vaults holding keys
+for the same field is how a record becomes readable by one service and opaque to the other.
+
+`domainEvent`, `counters` and `idempotencyKey` appear on more than one side because each service keeps its
+own instance, not because any of them reaches into another.
+
+The authority collections are NOT listed here. They live in its own registry, which is the source that its
+setup creates from and that its invariant test iterates, so restating them here would create a second list
+to keep in step. What matters at this level is the boundary: no row below names a principal, a credential,
+a role or a token, and a row that started to would be the extraction leaking back.
 
 #### Payment service provider (`psp/backend/`)
 
 | Collection | Owning module | Notes |
 |---|---|---|
-| `party` | `identity` | PII owner surface, QE tiers |
-| `customerAuthenticationAssessment` | `identity` | Credentials and the login realm (`leafypay` from v37) |
-| `partyAuthenticationAssessment` | `identity` | Identity verification stubs |
-| `authenticationDomain` | `domain` | Realm configuration: name, protocol, flow |
-| `role` | `identity` | Permission matrix |
-| `partyAuthenticationKey` | `identity` | Enrolled authenticator keys |
-| `partyEnrolledCredential` | `identity` | Enrolment records |
-| `partyBackchannelAuthentication` | `identity` | Backchannel authentication requests |
-| `partyAuthorizationCode` | `identity` | Authorisation codes, short lived |
-| `partyIssuedToken` | `identity` | Issued tokens, for revocation |
-| `partyAuthConsent` | `identity` | Consent to an authorisation request |
-| `consentAgreement` | `identity` | Granted scopes per client |
-| `consentAccessLog` | `identity` | Evidence of consent-checked access |
+| `party` | `customer` | PII owner surface, QE tiers. A party is a business record about a person; it never held a credential, and it stays here. Re-homed out of `identity` in v39 |
+| `consentAgreement` | `customer` | Account-access consent under the payment-services rules: regulated business data belonging to the institution holding the account. Explicitly NOT the OAuth consent that moved to the authority; the two share a word and nothing else |
+| `consentAccessLog` | `customer` | Evidence of consent-checked access, and it stays for the same reason |
 | `customerAgreementProcedure` | `customer` | KYC, QE identity fields |
-| `merchantAgreementProcedure` | `gateway` | KYB and beneficial owners |
+| `merchantAgreementProcedure` | `gateway` | KYB and beneficial owners. No credential lives here from v39 P2 |
 | `merchantAgreementEvents` | `gateway` | KYB decision history |
+| `oauthClient` | `gateway` | OAuth client registry (v39 P2), out of the commercial record. Owned by `gateway` only until the registry moves to the identity authority |
+| `apiKey` | `gateway` | Integration keys, one document per key (v39 P2), replacing an unbounded array inside the merchant record |
 | `paymentCardManagement` | `customer` | Card-on-file. BIN plus last four, never a PAN |
 | `cardEtokenProcedure` | `customer` | Acceptance-side surrogate tokens |
 | `paymentCardRegistry` | `customer` | Dedupes accepted card INSTRUMENTS; holder count is the shared-card fraud signal. Distinct from the bank's `issuedCardRegistry` |
@@ -4747,7 +4833,7 @@ sides because each service keeps its OWN instance, not because either reaches in
 | `paymentOrderProcedure` | `gateway` | Payment orders |
 | ~~`recurringMandateProcedure`~~ | retired (v37) | Replaced by the bank's `periodicPaymentProcedure`, which is Berlin Group's own standing-order resource. Created by neither side |
 | `payoutAccountArrangement` | `gateway` | Linked account record. Balance is a PROJECTION from v37; the bank owns the ledger |
-| `counterpartyArrangement` | `identity` | Beneficiaries |
+| `counterpartyArrangement` | `customer` | Beneficiaries |
 | `checkoutSessionLog` | `gateway` | Checkout sessions |
 | `paymentLinkRecord` | `gateway` | Payment links |
 | `paymentRequestProcedure` | `gateway` | Request to Pay |

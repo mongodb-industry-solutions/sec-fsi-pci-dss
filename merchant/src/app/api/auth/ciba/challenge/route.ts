@@ -1,4 +1,4 @@
-// GET /api/auth/ciba/challenge?auth_req_id=…: session-less relay to the PSP challenge endpoint.
+// GET /api/auth/ciba/challenge?auth_req_id=…: session-less relay to the authority challenge endpoint.
 // Served server-side (no CORS surface). Safe without a session: approval is gated by the signature, not
 // by holding the auth_req_id. Returns { challenge, binding_message, client_name, scopes, status }.
 import { NextRequest, NextResponse } from 'next/server';
@@ -12,10 +12,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'invalid auth_req_id' }, { status: 400 });
   }
 
-  const res = await fetch(`${ENV.pspBaseUrl()}/api/v1/auth/bc-authorize/${encodeURIComponent(authReqId)}`, {
+  const res = await fetch(`${ENV.issuerUrl()}/protocol/openid-connect/ext/ciba/auth/${encodeURIComponent(authReqId)}`, {
     cache: 'no-store',
   }).catch(() => null);
-  if (!res) return NextResponse.json({ error: 'psp_unreachable' }, { status: 502 });
+  if (!res) return NextResponse.json({ error: 'authority_unreachable' }, { status: 502 });
   const text = await res.text();
   return new NextResponse(text, { status: res.status, headers: { 'Content-Type': 'application/json' } });
 }

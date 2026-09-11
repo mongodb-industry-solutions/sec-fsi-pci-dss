@@ -1,7 +1,7 @@
 /**
  * Unit tests: a case reference must SCOPE a beneficiary read, not merely satisfy the predicate
  * check (ADR-048 no-enumeration).
- * Source: backend/src/modules/identity/services/counterpartyArrangement.service.ts (listAllBeneficiaries)
+ * Source: backend/src/modules/customer/services/counterpartyArrangement.service.ts (listAllBeneficiaries)
  *
  * assertBeneficiaryPredicate accepts `caseRef` as a discriminating predicate. If the query does not
  * then filter by the party behind that case, any caseRef value returns the whole registry, which is
@@ -15,7 +15,7 @@ vi.mock('../../../../../psp/backend/src/vendors/encryption/roleClients', () => (
   getEncryptionWriteDb: vi.fn(),
 }));
 
-import { listAllBeneficiaries, PredicateRequiredError } from '../../../../../psp/backend/src/modules/identity/services/counterpartyArrangement.service';
+import { listAllBeneficiaries, PredicateRequiredError } from '../../../../../psp/backend/src/modules/customer/services/counterpartyArrangement.service';
 
 const CASE_REF = 'FD-2026-000123';
 const AGREEMENT = 'agreement-1';

@@ -9,13 +9,26 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { config } from '../../../../psp/backend/src/config';
+// Imported for its side effect as much as its value: config loads the environment, and the panel
+// secret is derived from a variable in it.
+import '../../../../psp/backend/src/config';
+import { adminSecret } from '../../../../psp/backend/src/vendors/security/secrets';
 
 const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
 const ROOT = resolve(__dirname, '../../../..');
 
+/**
+ * A panel token, signed with the panel's OWN secret.
+ *
+ * This previously used the application signing secret, which the panel does not accept. The panel is
+ * an operations surface deliberately kept outside the principal identity the authority issues, so
+ * that rebuilding a database is never reachable with a token from an ordinary sign-in; it verifies
+ * against a separate secret and it holds a separate operator password. The password is stored hashed
+ * in the environment, so a test cannot present it, and driving the login is not what these cases are
+ * about: they are about the task allowlist and the streamed output behind the boundary.
+ */
 function adminToken(): string {
-  return jwt.sign({ role: 'admin', sub: 'p11-ops' }, config.app.jwtSecret, { expiresIn: 300 });
+  return jwt.sign({ role: 'admin', sub: 'p11-ops' }, adminSecret(), { expiresIn: 300 });
 }
 
 async function reachable(): Promise<boolean> {

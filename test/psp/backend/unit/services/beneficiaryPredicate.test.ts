@@ -1,6 +1,6 @@
 /**
  * Unit tests: v32 A1/A2/A7/A8 no enumeration of beneficiaries (tests 1-3, 8, 20)
- * Source: backend/src/modules/identity/services/counterpartyArrangement.service.ts
+ * Source: backend/src/modules/customer/services/counterpartyArrangement.service.ts
  *         backend/src/shared/models/acl.model.ts
  *
  * Before v32, GET /api/v1/beneficiaries with no predicate returned every beneficiary of every
@@ -11,6 +11,10 @@
  * EBA/GL/2019/04 §31(a) "prevent unjustified access to a large set of data".
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { giamPath, hasGiam } from '../../../../support/giamRepo';
+
+// The role matrix is the authority's fixture, in its own repository now.
+const HAS_ROLES = hasGiam('backend/data/roles.json');
 
 const h = vi.hoisted(() => ({ getDbForRole: vi.fn() }));
 vi.mock('../../../../../psp/backend/src/vendors/encryption/roleClients', () => ({
@@ -25,8 +29,10 @@ import {
   getBeneficiaryAggregates,
   PredicateRequiredError,
   BENEFICIARY_MIN_QUERY_LENGTH,
-} from '../../../../../psp/backend/src/modules/identity/services/counterpartyArrangement.service';
-import { BUILTIN_ROLES, hasPermission } from '../../../../../psp/backend/src/shared/models/acl.model';
+} from '../../../../../psp/backend/src/modules/customer/services/counterpartyArrangement.service';
+import { hasPermission } from '../../../../../psp/backend/src/shared/models/permissionCatalog';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 /** Records the filter the service builds, so scoping is asserted, not assumed. */
 function makeDb() {
@@ -119,8 +125,32 @@ describe('getBeneficiaryAggregates (A7)', () => {
   });
 });
 
-describe('role grants for beneficiaries (test 20)', () => {
-  const perms = (roleName: string) => BUILTIN_ROLES.find((r) => r.roleName === roleName)?.rolePermissions;
+describe.skipIf(!HAS_ROLES)('role grants for beneficiaries (test 20)', () => {
+  /**
+   * The roles are the authority's now, so this reads its fixture rather than a table here.
+   *
+   * The assertions stay because they are about BENEFICIARIES: which roles may search across parties,
+   * and which may not. That is this module's business rule, and the fact that the matrix is stored
+   * somewhere else does not make it somebody else's rule to state. The catalog helper is still local,
+   * because deciding whether a permission set contains a permission is a pure claim check.
+   */
+  const roles = (HAS_ROLES
+    ? JSON.parse(readFileSync(giamPath('backend/data/roles.json'), 'utf8'))
+    : []) as Array<{ name: string; permissions: Record<string, string[]> }>;
+
+  /**
+   * A permission is the string `resource:action`, which is the one spelling the catalog helper
+   * takes. This built `{ resource, action }` objects, the shape from before that spelling was
+   * settled, so every check below silently answered false. It went unnoticed because the block was
+   * skipped whenever the authority's checkout could not be located, which was always.
+   */
+  const perms = (roleName: string): string[] | undefined => {
+    const role = roles.find((r) => r.name === roleName);
+    if (!role) return undefined;
+    return Object.entries(role.permissions).flatMap(
+      ([resource, actions]) => actions.map((action) => `${resource}:${action}`),
+    );
+  };
 
   it('L1 may drill down but may NOT search across parties', () => {
     expect(hasPermission(perms('level1_analyst'), 'beneficiaries', 'view')).toBe(true);
@@ -148,7 +178,8 @@ describe('role grants for beneficiaries (test 20)', () => {
 
   it('roles with no business need hold nothing on beneficiaries', () => {
     for (const role of ['merchant_officer', 'manager', 'operations_officer']) {
-      expect(perms(role)?.beneficiaries, role).toBeUndefined();
+      const held = (perms(role) ?? []).filter((entry) => entry.startsWith('beneficiaries:'));
+      expect(held, role).toEqual([]);
     }
   });
 });

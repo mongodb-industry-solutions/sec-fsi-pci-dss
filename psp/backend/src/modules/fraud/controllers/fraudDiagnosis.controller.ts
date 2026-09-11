@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { getCases, getCaseById, updateCase, getCaseEvents, getAllAuditEvents, appendAuditEvent, createFraudCase, openCaseFromExecution, addCaseNote, retractCaseNote, getCaseNotes, getFraudStats, getFraudIntegrity } from '../services/fraudDiagnosis.service';
 import { getCardIntegrity } from '../../customer/services/paymentCard.service';
 import { getTransactionById } from '../../transaction/services/cardTransaction.service';
-import { generateToken } from '../../../vendors/security/escalationTokens';
+import { requestElevation } from '../../../vendors/security/elevation';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
@@ -522,12 +522,12 @@ Req 7 (least privilege) and Req 10 (audit of sensitive access).`,
       },
     },
   }, async (request, reply) => {
-    const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+    const { userRole, elevation } = request as unknown as AuthenticatedRequest;
     if (!ENRICHMENT_ROLES.includes(userRole)) {
       return reply.status(403).send({ error: 'Access denied: investigation enrichment requires an analyst or auditor role.' });
     }
     const { id } = request.params as { id: string };
-    const result = await getCaseEnrichment(fastify.db, id, userRole, escalationToken, actorOf(request));
+    const result = await getCaseEnrichment(fastify.db, id, userRole, elevation, actorOf(request));
     if (!result) return reply.status(404).send({ error: 'Fraud case not found' });
     return reply.send(result);
   });
@@ -933,7 +933,7 @@ The Level 2 Investigator gains access to QE:none sensitive fields (DEK-sensitive
             fraudDiagnosisInstanceReference: { type: 'string' },
             fraudDiagnosisCaseStatus: { type: 'string', enum: ['escalated'] },
             escalationDateTime: { type: 'string', format: 'date-time' },
-            escalationToken: { type: 'string', description: '[v2] Short-lived token granting DEK-sensitive access. Not yet implemented.' },
+            elevation: { type: 'string', description: '[v2] Short-lived token granting DEK-sensitive access. Not yet implemented.' },
           },
         },
         400: { $ref: 'Error#' },
@@ -996,7 +996,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
           properties: {
             fraudDiagnosisInstanceReference: { type: 'string' },
             fraudDiagnosisCaseStatus: { type: 'string', enum: ['escalated'] },
-            escalationToken: {
+            elevation: {
               type: 'string',
               description: 'Short-lived UUID token granting DEK-sensitive access to QE:none fields. Valid for 4 hours. Include in X-Escalation-Token header.',
             },
@@ -1020,7 +1020,21 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
       return reply.status(422).send({ error: 'Case must be in escalated status to approve' });
     }
 
-    const token = generateToken(id, 'level2_investigator');
+    // Recorded at the authority rather than minted here. The difference is that somebody can now ask
+    // who holds elevated access on this case, and take it back before it expires; neither was
+    // possible with a signed token this service produced and nothing tracked.
+    const token = await requestElevation(request, {
+      roleName: 'level2_investigator',
+      scopeKind: 'case',
+      scopeRef: id,
+      justification: approvalNotes ?? 'Escalation approved for investigation of this case.',
+      durationSeconds: 4 * 60 * 60,
+    });
+    if (!token) {
+      // No local fallback. An elevation the authority declined to record is one nobody can review,
+      // which is the entire reason it moved.
+      return reply.status(503 as 422).send({ error: 'The elevation could not be recorded; access was not granted.' });
+    }
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
@@ -1042,7 +1056,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     return reply.send({
       fraudDiagnosisInstanceReference: id,
       fraudDiagnosisCaseStatus: 'escalated',
-      escalationToken: token,
+      elevation: token,
       escalationApprovedAt: approvedAt.toISOString(),
       tokenExpiresAt: expiresAt.toISOString(),
     });

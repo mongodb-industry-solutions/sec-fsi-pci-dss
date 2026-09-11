@@ -6,14 +6,13 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 
-const REGISTRATION = { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: ['AISP', 'PISP', 'CBPII'] } as never;
-const withScopes = (scopes: string[]) => issueAccessToken(REGISTRATION, scopes as never).accessToken;
-
-const CARD_DATA = () => withScopes(['card-data', 'card-authorisations']);
+// Real tokens from the authority, not tokens this test minted for itself. The scope gate is proven
+// by asking for a NARROWER token and being refused, which is the same thing a real caller would hit.
+const CARD_DATA = () => tppToken(['card-data', 'card-authorisations']);
 // Deliberately without card-data: this is the token the funds gate uses.
-const HOLD_ONLY = () => withScopes(['card-authorisations']);
+const HOLD_ONLY = () => tppToken(['card-authorisations']);
 
 describe('v37 P7.1: the card issuer surface', () => {
   let app: FastifyInstance;
@@ -25,6 +24,7 @@ describe('v37 P7.1: the card issuer surface', () => {
   });
 
   afterAll(async () => {
+    await stopTppAuthority();
     await app?.close();
   });
 
@@ -39,7 +39,7 @@ describe('v37 P7.1: the card issuer surface', () => {
       const response = await app.inject({
         method: method as 'POST',
         url,
-        headers: { authorization: `Bearer ${HOLD_ONLY()}` },
+        headers: { authorization: `Bearer ${await HOLD_ONLY()}` },
         payload: {},
       });
       expect(response.statusCode, `${method} ${url} must refuse the hold-only token`).toBe(403);
@@ -56,7 +56,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/cards',
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { network: 'VISA', expiryMonth: '12', expiryYear: '31' },
     });
     if (response.statusCode === 503) return; // no database in this environment
@@ -74,7 +74,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/cards',
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { network: 'NOTANETWORK', expiryMonth: '12', expiryYear: '31' },
     });
     if (response.statusCode === 503) return;
@@ -86,7 +86,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const status = async (value: string) => app.inject({
       method: 'PUT',
       url: `/v1/cards/${issuedToken}/status`,
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { status: value },
     });
 
@@ -104,7 +104,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'PUT',
       url: `/v1/cards/${issuedToken}/limits`,
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { perTransactionAmount: 250, limitCurrency: 'EUR' },
     });
     expect(response.statusCode).toBe(200);
@@ -116,7 +116,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const created = await app.inject({
       method: 'POST',
       url: '/v1/cards',
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { network: 'VISA', expiryMonth: '01', expiryYear: '32' },
     });
     if (created.statusCode !== 201) return;
@@ -125,7 +125,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: `/v1/cards/${original}/replacements`,
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: {},
     });
     expect(response.statusCode).toBe(201);
@@ -137,7 +137,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const old = await app.inject({
       method: 'GET',
       url: `/v1/cards/${original}`,
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
     });
     expect(old.json().status).toBe('revoked');
   });
@@ -146,7 +146,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/v1/cards/pm_definitely_not_a_card',
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
     });
     if (response.statusCode === 503) return;
     expect(response.statusCode).toBe(404);
@@ -156,7 +156,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/cards/validations',
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { cardNumber: '4111111111111111', cvv: '123', expiry: '12/34' },
     });
     if (response.statusCode === 503) return;
@@ -170,7 +170,7 @@ describe('v37 P7.1: the card issuer surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/cards/validations',
-      headers: { authorization: `Bearer ${CARD_DATA()}` },
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
       payload: { cvv: '123' },
     });
     expect(response.statusCode).toBe(400);

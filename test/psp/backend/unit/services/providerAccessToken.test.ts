@@ -6,6 +6,7 @@
 // what this replaces.
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Db } from 'mongodb';
+import { clientSecretFor } from '@leafypay/platform-links';
 import {
   getProviderAccessToken, getProviderBaseUrl, resetProviderTokenCache,
 } from '../../../../../psp/backend/src/modules/provider/services/providerAccessToken.service';
@@ -19,7 +20,7 @@ const WITH_CREDENTIAL = {
     scheme: 'oauth2_cc',
     oauth2: {
       clientId: 'leafypay-psp',
-      clientSecretPlaintext: 'dev-bankcore-tpp-secret',
+      clientSecretPlaintext: clientSecretFor('leafypay-psp'),
       tokenEndpoint: 'http://bank:8083/v1/oauth/token',
       scopes: ['accounts', 'balances'],
       tokenCachingEnabled: true,

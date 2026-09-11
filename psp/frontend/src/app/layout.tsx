@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { UIProvider } from '../components/ui/ConfirmProvider';
+import { SessionKeeper } from '../components/SessionKeeper';
 import { BRAND } from '../config/brand';
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning>
+        <SessionKeeper />
         <UIProvider>{children}</UIProvider>
       </body>
     </html>

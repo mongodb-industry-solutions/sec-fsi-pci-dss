@@ -669,6 +669,15 @@ export async function runIntegrationTest(
     return { direction, executed: false, status: 'error', latencyMs: 0, transformed, appliedRules: rules.length, error: 'No endpoint configured and no override URL provided.' };
   }
   const targetUrl = resolveServiceUrl(rawTarget);
+
+  // The credential is obtained BEFORE the clock starts, as it is on the live path above.
+  //
+  // This timeout is meant to bound the call to the PROVIDER. Arming it first also charged it for
+  // acquiring the token to make that call, which is a request to the authority and not to the
+  // provider at all: on a cold token cache the two together exceeded the budget, and the provider was
+  // marked degraded for a delay that was never its own.
+  const authHeaders = await buildAuthHeaders(provider.authConfig, provider.externalProviderArrangementType);
+
   const start = Date.now();
   try {
     const controller = new AbortController();
@@ -678,7 +687,7 @@ export async function runIntegrationTest(
       headers: {
         'Content-Type': 'application/json',
         'X-Integration-Test': 'true',
-        ...(await buildAuthHeaders(provider.authConfig, provider.externalProviderArrangementType)),
+        ...authHeaders,
       },
       body: JSON.stringify(transformed),
       signal: controller.signal,

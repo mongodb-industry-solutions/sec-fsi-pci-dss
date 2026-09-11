@@ -41,9 +41,11 @@ function serviceWorkspaces(): string[] {
 
 function sharedDependenciesOf(workspace: string): string[] {
   const deps = (JSON.parse(read(workspace, 'package.json')) as { dependencies?: Record<string, string> }).dependencies ?? {};
+  // Any number of `../` segments: a root-level workspace reaches packages/ with one, and matching
+  // only the two-segment form let exactly that case through unnoticed.
   return Object.values(deps)
-    .filter((spec) => spec.startsWith('file:../../packages/'))
-    .map((spec) => spec.replace('file:../../packages/', ''));
+    .map((spec) => /^file:(?:\.\.\/)+packages\/(.+)$/.exec(spec)?.[1])
+    .filter((name): name is string => Boolean(name));
 }
 
 // The build context per workspace, as docker compose declares it. Only a repo-root context can see

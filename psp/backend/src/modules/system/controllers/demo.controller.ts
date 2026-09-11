@@ -4,10 +4,10 @@ import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
-import { getDemoUsers } from '../../identity/services/auth.service';
+import { getDemoUsers } from '../services/demoRoster.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
-import { authorizeRawDocumentAccess, RAW_COLLECTION_RESOURCE } from '../services/rawDocumentAccess.service';
+import { authorizeRawDocumentAccess, RAW_COLLECTION_RESOURCE, RAW_COLLECTION_ID_FIELD } from '../services/rawDocumentAccess.service';
 import { DEMO_TEAM_CONTACT_COLLECTION, DemoTeamContact } from '../models/demoTeamContact.model';
 import { config } from '../../../config';
 
@@ -248,7 +248,7 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
               items: {
                 type: 'object',
                 properties: {
-                  email: { type: 'string', format: 'email', description: 'Login email; submit to POST /api/v1/auth/login.' },
+                  email: { type: 'string', format: 'email', description: 'Login email, entered at the identity authority sign-in page.' },
                   name: { type: 'string', description: 'Display name.' },
                   role: {
                     type: 'string',
@@ -345,12 +345,23 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
     // Allowed collections and the authorization rule both live in the service.
     const caller = (request as unknown as {
       userRole?: string;
-      user?: { role?: string; partyRef?: string; sub?: string };
+      user?: {
+        role?: string;
+        partyRef?: string;
+        sub?: string;
+        permissions?: string[];
+        effectivePermissions?: string[];
+      };
     });
     const decision = await authorizeRawDocumentAccess(fastify.db, collection, id, {
       ...(caller.userRole ?? caller.user?.role ? { role: caller.userRole ?? caller.user?.role } : {}),
       ...(caller.user?.partyRef ? { partyRef: caller.user.partyRef } : {}),
       ...(caller.user?.sub ? { sub: caller.user.sub } : {}),
+      // Resolved by the authority at issuance; this application decides with it, never about it.
+      // Both forms are passed: the expanded set where the verifier had a catalog, the explicit
+      // claim otherwise, and the service prefers the former.
+      ...(caller.user?.permissions ? { permissions: caller.user.permissions } : {}),
+      ...(caller.user?.effectivePermissions ? { effectivePermissions: caller.user.effectivePermissions } : {}),
     });
     if (!decision.allowed) {
       return reply.status(decision.status).send({
@@ -383,16 +394,10 @@ QE-protected fields appear as BSON binary ciphertext  -  this is the core of the
 
       const rawClient = await getRawClient();
       const db = rawClient.db(config.mongodb.dbName);
-      const doc = await db.collection(collection).findOne({
-        $or: [
-          { partyInstanceReference: resolvedId },
-          { customerAuthenticationInstanceReference: resolvedId },
-          { cardTransactionInstanceReference: resolvedId },
-          { customerAgreementInstanceReference: resolvedId },
-          { paymentCardInstanceReference: resolvedId },
-          { fraudDiagnosisInstanceReference: resolvedId },
-        ],
-      });
+      // The collection's own unique `*InstanceReference` field, not a six-way `$or`: see
+      // `RAW_COLLECTION_ID_FIELD`'s own comment for why the `$or` made this a collection scan.
+      const idField = RAW_COLLECTION_ID_FIELD[collection];
+      const doc = await db.collection(collection).findOne({ [idField]: resolvedId });
 
       if (!doc) return reply.status(404).send({ error: 'Document not found' });
       return reply.send({ collection, document: doc });

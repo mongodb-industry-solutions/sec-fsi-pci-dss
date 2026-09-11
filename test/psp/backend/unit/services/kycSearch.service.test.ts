@@ -29,7 +29,7 @@ vi.mock('../../../../../psp/backend/src/modules/fraud/services/fraudDiagnosis.se
 }));
 
 import { searchKyc, getKycSearchRegistry } from '../../../../../psp/backend/src/modules/customer/services/customerAgreement.service';
-import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/identity/models/party.model';
+import { PARTY_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/party.model';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../../../../psp/backend/src/modules/customer/models/customerAgreement.model';
 
 const party = {
@@ -266,7 +266,7 @@ describe('searchKyc tier gate on result fields', () => {
     expect(rows[0].sensitive).toBeUndefined();
 
     h.validateToken.mockReturnValue({ valid: true, entry: { caseId: 'case-1' } });
-    rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'level2_investigator', 'tok');
+    rows = await searchKyc({ field: 'partyNationality', value: 'ES' }, 'level2_investigator', { caseRef: 'case-1' });
     expect(rows[0].sensitive).toBeDefined();
   });
 });

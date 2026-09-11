@@ -1,7 +1,7 @@
 /**
  * Unit tests: v32 C7 the beneficiary lookup value is unrecoverable by design (test 28)
- * Source: backend/src/modules/identity/models/counterpartyArrangement.model.ts
- *         backend/src/modules/identity/services/counterpartyArrangement.service.ts
+ * Source: backend/src/modules/customer/models/counterpartyArrangement.model.ts
+ *         backend/src/modules/customer/services/counterpartyArrangement.service.ts
  *
  * The plan required this to be a STATED decision rather than an omission: the raw phone/email of a
  * counterparty is masked before it is written and the plaintext is never persisted, so no role can
@@ -13,7 +13,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { maskLookupValue } from '../../../../../psp/backend/src/modules/identity/models/counterpartyArrangement.model';
+import { maskLookupValue } from '../../../../../psp/backend/src/modules/customer/models/counterpartyArrangement.model';
 
 describe('maskLookupValue', () => {
   it('masks an email to a single leading character plus the domain', () => {
@@ -64,7 +64,7 @@ describe('no reveal path exists for the counterparty lookup value', () => {
 
   it('writes the masked hint, never a raw lookup field, on the arrangement record', () => {
     const service = readFileSync(
-      join(SRC, 'modules', 'identity', 'services', 'counterpartyArrangement.service.ts'), 'utf-8',
+      join(SRC, 'modules', 'customer', 'services', 'counterpartyArrangement.service.ts'), 'utf-8',
     );
     // Every persisted hint comes from the masker.
     const hintWrites = service.match(/counterpartyLookupHint:\s*([A-Za-z0-9_.]+)/g) ?? [];

@@ -10,10 +10,11 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   MERCHANT_AGREEMENT_COLLECTION,
   MerchantAgreementControlRecord,
-  MerchantApiKeyRecord,
   MerchantWebhookConfig,
   WebhookEventType,
 } from '../models/merchantAgreement.model';
+import { ApiKeyRecord } from '../models/apiKey.model';
+import { listActiveKeysByOwner } from './apiKeyRegistry.service';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION, MerchantWebhookDeliveryLog } from '../models/merchantWebhookLog.model';
 import { deliverWebhook, signWebhookPayload } from './webhook.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
@@ -212,7 +213,7 @@ export class WebhookService {
   // production systems should use a dedicated outbound credential stored in a secrets manager.
   static resolveApiKeyAuth(
     cfg: MerchantWebhookConfig,
-    apiKeys: MerchantApiKeyRecord[],
+    apiKeys: ApiKeyRecord[],
   ): { extraHeaders?: Record<string, string>; bodyFields?: Record<string, string> } {
     if (!cfg.webhookApiKeyId || !cfg.webhookApiKeyTransport || !cfg.webhookApiKeyFieldName) return {};
     const key = apiKeys.find((k) => k.keyId === cfg.webhookApiKeyId && k.keyStatus === 'active');
@@ -344,7 +345,7 @@ export class WebhookService {
     }
 
     const raw = customPayload ?? (WebhookService.buildTestPayload(cfg.webhookEventType, merchantId) as Record<string, unknown>);
-    const apiKeyAuth = WebhookService.resolveApiKeyAuth(cfg, merchant.merchantApiKeys ?? []);
+    const apiKeyAuth = WebhookService.resolveApiKeyAuth(cfg, await listActiveKeysByOwner(this.db, merchantId));
     const mappedData = {
       ...raw,
       test: true,
@@ -417,9 +418,12 @@ export class WebhookService {
 
     const messageId = uuidv4();
     const timestamp = new Date().toISOString();
+    // Loaded once for the whole fan-out rather than per hook: the keys are the same for every
+    // webhook this merchant has configured.
+    const ownerKeys = await listActiveKeysByOwner(this.db, merchantId);
 
     for (const cfg of hooks) {
-      const apiKeyAuth = WebhookService.resolveApiKeyAuth(cfg, merchant.merchantApiKeys ?? []);
+      const apiKeyAuth = WebhookService.resolveApiKeyAuth(cfg, ownerKeys);
       const mapped = WebhookService.applyBodyMapping(
         { messageId, eventType, timestamp, specVersion: '1.0', data, ...(apiKeyAuth.bodyFields ?? {}) },
         cfg.webhookAttributeMapping,

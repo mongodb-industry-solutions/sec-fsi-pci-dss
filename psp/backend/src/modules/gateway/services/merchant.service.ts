@@ -11,8 +11,11 @@ import {
   MerchantAgreementStatus,
   MerchantAgreementKybCheck,
   KybCheckStatus,
-  MerchantApiKeyRecord,
 } from '../models/merchantAgreement.model';
+import { ApiKeyRecord } from '../models/apiKey.model';
+import {
+  insertKey, listKeysByOwner, listActiveKeysByOwner, revokeKey, setKeyLabel, touchKeyUsage,
+} from './apiKeyRegistry.service';
 import { emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { deliverWebhook } from './webhook.service';
@@ -67,7 +70,7 @@ export async function getMerchants(
 
   const col = db.collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION);
   const [results, total] = await Promise.all([
-    col.find(query).project({ merchantApiKeys: 0 }).skip(skip).limit(limit).toArray(),
+    col.find(query).skip(skip).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
 
@@ -117,7 +120,7 @@ export async function getMerchantByOwnerPartyRef(db: Db, partyRef: string) {
           { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': partyRef },
         ],
       } as never,
-      { projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
+      { projection: { merchantWebhookSecret: 0 } }
     );
   return merchant ?? null;
 }
@@ -127,7 +130,7 @@ export async function getMerchantById(db: Db, id: string) {
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne(
       { merchantAgreementInstanceReference: id } as Partial<MerchantAgreementControlRecord>,
-      { projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
+      { projection: { merchantWebhookSecret: 0 } }
     );
   return merchant ?? null;
 }
@@ -184,12 +187,16 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
   // Generate initial API key
   const plaintext = generatePlaintextApiKey();
   const keyHashBcrypt = await bcryptHash(plaintext, BCRYPT_ROUNDS);
-  const initialKey: MerchantApiKeyRecord = {
+  const initialKey: ApiKeyRecord = {
     keyId: uuidv4(),
     keyPrefix: plaintext.slice(0, 12),
     keyHashBcrypt,
     keyStatus: 'active',
     keyCreatedDateTime: now,
+    merchantAgreementInstanceReference: id,
+    recordCreatedDateTime: now,
+    recordUpdatedDateTime: now,
+    schemaVersion: 1,
   };
 
   const riskMcc = ['5812', '6011', '7995'];
@@ -217,7 +224,6 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
     merchantAverageTransactionAmount: 0,
     merchantTransactionCount30d: 0,
     merchantRiskCategory,
-    merchantApiKeys: [initialKey],
     bianServiceDomain: 'Merchant Relations',
     bianControlRecordType: 'MerchantAgreementProcedure',
     recordCreatedDateTime: now,
@@ -226,6 +232,10 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
   };
 
   await db.collection(MERCHANT_AGREEMENT_COLLECTION).insertOne(merchant as object);
+  // After the merchant exists, so a key can never reference an owner that does not.
+  await insertKey(db, initialKey);
+  // After the merchant exists, so a key can never reference an owner that does not.
+  await insertKey(db, initialKey);
 
   await appendMerchantEvent(db, id, 'merchant.validation.requested', {
     performedByPartyReference: input.merchantOwnerPartyReference,
@@ -359,7 +369,7 @@ export async function updateMerchant(
   const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).findOneAndUpdate(
     { merchantAgreementInstanceReference: id },
     { $set: { ...patch, recordUpdatedDateTime: new Date() } },
-    { returnDocument: 'after', projection: { merchantApiKeys: 0, merchantWebhookSecret: 0 } }
+    { returnDocument: 'after', projection: { merchantWebhookSecret: 0 } }
   );
   if (result) {
     await appendMerchantEvent(db, id, 'merchant.updated', { details: { fields: Object.keys(patch) } });
@@ -471,7 +481,7 @@ export async function generateApiKey(
   const keyHashBcrypt = await bcryptHash(plaintext, BCRYPT_ROUNDS);
   const now = new Date();
 
-  const newKey: MerchantApiKeyRecord = {
+  const newKey: ApiKeyRecord = {
     keyId: uuidv4(),
     keyPrefix: plaintext.slice(0, 12),
     keyHashBcrypt,
@@ -479,12 +489,13 @@ export async function generateApiKey(
     keyCreatedDateTime: now,
     keyOrigin: 'generated',
     ...(label?.trim() && { keyLabel: label.trim() }),
+    merchantAgreementInstanceReference: merchantId,
+    recordCreatedDateTime: now,
+    recordUpdatedDateTime: now,
+    schemaVersion: 1,
   };
 
-  await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
-    { merchantAgreementInstanceReference: merchantId },
-    { $push: { merchantApiKeys: newKey }, $set: { recordUpdatedDateTime: now } } as object
-  );
+  await insertKey(db, newKey);
 
   return {
     keyId: newKey.keyId,
@@ -515,13 +526,13 @@ export async function importApiKey(
   if (trimmed.length < 12) return 'invalid';
 
   // Reject re-importing a key already on file (compare against active keys' hashes).
-  const active = (merchant.merchantApiKeys ?? []).filter((k) => k.keyStatus === 'active');
+  const active = await listActiveKeysByOwner(db, merchantId);
   for (const k of active) {
     if (await bcryptCompare(trimmed, k.keyHashBcrypt)) return 'duplicate';
   }
 
   const now = new Date();
-  const newKey: MerchantApiKeyRecord = {
+  const newKey: ApiKeyRecord = {
     keyId: uuidv4(),
     keyPrefix: trimmed.slice(0, 12),
     keyHashBcrypt: await bcryptHash(trimmed, BCRYPT_ROUNDS),
@@ -529,12 +540,13 @@ export async function importApiKey(
     keyCreatedDateTime: now,
     keyOrigin: 'imported',
     ...(label?.trim() && { keyLabel: label.trim() }),
+    merchantAgreementInstanceReference: merchantId,
+    recordCreatedDateTime: now,
+    recordUpdatedDateTime: now,
+    schemaVersion: 1,
   };
 
-  await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
-    { merchantAgreementInstanceReference: merchantId },
-    { $push: { merchantApiKeys: newKey }, $set: { recordUpdatedDateTime: now } } as object
-  );
+  await insertKey(db, newKey);
 
   return { keyId: newKey.keyId, keyPrefix: newKey.keyPrefix, keyLabel: newKey.keyLabel, keyStatus: 'active', keyOrigin: 'imported' };
 }
@@ -547,14 +559,8 @@ export async function updateApiKeyLabel(
   label: string,
 ): Promise<'ok' | 'not_found'> {
   const trimmed = label.trim();
-  const update = trimmed
-    ? { $set: { 'merchantApiKeys.$.keyLabel': trimmed, recordUpdatedDateTime: new Date() } }
-    : { $unset: { 'merchantApiKeys.$.keyLabel': '' }, $set: { recordUpdatedDateTime: new Date() } };
-  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
-    { merchantAgreementInstanceReference: merchantId, 'merchantApiKeys.keyId': keyId } as object,
-    update as object,
-  );
-  return result.matchedCount > 0 ? 'ok' : 'not_found';
+  const matched = await setKeyLabel(db, merchantId, keyId, trimmed || null);
+  return matched ? 'ok' : 'not_found';
 }
 
 /**
@@ -566,10 +572,10 @@ export async function getMerchantApiKeys(db: Db, merchantId: string) {
     .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
     .findOne(
       { merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>,
-      { projection: { merchantApiKeys: 1 } },
+      { projection: { merchantAgreementInstanceReference: 1 } },
     );
   if (!merchant) return null;
-  return (merchant.merchantApiKeys ?? []).map((k) => ({
+  return (await listKeysByOwner(db, merchantId)).map((k) => ({
     keyId: k.keyId,
     keyPrefix: k.keyPrefix,
     keyLabel: k.keyLabel ?? null,
@@ -585,15 +591,7 @@ export async function revokeApiKey(
   merchantId: string,
   keyId: string
 ): Promise<'ok' | 'not_found'> {
-  const result = await db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
-    {
-      merchantAgreementInstanceReference: merchantId,
-      'merchantApiKeys.keyId': keyId,
-    },
-    { $set: { 'merchantApiKeys.$.keyStatus': 'revoked', recordUpdatedDateTime: new Date() } }
-  );
-
-  return result.matchedCount > 0 ? 'ok' : 'not_found';
+  return (await revokeKey(db, merchantId, keyId)) ? 'ok' : 'not_found';
 }
 
 export async function verifyApiKey(
@@ -601,22 +599,17 @@ export async function verifyApiKey(
   merchantId: string,
   plaintext: string
 ): Promise<boolean> {
-  const merchant = await db
-    .collection<MerchantAgreementControlRecord>(MERCHANT_AGREEMENT_COLLECTION)
-    .findOne({ merchantAgreementInstanceReference: merchantId } as Partial<MerchantAgreementControlRecord>);
-
-  if (!merchant) return false;
-
-  const activeKeys = merchant.merchantApiKeys?.filter((k) => k.keyStatus === 'active') ?? [];
+  // bcrypt is salted, so a presented key cannot be looked up by its hash: the owner's active keys
+  // are loaded and compared one by one. Unchanged from before the extraction, deliberately, because
+  // changing the verification algorithm here would hide a behavioural change inside a move.
+  const activeKeys = await listActiveKeysByOwner(db, merchantId);
 
   for (const key of activeKeys) {
     const match = await bcryptCompare(plaintext, key.keyHashBcrypt);
     if (match) {
-      // Update last used timestamp (fire-and-forget)
-      db.collection(MERCHANT_AGREEMENT_COLLECTION).updateOne(
-        { merchantAgreementInstanceReference: merchantId, 'merchantApiKeys.keyId': key.keyId },
-        { $set: { 'merchantApiKeys.$.keyLastUsedDateTime': new Date() } }
-      ).catch(() => {});
+      // Bookkeeping, deliberately not awaited: a failed write must never turn a successful
+      // authentication into an error.
+      touchKeyUsage(db, key.keyId).catch(() => {});
       return true;
     }
   }

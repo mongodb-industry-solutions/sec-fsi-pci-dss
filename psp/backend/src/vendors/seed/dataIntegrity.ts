@@ -108,80 +108,10 @@ const pick = <T>(list: readonly T[], seed: number, shift = 0): T => list[(seed >
 
 // ── F1: a login for every customer party ──────────────────────────────────────
 
-const LOGIN_NAMESPACE = 'v33:customerAuthentication';
 
-/**
- * Derives an authentication record for every `customer` party that lacks one, so no customer
- * with an agreement, cards and transactions is unable to sign in.
- *
- * BIAN note: authentication stays a control record separate from the agreement, so
- * a credential-less customer remains representable. A non-active customer is expressed through
- * `customerAuthenticationAccountStatus`, never by omitting the record.
- *
- * Identity comes from the party (is the source of truth), so the login and the KYC record can
- * never disagree. Derived logins are NOT `customerAuthenticationDemoFeatured`: the curated login
- * picker stays short while every customer remains reachable through search.
- *
- * @returns only the NEW records, so the caller can report coverage and upsert just the additions.
- */
-export function deriveCustomerLogins(
-  parties: readonly PartySeed[],
-  logins: readonly AuthenticationSeed[],
-): AuthenticationSeed[] {
-  const credentialHash = sharedCredentialHash(logins);
-  const withLogin = new Set(logins.map((l) => l.partyInstanceReference));
-  const takenEmails = new Set(
-    logins.map((l) => (l.customerAuthenticationEmailAddress ?? '').toLowerCase()).filter(Boolean),
-  );
+// v39: deriveCustomerLogins is gone. This service derives no logins, because it holds no principals:
+// a login for every customer is the identity authority s to seed, from its own fixtures.
 
-  const derived: AuthenticationSeed[] = [];
-  for (const party of parties) {
-    if (party.partyType !== 'customer') continue;
-    if (withLogin.has(party.partyInstanceReference)) continue;
-
-    const email = (party.partyEmailAddress ?? '').toLowerCase();
-    // A party with no email or no name cannot be given a coherent credential; skip rather than
-    // invent identity that would then disagree with.
-    if (!email || !party.partyName) continue;
-    if (takenEmails.has(email)) continue;
-
-    takenEmails.add(email);
-    withLogin.add(party.partyInstanceReference);
-    derived.push({
-      customerAuthenticationInstanceReference: deterministicReference(LOGIN_NAMESPACE, party.partyInstanceReference),
-      partyInstanceReference: party.partyInstanceReference,
-      customerAuthenticationEmailAddress: email,
-      customerAuthenticationCredentialHash: credentialHash,
-      customerAuthenticationUserRole: 'customer',
-      customerAuthenticationUserName: party.partyName as string,
-      customerAuthenticationLoginDomain: 'leafypay',
-      customerAuthenticationAccountStatus: 'active',
-      customerAuthenticationDemoFeatured: false,
-      bianServiceDomain: 'Customer Authentication',
-      bianControlRecordType: 'CustomerAuthenticationAssessment',
-      recordCreatedDateTime: party.recordCreatedDateTime ?? new Date().toISOString(),
-      schemaVersion: 1,
-    });
-  }
-  return derived;
-}
-
-/**
- * The shared demo credential hash, read from the curated records so there is exactly one source for
- * it: a derived login must accept the same demo password as a curated one.
- */
-export function sharedCredentialHash(logins: readonly AuthenticationSeed[]): string {
-  const fromCustomer = logins.find(
-    (l) => l.customerAuthenticationUserRole === 'customer' && l.customerAuthenticationCredentialHash,
-  );
-  const any = fromCustomer ?? logins.find((l) => l.customerAuthenticationCredentialHash);
-  if (!any?.customerAuthenticationCredentialHash) {
-    throw new Error(
-      'Cannot derive customer logins: no curated authentication record carries a credential hash to share.',
-    );
-  }
-  return any.customerAuthenticationCredentialHash;
-}
 
 // ── F3: the transaction-to-card link ──────────────────────────────────────────
 

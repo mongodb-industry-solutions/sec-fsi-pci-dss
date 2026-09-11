@@ -4,7 +4,8 @@
 // by ownership instead, proven server-side from its own identity (GDPR Art. 15).
 
 import type { Db } from 'mongodb';
-import type { Resource } from '../../../shared/models/acl.model';
+import type { Resource } from '../../../shared/models/permissionCatalog';
+import { hasPermission } from '../../../shared/models/permissionCatalog';
 import { can } from '../../../vendors/middleware/acl';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
 import { CUSTOMER_AGREEMENT_COLLECTION } from '../../customer/models/customerAgreement.model';
@@ -17,14 +18,35 @@ import { FRAUD_DIAGNOSIS_COLLECTION } from '../../fraud/models/fraudDiagnosis.mo
 export const RAW_COLLECTION_RESOURCE: Readonly<Record<string, Resource>> = {
   party: 'customers',                          // Party
   customerAgreementProcedure: 'customers',     // Customer Agreement
-  customerAuthenticationAssessment: 'customers', // the customer's own auth record
   cardTransactionLog: 'transactions',          // Card Transaction
   paymentCardManagement: 'cards',              // Payment Card
   fraudDiagnosisCase: 'fraudCases',            // Fraud Diagnosis
 };
 
+/**
+ * Collection to its own unique `*InstanceReference` field (see `createIndexes.ts`).
+ *
+ * The raw-document lookup used to `$or` all five field names against whichever collection was
+ * asked for. MongoDB can only serve an `$or` from indexes when EVERY branch is indexed on that
+ * collection; since only one of the five ever is, that turned a unique-index point lookup into a
+ * full collection scan on every call, on collections (`cardTransactionLog`, `fraudDiagnosisCase`)
+ * that grow without bound in this demo. Naming the one real field per collection restores the
+ * point lookup the unique index was already there to serve.
+ */
+export const RAW_COLLECTION_ID_FIELD: Readonly<Record<string, string>> = {
+  party: 'partyInstanceReference',
+  [CUSTOMER_AGREEMENT_COLLECTION]: 'customerAgreementInstanceReference',
+  [CARD_TRANSACTION_COLLECTION]: 'cardTransactionInstanceReference',
+  [PAYMENT_CARD_COLLECTION]: 'paymentCardInstanceReference',
+  [FRAUD_DIAGNOSIS_COLLECTION]: 'fraudDiagnosisInstanceReference',
+};
+
 export interface RawAccessCaller {
   role?: string;
+  /** Permission strings the token carried explicitly, when a client narrowed. */
+  permissions?: string[];
+  /** The expanded set, where the verifier resolved the roles against the published catalog. */
+  effectivePermissions?: string[];
   partyRef?: string;
   sub?: string;
 }
@@ -127,7 +149,13 @@ export async function authorizeRawDocumentAccess(
     return { allowed: true };
   }
 
-  if (!(await can(db, role, resource, 'view'))) {
+  /**
+   * The permissions the authority resolved, carried by the caller rather than looked up here.
+   *
+   * v40: `effectivePermissions` is the expanded set where the verifier could expand the roles, and
+   * the explicit claim otherwise. Both are permission strings; neither being present is a refusal.
+   */
+  if (!hasPermission(caller.effectivePermissions ?? caller.permissions, resource, 'view')) {
     return {
       allowed: false,
       status: 403,

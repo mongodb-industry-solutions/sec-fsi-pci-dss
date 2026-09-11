@@ -1,56 +1,84 @@
 /**
- * OAuth Consent Grant API (Party Authentication: ADR-038)
- * Lets authenticated users view and revoke their consent grants to merchant OAuth clients.
+ * Authorized Applications: what a user has allowed a merchant app to do.
  *
- * Routes (all require internal PSP JWT: the user's own session):
- *   GET  /api/v1/auth/grants: list active grants for the calling user
- *   GET  /api/v1/auth/grants/:consentId, detail of one grant owned by the caller (v18 D-01)
- *   GET  /api/v1/auth/grants/:consentId/operations, the caller's operations via that app (v18 D-02)
- *   DELETE /api/v1/auth/grants/:consentId, revoke a grant (tokens immediately invalidated)
+ * The page and its shape do not move. This is a person looking at their own data inside this
+ * product, not an administrative screen, and the routes below answer exactly what they answered
+ * before. What changed is where the data comes from: the authorisations now live at the identity
+ * authority, and this application reads them by forwarding the caller's own token.
+ *
+ * Three rules make that safe rather than merely convenient:
+ *
+ * - Nothing is stored and nothing is cached here. A withdrawn authorisation has to be gone on the
+ *   next render, and a cache is precisely what would keep a revoked one alive on screen.
+ * - Who may see or withdraw what is decided at the authority. This service does not filter the
+ *   result, because a filter applied after the fact by a client is a presentation choice and not an
+ *   access control.
+ * - The commercial record of the merchant stays here, because it is this product's data. The join is
+ *   by client id, which is the one identifier both sides legitimately share.
  */
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { listUserConsentGrants, getUserConsentGrantDetail, revokeConsentGrant, reactivateConsentGrant, resolveSubForParty } from '../services/oauth.service';
-import { listPartyAppActivity, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
-import { extractUserRole, canStaffInvestigate, canStaffMutate } from '../../../vendors/middleware/rbac';
+import { callAuthority, AuthorityError } from '../../../vendors/security/authorityApi';
+import { findClientById } from '../../gateway/services/oauthClientRegistry.service';
+import { listPartyAppActivity } from '../../provider/services/businessProcessEvent.service';
 
-function getSubFromRequest(request: FastifyRequest): string | null {
-  const user = (request as any).user as { sub?: string; partyAuthenticationInstanceReference?: string } | undefined;
-  return user?.sub ?? user?.partyAuthenticationInstanceReference ?? null;
+interface AuthorityGrant {
+  grantId: string;
+  clientId: string;
+  clientName: string;
+  logoUri?: string;
+  scopes: string[];
+  status: 'active' | 'revoked';
+  grantedAt: string;
+  revokedAt?: string;
+  lastUsedAt?: string;
 }
 
-// Resolve the OAuth subject the request targets. When `partyRef` is present this is a staff view of
-// another party's grants (gated to investigator/auditor); otherwise it is the caller's own sub.
-// Returns { sub } on success, or { error, status } to send. A staff partyRef with no auth identity
-// resolves to sub=null so the caller can return an empty payload without leaking existence.
-export async function resolveTargetSub(
-  fastify: FastifyInstance,
-  request: FastifyRequest,
-  partyRef: string | undefined,
-): Promise<{ sub: string | null } | { error: string; status: number }> {
-  if (partyRef) {
-    if (!canStaffInvestigate(extractUserRole(request))) {
-      return { error: 'Viewing another customer\'s authorized apps is restricted to investigator and auditor roles', status: 403 };
-    }
-    return { sub: await resolveSubForParty(fastify.db, partyRef) };
+/** The shape this product's screens already expect, filled from both sides. */
+async function toView(fastify: FastifyInstance, grant: AuthorityGrant) {
+  const commercial = await findClientById(fastify.db, grant.clientId);
+  return {
+    consentId: grant.grantId,
+    oauthClientId: grant.clientId,
+    merchantAgreementInstanceReference: commercial?.merchantAgreementInstanceReference,
+    merchantName: commercial?.merchantName ?? grant.clientName,
+    oauthLogoUri: commercial?.oauthLogoUri ?? grant.logoUri ?? null,
+    grantedScopes: grant.scopes,
+    consentStatus: grant.status,
+    consentGrantedAt: grant.grantedAt,
+    consentRevokedAt: grant.revokedAt ?? null,
+    lastUsedAt: grant.lastUsedAt ?? null,
+  };
+}
+
+/** The authority's refusal, propagated. Reinterpreting it here would make this a second policy point. */
+function relayFailure(reply: FastifyReply, error: unknown) {
+  if (error instanceof AuthorityError) {
+    const body = error.body as { detail?: string; title?: string } | undefined;
+    return reply.status(error.status).send({ error: body?.detail ?? body?.title ?? 'Request refused' });
   }
-  const sub = getSubFromRequest(request);
-  if (!sub) return { error: 'Unauthorized', status: 401 };
-  return { sub };
+  throw error;
 }
 
 export async function consentGrantsController(fastify: FastifyInstance) {
-  // GET /api/v1/auth/grants: list the calling user's active OAuth consent grants
+  // The staff view names the customer by this product's own reference. The authority resolves which
+  // principal is bound to it and decides whether the caller may look, so no mapping is held here.
+  const onBehalf = (partyRef?: string) => (partyRef ? { accountHolderRef: partyRef } : {});
+
   fastify.get('/grants', {
     schema: {
       tags: ['auth:oauth'],
-      summary: 'List my authorized apps (OAuth consent grants)',
-      description: 'Returns the authenticated user\'s OAuth consent grants, the merchant apps authorized via OIDC. Revoked grants are kept (soft-revoke) so the user can review past apps/operations and re-approve; filter with `status` (active | revoked | all, default all). Requires a valid PSP session token (any role). **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to list THAT party\'s grants; this is restricted to `level2_investigator` and `security_auditor` (else 403).',
+      summary: 'List my authorized apps',
+      description:
+        'The authenticated user\'s authorizations, read from the identity authority with the '
+        + 'caller\'s own token. Revoked grants are kept so past apps and operations can still be '
+        + 'reviewed and re-approved; filter with `status`. Pass `partyRef` to view another customer\'s, '
+        + 'which the authority permits only for a role that grants it.',
       security: [{ bearerAuth: [] }],
       querystring: {
         type: 'object',
         properties: {
-          status: { type: 'string', enum: ['active', 'revoked', 'all'], default: 'all', description: 'Filter by consent status. Default all (active + revoked).' },
-          partyRef: { type: 'string', description: 'Staff target: a customer\'s `partyInstanceReference`. When present, requires investigator/auditor and returns that party\'s grants instead of the caller\'s own.' },
+          status: { type: 'string', enum: ['active', 'revoked', 'all'], default: 'all' },
+          partyRef: { type: 'string', description: 'The customer to view instead of the caller.' },
         },
       },
       response: {
@@ -64,61 +92,42 @@ export async function consentGrantsController(fastify: FastifyInstance) {
                 properties: {
                   consentId: { type: 'string' },
                   oauthClientId: { type: 'string' },
-                  merchantAgreementInstanceReference: { type: 'string', description: 'v18: SD-89 merchant reference (for detail/activity views).' },
+                  merchantAgreementInstanceReference: { type: 'string' },
                   merchantName: { type: 'string' },
-                  oauthLogoUri: { type: 'string', nullable: true, description: 'v18: OIDC logo_uri of the merchant app (branding).' },
+                  oauthLogoUri: { type: 'string', nullable: true },
                   grantedScopes: { type: 'array', items: { type: 'string' } },
                   consentStatus: { type: 'string', enum: ['active', 'revoked'] },
-                  consentGrantedAt: { type: 'string', format: 'date-time' },
-                  consentRevokedAt: { type: 'string', format: 'date-time', nullable: true, description: 'When the grant was revoked (soft-revoke); null while active.' },
-                  lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
+                  consentGrantedAt: { type: 'string' },
+                  consentRevokedAt: { type: 'string', nullable: true },
+                  lastUsedAt: { type: 'string', nullable: true },
                 },
               },
             },
           },
         },
         401: { $ref: 'Error#' },
+        403: { $ref: 'Error#' },
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const { status, partyRef } = request.query as { status?: 'active' | 'revoked' | 'all'; partyRef?: string };
-
-    // Staff view: resolve the target party's OAuth subject server-side. Gated to investigator/auditor.
-    let sub: string | null;
-    if (partyRef) {
-      if (!canStaffInvestigate(extractUserRole(request))) {
-        return reply.status(403).send({ error: 'Viewing another customer\'s authorized apps is restricted to investigator and auditor roles' });
-      }
-      sub = await resolveSubForParty(fastify.db, partyRef);
-      if (!sub) return { grants: [] }; // party has no auth identity → no grants (do not leak existence)
-    } else {
-      sub = getSubFromRequest(request);
-      if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
+    const { status, partyRef } = request.query as { status?: string; partyRef?: string };
+    try {
+      const { grants } = await callAuthority<{ grants: AuthorityGrant[] }>(request, '/grants', {
+        query: { status: status ?? 'all', ...onBehalf(partyRef) },
+      });
+      return { grants: await Promise.all(grants.map((grant) => toView(fastify, grant))) };
+    } catch (error) {
+      return relayFailure(reply, error);
     }
-
-    const grants = await listUserConsentGrants(fastify.db, sub, status ?? 'all');
-    return {
-      grants: grants.map((g) => ({
-        consentId: g.consentId,
-        oauthClientId: g.oauthClientId,
-        merchantAgreementInstanceReference: g.merchantAgreementInstanceReference,
-        merchantName: g.merchantName,
-        oauthLogoUri: g.oauthLogoUri ?? null,
-        grantedScopes: g.grantedScopes,
-        consentStatus: g.consentStatus,
-        consentGrantedAt: g.consentGrantedAt,
-        consentRevokedAt: g.consentRevokedAt ?? null,
-        lastUsedAt: g.lastUsedAt ?? null,
-      })),
-    };
   });
 
-  // GET /api/v1/auth/grants/:consentId, detail of ONE authorized app owned by the caller (D-01)
   fastify.get('/grants/:consentId', {
     schema: {
       tags: ['auth:oauth'],
-      summary: 'Get one of my authorized apps (detail)',
-      description: 'Returns the detail of a single OAuth consent grant owned by the authenticated user: merchant branding (name, logo_uri, client_uri), granted scopes with human-readable descriptions, approval date/time, last use and status. Self-scoped: a consentId that is not the caller\'s returns 404 (existence is not leaked). **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to read THAT party\'s grant detail; restricted to `level2_investigator` and `security_auditor` (else 403).',
+      summary: 'Get one of my authorized apps',
+      description:
+        'One authorization, read from the identity authority with the caller\'s own token. A grant '
+        + 'belonging to somebody else is not found rather than found and refused.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -127,64 +136,33 @@ export async function consentGrantsController(fastify: FastifyInstance) {
       },
       querystring: {
         type: 'object',
-        properties: {
-          partyRef: { type: 'string', description: 'Staff target: a customer\'s `partyInstanceReference`. When present, requires investigator/auditor and returns that party\'s grant detail instead of the caller\'s own.' },
-        },
+        properties: { partyRef: { type: 'string' } },
       },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            consentId: { type: 'string' },
-            oauthClientId: { type: 'string' },
-            merchantAgreementInstanceReference: { type: 'string' },
-            merchantName: { type: 'string' },
-            oauthLogoUri: { type: 'string', nullable: true },
-            oauthClientUri: { type: 'string', nullable: true },
-            grantedScopes: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  scope: { type: 'string' },
-                  description: { type: 'string' },
-                  required: { type: 'boolean' },
-                },
-              },
-            },
-            consentStatus: { type: 'string', enum: ['active', 'revoked'] },
-            consentGrantedAt: { type: 'string', format: 'date-time' },
-            lastUsedAt: { type: 'string', format: 'date-time', nullable: true },
-            cibaEnabled: { type: 'boolean', description: 'this client may initiate CIBA (passwordless) on the user\'s behalf.' },
-          },
-        },
-        401: { $ref: 'Error#' },
-        404: { $ref: 'Error#' },
-      },
+      response: { 401: { $ref: 'Error#' }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const { partyRef } = request.query as { partyRef?: string };
-    const resolved = await resolveTargetSub(fastify, request, partyRef);
-    if ('error' in resolved) return reply.status(resolved.status).send({ error: resolved.error });
-    if (!resolved.sub) return reply.status(404).send({ error: 'Consent grant not found' });
-
     const { consentId } = request.params as { consentId: string };
-    const detail = await getUserConsentGrantDetail(fastify.db, resolved.sub, consentId);
-    if (!detail) return reply.status(404).send({ error: 'Consent grant not found' });
-    return {
-      ...detail,
-      oauthLogoUri: detail.oauthLogoUri ?? null,
-      oauthClientUri: detail.oauthClientUri ?? null,
-      lastUsedAt: detail.lastUsedAt ?? null,
-    };
+    const { partyRef } = request.query as { partyRef?: string };
+    try {
+      const grant = await callAuthority<AuthorityGrant>(request, `/grants/${encodeURIComponent(consentId)}`, {
+        query: onBehalf(partyRef),
+      });
+      return toView(fastify, grant);
+    } catch (error) {
+      return relayFailure(reply, error);
+    }
   });
 
-  // GET /api/v1/auth/grants/:consentId/operations, the caller's operations executed via this app (D-02)
   fastify.get('/grants/:consentId/operations', {
     schema: {
       tags: ['auth:oauth'],
       summary: 'Operations I executed through this app',
-      description: 'Returns the businessProcessEvent operations the authenticated user executed through this authorized app (attributed by clientId / merchantAgreementReference AND actingPartyReference === caller). Paginated, free-text searchable, date-range filterable. Display-safe: never returns CHD or raw IBAN. Self-scoped: a foreign consentId returns 404. **Staff view (v27):** pass `partyRef` (a found customer\'s `partyInstanceReference`) to read THAT party\'s operations through the app; restricted to `level2_investigator` and `security_auditor` (else 403).',
+      description:
+        'What the user actually DID through this app: payments, transfers, beneficiary changes. These '
+        + 'are this product\'s business events and they stay here, because a business outcome is not '
+        + 'an identity event and recording it at the authority would create a second source of truth '
+        + 'for it. Ownership of the authorization is confirmed at the authority first. Display-safe: '
+        + 'never returns card data or a raw account number.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -199,42 +177,50 @@ export async function consentGrantsController(fastify: FastifyInstance) {
           dateTo: { type: 'string', format: 'date-time' },
           page: { type: 'integer', minimum: 1 },
           limit: { type: 'integer', minimum: 1, maximum: 100 },
-          partyRef: { type: 'string', description: 'Staff target: a customer\'s `partyInstanceReference`. When present, requires investigator/auditor and returns that party\'s operations instead of the caller\'s own.' },
+          partyRef: { type: 'string' },
         },
       },
       response: { 401: { $ref: 'Error#' }, 403: { $ref: 'Error#' }, 404: { $ref: 'Error#' } },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
+    const { consentId } = request.params as { consentId: string };
     const { q, dateFrom, dateTo, page, limit, partyRef } = request.query as {
       q?: string; dateFrom?: string; dateTo?: string; page?: number; limit?: number; partyRef?: string;
     };
-    const resolved = await resolveTargetSub(fastify, request, partyRef);
-    if ('error' in resolved) return reply.status(resolved.status).send({ error: resolved.error });
-    if (!resolved.sub) return reply.status(404).send({ error: 'Consent grant not found' });
-    const sub = resolved.sub;
 
-    const { consentId } = request.params as { consentId: string };
-    // Verify the grant belongs to the target sub (and resolve clientId + merchant ref) before querying.
-    const detail = await getUserConsentGrantDetail(fastify.db, sub, consentId);
-    if (!detail) return reply.status(404).send({ error: 'Consent grant not found' });
+    let grant: AuthorityGrant;
+    try {
+      // Confirms both that the authorization exists and that this caller may see it, at the
+      // authority, before any business record is read here.
+      grant = await callAuthority<AuthorityGrant>(request, `/grants/${encodeURIComponent(consentId)}`, {
+        query: onBehalf(partyRef),
+      });
+    } catch (error) {
+      return relayFailure(reply, error);
+    }
 
+    const commercial = await findClientById(fastify.db, grant.clientId);
+    const actingParty = partyRef ?? ((request as unknown as { user?: { sub?: string } }).user?.sub ?? '');
     return listPartyAppActivity(fastify.db, {
-      actingPartyReference: sub,
-      clientId: detail.oauthClientId,
-      merchantAgreementReference: detail.merchantAgreementInstanceReference,
+      actingPartyReference: actingParty,
+      clientId: grant.clientId,
+      merchantAgreementReference: commercial?.merchantAgreementInstanceReference,
       q: q || undefined,
       from: dateFrom ? new Date(dateFrom) : undefined,
       to: dateTo ? new Date(dateTo) : undefined,
-      page, limit,
+      page,
+      limit,
     });
   });
 
-  // DELETE /api/v1/auth/grants/:consentId, revoke a specific consent grant
   fastify.delete('/grants/:consentId', {
     schema: {
       tags: ['auth:oauth'],
-      summary: 'Revoke an OAuth consent grant',
-      description: 'Revokes a specific consent grant. All active access tokens and refresh tokens for this user + merchant client are immediately invalidated. The merchant receives an `oauth.authorization_revoked` webhook. **Staff action (v27):** pass `partyRef` to revoke a grant the caller does NOT own; this is restricted to `level2_investigator` only (auditor is read-only, L1 has no reach → 403) and is audited.',
+      summary: 'Revoke an authorization',
+      description:
+        'Withdraws the authorization at the identity authority, which invalidates what was issued '
+        + 'under it. Pass `partyRef` to withdraw on another customer\'s behalf; the authority permits '
+        + 'that only for a role that grants it, and records who did it.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -243,17 +229,12 @@ export async function consentGrantsController(fastify: FastifyInstance) {
       },
       querystring: {
         type: 'object',
-        properties: {
-          partyRef: { type: 'string', description: 'Staff target: the owning customer\'s `partyInstanceReference`. When present, this is a staff revoke (level2_investigator only).' },
-        },
+        properties: { partyRef: { type: 'string' } },
       },
       response: {
         200: {
           type: 'object',
-          properties: {
-            revoked: { type: 'boolean' },
-            consentId: { type: 'string' },
-          },
+          properties: { revoked: { type: 'boolean' }, consentId: { type: 'string' } },
         },
         401: { $ref: 'Error#' },
         403: { $ref: 'Error#' },
@@ -261,53 +242,28 @@ export async function consentGrantsController(fastify: FastifyInstance) {
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const sub = getSubFromRequest(request);
-    if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
-
     const { consentId } = request.params as { consentId: string };
     const { partyRef } = request.query as { partyRef?: string };
-    const role = extractUserRole(request);
-
-    // Staff revoke of a grant the caller does not own: investigator only, audited (PCI DSS).
-    if (partyRef) {
-      if (!canStaffMutate(role)) {
-        return reply.status(403).send({ error: 'Revoking another customer\'s authorized app is restricted to level2_investigator' });
-      }
-      try {
-        await revokeConsentGrant(fastify.db, sub, consentId, 'psp', { staffOverride: true });
-        emitComplianceEvent(fastify.db, {
-          entityType: 'customer',
-          entityId: partyRef,
-          processType: 'authentication',
-          processAction: 'oauth.consent.revoked_by_staff',
-          processOutcome: 'approved',
-          performedByPartyReference: sub,
-          performedByRole: role,
-          eventSummary: { consentId, targetPartyReference: partyRef },
-          bianServiceDomain: 'PartyAuthentication',
-          bianControlRecordType: 'ConsentGrant',
-        });
-        return { revoked: true, consentId };
-      } catch (err: any) {
-        return reply.status(err.statusCode ?? 500).send({ error: err.message });
-      }
-    }
-
-    // Self-revoke (unchanged).
     try {
-      await revokeConsentGrant(fastify.db, sub, consentId, 'user');
+      await callAuthority(request, `/grants/${encodeURIComponent(consentId)}`, {
+        method: 'DELETE',
+        query: onBehalf(partyRef),
+      });
       return { revoked: true, consentId };
-    } catch (err: any) {
-      return reply.status(err.statusCode ?? 500).send({ error: err.message });
+    } catch (error) {
+      return relayFailure(reply, error);
     }
   });
 
-  // POST /api/v1/auth/grants/:consentId/reactivate, re-approve a previously revoked grant
   fastify.post('/grants/:consentId/reactivate', {
     schema: {
       tags: ['auth:oauth'],
-      summary: 'Re-approve a revoked OAuth consent grant',
-      description: 'Reverts an earlier revocation from the Authorized Applications view: restores the consent record and its previously granted scopes. Mints NO tokens, the merchant must run the OAuth authorization_code flow again to obtain fresh tokens (the prior scopes now count as granted, so re-consent is smooth). Emits an oauth.authorization_granted webhook. Self-scoped; a foreign consentId returns 404. Idempotent when already active.',
+      summary: 'Re-approve a revoked authorization',
+      description:
+        'Restores a previously withdrawn authorization and its scopes at the identity authority. '
+        + 'Mints no tokens: the app runs the authorization flow again, and the prior scopes now count '
+        + 'as granted so re-consent is smooth. The owner\'s own action and nobody else\'s, because it '
+        + 'gives access back without anyone approving it afresh.',
       security: [{ bearerAuth: [] }],
       params: {
         type: 'object',
@@ -317,25 +273,19 @@ export async function consentGrantsController(fastify: FastifyInstance) {
       response: {
         200: {
           type: 'object',
-          properties: {
-            reactivated: { type: 'boolean' },
-            consentId: { type: 'string' },
-          },
+          properties: { reactivated: { type: 'boolean' }, consentId: { type: 'string' } },
         },
         401: { $ref: 'Error#' },
         404: { $ref: 'Error#' },
       },
     },
   }, async (request: FastifyRequest, reply: FastifyReply) => {
-    const sub = getSubFromRequest(request);
-    if (!sub) return reply.status(401).send({ error: 'Unauthorized' });
-
     const { consentId } = request.params as { consentId: string };
     try {
-      await reactivateConsentGrant(fastify.db, sub, consentId);
+      await callAuthority(request, `/grants/${encodeURIComponent(consentId)}/reactivate`, { method: 'POST' });
       return { reactivated: true, consentId };
-    } catch (err: any) {
-      return reply.status(err.statusCode ?? 500).send({ error: err.message });
+    } catch (error) {
+      return relayFailure(reply, error);
     }
   });
 }

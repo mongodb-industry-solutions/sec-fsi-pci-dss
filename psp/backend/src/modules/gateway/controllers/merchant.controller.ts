@@ -5,9 +5,12 @@ import { FastifyInstance } from 'fastify';
 import type { JwtUserPayload } from '../../../shared/models/identity.model';
 import { getMerchants, getMerchantPicker, getMerchantById, getMerchantByOwnerPartyRef, createMerchant, updateMerchant, registerWebhook, sendTestWebhook, generateApiKey, importApiKey, updateApiKeyLabel, revokeApiKey, reviewMerchantApplication, getMerchantEvents, getMerchantApiKeys, appendMerchantEvent } from '../services/merchant.service';
 import { emitComplianceEvent, listMerchantActivity } from '../../provider/services/businessProcessEvent.service';
-import { listMerchantAuthorizations } from '../../identity/services/oauth.service';
+import { findActiveClientByOwner } from '../services/oauthClientRegistry.service';
+import { callAuthority, AuthorityError } from '../../../vendors/security/authorityApi';
 import { getPayoutAccount } from '../services/payoutAccount.service';
 import { issueMerchantOAuthClient, revokeMerchantOAuthClient, rotateMerchantOAuthClientSecret, updateMerchantOAuthClient } from '../services/merchantOAuth.service';
+import { findClientByOwner } from '../services/oauthClientRegistry.service';
+import { toPublicClient } from '../models/oauthClient.model';
 import { WebhookService } from '../services/merchantWebhook.service';
 import type { WebhookEventType } from '../models/merchantAgreement.model';
 import { getMerchantTransactions, getMerchantTransactionById, getMerchantStats } from '../../transaction/services/cardTransaction.service';
@@ -717,8 +720,32 @@ Display-safe, no CHD, no raw IBAN.`,
     if (!isOwner && !isStaff) {
       return reply.status(403).send({ error: 'Access denied: only the merchant owner, PSP staff, or a fraud investigator can view merchant authorizations.' });
     }
-    const result = await listMerchantAuthorizations(fastify.db, id, { q, page: Number(page), limit: Number(limit) });
-    return reply.send(result);
+    // Who has authorised this merchant, read from the authority with the CALLER's own token. The
+    // check above decides who may reach this screen; the authority decides what the answer contains,
+    // which is why this forwards a token rather than asking with an authority of its own.
+    const client = await findActiveClientByOwner(fastify.db, id);
+    if (!client) return reply.send({ authorizations: [], total: 0, page: Number(page), limit: Number(limit) });
+
+    try {
+      const { grants } = await callAuthority<{ grants: Array<Record<string, unknown>> }>(request, '/grants', {
+        query: { clientId: client.oauthClientId, status: 'all' },
+      });
+      const matching = q
+        ? grants.filter((grant) => JSON.stringify(grant).toLowerCase().includes(String(q).toLowerCase()))
+        : grants;
+      const from = (Number(page) - 1) * Number(limit);
+      return reply.send({
+        authorizations: matching.slice(from, from + Number(limit)),
+        total: matching.length,
+        page: Number(page),
+        limit: Number(limit),
+      });
+    } catch (error) {
+      if (error instanceof AuthorityError) {
+        return reply.status(error.status as 403).send({ error: 'Authorizations could not be read' });
+      }
+      throw error;
+    }
   });
 
   // PATCH /api/v1/merchants/:id/review  (Ch-05, BIAN Action Term: Control)
@@ -1313,10 +1340,9 @@ hashed and discarded, never persisted in plaintext and never returned. Marked \`
     if (!('ok' in access)) return reply.status(access.status).send({ error: access.error });
     const merchant = await getMerchantById(fastify.db, id) as Record<string, unknown> | null;
     if (!merchant) return reply.status(404).send({ error: 'Merchant not found' });
-    const oauthClient = merchant.merchantOAuthClient as (Record<string, unknown> & { oauthClientSecretHash?: unknown }) | undefined;
+    const oauthClient = await findClientByOwner(fastify.db, id);
     if (!oauthClient) return reply.status(404).send({ error: 'No OAuth client configured for this merchant' });
-    const { oauthClientSecretHash: _omit, ...publicConfig } = oauthClient;
-    return reply.status(200).send(publicConfig);
+    return reply.status(200).send(toPublicClient(oauthClient));
   });
 
   // PATCH /api/v1/merchants/:id/oauth-client, update OAuth client config

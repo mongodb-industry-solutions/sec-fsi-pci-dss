@@ -214,7 +214,7 @@ export async function merchantKybController(fastify: FastifyInstance) {
       if (user?.role === 'customer' && !isMerchantOwner(merchant as never, user?.partyRef)) {
         return reply.status(403).send({ error: 'Access denied: you can only view your own merchant.' });
       }
-      const result = await listAuditEvents(fastify.db, { source: 'all', ref: id, entityType: 'merchant', page: Number(page), limit: Number(limit) });
+      const result = await listAuditEvents(fastify.db, { source: 'all', ref: id, entityType: 'merchant', page: Number(page), limit: Number(limit), request });
       return reply.send(result);
     },
   });

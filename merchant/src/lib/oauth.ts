@@ -21,12 +21,14 @@ let jwksCache: ReturnType<typeof createRemoteJWKSet> | null = null;
 
 export async function discover(): Promise<OidcConfig> {
   if (discoveryCache) return discoveryCache;
-  const url = `${ENV.pspBaseUrl()}/.well-known/openid-configuration`;
+  // Discovery is asked of the ISSUER, not the business API. Everything else in this file reads its
+  // endpoints out of the returned document, so this single line is what repoints the whole flow.
+  const url = `${ENV.issuerUrl()}/.well-known/openid-configuration`;
   let res: Response;
   try {
     res = await fetch(url, { cache: 'no-store' });
   } catch (e) {
-    // The merchant process cannot reach the PSP base URL (wrong host/port, container networking, …).
+    // The merchant process cannot reach the issuer (wrong host/port, container networking, …).
     oauthLog.error('discover.unreachable', { url, error: (e as Error).message });
     throw new Error(`OIDC discovery unreachable at ${url}: ${(e as Error).message}`);
   }
@@ -56,11 +58,8 @@ export function generatePkce(): { verifier: string; challenge: string } {
 
 export const randomToken = () => b64url(randomBytes(16));
 
-/**
- * Build the browser-facing authorize URL. We point the user at the PSP frontend
- * consent page (PSP_AUTHORIZE_URL), which renders login+consent and then hands off
- * to the backend authorization endpoint to issue the code.
- */
+// Browser-facing authorize URL, addressed to the authorization ENDPOINT: the authority parks the
+// request, hosts sign-in and consent, and returns to the callback with a code.
 export function buildAuthorizeUrl(params: {
   state: string;
   nonce: string;

@@ -13,10 +13,10 @@
 
 import { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
 import type { Db } from 'mongodb';
-import type { Resource, Action } from '../../shared/models/acl.model';
+import type { Resource, Action } from '../../shared/models/permissionCatalog';
 import type { JwtUserPayload, AuthenticatedRequest } from '../../shared/models/identity.model';
 import { can } from './acl';
-import { resolvePartyInstanceReference } from '../../modules/identity/services/oauth.service';
+import { partyReferenceFrom } from '../security/partyReference';
 
 export type AuthChannel = 'session' | 'oauth';
 
@@ -40,7 +40,7 @@ function sessionRole(request: FastifyRequest): string | undefined {
 /**
  * preHandler: authorize a dual-auth capability route.
  *  · OAuth channel (request.merchantContext present): require the route's scope (403 otherwise).
- *  · Session channel: enforce the RBAC action via can(), identical to requirePermission('view'/'manage').
+ *  · Session channel: enforce the action against the permissions claim, identical to requirePermission().
  * Separation of duties: an OAuth token is never granted staff RBAC, and a session is never scope-gated.
  */
 export function dualPermission(opts: DualPermissionOptions) {
@@ -56,7 +56,7 @@ export function dualPermission(opts: DualPermissionOptions) {
       return;
     }
     const role = sessionRole(request);
-    const allowed = await can(serverDb(request), role, opts.resource, opts.action);
+    const allowed = can(request, opts.resource, opts.action);
     if (!allowed) {
       return reply.status(403).send({
         error: `Access denied: your role does not permit ${opts.action} on ${opts.resource}.`,
@@ -102,7 +102,10 @@ export async function resolveOwner(
       });
       return null;
     }
-    const ownerPartyRef = (await resolvePartyInstanceReference(serverDb(request), merchant.sub)) ?? undefined;
+    // Read from the token the authority issued, rather than looked up here: this application no
+    // longer holds the records that mapping used to live in. The context carries the claim through,
+    // so this no longer reads a field the context never had.
+    const ownerPartyRef = merchant.accountHolderRef ?? partyReferenceFrom(merchant as never);
     return { channel: 'oauth', ownerPartyRef, actingSubject: merchant.sub };
   }
 

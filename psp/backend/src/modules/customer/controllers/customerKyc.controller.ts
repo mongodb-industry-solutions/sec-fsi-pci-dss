@@ -1,3 +1,4 @@
+import type { Elevation } from '../../../shared/models/identity.model';
 // KYC Administration controller (v31). Mounted under /customer (same prefix as the
 // customer-agreement search controller: one customer surface, no forked API). The Operations Officer
 // reviews/corrects KYC data here; sensitive identity fields stay behind the L1/L2 QE tiers + escalation
@@ -5,8 +6,7 @@
 
 import { FastifyInstance } from 'fastify';
 import type { AuthenticatedRequest, JwtUserPayload } from '../../../shared/models/identity.model';
-import { requirePermission, loadRolePermissions } from '../../../vendors/middleware/acl';
-import { hasPermission } from '../../../shared/models/acl.model';
+import { requirePermission, can } from '../../../vendors/middleware/acl';
 import { getEventBus, makeEvent } from '../../../vendors/eventbus';
 import { listAuditEvents } from '../../provider/services/businessProcessEvent.service';
 import { listKycAdmin, getKycByPartyRef, patchKycData, revealKycSensitive } from '../services/customerAgreement.service';
@@ -25,9 +25,7 @@ export async function customerKycController(fastify: FastifyInstance) {
   // The audited reveal is reachable with customers:manage (administration) or
   // customers:viewSensitive (oversight, where requirePermission also enforces escalation).
   const canReveal = async (request: Parameters<typeof canManage>[0], reply: Parameters<typeof canManage>[1]) => {
-    const role = (request as unknown as { userRole?: string }).userRole;
-    const perms = await loadRolePermissions(fastify.db, role);
-    if (hasPermission(perms, 'customers', 'manage')) return;            // administration path
+    if (can(request, 'customers', 'manage')) return;                    // administration path
     return canSensitive(request, reply);                                // oversight path (+escalation)
   };
   const canSensitive = requirePermission('customers', 'viewSensitive');
@@ -78,9 +76,9 @@ export async function customerKycController(fastify: FastifyInstance) {
     preHandler: canView,
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
-      const { userRole, escalationToken } = request as unknown as AuthenticatedRequest;
+      const { userRole, elevation } = request as unknown as AuthenticatedRequest;
       const u = (request as { user?: JwtUserPayload }).user;
-      const result = await getKycByPartyRef(fastify.db, partyInstanceReference, userRole, escalationToken, { ref: u?.partyRef ?? u?.sub, name: u?.name });
+      const result = await getKycByPartyRef(fastify.db, partyInstanceReference, userRole, elevation, { ref: u?.partyRef ?? u?.sub, name: u?.name });
       if (!result) return reply.status(404).send({ error: 'KYC record not found' });
       return reply.send(result);
     },
@@ -138,10 +136,10 @@ export async function customerKycController(fastify: FastifyInstance) {
     preHandler: canReveal,
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
-      const req = request as unknown as { userRole?: string; escalationToken?: string };
+      const req = request as unknown as { userRole?: string; elevation?: Elevation };
       const result = await revealKycSensitive(fastify.db, partyInstanceReference, actor(request), {
         ...(req.userRole ? { callerRole: req.userRole as never } : {}),
-        hasValidToken: !!req.escalationToken,
+        hasValidToken: !!req.elevation,
       });
       if (result.status === 'forbidden') {
         return reply.status(403).send({
@@ -193,7 +191,7 @@ export async function customerKycController(fastify: FastifyInstance) {
     handler: async (request, reply) => {
       const { partyInstanceReference } = request.params as { partyInstanceReference: string };
       const { page = 1, limit = 100 } = request.query as { page?: number; limit?: number };
-      const result = await listAuditEvents(fastify.db, { source: 'all', ref: partyInstanceReference, entityType: 'customer', page: Number(page), limit: Number(limit) });
+      const result = await listAuditEvents(fastify.db, { source: 'all', ref: partyInstanceReference, entityType: 'customer', page: Number(page), limit: Number(limit), request });
       return reply.send(result);
     },
   });

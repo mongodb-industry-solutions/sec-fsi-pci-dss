@@ -9,6 +9,45 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPairSync, createSign, createHmac, randomUUID } from 'node:crypto';
 import { readSeedFile } from './support/contract';
+import { clientSecretFor } from '@leafypay/platform-links';
+import { interactiveToken } from '../../../support/authorizationFlow';
+import { readFileSync } from 'fs';
+import { giamPath } from '../../../support/giamRepo';
+
+/**
+ * A real token for this customer, from the identity authority.
+ *
+ * Signing in happens there now. These suites are about the BUSINESS endpoints behind the token, so
+ * obtaining it is setup rather than the thing under test; the sign-in itself has its own coverage in
+ * the authority's suite.
+ *
+ * The flow lives in the shared helper. This file, its neighbour and two bank suites each had a copy
+ * written against the shape the authorization endpoint used to have, so all four broke together
+ * when it became conforming.
+ */
+async function authorityLogin(userName: string): Promise<string> {
+  // A URI the console client is actually registered for. The authority refuses an unregistered one,
+  // which is correct and is why this is not simply whatever host the test happens to run against.
+  return interactiveToken(
+    'http://127.0.0.1:8085', 'leafypay', userName, 'demo-password',
+    'giam-console', 'http://localhost:8086/auth/callback',
+  );
+}
+
+
+/**
+ * The seeded principals, read from the identity authority's fixtures.
+ *
+ * This used to read a login file in this application. That file is gone with everything else about
+ * identity, and the binding now runs the other way: a principal carries the business reference it
+ * belongs to, rather than a login carrying a party.
+ */
+function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
+  // Located by the shared resolver, so there is one definition of where the checkout is.
+  return JSON.parse(readFileSync(giamPath('backend/data/identities.json'), 'utf8'));
+}
+
+
 
 const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
 
@@ -16,13 +55,13 @@ const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
 // app's own configuration. This is the demo value from `merchant/env.example`, which is what the running
 // merchant app authenticates with; an environment that changed it sets the variable instead.
 const MERCHANT_CLIENT_ID = process.env.PSP_MERCHANT_OAUTH_CLIENT_ID ?? 'oauth001-0000-4000-8000-000000000001';
-const MERCHANT_CLIENT_SECRET = process.env.PSP_MERCHANT_OAUTH_CLIENT_SECRET ?? 'espresso-demo-secret-2026';
+const MERCHANT_CLIENT_SECRET = process.env.PSP_MERCHANT_OAUTH_CLIENT_SECRET ?? clientSecretFor('oauth001-0000-4000-8000-000000000001');
 
 interface AuthSeed {
-  customerAuthenticationInstanceReference: string;
-  partyInstanceReference: string;
-  customerAuthenticationUserRole: string;
-  customerAuthenticationEmailAddress: string;
+  subjectId: string;
+  accountHolderRef: string;
+  roleName: string;
+  email: string;
 }
 interface MerchantSeed {
   merchantAgreementInstanceReference: string;
@@ -31,8 +70,8 @@ interface MerchantSeed {
 }
 
 function customer(): AuthSeed {
-  return readSeedFile<AuthSeed[]>('customerAuthentications.json')
-    .filter((a) => a.customerAuthenticationUserRole === 'customer')[0];
+  return readAuthorityIdentities()
+    .filter((a) => a.roleName === 'customer')[0];
 }
 
 function merchant(): MerchantSeed | undefined {
@@ -67,7 +106,12 @@ function authenticator() {
   return {
     publicKeyPem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
     sign(challenge: string): string {
-      return createSign('SHA256').update(challenge).end().sign(privateKey).toString('base64url');
+      // Raw r||s, which is what a real authenticator produces: WebCrypto ES256 and the WebAuthn
+      // profile both emit the IEEE P1363 form, and the wallet's own device code says so. Node's
+      // default is DER, so signing without this asks the authority to accept something no browser
+      // would ever send.
+      return createSign('SHA256').update(challenge).end()
+        .sign({ key: privateKey, dsaEncoding: 'ieee-p1363' }).toString('base64url');
     },
   };
 }
@@ -81,12 +125,8 @@ describe('v37 P11.4: the merchant app against the running services', () => {
   beforeAll(async () => {
     live = await reachable();
     if (!live) return;
-    const login = await call('/api/v1/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: person.customerAuthenticationEmailAddress, password: 'demo-password' }),
-    });
-    sessionToken = (login.body as { token?: string }).token ?? '';
+    // Signing in happens at the authority. This suite is about the CIBA ceremony behind the token.
+    sessionToken = await authorityLogin(person.userName);
   });
 
   it('logs a user in with CIBA, approved by a signature from an enrolled key', async () => {
@@ -123,7 +163,7 @@ describe('v37 P11.4: the merchant app against the running services', () => {
       body: JSON.stringify({
         client_id: MERCHANT_CLIENT_ID,
         client_secret: MERCHANT_CLIENT_SECRET,
-        login_hint: person.customerAuthenticationInstanceReference,
+        login_hint: person.subjectId,
         scope: 'openid profile read:accounts',
         binding_message: 'P11 login 1234',
       }),
@@ -200,7 +240,7 @@ describe('v37 P11.4: the merchant app against the running services', () => {
       headers: bearer(sessionToken, { 'Idempotency-Key': `p11-rtp-${Date.now()}` }),
       body: JSON.stringify({
         payerAliasType: 'email',
-        payerAlias: person.customerAuthenticationEmailAddress,
+        payerAlias: person.email,
         amount: 5,
         currency: 'EUR',
         remittanceInformation: 'P11 compatibility check',

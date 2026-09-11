@@ -15,7 +15,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import supertest from 'supertest';
 import { buildApp } from '../../../../../psp/backend/bin/server';
-import { generateToken, _clearStore } from '../../../../../psp/backend/src/vendors/security/escalationTokens';
 import type { FastifyInstance } from 'fastify';
 
 const SKIP = !process.env.TEST_MONGODB_URI;
@@ -50,7 +49,6 @@ describe('FR-v2-13: RBAC API Layer', () => {
 
   afterAll(async () => {
     if (SKIP) return;
-    _clearStore();
     await app.close();
   });
 
@@ -91,12 +89,14 @@ describe('FR-v2-13: RBAC API Layer', () => {
   });
 
   skip('FR-v2-13.3: L2 with valid escalation token returns 200 with sensitive block', async () => {
-    const escalationToken = generateToken(TEST_CASE_ID, 'level2_investigator');
+    // An elevation is recorded at the authority now, and the header names WHAT it is for rather than
+    // carrying a capability this test minted. The middleware checks it against the authority, so an
+    // unrecorded elevation yields no access, which is the behaviour worth asserting.
     const res = await supertest(app.server)
       .get(`/api/v1/customer-agreements?email=${encodeURIComponent(TEST_EMAIL)}`)
       .set('Authorization', `Bearer ${l2Token}`)
       .set('X-User-Role', 'level2_investigator')
-      .set('X-Escalation-Token', escalationToken);
+      .set('X-Elevation', `case:${TEST_CASE_ID}`);
     expect(res.status).toBe(200);
     expect(res.body.sensitive).toBeDefined();
     expect(res.body.sensitive.governmentIdentificationReference).toBeTruthy();

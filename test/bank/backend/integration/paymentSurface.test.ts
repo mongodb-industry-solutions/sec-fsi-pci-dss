@@ -7,12 +7,9 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../bank/backend/bin/server';
-import { issueAccessToken } from '../../../../bank/backend/src/modules/tpp-trust/services/tppAccessToken.service';
+import { tppToken, stopTppAuthority } from '../support/tppToken';
 
-const token = (roles: Array<'AISP' | 'PISP'>, scopes: string[]) => issueAccessToken(
-  { tppRegistrationClientId: 'leafypay-psp', tppRegistrationRoles: roles } as never,
-  scopes as never,
-).accessToken;
+const token = (_roles: Array<'AISP' | 'PISP'>, scopes: string[]) => tppToken(scopes);
 
 describe('v37 P3.3: the payment initiation surface', () => {
   let app: FastifyInstance;
@@ -24,7 +21,8 @@ describe('v37 P3.3: the payment initiation surface', () => {
     paths = (app as unknown as { swagger: () => { paths: typeof paths } }).swagger().paths;
   });
 
-  afterAll(async () => { if (app) await app.close(); });
+  afterAll(async () => {
+    await stopTppAuthority(); if (app) await app.close(); });
 
   it('exposes initiation, read, status and cancellation at the standard paths', () => {
     expect(paths['/v1/payments/{paymentProduct}'].post).toBeDefined();
@@ -57,7 +55,7 @@ describe('v37 P3.3: the payment initiation surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/payments/sepa-credit-transfers',
-      headers: { authorization: `Bearer ${token(['AISP'], ['accounts', 'balances'])}` },
+      headers: { authorization: `Bearer ${await token(['AISP'], ['accounts', 'balances'])}` },
       payload: {},
     });
     expect(response.statusCode).toBe(403);
@@ -67,7 +65,7 @@ describe('v37 P3.3: the payment initiation surface', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/payments/sepa-credit-transfers',
-      headers: { authorization: `Bearer ${token(['PISP'], ['payments'])}` },
+      headers: { authorization: `Bearer ${await token(['PISP'], ['payments'])}` },
       // A complete body, so the consent is the only thing missing: an incomplete one would be refused
       // for its format first, which is the correct order but not what this test is about.
       payload: {
@@ -92,7 +90,7 @@ describe('v37: a schema failure still looks like this bank', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/v1/payments/sepa-credit-transfers',
-      headers: { authorization: `Bearer ${token(['PISP'], ['payments'])}`, 'consent-id': 'cns-1' },
+      headers: { authorization: `Bearer ${await token(['PISP'], ['payments'])}`, 'consent-id': 'cns-1' },
       payload: { creditorName: 'X' },
     });
     const body = response.json();

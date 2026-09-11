@@ -1,15 +1,12 @@
-import { MongoClient, ClientEncryption } from 'mongodb';
+import { MongoClient, ClientEncryption, Document } from 'mongodb';
 import { buildKmsProviders, getKmsConfig } from '../encryption/kms';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';
 import { config } from '../../config';
 import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
-import { PARTY_AUTH_CONSENT_COLLECTION } from '../../modules/identity/models/partyAuthConsent.model';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
 import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
-import { COUNTERPARTY_COLLECTION } from '../../modules/identity/models/counterpartyArrangement.model';
-import { PARTY_ENROLLED_CREDENTIAL_COLLECTION } from '../../modules/identity/models/partyEnrolledCredential.model';
-import { PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION } from '../../modules/identity/models/partyBackchannelAuthentication.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/customer/models/counterpartyArrangement.model';
 import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
 import { PAYMENT_REQUEST_EVENT_COLLECTION } from '../../modules/gateway/models/paymentRequestEvent.model';
 import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
@@ -28,6 +25,8 @@ export async function createCollections(
   const dbName = config.mongodb.dbName;
   const db = client.db(dbName);
   const maps = buildEncryptedFieldsMaps(deks);
+  // The same maps with the text query types removed, used only when a driver refuses them below.
+  const plain = buildEncryptedFieldsMaps(deks, 'level2', false);
 
   const clientEncryption = new ClientEncryption(client, {
     keyVaultNamespace: kmsConfig.namespace,
@@ -40,31 +39,30 @@ export async function createCollections(
   // they are returned as Binary ciphertext; Level 2 map includes them for auto-decryption.
   const qeCollections = [
     // Party Data Management  -  canonical PII store
-    { name: 'party',                            map: maps.party },
+    { name: 'party',                            map: maps.party, degraded: plain.party },
     // Card Transaction Log (includes sensitive gateway fields in unified doc)
-    { name: 'cardTransactionLog',               map: maps.cardTransactionLog },
+    { name: 'cardTransactionLog',               map: maps.cardTransactionLog, degraded: plain.cardTransactionLog },
     // Customer Agreement Procedure (includes sensitive address/govId in unified doc)
-    { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure },
+    { name: 'customerAgreementProcedure',       map: maps.customerAgreementProcedure, degraded: plain.customerAgreementProcedure },
     // Payment Card Management
-    { name: 'paymentCardManagement',            map: maps.paymentCardManagement },
+    { name: 'paymentCardManagement',            map: maps.paymentCardManagement, degraded: plain.paymentCardManagement },
     // v37: the issuer vault moved to the bank, so no collection here holds a PAN.
     // Customer Authentication
-    { name: 'customerAuthenticationAssessment', map: maps.customerAuthenticationAssessment },
     // Payout Account Arrangement (IBAN/routing QE:none, L2 only, PCI DSS)
     ...(maps.payoutAccountArrangement
-      ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement }]
-      : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] } }]
+      ? [{ name: PAYOUT_ACCOUNT_COLLECTION, map: maps.payoutAccountArrangement, degraded: plain.payoutAccountArrangement }]
+      : [{ name: PAYOUT_ACCOUNT_COLLECTION, map: { fields: [] }, degraded: { fields: [] } }]
     ),
     // Payment Execution Procedure (destinationIban QE:none, L2 only, GDPR Art. 32 / PSD2)
     ...(maps.paymentExecutionProcedure
-      ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure }]
-      : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] } }]
+      ? [{ name: PAYMENT_EXECUTION_COLLECTION, map: maps.paymentExecutionProcedure, degraded: plain.paymentExecutionProcedure }]
+      : [{ name: PAYMENT_EXECUTION_COLLECTION, map: { fields: [] }, degraded: { fields: [] } }]
     ),
     // (v28): Request to Pay canonical record. Alias/remittance/address/payee-name QE:none, L2 only
     // (GDPR minimization). RTP is account/alias-based → OUTSIDE PCI scope (no PAN/CHD).
     ...(maps.paymentRequestProcedure
-      ? [{ name: PAYMENT_REQUEST_COLLECTION, map: maps.paymentRequestProcedure }]
-      : [{ name: PAYMENT_REQUEST_COLLECTION, map: { fields: [] } }]
+      ? [{ name: PAYMENT_REQUEST_COLLECTION, map: maps.paymentRequestProcedure, degraded: plain.paymentRequestProcedure }]
+      : [{ name: PAYMENT_REQUEST_COLLECTION, map: { fields: [] }, degraded: { fields: [] } }]
     ),
   ];
 
@@ -85,7 +83,7 @@ export async function createCollections(
 
   const existingNames = new Set(existingList.map((c) => c.name));
 
-  for (const { name, map } of qeCollections) {
+  for (const { name, map, degraded } of qeCollections) {
     if (existingNames.has(name)) {
       if (reset) {
         await db.collection(name).drop();
@@ -102,49 +100,47 @@ export async function createCollections(
         ? { key: config.kms.awsCmkArn!, region: config.kms.awsRegion }
         : undefined;
 
-    await clientEncryption.createEncryptedCollection(db, name, {
+    /**
+     * A driver that refuses the declared text query type falls back to equality, rather than
+     * leaving the collection uncreated.
+     *
+     * The text-search query types are a preview, and a newer crypt_shared rejects the ones this map
+     * declares. Setup then failed here, so the collection was never created, and because setup
+     * skips whatever already exists the database stayed in a state no rerun could repair. Worse,
+     * the collections that HAD been created that way keep answering every encrypted query with the
+     * same refusal, which reads as an unrelated 500 far from here.
+     *
+     * The environment flag was supposed to cover this, but a static flag cannot know what the
+     * driver in front of it will accept. The loss of capability is stated rather than silent:
+     * search by name FRAGMENT stops working, and somebody has to know that rather than discover it.
+     */
+    const create = (fields: Document) => clientEncryption.createEncryptedCollection(db, name, {
       provider,
-      createCollectionOptions: { encryptedFields: map },
+      createCollectionOptions: { encryptedFields: fields },
       ...(masterKey && { masterKey }),
     });
-    console.log(`  created: ${name}`);
+
+    try {
+      await create(map);
+      console.log(`  created: ${name}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/queryType|substring|prefix|suffix/i.test(message)) throw err;
+
+      console.warn(
+        `  warn:    ${name}: this driver refuses the declared text query type, so the encrypted `
+        + 'fields fall back to equality. Search by FRAGMENT will not work until crypt_shared and '
+        + 'the server support it.',
+      );
+      await create(degraded ?? { fields: [] });
+      console.log(`  created: ${name} (equality only)`);
+    }
   }
 
-  // authenticationDomain  -  plaintext, no QE (domain config, no CHD)
-  if (!existingNames.has('authenticationDomain') || reset) {
-    if (existingNames.has('authenticationDomain') && reset) {
-      await db.collection('authenticationDomain').drop();
-      console.log('  dropped: authenticationDomain');
-    }
-    await db.createCollection('authenticationDomain');
-    console.log('  created: authenticationDomain');
-  } else {
-    console.log('  skip:    authenticationDomain (already exists)');
-  }
+  // v39: authenticationDomain belonged to the login screen and moved with it. A realm at the
+  // authority is what a domain used to be, plus the key boundary a domain never had.
 
-  // ADR-030 / RBAC role definitions  -  plaintext, no QE (permission matrix, no CHD)
-  if (!existingNames.has('role') || reset) {
-    if (existingNames.has('role') && reset) {
-      await db.collection('role').drop();
-      console.log('  dropped: role');
-    }
-    await db.createCollection('role');
-    console.log('  created: role');
-  } else {
-    console.log('  skip:    role (already exists)');
-  }
 
-  // Party Authentication Assessment  -  plaintext, identity verification stubs
-  if (!existingNames.has('partyAuthenticationAssessment') || reset) {
-    if (existingNames.has('partyAuthenticationAssessment') && reset) {
-      await db.collection('partyAuthenticationAssessment').drop();
-      console.log('  dropped: partyAuthenticationAssessment');
-    }
-    await db.createCollection('partyAuthenticationAssessment');
-    console.log('  created: partyAuthenticationAssessment');
-  } else {
-    console.log('  skip:    partyAuthenticationAssessment (already exists)');
-  }
 
   // Payment Card Registry  -  plaintext, the physical card deduplicated by token (no CHD)
   if (!existingNames.has('paymentCardRegistry') || reset) {
@@ -276,7 +272,7 @@ export async function createCollections(
     console.log('  skip:    consentAccessLog (already exists)');
   }
 
-  // Merchant Agreement Procedure  -  plaintext (API key stored as bcrypt hash)
+  // Merchant Agreement Procedure  -  plaintext, and no longer a credential store
   if (!existingNames.has('merchantAgreementProcedure') || reset) {
     if (existingNames.has('merchantAgreementProcedure') && reset) {
       await db.collection('merchantAgreementProcedure').drop();
@@ -286,6 +282,23 @@ export async function createCollections(
     console.log('  created: merchantAgreementProcedure');
   } else {
     console.log('  skip:    merchantAgreementProcedure (already exists)');
+  }
+
+  // v39 P2: the OAuth client registry and the integration keys, out of the commercial record and
+  // into collections of their own. A credential the authorization server verifies on every token
+  // request has no business living inside a document the gateway module owns, and an unbounded array
+  // of keys inside a record read on every merchant lookup is the other half of the same mistake.
+  for (const name of ['oauthClient', 'apiKey']) {
+    if (!existingNames.has(name) || reset) {
+      if (existingNames.has(name) && reset) {
+        await db.collection(name).drop();
+        console.log(`  dropped: ${name}`);
+      }
+      await db.createCollection(name);
+      console.log(`  created: ${name}`);
+    } else {
+      console.log(`  skip:    ${name} (already exists)`);
+    }
   }
 
   // Checkout Session Log  -  plaintext (TTL-indexed, 30-min session lifecycle)
@@ -421,77 +434,16 @@ export async function createCollections(
     console.log('  skip:    domainEvent (already exists)');
   }
 
-  // v16 (ADR-036): RSA public key registry, public keys only, never private. JWKS + rotation audit.
-  if (!existingNames.has('partyAuthenticationKey') || reset) {
-    if (existingNames.has('partyAuthenticationKey') && reset) {
-      await db.collection('partyAuthenticationKey').drop();
-      console.log('  dropped: partyAuthenticationKey');
-    }
-    await db.createCollection('partyAuthenticationKey');
-    console.log('  created: partyAuthenticationKey (OAuth RS256 public key registry)');
-  } else {
-    console.log('  skip:    partyAuthenticationKey (already exists)');
-  }
 
-  // v16 (ADR-033): OAuth 2.0 authorization codes, TTL 5 minutes (expiresAt index)
-  if (!existingNames.has('partyAuthorizationCode') || reset) {
-    if (existingNames.has('partyAuthorizationCode') && reset) {
-      await db.collection('partyAuthorizationCode').drop();
-      console.log('  dropped: partyAuthorizationCode');
-    }
-    await db.createCollection('partyAuthorizationCode');
-    console.log('  created: partyAuthorizationCode (OAuth auth codes, TTL 5min)');
-  } else {
-    console.log('  skip:    partyAuthorizationCode (already exists)');
-  }
 
-  // v16 (ADR-033): Issued OAuth tokens, refresh tokens + revocation registry. TTL on expiresAt.
-  if (!existingNames.has('partyIssuedToken') || reset) {
-    if (existingNames.has('partyIssuedToken') && reset) {
-      await db.collection('partyIssuedToken').drop();
-      console.log('  dropped: partyIssuedToken');
-    }
-    await db.createCollection('partyIssuedToken');
-    console.log('  created: partyIssuedToken (OAuth refresh tokens + revocation registry)');
-  } else {
-    console.log('  skip:    partyIssuedToken (already exists)');
-  }
 
-  // v16 (ADR-038): PartyAuthentication, ConsentGrant, per-user per-client consent with revocation support.
-  if (!existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) || reset) {
-    if (existingNames.has(PARTY_AUTH_CONSENT_COLLECTION) && reset) {
-      await db.collection(PARTY_AUTH_CONSENT_COLLECTION).drop();
-      console.log(`  dropped: ${PARTY_AUTH_CONSENT_COLLECTION}`);
-    }
-    await db.createCollection(PARTY_AUTH_CONSENT_COLLECTION);
-    console.log(`  created: ${PARTY_AUTH_CONSENT_COLLECTION} (consent grants; user-authorized apps registry)`);
-  } else {
-    console.log(`  skip:    ${PARTY_AUTH_CONSENT_COLLECTION} (already exists)`);
-  }
-
-  // PartyEnrolledCredential, user authenticator registry (public keys only, no CHD).
-  if (!existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) || reset) {
-    if (existingNames.has(PARTY_ENROLLED_CREDENTIAL_COLLECTION) && reset) {
-      await db.collection(PARTY_ENROLLED_CREDENTIAL_COLLECTION).drop();
-      console.log(`  dropped: ${PARTY_ENROLLED_CREDENTIAL_COLLECTION}`);
-    }
-    await db.createCollection(PARTY_ENROLLED_CREDENTIAL_COLLECTION);
-    console.log(`  created: ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (passwordless credentials, public keys only)`);
-  } else {
-    console.log(`  skip:    ${PARTY_ENROLLED_CREDENTIAL_COLLECTION} (already exists)`);
-  }
-
-  // PartyBackchannelAuthentication, CIBA auth_req_id lifecycle (TTL-expiring, one-time).
-  if (!existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) || reset) {
-    if (existingNames.has(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION) && reset) {
-      await db.collection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION).drop();
-      console.log(`  dropped: ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION}`);
-    }
-    await db.createCollection(PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION);
-    console.log(`  created: ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (CIBA backchannel requests, TTL)`);
-  } else {
-    console.log(`  skip:    ${PARTY_BACKCHANNEL_AUTHENTICATION_COLLECTION} (already exists)`);
-  }
+  // v39: role, the party authentication assessment, authenticator keys, authorization codes and
+  // issued tokens all moved to the identity authority. This service creates none of them, because a
+  // place to write principals to is eventually written to.
+  // v39: the consent, enrolled-credential and backchannel collections belong to the identity
+  // authority and are created by its setup, in its database. Creating them here as well would leave
+  // two stores that both look authoritative, and which one a reader trusts becomes an accident of
+  // which they happened to open.
 
   // merchantWebhookDeliveryLog: persisted delivery attempt records (ADR-038)
   const logColls = await db.listCollections({ name: MERCHANT_WEBHOOK_LOG_COLLECTION }).toArray();

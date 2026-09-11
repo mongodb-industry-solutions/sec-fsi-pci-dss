@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import * as path from 'path';
 import * as fs from 'fs';
-import { PARTY_COLLECTION, PartyPostalAddress } from '../../modules/identity/models/party.model';
+import { PARTY_COLLECTION, PartyPostalAddress } from '../../modules/customer/models/party.model';
 import { phoneDigest } from '../encryption/digest';
 
 // Deterministic KYC/demographic backfill (Party Reference Data). Applies uniformly to
