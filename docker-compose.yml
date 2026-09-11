@@ -175,11 +175,15 @@ services:
       # institution and presents a credential that institution issued; passing the platform secret
       # here is what made the boundary between them documentation rather than key material.
       PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
-      # This app exchanges the authorization code server side, so it uses the private realm URL.
-      PSP_BANKCORE_GIAM_ISSUER_URL: ${PSP_BANKCORE_GIAM_ISSUER_URL:-http://giam:8080/realms/bankcore}
-      # Where the BROWSER is sent to sign in, which is why it is the published console and not a
-      # service name.
-      NEXT_PUBLIC_BANKCORE_AUTHORITY_URL: ${GIAM_FRONTEND_URL:-http://localhost:8086}
+      # This app exchanges the authorization code server side. Its console client (bankcore-console)
+      # is registered under the SHARED leafypay realm (ADR-003), not the bank's own institutional
+      # realm, so it reads the platform's private issuer, not PSP_BANKCORE_GIAM_ISSUER_URL (that one
+      # names /realms/bankcore, which bank/backend alone uses for its separate ASPSP boundary).
+      PSP_GIAM_ISSUER_URL: ${PSP_GIAM_ISSUER_URL:-http://giam:8080/realms/leafypay}
+      # PUBLIC authorize endpoint the BROWSER is sent to for sign-in, shared realm.
+      NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: ${GIAM_BROWSER_URL:-http://localhost:8085}/realms/leafypay
+      # PUBLIC GIAM console origin, for the SLO redirect (post_logout_redirect_uri).
+      NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: ${GIAM_FRONTEND_URL:-http://localhost:8086}
       # This app's own public address: the authority redirects the browser back to it.
       PSP_BANKCORE_FRONTEND_URL: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
     depends_on:

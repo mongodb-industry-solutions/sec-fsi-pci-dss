@@ -33,6 +33,18 @@ ENV NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=$NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER
 ARG NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC
 ENV NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=$NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC
 
+# BANKCORE_PRIVATE = in-cluster bank API URL, used server-side by next.config rewrites so the admin
+# monitoring page probes bankcore same-origin. Undeclared here previously, so docker-compose's and
+# drone's --build-arg for it was silently dropped and the rewrite always baked in its localhost dev
+# fallback, even in staging and production.
+ARG NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE
+ENV NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=$NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE
+
+# BANKCORE_FRONTEND_PUBLIC = the bank's own admin console, for the simulator's link to it. Same gap
+# as above: without this ARG the build-arg was a no-op and the card rendered as unavailable.
+ARG NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC
+ENV NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC=$NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC
+
 # Install dependencies (layer cached unless package.json changes)
 COPY package*.json ./
 RUN npm install

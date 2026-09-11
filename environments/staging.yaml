@@ -16,7 +16,7 @@ env:
 
   # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
   # Browser-facing sign-in → the authorization ENDPOINT on the PUBLIC GIAM console origin.
-  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-console.industrysolutions.staging.corp.mongodb.com/realms/leafypay/protocol/openid-connect/auth"
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com/realms/leafypay/protocol/openid-connect/auth"
   # Server-to-server discovery, token and introspection → PRIVATE in-cluster GIAM service.
   PSP_MERCHANT_ISSUER_URL: "http://sec-giam-web-app:80/realms/leafypay"
   # Server-to-server BUSINESS API → PRIVATE in-cluster backend service. Unchanged: no business
@@ -86,6 +86,20 @@ env:
   PSP_BANKCORE_GIAM_AUDIENCE: "bankcore"
   PSP_BANKCORE_GIAM_RESOURCE_SERVER: "bankcore"
   PSP_BANKCORE_GIAM_JWKS_CACHE_SECONDS: "900"
+
+  # ── bank/frontend, the bank's own staff console ────────────────────────────────────────
+  # This image ships no NEXT_PUBLIC_* build argument (see bank/frontend/Dockerfile): everything
+  # below is read server side at RUNTIME, so the same image works in every environment.
+  #
+  # This app's own public origin: the authority redirects the signed-in browser back to it, and it
+  # must match a registered redirect URI of bankcore-console.
+  PSP_BANKCORE_FRONTEND_URL: "https://sec-fsi-pci-dss-bank-frontend.industrysolutions.staging.corp.mongodb.com"
+  # PUBLIC authorize endpoint the BROWSER is sent to, shared realm (the console signs staff in
+  # against leafypay, not the bank's own institutional realm; see PSP_GIAM_ISSUER_URL above for the
+  # matching private, server-to-server path this app also reads).
+  NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: "https://sec-giam-api.industrysolutions.staging.corp.mongodb.com/realms/leafypay"
+  # PUBLIC GIAM console origin, for the SLO redirect (post_logout_redirect_uri).
+  NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: "https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-staging

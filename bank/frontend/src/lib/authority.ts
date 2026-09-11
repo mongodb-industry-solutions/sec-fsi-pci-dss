@@ -28,9 +28,15 @@ const VERIFIER_COOKIE_PREFIX = 'bankcore.pkce.';
 const CONSOLE_CLIENT_ID = 'bankcore-console';
 const TIMEOUT_MS = 10000;
 
+/**
+ * `PSP_BANKCORE_GIAM_ISSUER_URL` names the bank's OWN institutional realm (`/realms/bankcore`),
+ * which is what `bank/backend` reads under this same name. This console signs staff in against
+ * the SHARED realm instead (see the comment on `authorityIssuerPublic` below), so it reads the
+ * platform's own private issuer var instead of colliding with the bank's.
+ */
 function issuerBase(): string {
-  const raw = process.env.PSP_BANKCORE_GIAM_ISSUER_URL
-    ?? process.env.BANKCORE_GIAM_ISSUER_URL
+  const raw = process.env.PSP_GIAM_ISSUER_URL
+    ?? process.env.GIAM_ISSUER_URL
     ?? 'http://127.0.0.1:8085/realms/leafypay';
   return raw.replace(/\/$/, '');
 }
