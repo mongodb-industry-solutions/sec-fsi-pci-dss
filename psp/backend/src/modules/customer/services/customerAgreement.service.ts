@@ -403,11 +403,36 @@ export async function patchKycData(
   return { status: 'ok' };
 }
 
-export async function getSelfProfile(db: Db, email: string): Promise<Record<string, unknown> | null> {
+/**
+ * Who the caller is, in the terms this service can look a record up by.
+ *
+ * The party reference is the AUTHORITATIVE half: the authority carries the binding as a claim, so it
+ * is present for anybody who holds a business record and it is exact. The email is the fallback, for
+ * a token issued without the `email` scope aside, and for the same reason it cannot be the primary
+ * key: `userinfo` omits the address unless that scope was granted, and keying off it meant a profile
+ * screen that rendered nothing but an address while the record sat there, resolvable.
+ */
+export interface SelfIdentity {
+  partyInstanceReference?: string;
+  email?: string;
+}
+
+/** The party query for a self-service caller, by binding first and address second. */
+function selfPartyQuery(identity: SelfIdentity): Partial<PartyControlRecord> | null {
+  if (identity.partyInstanceReference) {
+    return { partyInstanceReference: identity.partyInstanceReference } as Partial<PartyControlRecord>;
+  }
+  if (identity.email) return { partyEmailAddress: identity.email } as Partial<PartyControlRecord>;
+  return null;
+}
+
+export async function getSelfProfile(db: Db, identity: SelfIdentity): Promise<Record<string, unknown> | null> {
+  const partyQuery = selfPartyQuery(identity);
+  if (!partyQuery) return null;
   // Self-profile: the data subject reads its OWN sensitive record (GDPR Art. 15), so the
   // sensitive tier is granted by the self-service capability, not by a role string.
   const roleDb = await getSensitiveTierDb('customer.selfProfile');
-  const result = await findPartyAndAgreement(roleDb, { partyEmailAddress: email } as Partial<PartyControlRecord>);
+  const result = await findPartyAndAgreement(roleDb, partyQuery);
   if (!result) return null;
   const { doc, party } = result;
   return {
@@ -445,7 +470,7 @@ export async function getSelfProfile(db: Db, email: string): Promise<Record<stri
 
 export async function updateSelfProfile(
   db: Db,
-  email: string,
+  identity: SelfIdentity,
   patch: {
     customerName?: string;
     customerAgreementPreferredLanguage?: string;
@@ -453,10 +478,12 @@ export async function updateSelfProfile(
     customerMobilePhoneNumber?: string;
   }
 ): Promise<boolean> {
+  const partyQuery = selfPartyQuery(identity);
+  if (!partyQuery) return false;
   // Write: the full map is needed to encrypt QE:none fields (not a disclosure).
   const roleDb = await getEncryptionWriteDb('customer.selfProfile.update');
   const party = await roleDb.collection<PartyControlRecord>(PARTY_COLLECTION)
-    .findOne({ partyEmailAddress: email } as Partial<PartyControlRecord>);
+    .findOne(partyQuery);
   if (!party) return false;
 
   let matched = false;

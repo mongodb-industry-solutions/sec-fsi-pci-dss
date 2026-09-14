@@ -102,20 +102,28 @@ export async function selfProfileController(fastify: FastifyInstance) {
 
     const identity = await identityOf(request);
     const email = identity.email ?? '';
+    // The binding the authority put in the token. It is what the record is addressed by below.
+    const bound = partyReferenceOf(request);
 
     /**
      * Attempted for everybody, not gated on the role being `customer`.
      *
-     * The lookup is by the caller's own email and returns null when there is no such record, so a
-     * staff caller is answered correctly without this route having to interpret a role string. One
-     * fewer place where a renamed role would silently empty a screen.
+     * Addressed by the token's binding, with the email only as a fallback. The lookup returns null
+     * when there is no such record, so a staff caller is answered correctly without this route
+     * having to interpret a role string. One fewer place where a renamed role would silently empty
+     * a screen.
+     *
+     * Keying off the email was the defect this replaces: `userinfo` omits the address unless the
+     * `email` scope was granted, so a perfectly valid token produced a profile screen showing
+     * nothing but an address, and a payment-methods screen claiming no agreement existed.
      */
-    const agreement = email ? await getSelfProfile(fastify.db, email).catch(() => null) : null;
+    const agreement = (bound || email)
+      ? await getSelfProfile(fastify.db, { ...(bound ? { partyInstanceReference: bound } : {}), ...(email ? { email } : {}) }).catch(() => null)
+      : null;
 
-    // The claim is the fallback: an agreement names its own party, and a staff caller has no
-    // agreement to name one.
+    // An agreement names its own party; the claim answers for a staff caller who has no agreement.
     const partyInstanceReference =
-      (agreement?.partyInstanceReference as string | undefined) ?? partyReferenceOf(request);
+      (agreement?.partyInstanceReference as string | undefined) ?? bound;
 
     let party: Record<string, unknown> | null = null;
     if (partyInstanceReference) {
@@ -185,13 +193,14 @@ export async function selfProfileController(fastify: FastifyInstance) {
     const caller = callerOf(request);
     if (!caller) return reply.status(401).send({ error: 'Unauthenticated' });
 
+    const bound = partyReferenceOf(request);
     const { email } = await identityOf(request);
-    // Without an email there is no record to address, and guessing one would edit somebody else's.
-    if (!email) return reply.status(404).send({ error: 'No profile record for this user' });
+    // Without either, there is no record to address, and guessing one would edit somebody else's.
+    if (!bound && !email) return reply.status(404).send({ error: 'No profile record for this user' });
 
     const updated = await updateSelfProfile(
       fastify.db,
-      email,
+      { ...(bound ? { partyInstanceReference: bound } : {}), ...(email ? { email } : {}) },
       request.body as Parameters<typeof updateSelfProfile>[2],
     );
     // No record to change is a 404 and not a silent success: a caller told "updated" about a write
