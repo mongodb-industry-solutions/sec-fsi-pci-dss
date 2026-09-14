@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from './api';
-import { readEscalationToken, storeEscalationToken } from './escalation';
+import { clearEscalationToken, readEscalationToken, storeEscalationToken } from './escalation';
 
 // One place to obtain the per-case L2 escalation token, for every page that renders sensitive
 // QE:none data for a case: the case itself, a linked transaction and a linked customer.
@@ -22,6 +22,19 @@ export function canResumeEscalation(
 ): boolean {
   if (role !== 'level2_investigator' || !fraudCase) return false;
   return fraudCase.caseStatus === 'escalated' && !!fraudCase.escalationAcceptedAt;
+}
+
+/**
+ * The only shape a token for this case can legitimately have: `case:<this case's id>`.
+ *
+ * A value from before the wire contract carried a scope (it used to be the authority's own
+ * `subjectId:roleId` addressing, meaningless to this check) can still be sitting in a tab's
+ * sessionStorage from an earlier visit. Trusting any non-empty string there means that stale
+ * value is read back forever and sent as the header, since nothing else ever invalidates it: the
+ * resume effect below only asks "is something already stored", not "is it still correct".
+ */
+function isValidEscalationToken(caseId: string, value: string | undefined): value is string {
+  return value === `case:${caseId}`;
 }
 
 export interface CaseEscalation {
@@ -57,13 +70,14 @@ export function useCaseEscalation({ caseId, role, token, fraudCase }: Options): 
   useEffect(() => {
     if (!caseId) return;
     const persisted = readEscalationToken(caseId);
-    if (persisted) setEscalationToken(persisted);
+    if (isValidEscalationToken(caseId, persisted)) setEscalationToken(persisted);
+    else if (persisted) clearEscalationToken(caseId);
   }, [caseId]);
 
   useEffect(() => {
     if (!caseId || !token || escalationToken) return;
     if (role !== 'level2_investigator') return;
-    if (readEscalationToken(caseId)) return;
+    if (isValidEscalationToken(caseId, readEscalationToken(caseId))) return;
     if (resumedFor.current === caseId) return;
     resumedFor.current = caseId;
 

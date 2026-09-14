@@ -998,7 +998,7 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
             fraudDiagnosisCaseStatus: { type: 'string', enum: ['escalated'] },
             elevation: {
               type: 'string',
-              description: 'Short-lived UUID token granting DEK-sensitive access to QE:none fields. Valid for 4 hours. Include in X-Escalation-Token header.',
+              description: 'The scope this grant covers, as `case:<fraudDiagnosisInstanceReference>`. Valid for 4 hours. Include in the X-Escalation-Token header verbatim: the header is a claimed scope, checked against the authority on every request, never a bearer credential by itself.',
             },
             escalationApprovedAt: { type: 'string', format: 'date-time' },
             tokenExpiresAt: { type: 'string', format: 'date-time' },
@@ -1023,18 +1023,24 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     // Recorded at the authority rather than minted here. The difference is that somebody can now ask
     // who holds elevated access on this case, and take it back before it expires; neither was
     // possible with a signed token this service produced and nothing tracked.
-    const token = await requestElevation(request, {
+    const granted = await requestElevation(request, {
       roleName: 'level2_investigator',
       scopeKind: 'case',
       scopeRef: id,
       justification: approvalNotes ?? 'Escalation approved for investigation of this case.',
       durationSeconds: 4 * 60 * 60,
     });
-    if (!token) {
+    if (!granted) {
       // No local fallback. An elevation the authority declined to record is one nobody can review,
       // which is the entire reason it moved.
       return reply.status(503 as 422).send({ error: 'The elevation could not be recorded; access was not granted.' });
     }
+    // The scope, not the authority's own `subjectId:roleId` addressing: `attachRbacContext` reads
+    // this header back as `scopeKind:scopeRef` on every subsequent sensitive-field request, and it
+    // is re-verified against the authority each time, so the value only ever needs to NAME what is
+    // being claimed. Returning the authority's internal identifier here instead left every reveal
+    // permanently refused: nothing downstream parsed it as anything meaningful.
+    const token = `case:${id}`;
     const now = new Date();
     const expiresAt = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 

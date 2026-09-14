@@ -64,15 +64,14 @@ export async function holdsElevation(
   target: { scopeKind: string; scopeRef: string },
 ): Promise<boolean> {
   try {
-    const { elevations } = await callAuthority<{
-      elevations: Array<{ subjectId: string; scope?: { kind: string; ref: string } }>;
-    }>(request, '/elevations', { query: { state: 'in-force' } });
-
-    const caller = (request as unknown as { user?: { sub?: string } }).user?.sub;
-    return elevations.some((elevation) =>
-      elevation.subjectId === caller
-      && elevation.scope?.kind === target.scopeKind
-      && elevation.scope?.ref === target.scopeRef);
+    // Not the oversight list (`GET /elevations`): that one answers "who holds elevated access" and
+    // needs a permission this caller's own role does not (and should not) carry. This asks the
+    // narrower question the caller IS entitled to ask about themselves, the same way reading your
+    // own profile needs no special grant.
+    const { inForce } = await callAuthority<{ inForce: boolean }>(request, '/elevations/mine', {
+      query: { scopeKind: target.scopeKind, scopeRef: target.scopeRef },
+    });
+    return inForce;
   } catch {
     return false;
   }

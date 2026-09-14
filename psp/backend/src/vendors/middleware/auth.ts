@@ -210,7 +210,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   // of a Bearer token: the EDA dispatcher calls them server-to-server, not as a user.
   const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean; dualAuth?: boolean };
   if (routeConfig.skipAuth) {
-    attachRbacContext(request);
+    await attachRbacContext(request);
     return;
   }
 
@@ -247,11 +247,11 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
   }
 
   if (PUBLIC_EXACT.has(path) && methodIsPublic(path, method)) {
-    attachRbacContext(request);
+    await attachRbacContext(request);
     return;
   }
   if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
-    attachRbacContext(request);
+    await attachRbacContext(request);
     return;
   }
 
@@ -269,7 +269,7 @@ export async function authMiddleware(request: FastifyRequest, reply: FastifyRepl
         return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
       }
     }
-    attachRbacContext(request);
+    await attachRbacContext(request);
     return;
   }
 

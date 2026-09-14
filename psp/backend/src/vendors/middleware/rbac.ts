@@ -88,7 +88,10 @@ export async function attachRbacContext(request: FastifyRequest): Promise<void> 
   const demoReq = request as unknown as AuthenticatedRequest;
   demoReq.userRole = extractUserRole(request);
 
-  const claimed = request.headers['x-elevation'] as string | undefined;
+  // Fastify lowercases incoming header names. The frontend and the CORS allowlist both name this
+  // `X-Escalation-Token` (it is the value the escalate/approve response documents under that name),
+  // so reading `x-elevation` here meant this branch never ran: no caller has ever sent that name.
+  const claimed = request.headers['x-escalation-token'] as string | undefined;
   if (!claimed) return;
 
   const separator = claimed.indexOf(':');
@@ -97,7 +100,8 @@ export async function attachRbacContext(request: FastifyRequest): Promise<void> 
   const scopeRef = claimed.slice(separator + 1);
   if (!scopeRef) return;
 
-  if (await holdsElevation(request, { scopeKind, scopeRef })) {
+  const held = await holdsElevation(request, { scopeKind, scopeRef });
+  if (held) {
     demoReq.elevation = { caseRef: scopeRef };
   }
 }

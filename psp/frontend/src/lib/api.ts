@@ -1219,12 +1219,18 @@ export const api = {
         { method: 'POST', body: JSON.stringify(body) },
         token
       ),
-    escalateApprove: (id: string, body: { approvalNotes?: string }, token: string) =>
-      apiFetch<EscalationApproveResponse>(
+    escalateApprove: async (id: string, body: { approvalNotes?: string }, token: string): Promise<EscalationApproveResponse> => {
+      // The wire field is `elevation` (see the backend's response schema); every caller on this side
+      // reads `escalationToken`. Fetching the raw shape and renaming it here, once, is what keeps
+      // that mismatch from silently dropping the token at every call site that reads the response.
+      const raw = await apiFetch<Omit<EscalationApproveResponse, 'escalationToken'> & { elevation: string }>(
         `/api/v1/fraud/${id}/escalate/approve`,
         { method: 'POST', body: JSON.stringify(body) },
         token
-      ),
+      );
+      const { elevation, ...rest } = raw;
+      return { ...rest, escalationToken: elevation };
+    },
     escalateReject: (id: string, body: { rejectionNotes?: string }, token: string) =>
       apiFetch<{ fraudDiagnosisInstanceReference: string; fraudDiagnosisCaseStatus: string; rejectedAt: string }>(
         `/api/v1/fraud/${id}/escalate/reject`,

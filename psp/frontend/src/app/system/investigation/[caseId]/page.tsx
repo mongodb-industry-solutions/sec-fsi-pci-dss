@@ -842,14 +842,6 @@ export default function DemoCaseDetailPage() {
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-xs">
                     <p className="font-semibold text-purple-800 mb-1">Escalation accepted - sensitive fields accessible</p>
                     {escalationToken && debugMode && <p className="font-mono text-purple-600">Token: {escalationToken}</p>}
-                    {!escalationToken && <p className="text-purple-700 italic">Re-open this page or click below to renew your access token.</p>}
-                    <button
-                      onClick={handleApproveEscalation}
-                      disabled={actionBusy}
-                      className="mt-2 text-xs px-2 py-1 rounded border border-purple-400 text-purple-700 hover:bg-purple-100 disabled:opacity-50"
-                    >
-                      Renew access token
-                    </button>
                   </div>
                   <button
                     onClick={handleRejectEscalation}
