@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { api, NoteEntry } from '../lib/api';
+import { getToken } from '../lib/auth';
 import { StickyNote, Plus, Trash2, X } from 'lucide-react';
 
 interface Props {
@@ -54,7 +55,10 @@ export function CaseNotesPanel({ caseId, token, role, onActivity }: Props) {
     setBusy(true);
     setMsg(null);
     try {
-      await api.fraud.addNote(caseId, { noteText, visibility }, token);
+      // See CaseQuestionsPanel's create(): `token` is captured once at this long-lived page's mount,
+      // and SessionKeeper's background renewal never updates it, so a note typed slowly enough can
+      // submit with an access token that expired minutes ago even though the cookie itself is fresh.
+      await api.fraud.addNote(caseId, { noteText, visibility }, getToken() || token);
       setNoteText('');
       setShowAddForm(false);
       setConfirmAdd(false);
@@ -82,7 +86,7 @@ export function CaseNotesPanel({ caseId, token, role, onActivity }: Props) {
     setBusy(true);
     setMsg(null);
     try {
-      await api.fraud.retractNote(caseId, retractTarget.noteId, { retractionReason: retractionReason || undefined }, token);
+      await api.fraud.retractNote(caseId, retractTarget.noteId, { retractionReason: retractionReason || undefined }, getToken() || token);
       setRetractTarget(null);
       setRetractionReason('');
       await loadNotes();

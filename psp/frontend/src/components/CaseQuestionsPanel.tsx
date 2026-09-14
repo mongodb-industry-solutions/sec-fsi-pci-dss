@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { HelpCircle, Plus, X, Send, CheckCircle2, Clock } from 'lucide-react';
 import { api, type CustomerQuestion } from '../lib/api';
+import { getToken } from '../lib/auth';
 import { useNotify } from './ui/ConfirmProvider';
 
 // ADR-031: L1/L2 panel to pose structured questions to the customer on a fraud case and
@@ -36,7 +37,12 @@ export function CaseQuestionsPanel({ caseId, token, role, onActivity, refreshSig
     if (clean.length === 0) { notify('Add at least one response option.', 'error'); return; }
     setCreating(true);
     try {
-      await api.fraud.createQuestion(caseId, { questionText: text.trim(), options: clean, allowOther }, token);
+      // Composing a question can take longer than the access token's lifetime. `token` is the value
+      // captured when this long-lived page mounted; SessionKeeper renews the cookie in the background
+      // but never updates that captured value, so re-reading it live here is what actually picks up
+      // the renewal (see SessionKeeper.tsx for why the token expires at all).
+      const liveToken = getToken() || token;
+      await api.fraud.createQuestion(caseId, { questionText: text.trim(), options: clean, allowOther }, liveToken);
       setText(''); setOptions(['Yes', 'No']); setAllowOther(true);
       notify('Question sent to the customer.', 'success');
       await load();

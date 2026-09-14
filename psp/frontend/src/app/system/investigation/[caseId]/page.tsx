@@ -174,8 +174,12 @@ export default function DemoCaseDetailPage() {
     setActionBusy(true);
     setActionMsg(null);
     try {
-      await api.fraud.update(caseId, body, token);
-      await reload(token);
+      // `token` is captured once when this long-lived page mounted; SessionKeeper renews the cookie
+      // in the background but never updates that captured value. An analyst reviewing a case before
+      // acting can easily outlast the access token's lifetime, so re-read it live here.
+      const liveToken = getToken() || token;
+      await api.fraud.update(caseId, body, liveToken);
+      await reload(liveToken);
       setActionMsg(successMsg);
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -200,8 +204,9 @@ export default function DemoCaseDetailPage() {
     setActionBusy(true);
     setActionMsg(null);
     try {
-      await api.fraud.update(caseId, { fraudDiagnosisCaseStatus: 'under_review' }, token);
-      await reload(token);
+      const liveToken = getToken() || token;
+      await api.fraud.update(caseId, { fraudDiagnosisCaseStatus: 'under_review' }, liveToken);
+      await reload(liveToken);
       setActionMsg('Escalation cancelled. Case returned to under review.');
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -214,8 +219,9 @@ export default function DemoCaseDetailPage() {
     setActionBusy(true);
     setActionMsg(null);
     try {
-      await api.fraud.escalate(caseId, { escalationReason: 'Risk exceeds L1 threshold. Requesting L2 review.' }, token);
-      await reload(token);
+      const liveToken = getToken() || token;
+      await api.fraud.escalate(caseId, { escalationReason: 'Risk exceeds L1 threshold. Requesting L2 review.' }, liveToken);
+      await reload(liveToken);
       setActionMsg('Case escalated to Level 2 Investigator.');
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -228,8 +234,9 @@ export default function DemoCaseDetailPage() {
     setActionBusy(true);
     setActionMsg(null);
     try {
-      await api.fraud.escalateReject(caseId, {}, token);
-      await reload(token);
+      const liveToken = getToken() || token;
+      await api.fraud.escalateReject(caseId, {}, liveToken);
+      await reload(liveToken);
       setActionMsg('Escalation rejected. Case returned to L1 for re-analysis.');
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -242,9 +249,10 @@ export default function DemoCaseDetailPage() {
     setActionBusy(true);
     setActionMsg(null);
     try {
-      const res = await api.fraud.escalateApprove(caseId, {}, token);
+      const liveToken = getToken() || token;
+      const res = await api.fraud.escalateApprove(caseId, {}, liveToken);
       adoptEscalation(caseId, res.escalationToken); // persist so it survives reload/navigation
-      await reload(token);
+      await reload(liveToken);
       setActionMsg('Escalation approved. Sensitive fields are now accessible.');
     } catch (err) {
       setActionMsg(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
