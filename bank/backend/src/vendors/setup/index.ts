@@ -6,6 +6,7 @@ import { provisionCardIssuerCvk } from '../encryption/cardVerificationKey.servic
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
+import { describeTarget, versionMismatch, cryptSharedHint } from '@leafypay/mongo-compat';
 
 // Works regardless of CWD: npm --prefix changes it to bankcore/.
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -26,7 +27,17 @@ export async function runSetup(reset = false): Promise<void> {
   const client = await getQEClient();
   try {
     const db = client.db(config.mongodb.dbName);
-    console.log(`Connected to the bank database "${config.mongodb.dbName}"\n`);
+    const { version } = await client.db('admin').command({ buildInfo: 1 });
+    console.log(`Connected to the bank database "${config.mongodb.dbName}"`);
+    console.log(`target: ${describeTarget(config.mongodb.type, config.mongodb.version)}; cluster reports ${version}\n`);
+
+    // Same cluster as the PSP: a declared version that disagrees breaks QE the same way here.
+    for (const warning of [
+      versionMismatch(config.mongodb.version, version),
+      cryptSharedHint(config.mongodb.version, config.mongodb.cryptSharedLibPath),
+    ]) {
+      if (warning) console.warn(`  [WARN] ${warning}`);
+    }
 
     // A bank database that survived a PSP reset points at DEKs the shared vault no longer has. Fail
     // here with the remedy, instead of at the first encrypted read with a driver-level message.

@@ -50,7 +50,7 @@ async function reachable(): Promise<boolean> {
  *
  * Returns the console's cookie jar, which holds the session when it worked.
  */
-async function signIn(login: string): Promise<{ jar: Jar; codeIssued: boolean }> {
+async function signInToConsole(login: string): Promise<{ jar: Jar; codeIssued: boolean }> {
   const jar: Jar = {};
 
   const start = await fetch(`${CONSOLE}/api/auth/login`, { redirect: 'manual', signal: AbortSignal.timeout(20000) });
@@ -150,7 +150,7 @@ describe('v39: the bank console signs in at the authority and authorises by role
 
   it('serves the guarded resource to a person holding the role', async () => {
     if (!live) return;
-    const { jar, codeIssued } = await signIn(ADMIN);
+    const { jar, codeIssued } = await signInToConsole(ADMIN);
     expect(codeIssued, `${ADMIN} could not complete the flow`).toBe(true);
     expect(jar['bankcore.session'], 'the session cookie must be set').toBeTruthy();
 
@@ -163,7 +163,7 @@ describe('v39: the bank console signs in at the authority and authorises by role
 
   it('refuses the same resource to a signed-in person WITHOUT the role', async () => {
     if (!live) return;
-    const { jar, codeIssued } = await signIn(CUSTOMER);
+    const { jar, codeIssued } = await signInToConsole(CUSTOMER);
     expect(codeIssued, `${CUSTOMER} could not complete the flow`).toBe(true);
 
     const response = await fetch(`${CONSOLE}${GUARDED}`, {

@@ -1263,7 +1263,7 @@ Adopt the **Internal-First integration pattern** for all six compliance integrat
 
 ### Context
 
-The existing codebase has a devops `admin` controller (`psp/backend/src/modules/admin/controllers/admin.controller.ts`) with 7 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
+The existing codebase has a devops `admin` controller (`psp/backend/src/modules/admin/controllers/admin.controller.ts`) with 8 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/drop-impact` (read-only preview of what a drop would delete: target server, database, key vault, collection inventory, Atlas roles and users), `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
 
 The Integration Hub (v6) requires a business role that can:
 - Register, configure, and suspend external compliance providers

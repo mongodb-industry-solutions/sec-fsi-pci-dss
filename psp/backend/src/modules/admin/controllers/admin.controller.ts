@@ -4,12 +4,15 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { spawn, execSync } from 'child_process';
 import * as path from 'path';
-import { reloadDbRuntime } from '../../../plugins/mongodb';
+import { reloadDbRuntime, sanitizeUri } from '../../../plugins/mongodb';
 import { logBuffer, appendLog, writeCount } from '../../../shared/services/logBuffer';
 import { beginSSE } from '../../../shared/services/sse';
 import { resolveTestStrategy, resolveTestSequence, aggregateSummaries, NormalizedTestSummary } from '../services/testRunners';
 import { sha256 } from '../../../vendors/encryption/digest';
 import { adminSecret } from '../../../vendors/security/secrets';
+import { getKmsConfig } from '../../../vendors/encryption/kms';
+import { getQEClient } from '../../../vendors/encryption/qeClient';
+import { config } from '../../../config';
 
 // In Docker (compiled dist/), __dirname gains an extra /dist/ level that breaks
 // the naïve levels-up heuristic. PSP_PROJECT_ROOT overrides cleanly in any env.
@@ -626,6 +629,86 @@ export async function adminController(fastify: FastifyInstance) {
 
     const dotenvKeys = readDotenvKeys();
     return reply.send({ os: osInfo, node: nodeInfo, package: pkgInfo, env, dotenvKeys });
+  });
+
+  // GET /admin/drop-impact
+  fastify.get('/drop-impact', {
+    schema: {
+      tags: ['admin'],
+      summary: 'What a drop would delete (target server, databases, collections, Atlas identities)',
+      description: 'Read-only preview shown before confirming `setup:db:drop`. Deletes nothing.',
+      security: [{ adminAuth: [] }],
+      response: {
+        200: { type: 'object', additionalProperties: true },
+        401: { $ref: 'Error#' },
+        429: { $ref: 'Error#' },
+      },
+    },
+  }, async (request, reply) => {
+    const ip = request.ip ?? 'unknown';
+    const rl = checkOpsRateLimit(ip);
+    if (!rl.allowed) {
+      reply.header('Retry-After', String(rl.retryAfter));
+      return reply.status(429).send({ error: `Too many requests. Retry after ${rl.retryAfter}s.` });
+    }
+    if (!verifyAdminToken(request.headers.authorization)) {
+      return reply.status(401).send({ error: 'Invalid admin token' });
+    }
+
+    const { server, database } = sanitizeUri(config.mongodb.uri);
+    const kms = getKmsConfig();
+    const warnings: string[] = [];
+
+    // Collection inventory with approximate counts. estimatedDocumentCount reads metadata only,
+    // so the preview stays cheap even on large demo datasets.
+    const collections: { name: string; documents: number | null }[] = [];
+    try {
+      const client = await getQEClient();
+      const db = client.db(config.mongodb.dbName);
+      const list = await db.listCollections({}, { nameOnly: true }).toArray();
+      for (const c of list.sort((a, b) => a.name.localeCompare(b.name))) {
+        let documents: number | null = null;
+        try {
+          documents = await db.collection(c.name).estimatedDocumentCount();
+        } catch {
+          documents = null;  // QE internal collections reject counts
+        }
+        collections.push({ name: c.name, documents });
+      }
+    } catch (e) {
+      warnings.push(`Could not list collections: ${(e as Error).message}`);
+    }
+
+    let dekCount: number | null = null;
+    try {
+      const client = await getQEClient();
+      dekCount = await client.db(kms.database).collection(kms.collection).countDocuments();
+    } catch (e) {
+      warnings.push(`Could not read the key vault: ${(e as Error).message}`);
+    }
+
+    const atlasConfigured = Boolean(config.atlas.publicKey && config.atlas.privateKey && config.atlas.projectId);
+    if (!atlasConfigured) {
+      warnings.push('Atlas API credentials are not set: roles and DB users must be deleted manually.');
+    }
+
+    return reply.send({
+      target: {
+        server,
+        database,
+        keyVaultNamespace: kms.namespace,
+        kmsProvider: kms.provider,
+        atlasProjectId: config.atlas.projectId ?? null,
+      },
+      collections,
+      keyVault: { namespace: kms.namespace, deks: dekCount },
+      atlas: {
+        configured: atlasConfigured,
+        roles: ['pci_level1_role', 'pci_level2_role'],
+        dbUsers: [config.atlas.dbUserLevel1, config.atlas.dbUserLevel2].filter(Boolean) as string[],
+      },
+      warnings,
+    });
   });
 
   // PATCH /admin/env  -  update a single env var in .env and process.env

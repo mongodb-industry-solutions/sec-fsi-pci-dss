@@ -4,8 +4,8 @@
   "version": "3.0.2",
   "private": true,
   "scripts": {
-    "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --prefix merchant && npm install --prefix bank/frontend",
-    "build:packages": "npm run build --prefix packages/eventbus && npm run build --prefix packages/platform-links",
+    "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix packages/mongo-compat && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --prefix merchant && npm install --prefix bank/frontend",
+    "build:packages": "npm run build --prefix packages/eventbus && npm run build --prefix packages/platform-links && npm run build --prefix packages/mongo-compat",
     "setup:key:master": "npm run setup:key:master --prefix psp/backend",
     "setup:key:rsa": "npm run setup:key:rsa --prefix psp/backend",
     "setup:db": "npm run setup:db --prefix psp/backend --",
@@ -42,7 +42,7 @@
     "deploy": "npm run deploy:kube",
     "deploy:docker": "docker compose up --build",
     "deploy:kube": "tsx tools/kube.ts",
-    "type-check": "tsc --noEmit --project packages/eventbus/tsconfig.json && tsc --noEmit --project packages/platform-links/tsconfig.json && tsc --noEmit --project psp/backend/tsconfig.json && tsc --noEmit --project bank/backend/tsconfig.json && tsc --noEmit --project psp/frontend/tsconfig.json"
+    "type-check": "tsc --noEmit --project packages/eventbus/tsconfig.json && tsc --noEmit --project packages/platform-links/tsconfig.json && tsc --noEmit --project packages/mongo-compat/tsconfig.json && tsc --noEmit --project psp/backend/tsconfig.json && tsc --noEmit --project bank/backend/tsconfig.json && tsc --noEmit --project psp/frontend/tsconfig.json"
   },
   "devDependencies": {
     "@playwright/test": "^1.44.0",

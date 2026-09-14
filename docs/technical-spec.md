@@ -1333,16 +1333,36 @@ an ISO string (`QE:none`) to a **BSON Date** with `QE:range`. Auth fields
 (`partyEmailAddress`, `partyMobilePhoneNumber`) are unchanged `QE:equality` (one query type per
 field; auth depends on equality).
 
-**Text-search gating.** `buildEncryptedFieldsMaps(deks, tier, textSearch = config.qe.textSearch)`.
-Text-search query types are single-sourced as constants: `QT_SUBSTRING = 'substringPreview'`,
-`QT_PREFIX = 'prefixPreview'`, `QT_SUFFIX = 'suffixPreview'` (MongoDB 8.2 preview /
-mongodb-client-encryption 7.2). Env var `PSP_QE_TEXT_SEARCH=false` degrades all text fields to
-`QE:equality` (contention 8) so setup never fails on pre-8.2 clusters while keeping the fields
-encrypted, lookup-tier and exact-searchable.
+**Text-search gating.** `buildEncryptedFieldsMaps(deks, tier, textSearch = config.qe.textSearch)`;
+the query types come from `@leafypay/mongo-compat`, resolved from the declared `MONGODB_VERSION`:
+
+| Declared version | Text search | Query types | substring `strMaxQueryLength` | crypt_shared |
+|---|---|---|---|---|
+| < 8.2 | no (equality fallback) | - | - | any |
+| 8.2 - 8.3.x | yes | `substringPreview` / `prefixPreview` / `suffixPreview` | <= 10 | 8.2.x - 8.3.x |
+| >= 9.0 | yes | `substring` / `prefix` / `suffix` | <= 6 (server rejects more, error 12860002) | 9.0.x |
+
+A version newer than the table uses the newest row rather than failing. Both knobs always have a
+value: `MONGODB_TYPE` defaults to `atlas`, `MONGODB_VERSION` to `9.0.0`.
+
+The two spellings are mutually exclusive and the library must match the server: an 8.x
+crypt_shared does not know the GA names, and a 9.0 server refuses the `*Preview` ones both at
+creation (12915800) and at query time (12915801), where the refusal breaks **every** encrypted
+query on the collection, not only the text ones. The same table is checked at every stage: `setup:db` and the backend at
+startup read `buildInfo` and warn when the declared version disagrees with the cluster or with the
+configured crypt_shared path, and `setup:check` additionally compares the encrypted fields STORED
+in each collection against the ones this build declares, field by field. `MONGODB_TYPE` (`atlas` | `ea`) selects the
+deployment kind; `ea` skips the Atlas Admin API steps (custom roles and DB users) in setup and
+drop, since a self-managed cluster has no such API.
+
+Because both supported versions have text search, no flag is normally needed. `PSP_QE_TEXT_SEARCH=false`
+stays as an escape hatch: it degrades every text field to `QE:equality` (contention 8), keeping them
+encrypted, lookup-tier and exact-searchable. Changing it requires recreating the collections, as the
+declared map must match the stored `encryptedFields`.
 
 | Field | bsonType | Query type | Params |
 |---|---|---|---|
-| `party.partyName` | string | substring | strMaxLength 30, strMinQueryLength 3, strMaxQueryLength 10, caseSensitive false, diacriticSensitive false (sized within cluster default substringPreview limits) |
+| `party.partyName` | string | substring | strMaxLength 30, strMinQueryLength 3, strMaxQueryLength per version (6 on 9.0, 10 on 8.3), caseSensitive false, diacriticSensitive false (sized within cluster default substring limits) |
 | `party.partyDateOfBirth` | date | range | min 1900-01-01, max 2035-01-01, sparsity 1, trimFactor 4 (upper bound in the future so minors and newborns stay searchable) |
 | `party.partyNationality` | string | equality | contention 8 |
 | `party.partyPlaceOfBirth` | string | equality | contention 8 |
@@ -1359,7 +1379,8 @@ encrypted, lookup-tier and exact-searchable.
 | `customerAgreementKycCheck.customerAgreementKycCheckSanctionsResult` | string | equality | contention 8 |
 | `customerAgreementSourceOfFunds` / `customerAgreementPurposeOfRelationship` / `...ScreeningProviderRef` | string | none (L2) | not searchable, retrieval only |
 
-> **Query window + in-memory refinement.** `strMaxQueryLength` (10) caps what the encrypted index
+> **Query window + in-memory refinement.** `strMaxQueryLength` (6 for substring on 9.0, 10 for
+> prefix and suffix) caps what the encrypted index
 > can match, but an operator holding a **full** value (e.g. the 11-character government ID
 > `ES123454821`) must still find the record. The registry therefore carries two limits per text
 > field: `maxQueryLength` (the QE window) and `inputMaxLength` (what the operator may type, sized to
@@ -1370,9 +1391,9 @@ encrypted, lookup-tier and exact-searchable.
 > `caseSensitive` / `diacriticSensitive` params (declared on the field def) and runs server-side only;
 > Atlas still receives ciphertext and only the window. Refining discards candidates, so the encrypted
 > query reads a bounded wider page (`limit * 5`, capped at 200) to still fill one result page.
-> Raising `strMaxQueryLength` above 10 instead would need the
-> `fleDisableSubstringPreviewParameterLimits` server parameter plus a full drop and reseed, which is
-> why the window is refined rather than widened.
+> Raising `strMaxQueryLength` above the cluster default instead would need the substring
+> parameter-limit server override plus a full drop and reseed, which is why the window is refined
+> rather than widened.
 
 > **Nested QE paths.** Encrypting `customerAgreementGovernmentID.number` and
 > `customerAgreementKycCheck.*` is allowed because each parent sub-document stays plaintext; only

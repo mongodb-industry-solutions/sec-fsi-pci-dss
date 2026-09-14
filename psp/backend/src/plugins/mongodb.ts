@@ -1,10 +1,11 @@
 import fp from 'fastify-plugin';
 import { FastifyInstance } from 'fastify';
-import { Db } from 'mongodb';
+import { Db, MongoClient } from 'mongodb';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { getQEClient } from '../vendors/encryption/qeClient';
 import { config } from '../config';
+import { describeTarget, versionMismatch, cryptSharedHint } from '@leafypay/mongo-compat';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -16,7 +17,7 @@ declare module 'fastify' {
   }
 }
 
-function sanitizeUri(uri: string): { server: string; database: string } {
+export function sanitizeUri(uri: string): { server: string; database: string } {
   const dbName = config.mongodb.dbName ?? 'unknown';
   try {
     // Strip username:password before parsing; never log credentials
@@ -43,12 +44,35 @@ let activeTimers: NodeJS.Timeout[] = [];
  * wiring: the reload rebuilds the QE client so a fresh key-vault/DEK set is picked up after a
  * drop + setup + seed, WITHOUT restarting the process.
  */
+/**
+ * States, once per connection, which MongoDB this build targets and whether the cluster agrees.
+ * A version declared wrong picks the wrong QE query types, and the resulting failures name
+ * neither the version nor the library, so they are impossible to place without this line.
+ */
+async function reportCompatibility(client: MongoClient): Promise<void> {
+  const declared = config.mongodb.version;
+  console.log(`[mongodb] target: ${describeTarget(config.mongodb.type, declared)}`);
+  try {
+    const { version } = await client.db('admin').command({ buildInfo: 1 });
+    for (const warning of [
+      versionMismatch(declared, version),
+      cryptSharedHint(declared, config.mongodb.cryptSharedLibPath),
+    ]) {
+      if (warning) console.warn(`[mongodb] ${warning}`);
+    }
+  } catch {
+    // buildInfo needs no privilege the app lacks, but a check must never block startup.
+  }
+}
+
 async function connectAndWire(fastify: FastifyInstance): Promise<void> {
   const client = await getQEClient();
   const db = client.db(config.mongodb.dbName);
 
   fastify.db = db;
   fastify.dbError = null;
+
+  await reportCompatibility(client);
 
   // dev.v8: EventBus vendor (in-process adapter + Mongo event store). initEventBus creates a fresh
   // instance; getEventBus() returns the latest, so a reload swaps to a clean bus + subscribers.

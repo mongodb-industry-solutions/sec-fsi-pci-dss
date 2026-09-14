@@ -5,6 +5,7 @@ import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 import { config } from '../../config';
+import { supportsAtlasAdminApi } from '@leafypay/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
 
@@ -66,6 +67,11 @@ async function atlasDelete(
 }
 
 async function dropAtlasRolesAndUsers(): Promise<void> {
+  if (!supportsAtlasAdminApi(config.mongodb.type)) {
+    console.log('  MONGODB_TYPE=ea - no Atlas Admin API; roles and users are managed with mongosh.');
+    return;
+  }
+
   const publicKey = config.atlas.publicKey;
   const privateKey = config.atlas.privateKey;
   const projectId = config.atlas.projectId;

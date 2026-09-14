@@ -6,6 +6,8 @@ import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 import { config } from '../../config';
+import { describeTarget, versionMismatch, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
+import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
 
@@ -264,6 +266,73 @@ function checkEnvVars(): boolean {
   return fail === 0;
 }
 
+/**
+ * Declared target vs reality: server version, crypt_shared series, and the query types actually
+ * stored in the encrypted collections. These three have to agree, and when they do not every
+ * encrypted query on the affected collection fails with an error that names none of them.
+ */
+async function checkCompatibility(client: MongoClient, dbName: string): Promise<void> {
+  const declared = config.mongodb.version;
+  check('pass', 'declared target', describeTarget(config.mongodb.type, declared));
+
+  let actual = '';
+  try {
+    ({ version: actual } = await client.db('admin').command({ buildInfo: 1 }));
+  } catch (e) {
+    check('warn', 'server version', `could not read buildInfo - ${(e as Error).message}`);
+  }
+
+  if (actual) {
+    const mismatch = versionMismatch(declared, actual);
+    if (mismatch) check('fail', 'server version', mismatch);
+    else check('pass', 'server version', `cluster reports ${actual}`);
+  }
+
+  const hint = cryptSharedHint(declared, config.mongodb.cryptSharedLibPath);
+  if (hint) check('warn', 'crypt_shared library', hint);
+  else if (config.mongodb.cryptSharedLibPath) check('pass', 'crypt_shared library', 'matches the declared version');
+
+  // What the database actually holds vs what this build would declare. Catches both spellings of
+  // the text query types and a database built while the escape hatch was on.
+  try {
+    const stored = await readEncryptedFields(client, dbName);
+    const expected = expectedEncryptedFields();
+    const drift = encryptedFieldsDrift(expected, stored);
+    if (drift) check('fail', 'encrypted fields', drift);
+    else check('pass', 'encrypted fields', `${stored.length} stored field(s) match this configuration`);
+  } catch (e) {
+    check('warn', 'encrypted fields', `could not compare collection options - ${(e as Error).message}`);
+  }
+}
+
+/** The encrypted fields this build declares, flattened to `collection.path` + query type. */
+function expectedEncryptedFields(): EncryptedFieldQuery[] {
+  // Only paths and query types are read, so a placeholder key id is enough to build the maps.
+  const deks = new Proxy({}, { get: () => undefined }) as never;
+  const maps = buildEncryptedFieldsMaps(deks) as Record<string, { fields: { path: string; queries?: { queryType?: string } }[] } | undefined>;
+  const out: EncryptedFieldQuery[] = [];
+  for (const [collection, map] of Object.entries(maps)) {
+    for (const field of map?.fields ?? []) {
+      out.push({ path: `${collection}.${field.path}`, queryType: field.queries?.queryType ?? 'none' });
+    }
+  }
+  return out;
+}
+
+/** The encrypted fields the database actually holds. */
+async function readEncryptedFields(client: MongoClient, dbName: string): Promise<EncryptedFieldQuery[]> {
+  const infos = await client.db(dbName).listCollections().toArray() as {
+    name: string; options?: { encryptedFields?: { fields?: { path: string; queries?: { queryType?: string } }[] } };
+  }[];
+  const stored: EncryptedFieldQuery[] = [];
+  for (const info of infos) {
+    for (const field of info.options?.encryptedFields?.fields ?? []) {
+      stored.push({ path: `${info.name}.${field.path}`, queryType: field.queries?.queryType ?? 'none' });
+    }
+  }
+  return stored;
+}
+
 async function checkMongoDB(client: MongoClient): Promise<void> {
   const dbName = config.mongodb.dbName;
   const kmsConfig = getKmsConfig();
@@ -278,6 +347,8 @@ async function checkMongoDB(client: MongoClient): Promise<void> {
     check('fail', 'main URI', `cannot connect - ${(e as Error).message}`);
     return;
   }
+
+  await checkCompatibility(client, dbName);
 
   for (const key of ['MONGODB_URI_LEVEL1', 'MONGODB_URI_LEVEL2'] as const) {
     const uri = process.env[key];

@@ -1,5 +1,6 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
+import { resolveQeProfile, MongoDeploymentType } from '@leafypay/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
@@ -14,6 +15,11 @@ function pspEnv(name: string, fallback?: string): string | undefined {
 function env(name: string, fallback?: string): string | undefined {
   return process.env[name] ?? fallback;
 }
+
+// Default target: the current Atlas rapid release. Both knobs always have a value, so nothing
+// downstream has to cope with "unset".
+const DEFAULT_MONGODB_VERSION = '9.0.0';
+const QE_PROFILE = resolveQeProfile(env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!);
 
 export const config = {
   nodeEnv: process.env.NODE_ENV ?? 'development',
@@ -33,6 +39,12 @@ export const config = {
     uriLevel2: env('MONGODB_URI_LEVEL2'),
     dbName: env('MONGODB_DB_NAME', 'pcidb')!,
     cryptSharedLibPath: env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
+    // Deployment kind. 'atlas' provisions custom roles and DB users through the Atlas Admin API;
+    // 'ea' (Enterprise Advanced, self-managed) has no such API, so setup skips those steps.
+    type: (env('MONGODB_TYPE', 'atlas')! === 'ea' ? 'ea' : 'atlas') as MongoDeploymentType,
+    // Target server version. Decides the QE text-search query type names and limits (see
+    // qeCapabilities). The crypt_shared library must match it.
+    version: env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!,
   },
 
   rtp: {
@@ -45,11 +57,15 @@ export const config = {
   },
 
   qe: {
-    // QE text search (substring/prefix/suffix) needs MongoDB 8.2+ and mongodb-client-encryption 7.2.
-    // Default TRUE (assume a recent Atlas). Set PSP_QE_TEXT_SEARCH=false for pre-8.2 clusters:
-    // text-search fields degrade to QE:equality (still encrypted + searchable exactly, still lookup-tier)
-    // so setup never fails and L1 keeps decrypting them.
-    textSearch: pspEnv('QE_TEXT_SEARCH', 'true') !== 'false',
+    // Query types and limits for the declared server version. Everything QE-text-search related
+    // reads this, so a new version is one table entry in qeCapabilities and nothing else.
+    profile: QE_PROFILE,
+    // QE text search follows the version by default. PSP_QE_TEXT_SEARCH is an escape hatch only:
+    // set it to false to degrade text fields to QE:equality (still encrypted, still lookup-tier,
+    // exact-searchable) on a cluster that misbehaves. Changing it requires recreating collections.
+    textSearch: pspEnv('QE_TEXT_SEARCH') !== undefined
+      ? pspEnv('QE_TEXT_SEARCH') !== 'false'
+      : QE_PROFILE.textSearch,
   },
 
   demo: {

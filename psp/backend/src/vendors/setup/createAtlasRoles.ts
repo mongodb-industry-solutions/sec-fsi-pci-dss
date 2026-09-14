@@ -27,6 +27,7 @@
 import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { config } from '../../config';
+import { supportsAtlasAdminApi } from '@leafypay/mongo-compat';
 
 const ATLAS_API_BASE = 'cloud.mongodb.com';
 const ATLAS_API_PATH_BASE = '/api/atlas/v2';
@@ -159,6 +160,12 @@ export async function createAtlasRoles(): Promise<void> {
   const privateKey = config.atlas.privateKey;
   const projectId  = config.atlas.projectId;
   const dbName     = config.mongodb.dbName;
+
+  if (!supportsAtlasAdminApi(config.mongodb.type)) {
+    console.log('   MONGODB_TYPE=ea - self-managed deployment, no Atlas Admin API.');
+    console.log('   Create pci_level1_role / pci_level2_role and their users with mongosh.');
+    return;
+  }
 
   if (!publicKey || !privateKey || !projectId || !dbName) {
     console.log('   ATLAS_PUBLIC_KEY / ATLAS_PRIVATE_KEY / ATLAS_PROJECT_ID not set - skipping Atlas role automation.');

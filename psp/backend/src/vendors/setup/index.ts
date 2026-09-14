@@ -6,6 +6,7 @@ import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 import { createAtlasRoles } from './createAtlasRoles';
 import { config } from '../../config';
+import { versionMismatch, describeTarget, cryptSharedHint } from '@leafypay/mongo-compat';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -25,11 +26,19 @@ export async function runSetup(reset = false) {
   const client = new MongoClient(uri);
   try {
     await client.connect();
-    console.log('Connected to Atlas\n');
+    const { version } = await client.db('admin').command({ buildInfo: 1 });
+    console.log(`Connected: ${describeTarget(config.mongodb.type, config.mongodb.version)}; cluster reports ${version}\n`);
+
+    // A declared version that does not match the cluster picks the wrong QE text query types
+    // for every collection created below, and the failure surfaces far from here.
+    for (const warning of [
+      versionMismatch(config.mongodb.version, version),
+      cryptSharedHint(config.mongodb.version, config.mongodb.cryptSharedLibPath),
+    ].filter(Boolean)) console.warn(`  [WARN] ${warning}\n`);
 
     // v2: create Atlas custom roles + DB users before provisioning DEKs so the
     // role-specific connection strings (MONGODB_URI_LEVEL1/2) are ready for the pools.
-    console.log('1. Creating Atlas custom roles and DB users (v2 role-pool architecture)...');
+    console.log('1. Creating custom roles and DB users (v2 role-pool architecture)...');
     await createAtlasRoles();
     console.log('');
 

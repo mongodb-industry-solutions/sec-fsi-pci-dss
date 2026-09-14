@@ -570,18 +570,50 @@ function TestSummary({ summary, status }: {
   );
 }
 
+interface DropImpact {
+  target: { server: string; database: string; keyVaultNamespace: string; kmsProvider: string; atlasProjectId: string | null };
+  collections: { name: string; documents: number | null }[];
+  keyVault: { namespace: string; deks: number | null };
+  atlas: { configured: boolean; roles: string[]; dbUsers: string[] };
+  warnings: string[];
+}
+
 function ConfirmModal({ cmd, onConfirm, onCancel }: {
   cmd: CommandDef;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const [impact, setImpact] = useState<DropImpact | null>(null);
+  const [impactError, setImpactError] = useState<string | null>(null);
+  const [impactLoading, setImpactLoading] = useState(false);
+
+  // Loaded on demand: the inventory hits the database, so an operator who just cancels pays nothing.
+  useEffect(() => {
+    if (!expanded || impact || impactLoading) return;
+    const token = getAdminToken();
+    if (!token) { setImpactError('Not authenticated'); return; }
+    setImpactLoading(true);
+    setImpactError(null);
+    fetch(`${API_BASE_URL}/api/v1/admin/drop-impact`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error ?? res.statusText);
+        setImpact(data as DropImpact);
+      })
+      .catch((err) => setImpactError((err as Error).message))
+      .finally(() => setImpactLoading(false));
+  }, [expanded, impact, impactLoading]);
+
+  const totalDocs = impact?.collections.reduce((sum, c) => sum + (c.documents ?? 0), 0) ?? 0;
+
   return (
     <div
       className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4"
       onClick={onCancel}
     >
       <div
-        className="bg-gray-900 border border-red-900/60 rounded-xl p-6 max-w-md w-full shadow-2xl"
+        className="bg-gray-900 border border-red-900/60 rounded-xl p-6 max-w-2xl w-full shadow-2xl max-h-[85vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3 mb-4">
@@ -596,7 +628,66 @@ function ConfirmModal({ cmd, onConfirm, onCancel }: {
           <code className="text-red-400 text-xs font-mono">npm run {cmd.id}</code>
         </div>
 
-        <p className="text-gray-300 text-sm mb-6 leading-relaxed">{cmd.confirmMessage}</p>
+        <p className="text-gray-300 text-sm mb-4 leading-relaxed">{cmd.confirmMessage}</p>
+
+        <button
+          onClick={() => setExpanded((v) => !v)}
+          className="text-xs text-gray-400 hover:text-white underline underline-offset-2 mb-4"
+        >
+          {expanded ? 'Hide details' : 'Show what will be deleted'}
+        </button>
+
+        {expanded && (
+          <div className="mb-6 space-y-3">
+            {impactLoading && <p className="text-xs text-gray-500">Loading inventory...</p>}
+            {impactError && <p className="text-xs text-red-400">Could not load the inventory: {impactError}</p>}
+            {impact && (
+              <>
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs font-mono space-y-1">
+                  <div className="flex justify-between gap-4"><span className="text-gray-500">Server</span><span className="text-gray-200 break-all">{impact.target.server}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-gray-500">Database</span><span className="text-red-300">{impact.target.database}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-gray-500">Key vault</span><span className="text-red-300">{impact.target.keyVaultNamespace}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-gray-500">KMS provider</span><span className="text-gray-200">{impact.target.kmsProvider}</span></div>
+                  {impact.target.atlasProjectId && (
+                    <div className="flex justify-between gap-4"><span className="text-gray-500">Atlas project</span><span className="text-gray-200 break-all">{impact.target.atlasProjectId}</span></div>
+                  )}
+                </div>
+
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-3">
+                  <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-2">
+                    Collections ({impact.collections.length}, ~{totalDocs.toLocaleString()} documents)
+                  </p>
+                  <div className="max-h-52 overflow-y-auto space-y-0.5">
+                    {impact.collections.map((c) => (
+                      <div key={c.name} className="flex justify-between gap-4 text-xs font-mono">
+                        <span className="text-gray-300 break-all">{c.name}</span>
+                        <span className="text-gray-500">{c.documents === null ? 'n/a' : c.documents.toLocaleString()}</span>
+                      </div>
+                    ))}
+                    {impact.collections.length === 0 && <p className="text-xs text-gray-600">No collections found.</p>}
+                  </div>
+                </div>
+
+                <div className="bg-gray-950 border border-gray-800 rounded-lg p-3 text-xs font-mono space-y-1">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-gray-500">Encryption keys (DEKs)</span>
+                    <span className="text-gray-200">{impact.keyVault.deks === null ? 'n/a' : impact.keyVault.deks}</span>
+                  </div>
+                  <div className="flex justify-between gap-4"><span className="text-gray-500">Atlas roles</span><span className="text-gray-200 break-all">{impact.atlas.roles.join(', ')}</span></div>
+                  <div className="flex justify-between gap-4"><span className="text-gray-500">Atlas DB users</span><span className="text-gray-200 break-all">{impact.atlas.dbUsers.join(', ') || 'none configured'}</span></div>
+                </div>
+
+                {impact.warnings.length > 0 && (
+                  <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-3 space-y-1">
+                    {impact.warnings.map((w, i) => (
+                      <p key={i} className="text-[11px] text-amber-300/90 break-all">{w}</p>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
 
         <div className="flex gap-3 justify-end">
           <button

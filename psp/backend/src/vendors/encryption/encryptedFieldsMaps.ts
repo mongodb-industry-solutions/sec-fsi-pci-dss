@@ -1,12 +1,6 @@
 import { DEKs } from './keyVault';
 import { config } from '../../config';
 
-// QE text-search preview query types (MongoDB 8.2 preview / mongodb-client-encryption 7.2).
-// If a spike shows different identifiers, change ONLY these three constants.
-const QT_SUBSTRING = 'substringPreview';
-const QT_PREFIX = 'prefixPreview';
-const QT_SUFFIX = 'suffixPreview';
-
 /**
  * Access tier for QE client pools (v2).
  *
@@ -29,6 +23,8 @@ export function buildEncryptedFieldsMaps(
   textSearch: boolean = config.qe.textSearch,
 ) {
   const includeSensitive = tier === 'level2';
+  // Query types for the declared server version (MONGODB_VERSION); see qeCapabilities.
+  const QT = config.qe.profile;
 
   // Text-search query object, gated by textSearch. On pre-8.2 clusters the field degrades
   // to QE:equality (still encrypted, still lookup-tier, exact-match searchable).
@@ -59,10 +55,10 @@ export function buildEncryptedFieldsMaps(
           keyId: deks.partyName,
           path: 'partyName',
           bsonType: 'string',
-          queries: textQuery(QT_SUBSTRING, {
-            // Params kept within the cluster default substringPreview limits (strMaxQueryLength
-            // capped) so setup needs no fleDisableSubstringPreviewParameterLimits override.
-            strMaxLength: 30, strMinQueryLength: 3, strMaxQueryLength: 10,
+          queries: textQuery(QT.substring, {
+            // Kept within the cluster default substring limits (6 on 9.0, 10 before it), so setup
+            // needs no parameter-limit override.
+            strMaxLength: 30, strMinQueryLength: 3, strMaxQueryLength: QT.substringMaxQueryLength,
             caseSensitive: false, diacriticSensitive: false,
           }),
         },
@@ -153,7 +149,7 @@ export function buildEncryptedFieldsMaps(
           keyId: deks.caGovIdNumber,
           path: 'customerAgreementGovernmentID.number',
           bsonType: 'string',
-          queries: textQuery(QT_SUFFIX, {
+          queries: textQuery(QT.suffix, {
             strMaxLength: 20, strMinQueryLength: 3, strMaxQueryLength: 10,
             caseSensitive: true, diacriticSensitive: true,
           }),
@@ -184,7 +180,7 @@ export function buildEncryptedFieldsMaps(
           keyId: deks.caTaxId,
           path: 'customerAgreementTaxIDNumber',
           bsonType: 'string',
-          queries: textQuery(QT_PREFIX, {
+          queries: textQuery(QT.prefix, {
             strMaxLength: 20, strMinQueryLength: 2, strMaxQueryLength: 10,
             caseSensitive: true, diacriticSensitive: true,
           }),

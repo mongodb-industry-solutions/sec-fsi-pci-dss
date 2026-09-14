@@ -34,6 +34,8 @@ import { validateCrossSide } from './validateCrossSide';
 import { assertLinks, resolvePlatformLinks } from '@leafypay/platform-links';
 import { readSeedFile } from '../seed/readSeedFile';
 import { config, keyVaultNamespaceParts } from '../../config';
+import { describeTarget, versionMismatch, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
+import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
 export interface ValidationResult {
   checks: Array<{ name: string; ok: boolean; detail?: string }>;
@@ -75,6 +77,44 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
     add('crypt_shared library', true, assertCryptSharedLib());
   } catch (err) {
     add('crypt_shared library', false, err instanceof Error ? err.message : String(err));
+  }
+
+  // Declared target vs the cluster. The bank shares the PSP's cluster and key vault, so a version
+  // that disagrees breaks encrypted reads on both sides for the same reason.
+  add('declared target', true, describeTarget(config.mongodb.type, config.mongodb.version));
+  try {
+    const { version } = await db.client.db('admin').command({ buildInfo: 1 });
+    const mismatch = versionMismatch(config.mongodb.version, version);
+    add('server version', !mismatch, mismatch ?? `cluster reports ${version}`);
+  } catch (err) {
+    add('server version', true, `could not read buildInfo (${err instanceof Error ? err.message : String(err)})`);
+  }
+  const hint = cryptSharedHint(config.mongodb.version, config.mongodb.cryptSharedLibPath);
+  if (hint) add('crypt_shared version', false, hint);
+
+  // What the bank database holds vs what this build declares, field by field.
+  try {
+    const infos = await db.listCollections().toArray() as {
+      name: string; options?: { encryptedFields?: { fields?: { path: string; queries?: { queryType?: string } }[] } };
+    }[];
+    const stored: EncryptedFieldQuery[] = [];
+    for (const info of infos) {
+      for (const field of info.options?.encryptedFields?.fields ?? []) {
+        stored.push({ path: `${info.name}.${field.path}`, queryType: field.queries?.queryType ?? 'none' });
+      }
+    }
+    const deks = new Proxy({}, { get: () => undefined }) as never;
+    const maps = buildEncryptedFieldsMaps(deks) as Record<string, { fields: { path: string; queries?: { queryType?: string } }[] }>;
+    const expected: EncryptedFieldQuery[] = [];
+    for (const [collection, map] of Object.entries(maps)) {
+      for (const field of map.fields) {
+        expected.push({ path: `${collection}.${field.path}`, queryType: field.queries?.queryType ?? 'none' });
+      }
+    }
+    const drift = encryptedFieldsDrift(expected, stored);
+    add('encrypted fields', !drift, drift ?? `${stored.length} stored field(s) match this configuration`);
+  } catch (err) {
+    add('encrypted fields', true, `could not compare collection options (${err instanceof Error ? err.message : String(err)})`);
   }
 
   const existing = new Set((await db.listCollections({}, { nameOnly: true }).toArray()).map((c) => c.name));
