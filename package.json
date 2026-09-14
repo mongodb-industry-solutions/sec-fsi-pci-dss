@@ -42,7 +42,7 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.6",
     "@vitejs/plugin-react": "^6.0.3",
-    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/coverage-v8": "^5.0.0",
     "bcryptjs": "^2.4.3",
     "concurrently": "^10.0.3",
     "dotenv": "^17.4.2",
