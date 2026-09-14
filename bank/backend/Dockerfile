@@ -36,6 +36,7 @@ ENV PSP_BANKCORE_PORT=8080
 COPY packages/ packages/
 RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
+RUN cd packages/mongo-compat && npm install
 
 COPY bank/backend/package.json bank/backend/
 RUN cd bank/backend && npm install

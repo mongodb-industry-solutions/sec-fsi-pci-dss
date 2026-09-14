@@ -42,12 +42,14 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 COPY package.json ./
 RUN npm install --ignore-scripts
 
-# Shared workspace packages, built before the backend installs them via file: (v37). BOTH are needed:
-# the backend imports @leafypay/eventbus and @leafypay/platform-links, and each is consumed through its
-# compiled dist, so an uninstalled package fails the build with a missing type rather than at runtime.
+# Shared workspace packages, built before the backend installs them via file: (v37). EVERY declared
+# one is needed: the backend imports @leafypay/eventbus, @leafypay/platform-links and
+# @leafypay/mongo-compat, and each is consumed through its compiled dist, so an uninstalled package
+# fails the build with a missing type rather than at runtime.
 COPY packages/ packages/
 RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
+RUN cd packages/mongo-compat && npm install
 
 # Backend package.json — "fsi-pci-dss-demo": "file:../.." now resolves to /app/
 COPY psp/backend/package.json psp/backend/
