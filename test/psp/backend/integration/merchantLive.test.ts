@@ -29,7 +29,7 @@ async function authorityLogin(userName: string): Promise<string> {
   // A URI the console client is actually registered for. The authority refuses an unregistered one,
   // which is correct and is why this is not simply whatever host the test happens to run against.
   return interactiveToken(
-    'http://127.0.0.1:8085', 'leafypay', userName, 'demo-password',
+    'http://127.0.0.1:8085', 'LeafyIdp', userName, 'demo-password',
     'giam-console', 'http://localhost:8086/auth/callback',
   );
 }

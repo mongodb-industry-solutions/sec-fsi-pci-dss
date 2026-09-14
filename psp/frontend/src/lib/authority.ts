@@ -41,7 +41,7 @@ const TIMEOUT_MS = 10000;
 function issuerBase(): string {
   const raw = process.env.PSP_GIAM_ISSUER_URL
     ?? process.env.GIAM_ISSUER_URL
-    ?? 'http://127.0.0.1:8085/realms/leafypay';
+    ?? 'http://127.0.0.1:8085/realms/LeafyIdp';
   return raw.replace(/\/$/, '');
 }
 

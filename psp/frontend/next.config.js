@@ -70,7 +70,7 @@ const nextConfig = {
         // preferred and the issuer origin is only the fallback.
         const authorityUrl = (
             process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE ||
-            (process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER || 'http://localhost:8085/realms/leafypay')
+            (process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER || 'http://localhost:8085/realms/LeafyIdp')
                 .replace(/\/realms\/.*$/, '')
         ).replace(/\/+$/, '');
         return [

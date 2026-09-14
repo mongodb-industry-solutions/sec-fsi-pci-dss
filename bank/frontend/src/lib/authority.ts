@@ -29,15 +29,15 @@ const CONSOLE_CLIENT_ID = 'bankcore-console';
 const TIMEOUT_MS = 10000;
 
 /**
- * `PSP_BANKCORE_GIAM_ISSUER_URL` names the bank's OWN institutional realm (`/realms/bankcore`),
- * which is what `bank/backend` reads under this same name. This console signs staff in against
- * the SHARED realm instead (see the comment on `authorityIssuerPublic` below), so it reads the
- * platform's own private issuer var instead of colliding with the bank's.
+ * `PSP_BANKCORE_GIAM_ISSUER_URL` is what `bank/backend` reads under this same name, and it names
+ * the SHARED realm like everything else (ADR-003). It once named a `/realms/bankcore` that the
+ * authority has never had, which is how every token request the platform made was refused. This
+ * console reads the platform's own private issuer var rather than colliding with the bank's.
  */
 function issuerBase(): string {
   const raw = process.env.PSP_GIAM_ISSUER_URL
     ?? process.env.GIAM_ISSUER_URL
-    ?? 'http://127.0.0.1:8085/realms/leafypay';
+    ?? 'http://127.0.0.1:8085/realms/LeafyIdp';
   return raw.replace(/\/$/, '');
 }
 
@@ -56,7 +56,7 @@ function issuerBase(): string {
 function authorityIssuerPublic(): string {
   const raw = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_ISSUER_URL
     ?? process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER
-    ?? 'http://localhost:8085/realms/leafypay';
+    ?? 'http://localhost:8085/realms/LeafyIdp';
   return raw.replace(/\/$/, '');
 }
 

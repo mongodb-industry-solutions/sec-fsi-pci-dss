@@ -14,7 +14,7 @@ import { clientSecretFor } from '@leafypay/platform-links';
  * The SHARED realm (ADR-003). The bank is a client in it, not a directory of its own: what keeps it
  * separate is its own resource server, its own roles and its own token audience.
  */
-const REALM = 'leafypay';
+const REALM = 'LeafyIdp';
 /** The registered third parties, so a test can prove one cannot see another's records. */
 const CLIENTS: Record<string, string> = {
   'leafypay-psp': clientSecretFor('leafypay-psp'),

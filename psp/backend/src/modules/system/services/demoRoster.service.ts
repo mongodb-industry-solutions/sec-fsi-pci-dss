@@ -32,7 +32,7 @@ export async function getDemoUsers(
   filters: { featured?: boolean; role?: string[]; q?: string; isMerchant?: boolean } = {},
 ): Promise<DemoUser[]> {
   const issuer = config.giam.issuerUrl.replace(/\/+$/, '');
-  const realm = issuer.split('/realms/')[1] ?? 'leafypay';
+  const realm = issuer.split('/realms/')[1] ?? 'LeafyIdp';
   const base = issuer.split('/realms/')[0];
 
   let roster: RosterEntry[] = [];

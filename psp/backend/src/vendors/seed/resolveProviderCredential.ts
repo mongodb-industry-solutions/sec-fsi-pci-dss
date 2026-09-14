@@ -27,14 +27,14 @@ function fromEnv(name: string, fallback: string): string {
  * ever had, so every TPP call the PSP made was refused with `unknown realm` and surfaced three
  * layers up as a transfer that could not reach the rail.
  */
-const DEFAULT_REALM = 'leafypay';
+const DEFAULT_REALM = 'LeafyIdp';
 
 /**
  * The issuer, realm included, from a base URL that may or may not already name one.
  *
  * Both shapes are in use: `GIAM_ISSUER_URL` is the issuer and carries the realm, while
  * `GIAM_BASE_URL` and the default are the authority's ORIGIN and do not. Appending blindly gave
- * `/realms/leafypay/realms/...` under the first and the right answer under the second, which is the
+ * `/realms/LeafyIdp/realms/...` under the first and the right answer under the second, which is the
  * kind of difference that only shows up in one deployment.
  */
 function authorityIssuer(baseUrl: string): string {

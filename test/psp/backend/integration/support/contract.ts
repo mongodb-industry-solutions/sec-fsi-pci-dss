@@ -86,7 +86,7 @@ export async function mintOAuthToken(sub: string, scopes: string[], _clientId: s
   const own = await authorityToken('leafypay-simulator', clientSecretFor('leafypay-simulator'));
   if (!own) throw new Error('the identity authority is not reachable, so no token can be obtained');
 
-  const response = await fetch('http://127.0.0.1:8085/realms/leafypay/protocol/openid-connect/token', {
+  const response = await fetch('http://127.0.0.1:8085/realms/LeafyIdp/protocol/openid-connect/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

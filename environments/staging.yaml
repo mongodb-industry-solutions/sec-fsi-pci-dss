@@ -16,9 +16,9 @@ env:
 
   # ── Merchant app (Espresso Works) config ──────────────────────────────────────────────────────
   # Browser-facing sign-in → the authorization ENDPOINT on the PUBLIC GIAM console origin.
-  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com/realms/leafypay/protocol/openid-connect/auth"
+  PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com/realms/LeafyIdp/protocol/openid-connect/auth"
   # Server-to-server discovery, token and introspection → PRIVATE in-cluster GIAM service.
-  PSP_MERCHANT_ISSUER_URL: "http://sec-giam-web-app:80/realms/leafypay"
+  PSP_MERCHANT_ISSUER_URL: "http://sec-giam-web-app:80/realms/LeafyIdp"
   # Server-to-server BUSINESS API → PRIVATE in-cluster backend service. Unchanged: no business
   # endpoint moved, and this variable is the proof that authentication was separable from them.
   PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
@@ -69,7 +69,7 @@ env:
   # The platform realm issuer, private for the same reason. PSP_-prefixed deliberately: the shared
   # link resolver reads the UNPREFIXED name as a bare host, and a realm URL there would be joined
   # onto fixture paths that already carry their own realm, producing /realms/x/realms/y.
-  PSP_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/leafypay"
+  PSP_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/LeafyIdp"
   # What a token must name in its audience claim to be accepted here, and the name this platform
   # registers its enforcement points under. Both are the realm GIAM seeds for this platform.
   GIAM_AUDIENCE: "leafypay"
@@ -80,9 +80,10 @@ env:
   # How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old public
   # key can only verify signatures GIAM itself produced.
   GIAM_JWKS_CACHE_SECONDS: "900"
-  # The bank is a relying party in its OWN realm. A platform token carries a different issuer and is
-  # refused before any claim is read, which is what makes the institutional boundary structural.
-  PSP_BANKCORE_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/bankcore"
+  # The bank is a resource server in the SHARED realm, not a realm of its own (ADR-003). What keeps
+  # the institutional boundary structural is its own audience and roles below, which a platform
+  # token does not carry. It named `/realms/bankcore` until this line, and no such realm exists.
+  PSP_BANKCORE_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/LeafyIdp"
   PSP_BANKCORE_GIAM_AUDIENCE: "bankcore"
   PSP_BANKCORE_GIAM_RESOURCE_SERVER: "bankcore"
   PSP_BANKCORE_GIAM_JWKS_CACHE_SECONDS: "900"
@@ -94,10 +95,10 @@ env:
   # This app's own public origin: the authority redirects the signed-in browser back to it, and it
   # must match a registered redirect URI of bankcore-console.
   PSP_BANKCORE_FRONTEND_URL: "https://sec-fsi-pci-dss-bank-frontend.industrysolutions.staging.corp.mongodb.com"
-  # PUBLIC authorize endpoint the BROWSER is sent to, shared realm (the console signs staff in
-  # against leafypay, not the bank's own institutional realm; see PSP_GIAM_ISSUER_URL above for the
-  # matching private, server-to-server path this app also reads).
-  NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: "https://sec-giam-api.industrysolutions.staging.corp.mongodb.com/realms/leafypay"
+  # PUBLIC authorize endpoint the BROWSER is sent to. One realm for everybody (ADR-003): there is no
+  # second, institutional realm to distinguish this from; see PSP_GIAM_ISSUER_URL above for the
+  # matching private, server-to-server path this app also reads.
+  NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: "https://sec-giam-api.industrysolutions.staging.corp.mongodb.com/realms/LeafyIdp"
   # PUBLIC GIAM console origin, for the SLO redirect (post_logout_redirect_uri).
   NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: "https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com"
 

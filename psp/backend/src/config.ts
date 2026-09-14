@@ -92,7 +92,7 @@ export const config = {
   // issuer it trusts and the name it registers its enforcement points under.
   giam: {
     // The realm issuer. Everything else is discovered from it, so a deployment configures one URL.
-    issuerUrl: pspEnv('GIAM_ISSUER_URL', 'http://127.0.0.1:8085/realms/leafypay')!,
+    issuerUrl: pspEnv('GIAM_ISSUER_URL', 'http://127.0.0.1:8085/realms/LeafyIdp')!,
     // What a token must name in its audience claim to be accepted here.
     audience: pspEnv('GIAM_AUDIENCE', 'leafypay')!,
     resourceServerName: pspEnv('GIAM_RESOURCE_SERVER', 'leafypay')!,

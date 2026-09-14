@@ -8,7 +8,7 @@ import { PasswordFields, passwordFieldsValid } from '../../../components/Passwor
 
 function RegisterForm() {
   const params = useSearchParams();
-  const domain = params.get('domain') || 'leafypay';
+  const domain = params.get('domain') || 'LeafyIdp';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

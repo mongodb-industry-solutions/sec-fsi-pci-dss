@@ -62,10 +62,10 @@ async function signInToConsole(login: string): Promise<{ jar: Jar; codeIssued: b
    * endpoint is a `GET`, and the code arrives in the `Location` header of a 302. The code then goes
    * back to the console, which holds the verifier for the challenge it put in the request.
    */
-  const session = await signIn(AUTHORITY, 'leafypay', login, DEMO_PASSWORD);
+  const session = await signIn(AUTHORITY, 'LeafyIdp', login, DEMO_PASSWORD);
   if (!session) return { jar, codeIssued: false };
 
-  const code = await authorizationCode(AUTHORITY, 'leafypay', session.cookie, {
+  const code = await authorizationCode(AUTHORITY, 'LeafyIdp', session.cookie, {
     clientId: params.get('client_id') ?? '',
     redirectUri: params.get('redirect_uri') ?? '',
     scope: params.get('scope') ?? undefined,
@@ -110,7 +110,7 @@ describe('v39: the bank console signs in at the authority and authorises by role
      * the application holding the session and not the directory.
      */
     expect(location.pathname, 'the request must go to the authorization endpoint')
-      .toBe('/realms/leafypay/protocol/openid-connect/auth');
+      .toBe('/realms/LeafyIdp/protocol/openid-connect/auth');
     expect(location.searchParams.get('response_type')).toBe('code');
     expect(location.searchParams.get('code_challenge_method'), 'PKCE is not optional here').toBe('S256');
     expect(location.searchParams.get('client_id')).toBe('bankcore-console');

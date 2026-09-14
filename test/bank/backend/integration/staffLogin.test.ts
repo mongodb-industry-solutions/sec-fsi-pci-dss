@@ -19,8 +19,8 @@ import {
  * The SHARED realm (ADR-003). The bank is a client in it, not a directory of its own: what keeps it
  * separate is its own resource server, its own roles and its own token audience.
  */
-const BANK_REALM = 'leafypay';
-const PLATFORM_REALM = 'leafypay';
+const BANK_REALM = 'LeafyIdp';
+const PLATFORM_REALM = 'LeafyIdp';
 const CONSOLE_CLIENT = 'bankcore-console';
 const REDIRECT_URI = 'http://localhost:8084/api/auth/callback';
 const DEMO_PASSWORD = 'demo-password';
@@ -65,7 +65,7 @@ afterAll(async () => {
  * the fixture instead would be asserting the fixture against itself.
  */
 async function expanded(token: string, held: string[]): Promise<Set<string>> {
-  const response = await fetch(`${authority!.baseUrl}/realms/leafypay/permissions`, {
+  const response = await fetch(`${authority!.baseUrl}/realms/LeafyIdp/permissions`, {
     headers: { authorization: `Bearer ${token}` },
   });
   if (!response.ok) return new Set();

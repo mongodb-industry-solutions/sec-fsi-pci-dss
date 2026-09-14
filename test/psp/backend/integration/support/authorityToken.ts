@@ -12,7 +12,7 @@ import { resolve } from 'path';
 import { giamPath } from '../../../../support/giamRepo';
 
 const GIAM_DIR = giamPath('backend');
-const REALM = 'leafypay';
+const REALM = 'LeafyIdp';
 const DEFAULT_PORT = 8085;
 
 export interface Authority {

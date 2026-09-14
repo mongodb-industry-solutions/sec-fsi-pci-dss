@@ -13,7 +13,7 @@ import { startAuthority, interactiveToken, type Authority } from './authorityPro
  * The SHARED realm (ADR-003). The bank is a client in it, not a directory of its own: what keeps it
  * separate is its own resource server, its own roles and its own token audience.
  */
-const REALM = 'leafypay';
+const REALM = 'LeafyIdp';
 const CONSOLE_CLIENT = 'bankcore-console';
 const REDIRECT_URI = 'http://localhost:8084/api/auth/callback';
 const DEMO_PASSWORD = 'demo-password';

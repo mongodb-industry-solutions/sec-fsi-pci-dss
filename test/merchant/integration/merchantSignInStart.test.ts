@@ -47,7 +47,7 @@ describe('the merchant app starts sign-in at the authority', () => {
     const location = await startSignIn();
     // The realm is in the path, not a parameter: that is the shared realm seen from here.
     expect(location.pathname, 'the request must go to the authorization endpoint')
-      .toBe('/realms/leafypay/protocol/openid-connect/auth');
+      .toBe('/realms/LeafyIdp/protocol/openid-connect/auth');
     expect(location.searchParams.get('response_type')).toBe('code');
     expect(location.searchParams.get('client_id')).toBe(MERCHANT_CLIENT_ID);
     expect(location.searchParams.get('code_challenge_method'), 'PKCE is not optional here').toBe('S256');
@@ -74,7 +74,7 @@ describe('the merchant app starts sign-in at the authority', () => {
     expect(requestId).toBeTruthy();
 
     const context = await fetch(
-      `${AUTHORITY}/realms/leafypay/login-context?request_id=${encodeURIComponent(requestId as string)}`,
+      `${AUTHORITY}/realms/LeafyIdp/login-context?request_id=${encodeURIComponent(requestId as string)}`,
       { signal: AbortSignal.timeout(20000) },
     );
     expect(context.ok).toBe(true);
