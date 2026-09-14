@@ -18,6 +18,30 @@ function fromEnv(name: string, fallback: string): string {
   return value && value.trim() ? value.trim() : fallback;
 }
 
+/**
+ * The realm the platform's tokens are issued in, when the configured base URL does not name one.
+ *
+ * The bank is a CLIENT of this realm and not a realm of its own (ADR-003): what separates the two
+ * institutions is the bank's own resource server, roles and token audience, none of which needs a
+ * second directory. The fixture used to carry `/realms/bankcore/` instead, which no authority has
+ * ever had, so every TPP call the PSP made was refused with `unknown realm` and surfaced three
+ * layers up as a transfer that could not reach the rail.
+ */
+const DEFAULT_REALM = 'leafypay';
+
+/**
+ * The issuer, realm included, from a base URL that may or may not already name one.
+ *
+ * Both shapes are in use: `GIAM_ISSUER_URL` is the issuer and carries the realm, while
+ * `GIAM_BASE_URL` and the default are the authority's ORIGIN and do not. Appending blindly gave
+ * `/realms/leafypay/realms/...` under the first and the right answer under the second, which is the
+ * kind of difference that only shows up in one deployment.
+ */
+function authorityIssuer(baseUrl: string): string {
+  if (/\/realms\/[^/]+/.test(baseUrl)) return baseUrl;
+  return `${baseUrl}/realms/${fromEnv('GIAM_REALM', DEFAULT_REALM)}`;
+}
+
 /** Fills a provider record's `oauth2_cc` credential in place. A record without one is left untouched. */
 export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
   const oauth2 = record.authConfig?.scheme === 'oauth2_cc' ? record.authConfig.oauth2 : undefined;
@@ -26,13 +50,13 @@ export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
   const { bankcoreBaseUrl, authorityBaseUrl } = resolvePlatformLinks();
   oauth2.clientId = fromEnv('BANKCORE_TPP_CLIENT_ID', DEFAULT_CLIENT_ID);
   oauth2.clientSecretPlaintext = fromEnv('BANKCORE_TPP_CLIENT_SECRET', DEFAULT_CLIENT_SECRET);
-  // The fixture holds the relative standard path; the host is the environment's.
+  // The fixture holds the relative standard path; the ISSUER is the environment's.
   //
   // It is the AUTHORITY's host, not the bank's. The bank stopped issuing tokens and is a resource
   // server that only verifies them, so a credential resolved against the bank asks for a token at a
   // service that has none to give, and the call that follows arrives with no bearer at all.
   if (!oauth2.tokenEndpoint.startsWith('http')) {
-    oauth2.tokenEndpoint = absoluteEndpoint(authorityBaseUrl, oauth2.tokenEndpoint);
+    oauth2.tokenEndpoint = absoluteEndpoint(authorityIssuer(authorityBaseUrl), oauth2.tokenEndpoint);
   }
   // The bank's base URL goes on the same record as its credential (P4.1). Picking the two from different
   // records is how a token ends up presented at the wrong bank.
