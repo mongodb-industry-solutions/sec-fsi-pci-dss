@@ -403,7 +403,7 @@
       "card.authorization.requested"
     ],
     "externalProviderMode": "sync",
-    "externalProviderTimeoutMs": 200,
+    "externalProviderTimeoutMs": 5000,
     "externalProviderRetryPolicy": {
       "maxAttempts": 1,
       "backoffMs": 0
@@ -682,7 +682,7 @@
       }
     ],
     "externalProviderMode": "sync",
-    "externalProviderTimeoutMs": 500,
+    "externalProviderTimeoutMs": 5000,
     "externalProviderRetryPolicy": {
       "maxAttempts": 1,
       "backoffMs": 0
