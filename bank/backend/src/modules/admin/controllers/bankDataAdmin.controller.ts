@@ -1,5 +1,5 @@
 import { FastifyInstance } from 'fastify';
-import { requireStaff } from '../../../vendors/middleware/staffAuth';
+import { requireStaff, bindOwnAccountHolder, refuseIfNotOwn } from '../../../vendors/middleware/staffAuth';
 import {
   searchIssuedCards, countCardsByStatus, searchAccounts, countAccountsByStatus,
   searchHolders, countHoldersByStatus, MAX_LIMIT, DEFAULT_LIMIT,
@@ -51,6 +51,8 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   // ── Cards ──────────────────────────────────────────────────────────────────────────────────────
   fastify.get('/cards', {
     preValidation: requireStaff('issuedCards', 'view'),
+    // An account holder sees the cards issued to them, never the estate. See `bindOwnAccountHolder`.
+    preHandler: bindOwnAccountHolder('holder'),
     schema: {
       tags: ['admin'],
       summary: 'List the cards this bank issued',
@@ -104,6 +106,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     const page = await searchIssuedCards(fastify.db, { reference: cardToken, limit: 1 });
     const card = page.results[0];
     if (!card) return reply.status(404).send({ error: 'No such card at this issuer' });
+    if (refuseIfNotOwn(request, reply, card.holderReference)) return reply;
     return card;
   });
 
@@ -255,6 +258,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   // ── Accounts ───────────────────────────────────────────────────────────────────────────────────
   fastify.get('/accounts', {
     preValidation: requireStaff('accounts', 'view'),
+    preHandler: bindOwnAccountHolder('holder'),
     schema: {
       tags: ['admin'],
       summary: 'List the accounts this bank holds',
@@ -458,6 +462,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     const page = await searchAccounts(fastify.db, { reference: accountReference, limit: 1 });
     const account = page.results[0];
     if (!account) return reply.status(404).send({ error: 'No such account at this bank' });
+    if (refuseIfNotOwn(request, reply, account.accountHolderInstanceReference)) return reply;
     return account;
   });
 
@@ -531,6 +536,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
   // ── The holder behind an account and a card ────────────────────────────────────────────────────
   fastify.get('/holders', {
     preValidation: requireStaff('accountHolders', 'view'),
+    preHandler: bindOwnAccountHolder('reference'),
     schema: {
       tags: ['admin'],
       summary: 'List account holders, masked',
@@ -545,6 +551,9 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
           ...PAGE_QUERY,
           status: { type: 'string', enum: ['active', 'dormant', 'closed'] },
           country: { type: 'string', minLength: 2, maxLength: 2 },
+          // Declared so the self-scope binding has a filter to narrow onto. A schema that refuses the
+          // parameter would leave the binding writing a value the search never reads.
+          reference: { type: 'string' },
         },
       },
       response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR },
@@ -579,6 +588,7 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     const { holderReference } = request.params as { holderReference: string };
     const holder = await findHolder(fastify.db, holderReference);
     if (!holder) return reply.status(404).send({ error: 'No such account holder at this bank' });
+    if (refuseIfNotOwn(request, reply, holderReference)) return reply;
     return holder;
   });
 

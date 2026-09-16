@@ -73,6 +73,21 @@ export const BANK_PERMISSION_CATALOG: BankPermissionDeclaration[] = [
   { resource: 'psd2Role', action: 'CBPII', description: 'Act as a card-based payment instrument issuer' },
 ];
 
+/**
+ * The roles whose entire scope is the holder's OWN records.
+ *
+ * Declared here beside the permissions because the published catalog answers what a role may do and
+ * not whose records it may do it to, and a resource server that cannot tell the two apart enforces
+ * the first and silently skips the second. That is exactly what happened: the self scope existed in
+ * the role definition, nothing here read it, and an account holder was served the whole bank.
+ */
+export const BANK_SELF_SCOPED_ROLES: ReadonlyArray<string> = ['bank_customer'];
+
+/** Whether any role held binds the caller to their own records. */
+export function isSelfScoped(roles: ReadonlyArray<string> | undefined): boolean {
+  return Boolean(roles?.some((role) => BANK_SELF_SCOPED_ROLES.includes(role)));
+}
+
 /** A pure claim check. Default deny: an absent claim is not an unrestricted one. */
 export function hasBankPermission(
   permissions: ReadonlyArray<string> | Set<string> | undefined,

@@ -238,6 +238,8 @@ export async function countAccountsByStatus(db: Db): Promise<Record<string, numb
 export interface HolderQuery {
   status?: string;
   country?: string;
+  /** One exact reference. What the self-scope binding narrows this list onto. */
+  reference?: string;
   q?: string;
   page?: number;
   limit?: number;
@@ -261,6 +263,9 @@ export async function searchHolders(db: Db, query: HolderQuery): Promise<Page<Ho
   // The name is not searchable and is not pretended to be: it carries no query index, so a name search would
   // silently match nothing. The reference is what an operator arrives with, from an account or a card.
   if (query.q?.trim()) filter.accountHolderInstanceReference = literalRegex(query.q.trim());
+  // Last, so it overrides the free-text form of the same field rather than being overridden by it: this
+  // is the boundary, and a search term must not be able to widen past it.
+  if (query.reference) filter.accountHolderInstanceReference = query.reference;
 
   const collection = db.collection<AccountHolderControlRecord>(ACCOUNT_HOLDER_COLLECTION);
   const [records, total] = await Promise.all([

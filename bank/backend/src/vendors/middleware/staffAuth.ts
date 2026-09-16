@@ -1,6 +1,6 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { verifyRealmToken } from '../security/tokenVerifier';
-import { BankResource, BankAction, hasBankPermission } from '../../shared/models/permissionCatalog';
+import { BankResource, BankAction, hasBankPermission, isSelfScoped } from '../../shared/models/permissionCatalog';
 
 /**
  * Authorisation for the bank's OWN people.
@@ -22,6 +22,8 @@ export interface StaffContext {
   permissions: string[];
   /** Present when the person is an account holder acting on their own records. */
   accountHolderRef?: string;
+  /** True when every record this caller may reach is their own. See `BANK_SELF_SCOPED_ROLES`. */
+  selfScoped: boolean;
 }
 
 declare module 'fastify' {
@@ -72,12 +74,30 @@ export function requireStaff(resource: BankResource, action: BankAction) {
       return refuse(reply, 503, 'The bank ledger is unavailable');
     }
 
+    const accountHolderRef = typeof claims.account_holder === 'string' && claims.account_holder
+      ? claims.account_holder
+      : undefined;
+    const selfScoped = isSelfScoped(claims.roles);
+
+    /**
+     * A self-scoped role with NO binding is refused, rather than admitted unbound.
+     *
+     * Unbound was the previous behaviour and it read as "not restricted to anybody", so an account
+     * holder whose principal carried no reference was served every other holder's records. The whole
+     * scope of the role is "your own", so not knowing whose it is leaves nothing it may legitimately
+     * reach.
+     */
+    if (selfScoped && !accountHolderRef) {
+      return refuse(reply, 403, 'Access denied: this account holder is not bound to a record at this bank');
+    }
+
     request.staff = {
       subjectId: claims.sub,
       roles: claims.roles,
       // The same set the guard decided on, so a downstream check cannot disagree with the gate.
       permissions: held,
-      ...(typeof claims.account_holder === 'string' ? { accountHolderRef: claims.account_holder } : {}),
+      selfScoped,
+      ...(accountHolderRef ? { accountHolderRef } : {}),
     };
   };
 }
@@ -87,20 +107,54 @@ export function requireStaff(resource: BankResource, action: BankAction) {
  *
  * The `self` scope in practice. An account holder signing in at their own institution needs no
  * consent to see their own accounts, because there is no third party in the arrangement; what they
- * do need is to be unable to see anybody else's, and that is what this enforces.
+ * do need is to be unable to see anybody else's.
+ *
+ * THE DEFECT THIS FIXES. The previous version of this was exported and never wired to a single
+ * route, so the self scope was declared in the role and enforced nowhere: an account holder calling
+ * the list endpoints was served the whole bank's accounts and cards, identical to what an operations
+ * officer sees. A guard that nothing calls is indistinguishable from no guard.
+ *
+ * It works by NARROWING THE QUERY rather than by filtering the answer. A list route already accepts
+ * a holder filter, so the binding sets it and the search runs scoped; there is no second code path
+ * that could disagree with the first, and no page of somebody else's records is ever built and then
+ * discarded. A holder asking explicitly for somebody else is refused rather than quietly rewritten,
+ * because silently changing what was asked for hides the boundary from whoever is meeting it.
  */
-export function requireOwnAccountHolder(resolveRequestedHolder: (request: FastifyRequest) => string | undefined) {
+export function bindOwnAccountHolder(queryField: string) {
   return async function handler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const staff = request.staff;
     if (!staff) return refuse(reply, 401, 'Not authenticated');
+    // A bank-wide role reaches every record by design; the binding is the self-scoped role's alone.
+    if (!staff.selfScoped) return;
+    // Unreachable while `requireStaff` refuses an unbound self-scoped caller, and kept so this guard
+    // is safe on its own terms rather than only in the company it currently keeps.
+    if (!staff.accountHolderRef) return refuse(reply, 403, 'Access denied: no account holder is bound to you');
 
-    // A person holding a bank-wide role is not restricted to themselves; the binding applies to the
-    // account-holder role, whose entire scope is its own records.
-    if (!staff.accountHolderRef) return;
-
-    const requested = resolveRequestedHolder(request);
-    if (requested && requested !== staff.accountHolderRef) {
-      return refuse(reply, 403, 'Access denied: this record does not belong to you');
+    const query = request.query as Record<string, unknown>;
+    const asked = query[queryField];
+    if (typeof asked === 'string' && asked && asked !== staff.accountHolderRef) {
+      return refuse(reply, 403, 'Access denied: these records do not belong to you');
     }
+    query[queryField] = staff.accountHolderRef;
   };
+}
+
+/**
+ * The same boundary for a route that names ONE record, checked once the record is in hand.
+ *
+ * A detail route cannot narrow a query: the reference it was given either belongs to the caller or
+ * does not, and which one is only known after the record is read. Returning 403 rather than 404 is
+ * deliberate: the caller named a reference they hold no claim on, and a bank telling them "no such
+ * account" would be answering a question about somebody else's record.
+ */
+export function refuseIfNotOwn(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  holderReference: string | null | undefined,
+): boolean {
+  const staff = request.staff;
+  if (!staff?.selfScoped) return false;
+  if (holderReference && holderReference === staff.accountHolderRef) return false;
+  reply.status(403).send({ error: 'Access denied: this record does not belong to you' });
+  return true;
 }
