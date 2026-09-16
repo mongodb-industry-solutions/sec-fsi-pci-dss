@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { DataList, type Column } from '../data/DataList';
 import { StatusBadge } from '../data/StatusBadge';
+import { useCapabilities } from '../../lib/capabilities';
 
 // The estate of cards this bank issued.
 //
@@ -52,6 +53,7 @@ const COLUMNS: Column<CardRow>[] = [
 ];
 
 export function CardsList({ fixed, heading }: { fixed?: Record<string, string>; heading?: React.ReactNode }) {
+  const capabilities = useCapabilities();
   return (
     <DataList<CardRow>
       resource="cards"
@@ -87,14 +89,14 @@ export function CardsList({ fixed, heading }: { fixed?: Record<string, string>; 
         { key: 'bin', label: 'Range starts with', placeholder: '4571' },
         { key: 'holder', label: 'Holder reference', placeholder: 'Exact reference' },
       ]}
-      toolbar={heading ?? (
+      toolbar={heading ?? (capabilities?.canManageCards && (
         <Link
           href="/cards/new"
           className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-accent bg-accent px-3 text-sm text-canvas transition hover:opacity-90 sm:h-9"
         >
           <Plus size={14} aria-hidden /> <span className="hidden sm:inline">Issue a card</span>
         </Link>
-      )}
+      ))}
     />
   );
 }

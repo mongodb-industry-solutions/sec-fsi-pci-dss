@@ -1,4 +1,4 @@
-import { AlertTriangle, Inbox } from 'lucide-react';
+import { AlertTriangle, Inbox, ShieldOff } from 'lucide-react';
 
 // The two states every screen here needs, said the same way each time.
 //
@@ -13,6 +13,20 @@ export function BankError({ message }: { message: string }) {
         <p className="text-sm font-semibold text-red-800 dark:text-red-300">The bank did not answer</p>
         <p className="mt-1 break-words text-xs text-red-700 dark:text-red-400">{message}</p>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A form or action reached by URL rather than offered by a menu: the destination exists, and this
+ * role has no authority for it. The backend would refuse the submission anyway; this is what stops
+ * the form being drawn at all, so nothing here reads as an invitation to try.
+ */
+export function Forbidden({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-line bg-surface p-4 text-sm text-ink-soft">
+      <ShieldOff size={18} className="mt-0.5 shrink-0" aria-hidden />
+      <span>{children}</span>
     </div>
   );
 }

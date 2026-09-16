@@ -8,6 +8,7 @@ import { StatusBadge } from '../data/StatusBadge';
 import { BankError } from '../States';
 import { AccountsList } from '../accounts/AccountsList';
 import { CardsList } from '../cards/CardsList';
+import { useCapabilities } from '../../lib/capabilities';
 
 // The party behind the accounts and the cards.
 //
@@ -31,6 +32,7 @@ interface Holder {
 export function HolderDetail({ holderReference }: { holderReference: string }) {
   const [holder, setHolder] = useState<Holder | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const capabilities = useCapabilities();
 
   useEffect(() => {
     let live = true;
@@ -76,16 +78,25 @@ export function HolderDetail({ holderReference }: { holderReference: string }) {
         title="Protected values"
         description="Personal data the bank holds about its customer, encrypted at rest. Each reveal is its own recorded act."
       >
-        <Reveal
-          label="Name"
-          masked={holder.accountHolderNameMasked}
-          fetchValue={async () => (await disclose()).accountHolderName ?? 'not held'}
-        />
-        <Reveal
-          label="Contact"
-          masked={holder.accountHolderEmailMasked}
-          fetchValue={async () => (await disclose()).accountHolderEmailAddress ?? 'not held'}
-        />
+        {capabilities?.canRevealHolderContact ? (
+          <>
+            <Reveal
+              label="Name"
+              masked={holder.accountHolderNameMasked}
+              fetchValue={async () => (await disclose()).accountHolderName ?? 'not held'}
+            />
+            <Reveal
+              label="Contact"
+              masked={holder.accountHolderEmailMasked}
+              fetchValue={async () => (await disclose()).accountHolderEmailAddress ?? 'not held'}
+            />
+          </>
+        ) : (
+          <>
+            <Field label="Name">{holder.accountHolderNameMasked}</Field>
+            <Field label="Contact">{holder.accountHolderEmailMasked ?? ''}</Field>
+          </>
+        )}
         <Field label="Country">{holder.accountHolderCountryCode}</Field>
         <Field label="Reference" mono>{holder.accountHolderInstanceReference}</Field>
       </Panel>
@@ -97,14 +108,14 @@ export function HolderDetail({ holderReference }: { holderReference: string }) {
         </div>
         <AccountsList
           fixed={{ holder: holderReference }}
-          toolbar={(
+          toolbar={capabilities?.canManageAccounts ? (
             <Link
               href="/accounts/new"
               className="inline-flex h-11 shrink-0 items-center rounded-lg border border-line px-3 text-sm text-ink-soft transition hover:border-accent hover:text-ink sm:h-9"
             >
               Open another
             </Link>
-          )}
+          ) : undefined}
         />
       </section>
 

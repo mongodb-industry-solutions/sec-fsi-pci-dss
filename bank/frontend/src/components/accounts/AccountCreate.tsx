@@ -5,6 +5,8 @@ import { admin } from '../../lib/adminClient';
 import { FormShell, SelectField, TextField } from '../form/Fields';
 import { ReferencePicker } from '../form/ReferencePicker';
 import { Panel } from '../Reveal';
+import { Forbidden } from '../States';
+import { useCapabilities } from '../../lib/capabilities';
 
 // Opening an account.
 //
@@ -28,6 +30,12 @@ export function AccountCreate() {
   const [currency, setCurrency] = useState('EUR');
   const [country, setCountry] = useState('ES');
   const [alias, setAlias] = useState('');
+  const capabilities = useCapabilities();
+
+  // Undefined while the session loads, so the form is not drawn for one frame and then withdrawn.
+  if (capabilities && !capabilities.canManageAccounts) {
+    return <Forbidden>Opening an account is not available to your role.</Forbidden>;
+  }
 
   return (
     <Panel

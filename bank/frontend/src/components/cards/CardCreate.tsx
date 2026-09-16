@@ -5,6 +5,8 @@ import { admin } from '../../lib/adminClient';
 import { FormShell, NumberField, SelectField, TextField } from '../form/Fields';
 import { ReferencePicker } from '../form/ReferencePicker';
 import { Panel } from '../Reveal';
+import { Forbidden } from '../States';
+import { useCapabilities } from '../../lib/capabilities';
 
 // Issuing a card.
 //
@@ -48,6 +50,11 @@ export function CardCreate() {
   const [account, setAccount] = useState('');
   const [limit, setLimit] = useState<number | ''>('');
   const [currency, setCurrency] = useState('EUR');
+  const capabilities = useCapabilities();
+
+  if (capabilities && !capabilities.canManageCards) {
+    return <Forbidden>Issuing a card is not available to your role.</Forbidden>;
+  }
 
   return (
     <Panel

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { DataList, type Column } from '../data/DataList';
 import { StatusBadge } from '../data/StatusBadge';
+import { useCapabilities } from '../../lib/capabilities';
 
 // The accounts this bank holds.
 //
@@ -63,6 +64,9 @@ const COLUMNS: Column<AccountRow>[] = [
 ];
 
 export function AccountsList({ fixed, toolbar }: { fixed?: Record<string, string>; toolbar?: React.ReactNode }) {
+  // Undefined while the session is still loading, so the button is not offered for one frame and
+  // then withdrawn: nothing renders here until the role that decides is actually known.
+  const capabilities = useCapabilities();
   return (
     <DataList<AccountRow>
       resource="accounts"
@@ -99,14 +103,14 @@ export function AccountsList({ fixed, toolbar }: { fixed?: Record<string, string
         { key: 'currency', label: 'Currency', placeholder: 'EUR' },
         { key: 'holder', label: 'Holder reference', placeholder: 'Exact reference' },
       ]}
-      toolbar={toolbar ?? (
+      toolbar={toolbar ?? (capabilities?.canManageAccounts && (
         <Link
           href="/accounts/new"
           className="inline-flex h-11 shrink-0 items-center gap-2 rounded-lg border border-accent bg-accent px-3 text-sm text-canvas transition hover:opacity-90 sm:h-9"
         >
           <Plus size={14} aria-hidden /> <span className="hidden sm:inline">Open an account</span>
         </Link>
-      )}
+      ))}
     />
   );
 }

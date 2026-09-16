@@ -10,7 +10,9 @@ import { StatusBadge } from '../data/StatusBadge';
 import { BankError } from '../States';
 import { JsonView } from '../JsonView';
 import { CardsList } from '../cards/CardsList';
+import { AccountMovements } from './AccountMovements';
 import type { AccountRow } from './AccountsList';
+import { useCapabilities } from '../../lib/capabilities';
 
 // One account: what it holds, who owns it, and which cards draw on it.
 //
@@ -50,6 +52,7 @@ export function AccountDetail({ accountReference }: { accountReference: string }
   const [error, setError] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
   const { debugMode } = useDebugMode();
+  const capabilities = useCapabilities();
 
   const reload = useCallback(() => setReloads((count) => count + 1), []);
 
@@ -125,16 +128,22 @@ export function AccountDetail({ accountReference }: { accountReference: string }
         title="Protected values"
         description="The IBAN is personal data and is encrypted at rest, so it is read one account at a time and each read is recorded."
       >
-        <Reveal
-          label="IBAN"
-          masked={account.accountMaskedIban}
-          fetchValue={async () => {
-            const result = await admin.disclose<{ iban?: string }>(
-              `accounts/${encodeURIComponent(accountReference)}/disclosures`,
-            );
-            return result.iban ?? 'not held';
-          }}
-        />
+        {capabilities?.canRevealAccountNumber ? (
+          <Reveal
+            label="IBAN"
+            masked={account.accountMaskedIban}
+            fetchValue={async () => {
+              const result = await admin.disclose<{ iban?: string }>(
+                `accounts/${encodeURIComponent(accountReference)}/disclosures`,
+              );
+              return result.iban ?? 'not held';
+            }}
+          />
+        ) : (
+          // An account holder reads their own IBAN off a statement, not through a staff disclosure
+          // route whose audit row means an employee revealed somebody's data (see bankRoles.json).
+          <Field label="IBAN" mono>{account.accountMaskedIban}</Field>
+        )}
         <Field label="Bank identifier" mono>{account.accountBic}</Field>
         <Field label="Alias">{account.accountAlias ?? ''}</Field>
         <Field label="Reference" mono>{account.accountArrangementInstanceReference}</Field>
@@ -160,6 +169,7 @@ export function AccountDetail({ accountReference }: { accountReference: string }
       </Panel>
 
       {/* ── Lifecycle ─────────────────────────────────────────────────────────────────────────── */}
+      {capabilities?.canManageAccounts && (
       <Panel
         title="Lifecycle"
         description="Approving an account is a real step: until it happens the account exists and holds nothing."
@@ -201,6 +211,7 @@ export function AccountDetail({ accountReference }: { accountReference: string }
           </p>
         )}
       </Panel>
+      )}
 
       {/* ── The cards that draw on it ──────────────────────────────────────────────────────────── */}
       <section className="space-y-3">
@@ -217,6 +228,16 @@ export function AccountDetail({ accountReference }: { accountReference: string }
           heading={<span className="sr-only">Cards on this account</span>}
         />
       </section>
+
+      {/* ── Movements ──────────────────────────────────────────────────────────────────────────── */}
+      {capabilities?.canViewMovements && (
+        <Panel
+          title="Recent activity"
+          description="Transfers, returns, and what a card authorisation on this account left behind. Newest first."
+        >
+          <AccountMovements accountReference={account.accountArrangementInstanceReference} />
+        </Panel>
+      )}
 
       {debugMode && (
         <Panel title="The record as the bank holds it" description="What the account record stores, with no decrypted value in it.">

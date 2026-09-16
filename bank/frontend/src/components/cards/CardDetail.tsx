@@ -11,6 +11,7 @@ import { BankError } from '../States';
 import { JsonView } from '../JsonView';
 import { CardLimits } from './CardLimits';
 import type { CardRow } from './CardsList';
+import { useCapabilities } from '../../lib/capabilities';
 
 // One card, everything about it, and the two records it belongs to.
 //
@@ -56,6 +57,7 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
   const [error, setError] = useState<string | null>(null);
   const [reloads, setReloads] = useState(0);
   const { debugMode } = useDebugMode();
+  const capabilities = useCapabilities();
 
   const reload = useCallback(() => setReloads((count) => count + 1), []);
 
@@ -119,24 +121,32 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
         title="Protected values"
         description="Encrypted at rest, and read one card at a time. Each reveal is a separate act the bank records against whoever asked."
       >
-        <Reveal
-          label="Card number"
-          masked={card.maskedDisplay}
-          fetchValue={async () => {
-            const result = await disclose();
-            return result.cardNumber ?? result.error ?? 'not held';
-          }}
-        />
-        <Reveal
-          label="Verification value"
-          fetchValue={async () => {
-            const result = await disclose();
-            // Said plainly when it cannot be produced: a blank looks the same as a card that has none, and
-            // those are different problems.
-            return result.verificationValue ?? result.error ?? 'not derivable';
-          }}
-          hint="derived, never stored"
-        />
+        {/* Only the card officer may disclose the number: the same authority that guards the request
+            behind, so a role that would only be refused is never offered the button. */}
+        {capabilities?.canRevealCardNumber ? (
+          <>
+            <Reveal
+              label="Card number"
+              masked={card.maskedDisplay}
+              fetchValue={async () => {
+                const result = await disclose();
+                return result.cardNumber ?? result.error ?? 'not held';
+              }}
+            />
+            <Reveal
+              label="Verification value"
+              fetchValue={async () => {
+                const result = await disclose();
+                // Said plainly when it cannot be produced: a blank looks the same as a card that has none, and
+                // those are different problems.
+                return result.verificationValue ?? result.error ?? 'not derivable';
+              }}
+              hint="derived, never stored"
+            />
+          </>
+        ) : (
+          <Field label="Card number">{card.maskedDisplay || `•••• ${card.lastFour}`}</Field>
+        )}
         <Field label="Expires" mono>
           {card.expiryMonth ? `${card.expiryMonth}/${card.expiryYear}` : ''}
         </Field>
@@ -197,49 +207,53 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
       </div>
 
       {/* ── Lifecycle ─────────────────────────────────────────────────────────────────────────── */}
-      <Panel
-        title="Lifecycle"
-        description="Only legal moves are offered. Revoking is terminal, which is why it asks first."
-      >
-        <div className="flex flex-wrap gap-2">
-          {(NEXT_STATUS[card.status] ?? []).map((move) => (
-            <Action
-              key={move.to}
-              label={move.label}
-              tone={move.tone}
-              title={move.why}
-              run={() => admin.put(`cards/${encodeURIComponent(cardToken)}/status`, { status: move.to })}
-              onDone={reload}
-            />
-          ))}
-          {!terminal && (
-            <>
+      {/* The whole panel, not just its buttons: a holder with no manage authority has nothing legal
+          to do here, and a panel of disabled controls only invites trying anyway. */}
+      {capabilities?.canManageCards && (
+        <Panel
+          title="Lifecycle"
+          description="Only legal moves are offered. Revoking is terminal, which is why it asks first."
+        >
+          <div className="flex flex-wrap gap-2">
+            {(NEXT_STATUS[card.status] ?? []).map((move) => (
               <Action
-                label="Replace"
-                title="Issues a new card with its own number, then revokes this one."
-                confirm="A replacement is issued first and this card is then revoked. The old number stops working."
-                run={() => admin.create(`cards/${encodeURIComponent(cardToken)}/replacements`, {})}
+                key={move.to}
+                label={move.label}
+                tone={move.tone}
+                title={move.why}
+                run={() => admin.put(`cards/${encodeURIComponent(cardToken)}/status`, { status: move.to })}
                 onDone={reload}
               />
-              <Action
-                label="Revoke"
-                tone="danger"
-                confirm="This card can never be used again. The record is kept, because an authorisation already made refers to it."
-                run={() => admin.remove(`cards/${encodeURIComponent(cardToken)}`)}
-                onDone={reload}
-              />
-            </>
-          )}
-          {terminal && (
-            <p className="text-xs text-ink-soft">
-              A revoked card offers no action. Issue a replacement from the estate instead.
-            </p>
-          )}
-        </div>
-      </Panel>
+            ))}
+            {!terminal && (
+              <>
+                <Action
+                  label="Replace"
+                  title="Issues a new card with its own number, then revokes this one."
+                  confirm="A replacement is issued first and this card is then revoked. The old number stops working."
+                  run={() => admin.create(`cards/${encodeURIComponent(cardToken)}/replacements`, {})}
+                  onDone={reload}
+                />
+                <Action
+                  label="Revoke"
+                  tone="danger"
+                  confirm="This card can never be used again. The record is kept, because an authorisation already made refers to it."
+                  run={() => admin.remove(`cards/${encodeURIComponent(cardToken)}`)}
+                  onDone={reload}
+                />
+              </>
+            )}
+            {terminal && (
+              <p className="text-xs text-ink-soft">
+                A revoked card offers no action. Issue a replacement from the estate instead.
+              </p>
+            )}
+          </div>
+        </Panel>
+      )}
 
       {/* ── The ceiling an authorisation is judged against ─────────────────────────────────────── */}
-      {!terminal && (
+      {!terminal && capabilities?.canManageCards && (
         <Panel
           title="Limits"
           description="What this card may authorise in one transaction. Read per call, so a change applies to the next authorisation."
