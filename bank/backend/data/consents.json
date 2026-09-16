@@ -1280,5 +1280,31 @@
     "bankConsentFrequencyPerDay": 4,
     "bankConsentValidUntil": "2030-12-31",
     "recordCreatedDateTime": "2025-09-09T16:00:00.000Z"
+  },
+  {
+    "bankConsentAgreementInstanceReference": "cns00077-0000-4000-8000-000000000077",
+    "bankConsentAccountHolderInstanceReference": "hld00077-0000-4000-8000-000000000077",
+    "bankConsentAccess": {
+      "accounts": [
+        "acc00077-0000-4000-8000-000000000077",
+        "acc00078-0000-4000-8000-000000000078"
+      ],
+      "balances": [
+        "acc00077-0000-4000-8000-000000000077",
+        "acc00078-0000-4000-8000-000000000078"
+      ],
+      "transactions": [
+        "acc00077-0000-4000-8000-000000000077",
+        "acc00078-0000-4000-8000-000000000078"
+      ],
+      "payments": [
+        "acc00077-0000-4000-8000-000000000077",
+        "acc00078-0000-4000-8000-000000000078"
+      ]
+    },
+    "bankConsentRecurringIndicator": true,
+    "bankConsentFrequencyPerDay": 4,
+    "bankConsentValidUntil": "2030-12-31",
+    "recordCreatedDateTime": "2026-06-15T09:00:00.000Z"
   }
 ]

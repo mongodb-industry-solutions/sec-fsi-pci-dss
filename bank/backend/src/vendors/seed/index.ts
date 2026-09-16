@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { seedBankProfile } from './seedBankProfile';
 import { seedAccountHolders, seedAccountArrangements } from './seedAccounts';
+import { seedAccountMovements } from './seedAccountMovements';
 import { seedTppRegistrations } from './seedTppRegistrations';
 import { seedConsents } from './seedConsents';
 import { seedModuleConfigurations } from './seedModuleConfigurations';
@@ -24,6 +25,9 @@ export async function runSeed(): Promise<void> {
     // Holders before accounts: an account references its holder.
     await seedAccountHolders(db);
     await seedAccountArrangements(db);
+    // After the accounts they happened on, and before anything reads either: the ledger explains a
+    // balance the account record already states, never the other way round.
+    await seedAccountMovements(db);
     // The registered TPP, so the PSP can obtain a token the moment both services are up.
     await seedTppRegistrations(db);
     // Consents last: they reference the accounts and the TPP that were just written.

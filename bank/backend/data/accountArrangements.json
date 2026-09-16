@@ -112,11 +112,11 @@
     "accountBic": "VRDNESMMXXX",
     "accountMaskedIban": "GB92**************3597",
     "accountBalance": {
-      "availableAmount": 3800,
+      "availableAmount": 4300,
       "pendingAmount": 0,
       "reservedAmount": 0,
       "currency": "EUR",
-      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+      "lastUpdatedDateTime": "2026-07-01T10:00:00.000Z"
     },
     "accountOpenedDateTime": "2026-06-01T12:00:00.000Z",
     "bianServiceDomain": "Current Account",
@@ -1705,23 +1705,48 @@
     "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
     "accountKind": "current",
     "accountStatus": "active",
-    "accountAlias": "Antonio main account",
+    "accountAlias": "Tony main account",
     "accountCurrency": "EUR",
     "accountCountryCode": "ES",
-    "accountIban": "ES1421000813610123456789",
+    "accountIban": "ES7498200000077000000077",
     "accountBic": "VRDNESMMXXX",
-    "accountMaskedIban": "ES14********************6789",
+    "accountMaskedIban": "ES74****************0077",
     "accountBalance": {
-      "availableAmount": 6200,
+      "availableAmount": 6365.1,
       "pendingAmount": 0,
       "reservedAmount": 0,
       "currency": "EUR",
-      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+      "lastUpdatedDateTime": "2026-07-01T10:00:00.000Z"
     },
     "accountOpenedDateTime": "2026-06-15T09:00:00.000Z",
     "bianServiceDomain": "Current Account",
     "bianControlRecordType": "AccountArrangement",
     "recordCreatedDateTime": "2026-06-15T09:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountArrangementInstanceReference": "acc00078-0000-4000-8000-000000000078",
+    "accountHolderInstanceReference": "hld00077-0000-4000-8000-000000000077",
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "accountKind": "current",
+    "accountStatus": "active",
+    "accountAlias": "Tony Deutsche Bank",
+    "accountCurrency": "EUR",
+    "accountCountryCode": "DE",
+    "accountIban": "DE48982000007800000007",
+    "accountBic": "VRDNESMMXXX",
+    "accountMaskedIban": "DE48**************0007",
+    "accountBalance": {
+      "availableAmount": 5767.5,
+      "pendingAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-06-22T16:30:00.000Z"
+    },
+    "accountOpenedDateTime": "2026-06-16T09:00:00.000Z",
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "AccountArrangement",
+    "recordCreatedDateTime": "2026-06-16T09:00:00.000Z",
     "schemaVersion": 1
   }
 ]
