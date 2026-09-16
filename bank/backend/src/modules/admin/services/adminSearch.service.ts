@@ -7,6 +7,7 @@ import {
   ACCOUNT_ARRANGEMENT_COLLECTION, AccountArrangementControlRecord,
 } from '../../aspsp/models/accountArrangement.model';
 import { ACCOUNT_HOLDER_COLLECTION, AccountHolderControlRecord } from '../../aspsp/models/accountHolder.model';
+import { ACCOUNT_MOVEMENT_COLLECTION, AccountMovementRecord } from '../../aspsp/models/accountMovement.model';
 import { maskName, maskEmail } from './valueMasking';
 
 // The queries behind the bank's administration screens: filtered, searched, paged.
@@ -298,4 +299,52 @@ export async function countHoldersByStatus(db: Db): Promise<Record<string, numbe
     .aggregate<{ _id: string; count: number }>([{ $group: { _id: '$accountHolderStatus', count: { $sum: 1 } } }])
     .toArray();
   return Object.fromEntries(rows.map((row) => [row._id, row.count]));
+}
+
+// ── Movements ────────────────────────────────────────────────────────────────────────────────────
+
+export interface MovementQuery {
+  account?: string;
+  kind?: string;
+  direction?: string;
+  page?: number;
+  limit?: number;
+}
+
+// Console-shaped, not Berlin Group-shaped: `listTransactions` in the AISP module already answers the TPP
+// surface's question, in that surface's vocabulary, under a consent. This is the same collection read the way
+// every other admin list is, because a staff console and a third party asking under a granted consent are two
+// different questions even when the rows are the same.
+export interface MovementAdminView {
+  accountMovementInstanceReference: string;
+  accountArrangementInstanceReference: string;
+  movementKind: string;
+  movementDirection: string;
+  movementAmount: number;
+  movementCurrency: string;
+  movementBalanceAfter: number;
+  movementRemittanceInformation?: string;
+  movementValueDateTime: string;
+}
+
+export async function searchMovements(db: Db, query: MovementQuery): Promise<Page<MovementAdminView>> {
+  const { skip, limit, page } = paging(query);
+  const filter: Filter<AccountMovementRecord> = {};
+  // Required, not optional: an unscoped list of every movement this bank ever recorded is not a screen
+  // anybody asks for, and it is the shape a self-scope binding narrows onto (bindOwnAccountHolder resolves
+  // the holder to accounts first, this resolves one of those accounts to its movements).
+  if (query.account) filter.accountArrangementInstanceReference = query.account;
+  if (query.kind) filter.movementKind = query.kind as AccountMovementRecord['movementKind'];
+  if (query.direction) filter.movementDirection = query.direction as AccountMovementRecord['movementDirection'];
+
+  const collection = db.collection<AccountMovementRecord>(ACCOUNT_MOVEMENT_COLLECTION);
+  const [results, total] = await Promise.all([
+    collection.find(filter, { projection: { _id: 0 } })
+      .sort({ movementValueDateTime: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray(),
+    collection.countDocuments(filter),
+  ]);
+  return { results, total, page, limit };
 }

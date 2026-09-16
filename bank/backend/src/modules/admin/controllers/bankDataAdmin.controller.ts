@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { requireStaff, bindOwnAccountHolder, refuseIfNotOwn } from '../../../vendors/middleware/staffAuth';
 import {
   searchIssuedCards, countCardsByStatus, searchAccounts, countAccountsByStatus,
-  searchHolders, countHoldersByStatus, MAX_LIMIT, DEFAULT_LIMIT,
+  searchHolders, countHoldersByStatus, searchMovements, MAX_LIMIT, DEFAULT_LIMIT,
 } from '../services/adminSearch.service';
 import {
   discloseCard, discloseAccountIban, findHolder, discloseHolder, openAccount,
@@ -464,6 +464,49 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     if (!account) return reply.status(404).send({ error: 'No such account at this bank' });
     if (refuseIfNotOwn(request, reply, account.accountHolderInstanceReference)) return reply;
     return account;
+  });
+
+  // ── Movements ──────────────────────────────────────────────────────────────────────────────────
+  fastify.get('/accounts/:accountReference/movements', {
+    preValidation: requireStaff('movements', 'view'),
+    schema: {
+      tags: ['admin'],
+      summary: 'Read one account\'s movements',
+      description:
+        'The ledger entries this bank recorded against one account: transfers, returns, and the holds and '
+        + 'settlements a card authorisation left behind. Filtered, paged, newest first.\n\n'
+        + 'Requires the account reference: an unscoped "every movement this bank ever recorded" is not a '
+        + 'screen anybody asks for, and it is what an account holder\'s own scope is drawn on, the same way '
+        + 'the account and card lists are.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['accountReference'],
+        properties: { accountReference: { type: 'string' } },
+      },
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT },
+          kind: { type: 'string' },
+          direction: { type: 'string', enum: ['debit', 'credit'] },
+        },
+      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    const { accountReference } = request.params as { accountReference: string };
+    // The account is read first and the self-scope boundary judged against it, exactly as the account
+    // detail route above does: a movement carries no holder reference of its own, only the account it
+    // happened on, so the account IS what the binding is checked against.
+    const page = await searchAccounts(fastify.db, { reference: accountReference, limit: 1 });
+    const account = page.results[0];
+    if (!account) return reply.status(404).send({ error: 'No such account at this bank' });
+    if (refuseIfNotOwn(request, reply, account.accountHolderInstanceReference)) return reply;
+
+    const query = request.query as Record<string, string | number>;
+    return searchMovements(fastify.db, { ...query, account: accountReference } as never);
   });
 
   fastify.post('/accounts', {
