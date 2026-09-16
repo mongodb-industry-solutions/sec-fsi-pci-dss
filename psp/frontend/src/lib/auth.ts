@@ -12,6 +12,8 @@
  * decision belongs to the backend, against the same access token, and it checks the signature.
  */
 
+import { ROLE_LABELS } from './constants';
+
 const COOKIE_NAME = 'demo_token';
 const IDENTITY_COOKIE_NAME = 'demo_identity';
 
@@ -78,9 +80,21 @@ export function decodeToken(token: string): TokenPayload | null {
 
   const identity = claimsOf(readCookie(IDENTITY_COOKIE_NAME) ?? '') ?? {};
 
-  // `roles` is an array: a person may hold several, and the screens are built around one. The first
-  // is the authority's own order, which is the order the roster presents them in.
-  const roles = Array.isArray(access.roles) ? (access.roles as unknown[]).map(String) : [];
+  // `roles` is an array: a person may hold several, and the screens are built around one.
+  //
+  // THE REGRESSION THIS GUARDS AGAINST. A principal can hold a role at a DIFFERENT resource server
+  // on the same token now (a LeafyPay customer who is also a BankCore account holder), and the
+  // authority's own order is not "this application's roles first": Amara Okafor's token carries
+  // `["bank_customer", "customer"]`, and taking index 0 of the unfiltered array picked the bank's
+  // role, which nearly forty screens here have never heard of, and every one of them rendered as
+  // though she held no role at all.
+  //
+  // Narrowed to a role THIS application labels (`ROLE_LABELS`) before taking the first one. That
+  // list already exists for the one purpose every one of those screens has always needed a role
+  // name for, so it is reused rather than asking the authority which roles are ours: this runs in
+  // the browser, synchronously, on every page load, and a network round trip here is not free.
+  const allRoles = Array.isArray(access.roles) ? (access.roles as unknown[]).map(String) : [];
+  const roles = allRoles.filter((name) => name in ROLE_LABELS);
   // The realm, which is what this application has always called the domain. Parsed from the issuer
   // because the token names the realm nowhere else.
   const issuer = typeof access.iss === 'string' ? access.iss : '';

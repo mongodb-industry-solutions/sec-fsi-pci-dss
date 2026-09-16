@@ -78,7 +78,7 @@ describe('decodeToken', () => {
     expect(decoded!.role).toBe('level1_analyst');
   });
 
-  it('collapses several held roles to the first, and survives the claim being absent', () => {
+  it('collapses several held roles to the first this application recognises, and survives the claim being absent', () => {
     /**
      * Both halves of the mapping, which the single fixture above could not show.
      *
@@ -86,11 +86,33 @@ describe('decodeToken', () => {
      * turn a missing claim into a crash on every one of them rather than a person who is simply
      * shown nothing they are not entitled to.
      */
-    const several = decodeToken(buildJwt({ sub: 'u1', roles: ['level2_analyst', 'auditor'], exp: 9999999999 }));
-    expect(several!.role).toBe('level2_analyst');
+    const several = decodeToken(
+      buildJwt({ sub: 'u1', roles: ['level2_investigator', 'security_auditor'], exp: 9999999999 }),
+    );
+    expect(several!.role).toBe('level2_investigator');
 
     const none = decodeToken(buildJwt({ sub: 'u1', exp: 9999999999 }));
     expect(none!.role).toBe('');
+  });
+
+  it('skips a role from a DIFFERENT resource server riding along on the same token', () => {
+    /**
+     * THE REGRESSION THIS GUARDS AGAINST. A principal can hold a role at another resource server
+     * on the same token now (a LeafyPay customer who is also a BankCore account holder), and the
+     * authority's own order is not "this application's roles first": `bank_customer` rode ahead of
+     * `customer` on Amara Okafor's token, and taking index 0 unconditionally rendered her as
+     * though she held no LeafyPay role at all, losing every customer screen.
+     */
+    const mixed = decodeToken(buildJwt({ sub: 'u1', roles: ['bank_customer', 'customer'], exp: 9999999999 }));
+    expect(mixed!.role).toBe('customer');
+
+    // And the reverse order, so this is not passing by coincidence of which index bank_customer sat at.
+    const reversed = decodeToken(buildJwt({ sub: 'u1', roles: ['customer', 'bank_customer'], exp: 9999999999 }));
+    expect(reversed!.role).toBe('customer');
+
+    // Nothing this application recognises: the empty string, not a bank role guessed at.
+    const foreignOnly = decodeToken(buildJwt({ sub: 'u1', roles: ['bank_customer'], exp: 9999999999 }));
+    expect(foreignOnly!.role).toBe('');
   });
 
   it('returns null for malformed token (< 3 parts)', () => {
