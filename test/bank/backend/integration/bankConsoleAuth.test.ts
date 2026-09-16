@@ -15,8 +15,13 @@ const CONSOLE = process.env.BANK_UI_URL ?? 'http://localhost:8084';
 const AUTHORITY = process.env.GIAM_BASE_URL ?? 'http://127.0.0.1:8085';
 
 // Seeded personas: one holds the bank's administrator role, one is an ordinary account holder.
-const ADMIN = 'Samuel Adeyemi';
-const CUSTOMER = 'Elena Duarte';
+//
+// By USER NAME, not display name: a user name is the unique, stable, sign-in identifier and a
+// display name is neither. `/realms/:realm/login` refuses a display name outright (401), so this
+// was failing the flow it means to exercise and reporting it as "could not complete the flow"
+// rather than as the permission question the test is actually about.
+const ADMIN = 'samuel.adeyemi';
+const CUSTOMER = 'elena.duarte';
 const DEMO_PASSWORD = 'demo-password';
 
 // A resource the bank guards with `bankModules: view`.
