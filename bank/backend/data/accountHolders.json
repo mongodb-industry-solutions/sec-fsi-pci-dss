@@ -572,7 +572,7 @@
   {
     "accountHolderInstanceReference": "hld00073-0000-4000-8000-000000000073",
     "accountHolderName": "Elena Duarte",
-    "accountHolderCountryCode": "PT",
+    "accountHolderCountryCode": "NL",
     "accountHolderStatus": "active",
     "bianServiceDomain": "Party Reference Data Directory",
     "bianControlRecordType": "AccountHolder",
@@ -582,7 +582,7 @@
   {
     "accountHolderInstanceReference": "hld00074-0000-4000-8000-000000000074",
     "accountHolderName": "Viktor Ilyin",
-    "accountHolderCountryCode": "EE",
+    "accountHolderCountryCode": "GB",
     "accountHolderStatus": "active",
     "bianServiceDomain": "Party Reference Data Directory",
     "bianControlRecordType": "AccountHolder",
