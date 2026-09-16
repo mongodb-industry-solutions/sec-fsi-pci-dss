@@ -259,7 +259,10 @@ export async function currentStaff(): Promise<StaffSession | null> {
      * either, so it was always absent and the console greeted everybody as "Signed in".
      */
     const profile = await profileOf(token);
-    const userName = profile.preferred_username ?? profile.name;
+    // The display name first, the login identifier only as a fallback: `preferred_username` is the
+    // slug somebody signs in with, so preferring it greeted every person by their login instead of
+    // their name. The PSP and the merchant already resolve it in this order.
+    const userName = profile.name ?? profile.preferred_username;
     return {
       subjectId: claims.sub,
       ...(userName ? { userName } : {}),
