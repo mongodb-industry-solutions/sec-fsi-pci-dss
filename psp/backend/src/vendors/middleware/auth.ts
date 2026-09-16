@@ -2,7 +2,7 @@ import { FastifyRequest, FastifyReply } from 'fastify';
 import { attachRbacContext } from './rbac';
 import { tryMerchantContext } from './validateMerchantToken';
 import { verifyAccessToken, VerifiedClaims } from '../security/tokenVerifier';
-import { expandRoles } from '../security/roleCatalog';
+import { expandRoles, roleCatalog, ownRoleNames } from '../security/roleCatalog';
 
 // Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
 // `dualAuth` accepts EITHER the PSP session JWT (HS256) OR a merchant OAuth Bearer (RS256): the route's
@@ -35,6 +35,12 @@ declare module 'fastify' {
 export interface AuthenticatedUser extends VerifiedClaims {
   /** The role names the authority resolved, for the checks that still reason in roles. */
   roles: string[];
+  /**
+   * The single role the checks that reason in the SINGULAR read, narrowed to this application's
+   * own roles first (see `ownRoleNames`). Undefined when the token holds none of this
+   * application's own roles at all.
+   */
+  role?: string;
 }
 
 // Exact URL matches that bypass JWT auth
@@ -150,6 +156,11 @@ async function tryVerifyToken(authHeader: string | undefined): Promise<Authentic
    * guard treats as "fall back to the explicit claims" and therefore still denies.
    */
   const expanded = await expandRoles(bearer, roles, explicit);
+  // Cached by expandRoles' own call above within the TTL, so this costs nothing extra: which of
+  // these roles are actually LeafyPay's, so a bank role riding along on the same token is never
+  // the one taken below.
+  const catalog = await roleCatalog(bearer);
+  const ownRoles = catalog ? ownRoleNames(catalog, roles) : roles;
 
   return {
     ...claims,
@@ -180,10 +191,12 @@ async function tryVerifyToken(authHeader: string | undefined): Promise<Authentic
      *
      * Narrowing a list to its first element is a real loss of information, so it is done here, once,
      * and only for the checks that have not yet been rewritten as permission checks.
+     *
+     * Narrowed to THIS application's own roles first (`ownRoleNames`): a principal can hold a role
+     * at another resource server on the same token, and index 0 of the unfiltered array is whichever
+     * one the authority happened to list first, not necessarily this application's.
      */
-    role: Array.isArray(claims.roles) && claims.roles.length > 0
-      ? String(claims.roles[0])
-      : undefined,
+    role: ownRoles.length > 0 ? String(ownRoles[0]) : undefined,
   };
 }
 
@@ -195,7 +208,10 @@ async function tryVerifyToken(authHeader: string | undefined): Promise<Authentic
  * than this phase should carry; what matters here is that the value is one the AUTHORITY asserted.
  */
 function roleOf(user: AuthenticatedUser | undefined): string | undefined {
-  return user?.roles?.[0];
+  // `user.role` (singular), not `user.roles[0]`: the former is already narrowed to this
+  // application's own roles by tryVerifyToken, the latter is the raw, unscoped list a bank role
+  // can also ride along on.
+  return user?.role;
 }
 
 export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {

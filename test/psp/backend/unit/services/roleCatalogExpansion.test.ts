@@ -12,13 +12,21 @@
  * here: what expansion produces, and what it does when it cannot resolve.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { expandRoles, roleCatalog, invalidateRoleCatalog } from '../../../../../psp/backend/src/vendors/security/roleCatalog';
+import {
+  expandRoles, roleCatalog, invalidateRoleCatalog, ownRoleNames, type RoleCatalog,
+} from '../../../../../psp/backend/src/vendors/security/roleCatalog';
 
 const CATALOG = {
   catalogVersion: 1,
   roles: [
     { name: 'level1_analyst', permissions: ['transactions:view', 'customers:view'] },
     { name: 'manager', permissions: ['modules:view', 'auditEvents:view'] },
+  ],
+  permissions: [
+    { permission: 'transactions:view', resourceServer: 'leafypay' },
+    { permission: 'customers:view', resourceServer: 'leafypay' },
+    { permission: 'modules:view', resourceServer: 'leafypay' },
+    { permission: 'auditEvents:view', resourceServer: 'leafypay' },
   ],
 };
 
@@ -114,6 +122,61 @@ describe('expanding roles against the published catalog', () => {
     vi.stubGlobal('fetch', spy);
     expect(await expandRoles('', ['manager'])).toBeNull();
     expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('telling this application\'s own roles apart from a different resource server\'s', () => {
+  /**
+   * A realm-wide catalog, the shape the authority actually publishes: `customer` (leafypay) and
+   * `bank_customer` (bankcore) side by side in one `roles` array, with `accounts:view` a string
+   * BOTH declare and everything else in `bank_customer`'s set meaning nothing here.
+   */
+  const REALM_WIDE: RoleCatalog = {
+    catalogVersion: 1,
+    roles: [
+      {
+        name: 'customer',
+        permissions: ['accounts:view', 'accounts:manage', 'beneficiaries:view', 'transactions:view'],
+      },
+      {
+        name: 'bank_customer',
+        permissions: ['accountHolders:view', 'accounts:view', 'movements:view', 'issuedCards:view'],
+      },
+    ],
+    permissions: [
+      { permission: 'accounts:view', resourceServer: 'leafypay' },
+      { permission: 'accounts:manage', resourceServer: 'leafypay' },
+      { permission: 'beneficiaries:view', resourceServer: 'leafypay' },
+      { permission: 'transactions:view', resourceServer: 'leafypay' },
+      // The SAME strings, declared again under the bank: this is what makes matching by permission
+      // string alone (rather than by majority share) wrong.
+      { permission: 'accounts:view', resourceServer: 'bankcore' },
+      { permission: 'accountHolders:view', resourceServer: 'bankcore' },
+      { permission: 'movements:view', resourceServer: 'bankcore' },
+      { permission: 'issuedCards:view', resourceServer: 'bankcore' },
+    ],
+  };
+
+  /**
+   * THE DEFECT THIS FIXES. A token carrying both roles on the same principal (an account holder of
+   * the payment provider who is also an account holder at the bank) picked whichever the authority
+   * happened to list first when code narrowed the array to a single role, and refused a customer
+   * their own beneficiaries as a stranger investigating someone else's the moment `bank_customer`
+   * came first.
+   */
+  it('keeps this application\'s own role and drops the other resource server\'s, whichever order the authority sent them', () => {
+    expect(ownRoleNames(REALM_WIDE, ['bank_customer', 'customer'])).toEqual(['customer']);
+    expect(ownRoleNames(REALM_WIDE, ['customer', 'bank_customer'])).toEqual(['customer']);
+  });
+
+  it('is not fooled by the one permission string the two resource servers happen to share', () => {
+    // bank_customer holds accounts:view too, and that alone must not be enough: three of its four
+    // permissions mean nothing to this application.
+    expect(ownRoleNames(REALM_WIDE, ['bank_customer'])).toEqual([]);
+  });
+
+  it('drops a role neither catalog nor this application recognises', () => {
+    expect(ownRoleNames(REALM_WIDE, ['not_a_real_role'])).toEqual([]);
   });
 });
 

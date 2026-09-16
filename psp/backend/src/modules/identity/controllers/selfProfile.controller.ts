@@ -34,14 +34,17 @@ export async function selfProfileController(fastify: FastifyInstance) {
   }
 
   /**
-   * The single role the screens are built around, from the `roles` array the authority issues.
+   * The single role the screens are built around.
    *
-   * Collapsed the same way the console collapses it. Empty rather than undefined when the claim is
-   * missing, so a screen reading it renders nothing rather than throwing.
+   * Read off `role`, not off the raw `roles` array: the auth middleware already narrowed that to
+   * THIS application's own roles (vendors/security/roleCatalog.ts's `ownRoleNames`), because a
+   * principal can hold a role at a different resource server on the same token and index 0 of the
+   * unfiltered array is whichever one the authority happened to list first. Empty rather than
+   * undefined when the claim is missing, so a screen reading it renders nothing rather than
+   * throwing.
    */
   function primaryRole(claims: Record<string, unknown>): string {
-    const roles = Array.isArray(claims.roles) ? claims.roles.map(String) : [];
-    return roles[0] ?? '';
+    return typeof claims.role === 'string' ? claims.role : '';
   }
 
   /**

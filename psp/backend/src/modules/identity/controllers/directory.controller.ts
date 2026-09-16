@@ -1,7 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { callAuthority, AuthorityError } from '../../../vendors/security/authorityApi';
 import { RESOURCES, ACTIONS } from '../../../shared/models/permissionCatalog';
-import { expandRoles } from '../../../vendors/security/roleCatalog';
+import { expandRoles, roleCatalog, ownRoleNames } from '../../../vendors/security/roleCatalog';
 
 /**
  * The console's view of the directory: what the caller may do, which roles exist, and who is in it.
@@ -104,9 +104,17 @@ export async function directoryController(fastify: FastifyInstance) {
     const caller = callerOf(request);
     if (!caller) return reply.status(401).send({ error: 'Unauthenticated' });
 
-    const roleName = caller.roles?.[0] ?? '';
+    const bearer = bearerOf(request);
+    // Narrowed to THIS application's own roles first: a principal can hold a role at a DIFFERENT
+    // resource server on the same token (an account holder at the bank), and index 0 of the
+    // unfiltered array is whichever one the authority happened to list first, not necessarily
+    // this application's. Showing that one here would tell a LeafyPay customer their role is
+    // something LeafyPay has never heard of.
+    const catalog = await roleCatalog(bearer);
+    const ownRoles = catalog ? ownRoleNames(catalog, caller.roles ?? []) : (caller.roles ?? []);
+    const roleName = ownRoles[0] ?? '';
     const held = caller.effectivePermissions
-      ?? await expandRoles(bearerOf(request), caller.roles ?? [], caller.permissions ?? [])
+      ?? await expandRoles(bearer, caller.roles ?? [], caller.permissions ?? [])
       ?? [];
 
     // The role's own description is the authority's to give. A failure here costs a label, never

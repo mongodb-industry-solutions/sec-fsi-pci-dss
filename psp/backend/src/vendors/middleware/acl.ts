@@ -43,8 +43,12 @@ function permissionsOf(request: FastifyRequest): Set<string> {
 }
 
 function roleOf(request: FastifyRequest): string | undefined {
-  const user = (request as FastifyRequest & { user?: { roles?: string[] } }).user;
-  return (request as unknown as AuthenticatedRequest).userRole ?? user?.roles?.[0];
+  // `user.role`, not `user.roles?.[0]`: the former is already narrowed to this application's own
+  // roles (see `ownRoleNames` in vendors/security/roleCatalog.ts), the latter is the raw,
+  // unscoped list a role from a DIFFERENT resource server (e.g. a bank role) can also ride along
+  // on. `canReadSensitive` below reasons about this value, so a wrong pick here is not cosmetic.
+  const user = (request as FastifyRequest & { user?: { role?: string } }).user;
+  return (request as unknown as AuthenticatedRequest).userRole ?? user?.role;
 }
 
 export function can(request: FastifyRequest, resource: Resource, action: Action): boolean {

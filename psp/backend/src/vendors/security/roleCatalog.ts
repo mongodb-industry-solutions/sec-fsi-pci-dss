@@ -31,6 +31,11 @@ import { config } from '../../config';
 export interface RoleCatalog {
   catalogVersion: number;
   roles: Array<{ name: string; permissions: string[] }>;
+  // Each declared enforcement point, tagged with the resource server that owns it. This is what
+  // makes `ownRoleNames` below correct where matching by bare resource NAME is not: "accounts" is
+  // declared by both leafypay and bankcore, meaning what an account is at each, and a role holding
+  // `accounts:view` could be either one's.
+  permissions: Array<{ permission: string; resourceServer: string }>;
 }
 
 const CATALOG_TTL_MS = 60_000;
@@ -64,7 +69,11 @@ export async function roleCatalog(bearer: string): Promise<RoleCatalog | null> {
     const body = await response.json() as RoleCatalog;
     if (!Array.isArray(body?.roles)) return catalog;
 
-    catalog = { catalogVersion: Number(body.catalogVersion ?? 0), roles: body.roles };
+    catalog = {
+      catalogVersion: Number(body.catalogVersion ?? 0),
+      roles: body.roles,
+      permissions: Array.isArray(body.permissions) ? body.permissions : [],
+    };
     catalogFetchedAt = Date.now();
     return catalog;
   } catch {
@@ -103,4 +112,45 @@ export async function expandRoles(
 export function invalidateRoleCatalog(): void {
   catalog = null;
   catalogFetchedAt = 0;
+}
+
+/**
+ * Which of a token's roles are this application's OWN, in the order the authority sent them.
+ *
+ * A principal can hold roles at more than one resource server on the SAME token (an account holder
+ * of the payment provider who is also an account holder at the bank), and the realm's published
+ * catalog is realm-wide, not scoped per resource server: `bank_customer` is right there beside
+ * `customer` in the same `roles` array. Code that still reasons about "the role" in the singular
+ * (see `roleOf` in vendors/middleware/auth.ts) took index 0 unconditionally, which used to be safe
+ * because a token only ever carried one role, and stopped being safe the moment it could carry two:
+ * `["bank_customer", "customer"]` picked the bank's role for an ordinary LeafyPay request and
+ * refused a customer their own beneficiaries as a stranger asking to investigate someone else's.
+ *
+ * A single shared permission is not enough to call a role "ours", and that qualifier is not
+ * decoration: `accounts` is declared by both leafypay and bankcore, meaning something different at
+ * each, so `accounts:view` is a string both catalogs happen to use and matching on ANY overlap
+ * would let `bank_customer` back in for holding that one shared permission alongside three
+ * (`accountHolders:view`, `movements:view`, `issuedCards:view`) that mean nothing here. A MAJORITY
+ * of a role's own permissions falling inside what this resource server declares is what tells a
+ * role that is genuinely ours from one merely borrowing a name from a vocabulary it does not
+ * belong to; `customer` clears it because every one of its permissions is leafypay's own, and
+ * `bank_customer` fails it at one shared string out of four.
+ *
+ * A role neither this catalog nor this application recognises is filtered out too, which is the
+ * same default-deny direction as everywhere else here: an unrecognised name grants nothing rather
+ * than being guessed at.
+ */
+export function ownRoleNames(resolved: RoleCatalog, roles: ReadonlyArray<string>): string[] {
+  const ownPermissions = new Set(
+    resolved.permissions
+      .filter((entry) => entry.resourceServer === config.giam.resourceServerName)
+      .map((entry) => entry.permission),
+  );
+  const permissionsByRole = new Map(resolved.roles.map((role) => [role.name, role.permissions]));
+  return roles.filter((name) => {
+    const permissions = permissionsByRole.get(name);
+    if (!permissions || permissions.length === 0) return false;
+    const matching = permissions.filter((permission) => ownPermissions.has(permission)).length;
+    return matching > permissions.length / 2;
+  });
 }
