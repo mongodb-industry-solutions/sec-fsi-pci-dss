@@ -234,8 +234,6 @@ export async function createMerchant(db: Db, input: CreateMerchantInput) {
   await db.collection(MERCHANT_AGREEMENT_COLLECTION).insertOne(merchant as object);
   // After the merchant exists, so a key can never reference an owner that does not.
   await insertKey(db, initialKey);
-  // After the merchant exists, so a key can never reference an owner that does not.
-  await insertKey(db, initialKey);
 
   await appendMerchantEvent(db, id, 'merchant.validation.requested', {
     performedByPartyReference: input.merchantOwnerPartyReference,
