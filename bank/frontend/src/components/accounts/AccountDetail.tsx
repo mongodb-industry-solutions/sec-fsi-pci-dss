@@ -128,20 +128,22 @@ export function AccountDetail({ accountReference }: { accountReference: string }
         title="Protected values"
         description="The IBAN is personal data and is encrypted at rest, so it is read one account at a time and each read is recorded."
       >
-        {capabilities?.canRevealAccountNumber ? (
+        {(capabilities?.canRevealAccountNumber || capabilities?.canSelfDisclose) ? (
           <Reveal
             label="IBAN"
             masked={account.accountMaskedIban}
             fetchValue={async () => {
-              const result = await admin.disclose<{ iban?: string }>(
-                `accounts/${encodeURIComponent(accountReference)}/disclosures`,
-              );
+              // A staff disclosure is an employee revealing someone else's value, audited as that; an
+              // account holder revealing their own is a different act, so it is a different route
+              // (self-disclosure below is refused to anyone but the account's own holder).
+              const path = capabilities?.canRevealAccountNumber
+                ? `accounts/${encodeURIComponent(accountReference)}/disclosures`
+                : `accounts/${encodeURIComponent(accountReference)}/self-disclosure`;
+              const result = await admin.disclose<{ iban?: string }>(path);
               return result.iban ?? 'not held';
             }}
           />
         ) : (
-          // An account holder reads their own IBAN off a statement, not through a staff disclosure
-          // route whose audit row means an employee revealed somebody's data (see bankRoles.json).
           <Field label="IBAN" mono>{account.accountMaskedIban}</Field>
         )}
         <Field label="Bank identifier" mono>{account.accountBic}</Field>

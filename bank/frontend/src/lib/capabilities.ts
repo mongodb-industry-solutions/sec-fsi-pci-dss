@@ -22,6 +22,12 @@ const CAN_REVEAL_CARD_NUMBER = ['bank_card_officer'];
 const CAN_REVEAL_ACCOUNT_NUMBER = ['bank_operations', 'bank_compliance'];
 const CAN_REVEAL_HOLDER_CONTACT = ['bank_operations', 'bank_compliance'];
 const CAN_VIEW_MOVEMENTS = ['bank_operations', 'bank_compliance', 'bank_customer'];
+// Not a permission the staff catalog grants: bank_customer holds no *:viewSensitive by design (see
+// bankRoles.json's denialRationale), because that authority means disclosing SOMEONE ELSE's value.
+// Reading your own IBAN or card number back is a different act, gated on ownership rather than on
+// that permission, and served by its own `self-disclosure` route. This just decides which button a
+// self-scoped screen offers.
+const SELF_SCOPED_ROLES = ['bank_customer'];
 
 function holds(roles: string[], allowed: string[]): boolean {
   return roles.some((role) => allowed.includes(role));
@@ -34,6 +40,8 @@ export interface Capabilities {
   canRevealAccountNumber: boolean;
   canRevealHolderContact: boolean;
   canViewMovements: boolean;
+  /** Can reveal their OWN account's IBAN or OWN card's number, through the self-disclosure route. */
+  canSelfDisclose: boolean;
 }
 
 export function capabilitiesFor(roles: string[] | undefined): Capabilities {
@@ -45,6 +53,7 @@ export function capabilitiesFor(roles: string[] | undefined): Capabilities {
     canRevealAccountNumber: holds(held, CAN_REVEAL_ACCOUNT_NUMBER),
     canRevealHolderContact: holds(held, CAN_REVEAL_HOLDER_CONTACT),
     canViewMovements: holds(held, CAN_VIEW_MOVEMENTS),
+    canSelfDisclose: holds(held, SELF_SCOPED_ROLES),
   };
 }
 

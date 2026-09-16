@@ -94,7 +94,14 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
   if (!card) return <div className="py-8 text-sm text-ink-soft">Reading the card…</div>;
 
   const terminal = card.status === 'revoked';
-  const disclose = () => admin.disclose<Disclosure>(`cards/${encodeURIComponent(cardToken)}/disclosures`);
+  // The staff route is an employee revealing someone else's number, audited as that; a cardholder
+  // revealing their own is a different act, so it is a different route (self-disclosure is refused
+  // to anyone but the card's own holder).
+  const disclose = () => admin.disclose<Disclosure>(
+    capabilities?.canRevealCardNumber
+      ? `cards/${encodeURIComponent(cardToken)}/disclosures`
+      : `cards/${encodeURIComponent(cardToken)}/self-disclosure`,
+  );
 
   return (
     <div className="space-y-4">
@@ -121,9 +128,7 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
         title="Protected values"
         description="Encrypted at rest, and read one card at a time. Each reveal is a separate act the bank records against whoever asked."
       >
-        {/* Only the card officer may disclose the number: the same authority that guards the request
-            behind, so a role that would only be refused is never offered the button. */}
-        {capabilities?.canRevealCardNumber ? (
+        {(capabilities?.canRevealCardNumber || capabilities?.canSelfDisclose) ? (
           <>
             <Reveal
               label="Card number"

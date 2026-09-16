@@ -35,8 +35,15 @@ const COLUMNS: Column<CardRow>[] = [
   {
     key: 'maskedDisplay',
     label: 'Card',
+    // Same reasoning as the accounts list: the value itself is the destination, not just the
+    // chevron at the row's end.
     render: (row) => (
-      <span className="font-mono">{row.maskedDisplay || `•••• ${row.lastFour}`}</span>
+      <Link
+        href={`/cards/${encodeURIComponent(row.cardToken)}`}
+        className="font-mono text-accent hover:underline"
+      >
+        {row.maskedDisplay || `•••• ${row.lastFour}`}
+      </Link>
     ),
   },
   { key: 'network', label: 'Network' },

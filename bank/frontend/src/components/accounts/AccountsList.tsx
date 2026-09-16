@@ -40,8 +40,16 @@ const COLUMNS: Column<AccountRow>[] = [
   {
     key: 'accountMaskedIban',
     label: 'Account',
+    // The chevron at the row's end already opens it; this is the same destination on the value
+    // itself, because clicking the thing you are reading is the affordance people actually reach
+    // for, and a chevron alone reads as decoration on a wide screen where it sits far from the text.
     render: (row) => (
-      <span className="font-mono">{row.accountMaskedIban}</span>
+      <Link
+        href={`/accounts/${encodeURIComponent(row.accountArrangementInstanceReference)}`}
+        className="font-mono text-accent hover:underline"
+      >
+        {row.accountMaskedIban}
+      </Link>
     ),
   },
   { key: 'accountHolderNameMasked', label: 'Holder' },
