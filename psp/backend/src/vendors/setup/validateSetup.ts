@@ -20,10 +20,9 @@ const EXPECTED_COLLECTIONS = [
   'customerAgreementProcedure',
   'paymentCardManagement',
   'paymentCardRegistry',
-  'customerAuthenticationAssessment',
-  'authenticationDomain',
-  'role',
-  'partyAuthenticationAssessment',
+  // v39: the four identity collections are NOT listed, and their absence is the intended outcome.
+  // Identity moved to the authority, `createCollections.ts` stopped creating them, and this list was
+  // not told: `setup:check` then reported `20/24 present` on a database that was exactly right.
   'fraudDiagnosisCase',
   'fraudDiagnosisCaseEvents',
   'fraudDiagnosisCustomerQuestion',
@@ -51,14 +50,10 @@ const EXPECTED_UNIQUE_INDEXES: Record<string, string> = {
   customerAgreementProcedure:       'customerAgreementInstanceReference',
   paymentCardManagement:            'paymentCardInstanceReference',
   paymentCardRegistry:              'paymentCardReference',
-  customerAuthenticationAssessment: 'customerAuthenticationInstanceReference',
   fraudDiagnosisCase:               'fraudDiagnosisInstanceReference',
   fraudDiagnosisCustomerQuestion:   'customerQuestionInstanceReference',
   notification:                     'notificationInstanceReference',
   domainEvent:                      'eventId',
-  partyAuthenticationAssessment:    'partyAuthenticationInstanceReference',
-  authenticationDomain:             'partyAuthenticationDomainInstanceReference',
-  role:                             'roleName',
   customerCreditRatingState:        'customerCreditRatingInstanceReference',
   consentAgreement:                 'consentAgreementInstanceReference',
   consentAccessLog:                 'consentAccessLogInstanceReference',
