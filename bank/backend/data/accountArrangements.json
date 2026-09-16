@@ -1648,5 +1648,80 @@
     "bianControlRecordType": "AccountArrangement",
     "recordCreatedDateTime": "2026-06-22T15:30:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "accountArrangementInstanceReference": "acc00075-0000-4000-8000-000000000075",
+    "accountHolderInstanceReference": "hld00075-0000-4000-8000-000000000075",
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "accountKind": "current",
+    "accountStatus": "active",
+    "accountAlias": "Luis main account",
+    "accountCurrency": "EUR",
+    "accountCountryCode": "ES",
+    "accountIban": "ES2498200000075000000075",
+    "accountBic": "VRDNESMMXXX",
+    "accountMaskedIban": "ES24****************0075",
+    "accountBalance": {
+      "availableAmount": 4250,
+      "pendingAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "accountOpenedDateTime": "2026-06-01T12:00:00.000Z",
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "AccountArrangement",
+    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountArrangementInstanceReference": "acc00076-0000-4000-8000-000000000076",
+    "accountHolderInstanceReference": "hld00076-0000-4000-8000-000000000076",
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "accountKind": "current",
+    "accountStatus": "active",
+    "accountAlias": "Amara main account",
+    "accountCurrency": "EUR",
+    "accountCountryCode": "GB",
+    "accountIban": "GB32VRDN00076000000076",
+    "accountBic": "VRDNESMMXXX",
+    "accountMaskedIban": "GB32**************0076",
+    "accountBalance": {
+      "availableAmount": 5120,
+      "pendingAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "accountOpenedDateTime": "2026-06-01T12:00:00.000Z",
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "AccountArrangement",
+    "recordCreatedDateTime": "2026-06-01T12:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountArrangementInstanceReference": "acc00077-0000-4000-8000-000000000077",
+    "accountHolderInstanceReference": "hld00077-0000-4000-8000-000000000077",
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "accountKind": "current",
+    "accountStatus": "active",
+    "accountAlias": "Antonio main account",
+    "accountCurrency": "EUR",
+    "accountCountryCode": "ES",
+    "accountIban": "ES1421000813610123456789",
+    "accountBic": "VRDNESMMXXX",
+    "accountMaskedIban": "ES14********************6789",
+    "accountBalance": {
+      "availableAmount": 6200,
+      "pendingAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "accountOpenedDateTime": "2026-06-15T09:00:00.000Z",
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "AccountArrangement",
+    "recordCreatedDateTime": "2026-06-15T09:00:00.000Z",
+    "schemaVersion": 1
   }
 ]
