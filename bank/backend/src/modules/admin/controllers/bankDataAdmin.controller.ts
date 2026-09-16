@@ -404,6 +404,67 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     return disclosure;
   });
 
+  // ── Self-service disclosure ───────────────────────────────────────────────────────────────────
+  //
+  // The same values, for the person they belong to rather than for staff acting on them. This is
+  // NOT `cardData:viewSensitive` or `accounts:viewSensitive`: those name an EMPLOYEE's authority to
+  // disclose somebody else's protected value, and bank_customer holds neither, by design (see
+  // bankRoles.json's denialRationale). Reading your own card number back is a different act with a
+  // different audience, closer to a banking app showing a cardholder their own card than to a staff
+  // disclosure route whose audit row means an employee revealed a customer's data. It is gated on
+  // ownership instead: any account or card, but only the caller's own.
+  fastify.post('/cards/:cardToken/self-disclosure', {
+    preValidation: requireStaff('issuedCards', 'view'),
+    schema: {
+      tags: ['admin'],
+      summary: 'Reveal your own card\'s protected values',
+      description: 'The same disclosure as the staff route, restricted to a self-scoped caller\'s own card.',
+      security: [{ adminAuth: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    if (!request.staff?.selfScoped) {
+      return reply.status(403).send({ error: 'This route is for an account holder\'s own card, not staff' });
+    }
+    const { cardToken } = request.params as { cardToken: string };
+    const page = await searchIssuedCards(fastify.db, { reference: cardToken, limit: 1 });
+    const card = page.results[0];
+    if (!card) return reply.status(404).send({ error: 'No such card at this issuer' });
+    if (refuseIfNotOwn(request, reply, card.holderReference)) return reply;
+    const disclosure = await discloseCard(fastify.db, cardToken);
+    if (!disclosure) return reply.status(404).send({ error: 'No such card at this issuer' });
+    return disclosure;
+  });
+
+  fastify.post('/accounts/:accountReference/self-disclosure', {
+    preValidation: requireStaff('accounts', 'view'),
+    schema: {
+      tags: ['admin'],
+      summary: 'Reveal your own account\'s IBAN',
+      description: 'The same disclosure as the staff route, restricted to a self-scoped caller\'s own account.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['accountReference'],
+        properties: { accountReference: { type: 'string' } },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    if (!request.staff?.selfScoped) {
+      return reply.status(403).send({ error: 'This route is for an account holder\'s own account, not staff' });
+    }
+    const { accountReference } = request.params as { accountReference: string };
+    const page = await searchAccounts(fastify.db, { reference: accountReference, limit: 1 });
+    const account = page.results[0];
+    if (!account) return reply.status(404).send({ error: 'No such account at this bank' });
+    if (refuseIfNotOwn(request, reply, account.accountHolderInstanceReference)) return reply;
+    const disclosure = await discloseAccountIban(fastify.db, accountReference);
+    if (!disclosure) return reply.status(404).send({ error: 'No such account at this bank' });
+    return disclosure;
+  });
+
   fastify.post('/accounts/:accountReference/disclosures', {
     preValidation: requireStaff('accounts', 'viewSensitive'),
     schema: {
