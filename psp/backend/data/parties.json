@@ -1520,5 +1520,27 @@
       "postalCode": "94102",
       "countryCode": "US"
     }
+  },
+  {
+    "partyInstanceReference": "b0000077-0000-4000-8000-000000000077",
+    "partyEmailAddress": "antonio.membrides@back.es",
+    "partyMobilePhoneNumber": "+34 611 222 333",
+    "partyName": "Antonio Membrides",
+    "partyType": "customer",
+    "bianServiceDomain": "Party Data Management",
+    "bianControlRecordType": "Party",
+    "recordCreatedDateTime": "2026-06-15T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-15T09:00:00.000Z",
+    "schemaVersion": 1,
+    "partyNationality": "ES",
+    "partyDateOfBirth": "1985-07-22",
+    "partyPostalAddress": {
+      "line1": "Paseo de la Castellana 200",
+      "city": "Madrid",
+      "postalCode": "28046",
+      "countryCode": "ES"
+    },
+    "partyPlaceOfBirth": "Madrid",
+    "partySex": "male"
   }
 ]
