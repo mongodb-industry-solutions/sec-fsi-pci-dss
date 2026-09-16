@@ -3387,5 +3387,53 @@
     "bianControlRecordType": "PaymentCardManagement",
     "recordCreatedDateTime": "2026-04-04T00:35:13.385Z",
     "schemaVersion": 1
+  },
+  {
+    "paymentCardInstanceReference": "6520d69c-85e0-4525-a940-691ae4903d49",
+    "customerAgreementInstanceReference": "c0000077-0000-4000-8000-000000000077",
+    "paymentCardReference": "pm_a6e84b21e920f61424f922b0c558d10f",
+    "paymentCardMaskedPanDisplay": "****-****-****-d10f",
+    "paymentCardNetwork": "VISA",
+    "paymentCardStatus": "active",
+    "paymentCardIssuanceDateTime": "2026-06-15T09:00:00.000Z",
+    "paymentCardIsPreferred": true,
+    "paymentCardAlias": "Everyday",
+    "bianServiceDomain": "Payment Card",
+    "bianControlRecordType": "PaymentCardManagement",
+    "recordCreatedDateTime": "2026-06-15T09:00:00.000Z",
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00077-0000-4000-8000-000000000077"
+  },
+  {
+    "paymentCardInstanceReference": "0e3616fc-ce00-4e40-b2bc-17192bf1da06",
+    "customerAgreementInstanceReference": "c0000077-0000-4000-8000-000000000077",
+    "paymentCardReference": "pm_d65f386df45f5b867d6b0f8eee53845e",
+    "paymentCardMaskedPanDisplay": "****-****-****-845e",
+    "paymentCardNetwork": "MASTERCARD",
+    "paymentCardStatus": "active",
+    "paymentCardIssuanceDateTime": "2026-06-15T09:00:00.000Z",
+    "paymentCardIsPreferred": false,
+    "paymentCardAlias": "Subscriptions",
+    "bianServiceDomain": "Payment Card",
+    "bianControlRecordType": "PaymentCardManagement",
+    "recordCreatedDateTime": "2026-06-15T09:00:00.000Z",
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00077-0000-4000-8000-000000000077"
+  },
+  {
+    "paymentCardInstanceReference": "9bfe7569-ec03-443b-ba61-8865cccc9353",
+    "customerAgreementInstanceReference": "c0000077-0000-4000-8000-000000000077",
+    "paymentCardReference": "pm_fa71ff58a20a64a14abc6f564a93f250",
+    "paymentCardMaskedPanDisplay": "****-****-****-f250",
+    "paymentCardNetwork": "VISA",
+    "paymentCardStatus": "active",
+    "paymentCardIssuanceDateTime": "2026-06-16T09:00:00.000Z",
+    "paymentCardIsPreferred": false,
+    "paymentCardAlias": "Germany",
+    "bianServiceDomain": "Payment Card",
+    "bianControlRecordType": "PaymentCardManagement",
+    "recordCreatedDateTime": "2026-06-16T09:00:00.000Z",
+    "schemaVersion": 1,
+    "fundingPayoutAccountInstanceReference": "pau00078-0000-4000-8000-000000000078"
   }
 ]

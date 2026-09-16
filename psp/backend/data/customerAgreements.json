@@ -2389,5 +2389,47 @@
     "customerAgreementOccupation": "doctor",
     "customerAgreementSourceOfFunds": "salary",
     "customerAgreementPurposeOfRelationship": "business_banking"
+  },
+  {
+    "customerAgreementInstanceReference": "c0000077-0000-4000-8000-000000000077",
+    "partyInstanceReference": "b0000077-0000-4000-8000-000000000077",
+    "customerAgreementReference": "ACC-AM-20260615",
+    "customerSegment": "premium",
+    "customerAgreementStatus": "active",
+    "customerAgreementEnrollmentDate": "2026-06-15T09:00:00.000Z",
+    "customerAgreementPreferredLanguage": "es",
+    "customerAgreementResidentialAddress": {
+      "streetAddress": "Paseo de la Castellana 200",
+      "city": "Madrid",
+      "postalCode": "28046",
+      "countryCode": "ES"
+    },
+    "bianServiceDomain": "Customer Agreement",
+    "bianControlRecordType": "CustomerAgreementProcedure",
+    "recordCreatedDateTime": "2026-06-15T09:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-15T09:00:00.000Z",
+    "schemaVersion": 3,
+    "customerAgreementRiskNotes": "No prior fraud history.",
+    "customerAgreementKycCheck": {
+      "customerAgreementKycCheckStatus": "verified",
+      "customerAgreementKycCheckCompletedDate": "2026-06-15T09:00:00.000Z",
+      "customerAgreementKycCheckReference": "KYC-B0000077-077",
+      "customerAgreementKycCheckNotes": "Identity verified via document check at onboarding",
+      "customerAgreementKycCheckRiskScore": 15,
+      "customerAgreementKycCheckRiskRating": "low",
+      "customerAgreementKycCheckPepStatus": false,
+      "customerAgreementKycCheckSanctionsResult": "clear",
+      "customerAgreementKycCheckScreeningProviderRef": "HRP-am000077"
+    },
+    "customerAgreementGovernmentID": {
+      "type": "national_id",
+      "issuingCountry": "ES",
+      "number": "ES-52384719K",
+      "expiryDate": "2032-07-22"
+    },
+    "customerAgreementTaxIDNumber": "ES-52384719K",
+    "customerAgreementSourceOfFunds": "salary",
+    "customerAgreementOccupation": "software engineer",
+    "customerAgreementPurposeOfRelationship": "everyday_banking"
   }
 ]

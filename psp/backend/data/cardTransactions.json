@@ -4918,5 +4918,77 @@
     "recordCreatedDateTime": "2026-03-17T14:00:00.000Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "CARD_TX_A",
+    "paymentCardReference": "pm_a6e84b21e920f61424f922b0c558d10f",
+    "cardTransactionAccountReference": "ACC-AM-20260615",
+    "cardTransactionAmount": {
+      "amount": 45.9,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-06-20T11:15:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionChannel": "pos",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionType": "purchase",
+    "cardTransactionMerchantCategoryCode": "5812",
+    "cardTransactionMerchantName": "Espresso Works Ltd",
+    "cardTransactionMaskedPanDisplay": "****-****-****-d10f",
+    "merchantAgreementInstanceReference": "m0000001-0000-4000-8000-000000000001",
+    "cardTransactionDescription": "Coffee and workspace",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-06-20T11:15:00.000Z",
+    "recordUpdatedDateTime": "2026-06-20T11:15:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "CARD_TX_B",
+    "paymentCardReference": "pm_d65f386df45f5b867d6b0f8eee53845e",
+    "cardTransactionAccountReference": "ACC-AM-20260615",
+    "cardTransactionAmount": {
+      "amount": 89,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-06-25T14:00:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionChannel": "online",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionType": "purchase",
+    "cardTransactionMerchantCategoryCode": "7372",
+    "cardTransactionMerchantName": "Leafy Wallet - Digital Services",
+    "cardTransactionMaskedPanDisplay": "****-****-****-845e",
+    "merchantAgreementInstanceReference": "m0000002-0000-4000-8000-000000000002",
+    "cardTransactionDescription": "Software subscription",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-06-25T14:00:00.000Z",
+    "recordUpdatedDateTime": "2026-06-25T14:00:00.000Z",
+    "schemaVersion": 3
+  },
+  {
+    "cardTransactionInstanceReference": "CARD_TX_C",
+    "paymentCardReference": "pm_fa71ff58a20a64a14abc6f564a93f250",
+    "cardTransactionAccountReference": "ACC-AM-20260615",
+    "cardTransactionAmount": {
+      "amount": 32.5,
+      "currency": "EUR"
+    },
+    "cardTransactionDateTime": "2026-06-22T16:30:00.000Z",
+    "cardTransactionStatus": "settled",
+    "cardTransactionChannel": "online",
+    "cardTransactionInitiationType": "customerInitiated",
+    "cardTransactionType": "purchase",
+    "cardTransactionMerchantCategoryCode": "7372",
+    "cardTransactionMerchantName": "Fischer Web Studio",
+    "cardTransactionMaskedPanDisplay": "****-****-****-f250",
+    "merchantAgreementInstanceReference": "m0000003-0000-4000-8000-000000000003",
+    "cardTransactionDescription": "Website maintenance",
+    "bianServiceDomain": "Card Transaction",
+    "bianControlRecordType": "CardTransactionLog",
+    "recordCreatedDateTime": "2026-06-22T16:30:00.000Z",
+    "recordUpdatedDateTime": "2026-06-22T16:30:00.000Z",
+    "schemaVersion": 3
   }
 ]
