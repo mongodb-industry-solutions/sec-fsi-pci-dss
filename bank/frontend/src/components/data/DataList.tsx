@@ -64,6 +64,8 @@ export interface DataListProps<T> {
   fixed?: Record<string, string>;
   rowHref?: (row: T) => string;
   rowKey?: (row: T) => string;
+  /** Data attributes to stamp on each row, for a test to read the boundary a screen renders rather than assert it blind. */
+  rowDataAttrs?: (row: T) => Record<string, string>;
   /** Status chips above the list, from the counts the bank returns with the page. */
   statusFilterKey?: string;
   /** Shown when the result is empty, so each list explains its own emptiness. */
@@ -134,7 +136,7 @@ function FilterControl({
 }
 
 export function DataList<T extends Row>({
-  resource, noun, searchHint, columns, filters = [], fixed, rowHref, rowKey,
+  resource, noun, searchHint, columns, filters = [], fixed, rowHref, rowKey, rowDataAttrs,
   statusFilterKey, emptyMessage, expand, toolbar, refreshToken,
 }: DataListProps<T>) {
   const router = useRouter();
@@ -463,7 +465,7 @@ export function DataList<T extends Row>({
               const key = keyOf(row, index);
               const href = rowHref?.(row);
               return (
-                <li key={key} className="rounded-xl border border-line bg-surface p-4">
+                <li key={key} className="rounded-xl border border-line bg-surface p-4" {...(rowDataAttrs?.(row) ?? {})}>
                   <dl className="space-y-2">
                     {resolvedColumns.map((column) => (
                       <div key={column.key} className="grid grid-cols-[minmax(0,8rem)_1fr] gap-2">
@@ -526,7 +528,7 @@ export function DataList<T extends Row>({
                     // The key belongs on the fragment: a row and its expanded detail are two siblings of one
                     // record, and keying the inner rows instead makes React re-create them on every toggle.
                     <Fragment key={key}>
-                      <tr className="border-t border-line align-top hover:bg-surface-alt/60">
+                      <tr className="border-t border-line align-top hover:bg-surface-alt/60" {...(rowDataAttrs?.(row) ?? {})}>
                         {expand && (
                           <td className="px-1 py-2">
                             <button

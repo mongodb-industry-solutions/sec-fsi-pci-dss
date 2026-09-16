@@ -45,13 +45,20 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-const ITEMS: Array<{ href: string; label: string; icon: typeof Home; external?: boolean }> = [
+/**
+ * Where each destination can actually be reached from, by role.
+ *
+ * Offered to everybody until now, which meant an account holder was shown Parties, Audit records and
+ * Third-party registrations and met a 403 on each: the menu promised authority the token does not
+ * carry. A destination with no `roles` is open to anybody signed in.
+ */
+const ITEMS: Array<{ href: string; label: string; icon: typeof Home; roles?: string[] }> = [
   { href: '/', label: 'Bank home', icon: Home },
   { href: '/accounts', label: 'Accounts', icon: Landmark },
   { href: '/cards', label: 'Card estate', icon: CreditCard },
-  { href: '/holders', label: 'Parties', icon: Users },
-  { href: '/records/audit', label: 'Audit records', icon: ScrollText },
-  { href: '/records/tpp/registrations', label: 'Third-party registrations', icon: FileClock },
+  { href: '/holders', label: 'Parties', icon: Users, roles: ['bank_operations', 'bank_card_officer', 'bank_compliance'] },
+  { href: '/records/audit', label: 'Audit records', icon: ScrollText, roles: ['bank_compliance', 'bank_admin'] },
+  { href: '/records/tpp/registrations', label: 'Third-party registrations', icon: FileClock, roles: ['bank_compliance', 'bank_admin'] },
 ];
 
 export function UserMenu({ authorityUi }: { authorityUi: string }) {
@@ -86,8 +93,18 @@ export function UserMenu({ authorityUi }: { authorityUi: string }) {
   if (!session?.signedIn) return null;
 
   const name = session.userName ?? 'Signed in';
-  const role = session.roles?.[0] ?? '';
+  /**
+   * The first role THIS BANK knows, not the first role in the claim.
+   *
+   * A person can hold more than one, and the order they arrive in is the authority's, not something
+   * to rely on: whoever administers the realm as well as the bank carries `realm_administrator`
+   * alongside `bank_admin`, and taking element zero labelled them with a role this console has no
+   * entry for, so the header read "realm_administrator" over a grey circle.
+   */
+  const held = session.roles ?? [];
+  const role = held.find((candidate) => candidate in ROLE_LABEL) ?? held[0] ?? '';
   const avatar = ROLE_AVATAR[role] ?? 'bg-gray-600';
+  const destinations = ITEMS.filter((item) => !item.roles || item.roles.some((allowed) => held.includes(allowed)));
 
   /** This app only. The authority's own session, and every other app sharing it, stays live. */
   async function signOutHere() {
@@ -153,7 +170,7 @@ export function UserMenu({ authorityUi }: { authorityUi: string }) {
           </div>
 
           <div className="py-1.5">
-            {ITEMS.map((item) => (
+            {destinations.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

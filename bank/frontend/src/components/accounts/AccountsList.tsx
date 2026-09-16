@@ -73,6 +73,9 @@ export function AccountsList({ fixed, toolbar }: { fixed?: Record<string, string
       fixed={fixed}
       rowKey={(row) => row.accountArrangementInstanceReference}
       rowHref={(row) => `/accounts/${encodeURIComponent(row.accountArrangementInstanceReference)}`}
+      // Which holder each row belongs to, readable by a test without decrypting anything: the value is the
+      // same opaque reference the self-scope boundary is drawn on, not personal data.
+      rowDataAttrs={(row) => ({ 'data-account-holder-reference': row.accountHolderInstanceReference })}
       emptyMessage="This bank holds no accounts matching that."
       filters={[
         {
