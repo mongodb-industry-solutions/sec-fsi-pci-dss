@@ -228,7 +228,11 @@ describe('v39 P7.4: an account holder sees their own records and nobody else s',
     expect(claims.roles).toContain('bank_customer');
     // The self scope, as an opaque binding the authority never resolves. It means something to the
     // bank and nothing to the authority, which is the correct direction for it to travel.
-    expect(claims.account_holder).toBe('hld00001-0000-4000-8000-000000000001');
+    //
+    // hld00073 is Elena Duarte's own record. The seed used to bind her to hld00001, which belongs
+    // to Luis Fernandez: a fixture bug, not a design choice, and the self-scope guard now enforces
+    // this hard enough that it would have refused her every list rather than leaking his.
+    expect(claims.account_holder).toBe('hld00073-0000-4000-8000-000000000073');
   });
 
   it('holds no authority over anybody else s records', async () => {

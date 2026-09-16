@@ -1598,5 +1598,55 @@
     "bianControlRecordType": "AccountArrangement",
     "recordCreatedDateTime": "2026-07-07T00:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "accountArrangementInstanceReference": "acc00066-0000-4000-8000-000000000066",
+    "accountHolderInstanceReference": "hld00073-0000-4000-8000-000000000073",
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "accountKind": "current",
+    "accountStatus": "active",
+    "accountAlias": "Elena Novo Banco",
+    "accountCurrency": "EUR",
+    "accountCountryCode": "PT",
+    "accountIban": "PT50000201231234567890154",
+    "accountBic": "VRDNESMMXXX",
+    "accountMaskedIban": "PT50****************0154",
+    "accountBalance": {
+      "availableAmount": 3250.4,
+      "pendingAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "accountOpenedDateTime": "2026-06-22T15:30:00.000Z",
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "AccountArrangement",
+    "recordCreatedDateTime": "2026-06-22T15:30:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountArrangementInstanceReference": "acc00067-0000-4000-8000-000000000067",
+    "accountHolderInstanceReference": "hld00074-0000-4000-8000-000000000074",
+    "bankProfileInstanceReference": "bank0001-0000-4000-8000-000000000001",
+    "accountKind": "current",
+    "accountStatus": "active",
+    "accountAlias": "Viktor Swedbank",
+    "accountCurrency": "EUR",
+    "accountCountryCode": "EE",
+    "accountIban": "EE382200221234567890",
+    "accountBic": "VRDNESMMXXX",
+    "accountMaskedIban": "EE38****************7890",
+    "accountBalance": {
+      "availableAmount": 1875.9,
+      "pendingAmount": 0,
+      "reservedAmount": 0,
+      "currency": "EUR",
+      "lastUpdatedDateTime": "2026-07-01T00:00:00.000Z"
+    },
+    "accountOpenedDateTime": "2026-06-22T15:30:00.000Z",
+    "bianServiceDomain": "Current Account",
+    "bianControlRecordType": "AccountArrangement",
+    "recordCreatedDateTime": "2026-06-22T15:30:00.000Z",
+    "schemaVersion": 1
   }
 ]

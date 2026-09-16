@@ -568,5 +568,25 @@
     "bianControlRecordType": "AccountHolder",
     "recordCreatedDateTime": "2025-09-09T16:00:00.000Z",
     "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00073-0000-4000-8000-000000000073",
+    "accountHolderName": "Elena Duarte",
+    "accountHolderCountryCode": "PT",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-09-16T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "accountHolderInstanceReference": "hld00074-0000-4000-8000-000000000074",
+    "accountHolderName": "Viktor Ilyin",
+    "accountHolderCountryCode": "EE",
+    "accountHolderStatus": "active",
+    "bianServiceDomain": "Party Reference Data Directory",
+    "bianControlRecordType": "AccountHolder",
+    "recordCreatedDateTime": "2026-09-16T00:00:00.000Z",
+    "schemaVersion": 1
   }
 ]
