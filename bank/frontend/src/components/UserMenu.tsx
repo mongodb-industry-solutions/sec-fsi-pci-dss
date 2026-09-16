@@ -52,11 +52,21 @@ function initials(name: string): string {
  * Third-party registrations and met a 403 on each: the menu promised authority the token does not
  * carry. A destination with no `roles` is open to anybody signed in.
  */
-const ITEMS: Array<{ href: string; label: string; icon: typeof Home; roles?: string[] }> = [
+const ITEMS: Array<{ href: string; label: string; icon: typeof Home; roles?: string[]; selfLabel?: string }> = [
   { href: '/', label: 'Bank home', icon: Home },
   { href: '/accounts', label: 'Accounts', icon: Landmark },
   { href: '/cards', label: 'Card estate', icon: CreditCard },
-  { href: '/holders', label: 'Parties', icon: Users, roles: ['bank_operations', 'bank_card_officer', 'bank_compliance'] },
+  // Reached by the account holder too, and it is their OWN record they arrive at: the list is
+  // narrowed server side by the self binding, so this is the same destination rather than a second
+  // one built for them. Only the label differs, because "Parties" is not what a person calls
+  // themselves.
+  {
+    href: '/holders',
+    label: 'Parties',
+    selfLabel: 'My details',
+    icon: Users,
+    roles: ['bank_operations', 'bank_card_officer', 'bank_compliance', 'bank_customer'],
+  },
   { href: '/records/audit', label: 'Audit records', icon: ScrollText, roles: ['bank_compliance', 'bank_admin'] },
   { href: '/records/tpp/registrations', label: 'Third-party registrations', icon: FileClock, roles: ['bank_compliance', 'bank_admin'] },
 ];
@@ -104,7 +114,10 @@ export function UserMenu({ authorityUi }: { authorityUi: string }) {
   const held = session.roles ?? [];
   const role = held.find((candidate) => candidate in ROLE_LABEL) ?? held[0] ?? '';
   const avatar = ROLE_AVATAR[role] ?? 'bg-gray-600';
-  const destinations = ITEMS.filter((item) => !item.roles || item.roles.some((allowed) => held.includes(allowed)));
+  const selfScoped = held.includes('bank_customer');
+  const destinations = ITEMS
+    .filter((item) => !item.roles || item.roles.some((allowed) => held.includes(allowed)))
+    .map((item) => (selfScoped && item.selfLabel ? { ...item, label: item.selfLabel } : item));
 
   /** This app only. The authority's own session, and every other app sharing it, stays live. */
   async function signOutHere() {
