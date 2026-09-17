@@ -12,13 +12,14 @@ const nextConfig = {
     NEXT_PUBLIC_PSP_NAME_PRIMARY: process.env.NEXT_PUBLIC_PSP_NAME_PRIMARY || 'Leafy',
     NEXT_PUBLIC_PSP_NAME_SECONDARY: process.env.NEXT_PUBLIC_PSP_NAME_SECONDARY || 'Pay',
   },
-  // The repo has multiple package-lock.json files (root + backend + frontend + merchant),
-  // so Turbopack otherwise infers the REPO root as the workspace root and resolves
-  // node_modules from there. The merchant's deps (lucide-react, @radix-ui/*) live ONLY in
-  // merchant/node_modules, so SSR failed with "Cannot find module 'lucide-react'". Pin the
-  // Turbopack root to THIS directory so modules resolve from merchant/node_modules.
+  // Pinned explicitly because the repo has several package-lock.json files and Turbopack would
+  // otherwise infer a root by guessing. It must be the REPO root, not this directory: the app
+  // installs @leafypay/platform-links via `file:../packages/platform-links`, a symlink whose real
+  // path sits outside merchant/, and Turbopack cannot resolve a module below its root ("Can't
+  // resolve '@leafypay/platform-links'"). Node resolution still walks up from each file, so the
+  // merchant-only deps (lucide-react, @radix-ui/*) keep resolving from merchant/node_modules.
   turbopack: {
-    root: __dirname,
+    root: require('path').resolve(__dirname, '..'),
   },
 };
 

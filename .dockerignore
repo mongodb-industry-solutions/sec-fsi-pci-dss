@@ -11,6 +11,7 @@ psp/backend/dist/
 bank/backend/dist/
 psp/frontend/.next/
 psp/frontend/out/
+merchant/.next/
 
 # Environment files (injected via env_file / environment in Compose)
 .env

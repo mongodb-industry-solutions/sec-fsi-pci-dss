@@ -243,8 +243,9 @@ services:
   # Integrates with the PSP purely via OAuth2/OIDC SSO + API. Container on 8080, host 8082.
   merchant:
     build:
-      context: ./merchant
-      dockerfile: Dockerfile
+      # Repo root: the app installs the shared platform-links package from packages/.
+      context: .
+      dockerfile: merchant/Dockerfile
     ports:
       - "8082:8080"  # host:container — mirrors the frontend convention
     env_file:

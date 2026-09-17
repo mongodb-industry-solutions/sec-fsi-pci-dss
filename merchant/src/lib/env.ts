@@ -5,14 +5,12 @@
 // values injected by docker-compose / Kubernetes). The .env files are OPTIONAL conveniences for
 // temporarily customizing the environment, never a hard requirement. Precedence for every var:
 //   process.env (incl. merchant/.env.local loaded by Next)  >  repo-root .env  >  built-in default
-// Missing .env files never obstruct startup, and a missing value never throws here. Enforcement of
-// "the client must be registered and authorized" lives at the PSP authorization server, which
-// rejects an unknown / unauthenticated client: the merchant must not fabricate credentials, so an
-// unset client id/secret resolves to empty and the PSP declines the flow (invalid_client).
+// Missing .env files never obstruct startup, and a missing value never throws here.
 import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 // Optional fallback: parse the repo-root .env (one level above the merchant package). Read-only,
 // loaded once, best-effort. In containers the parent .env usually doesn't exist and env comes from
@@ -53,6 +51,11 @@ function envVar(name: string): string | undefined {
   const v = process.env[name] ?? globalEnv()[name];
   return v && v.length > 0 ? v : undefined;
 }
+
+// GIAM's own seed fixture names this registration by this literal id ("Espresso Works"); it is a
+// public identifier, not a secret, so defaulting to it here fabricates nothing GIAM did not already
+// register on its own.
+const DEFAULT_CLIENT_ID = 'oauth001-0000-4000-8000-000000000001';
 
 // Ephemeral, per-process session key used ONLY when PSP_MERCHANT_SESSION_SECRET is unset. Random
 // (not a predictable/forgeable hardcoded value), so the app stays usable for local dev without any
@@ -124,10 +127,24 @@ export const ENV = {
   apiDocsUrl: () =>
     envVar('PSP_MERCHANT_SWAGGER_URL') ??
     `${envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081'}/doc`,
-  // No built-in default: an unconfigured merchant must authenticate as nobody, not as a guess.
-  // Read the demo values with `npm run clients:credentials --prefix backend` in the sec-giam repo.
-  clientId: () => envVar('PSP_MERCHANT_GIAM_CLIENT_ID') ?? '',
-  clientSecret: () => envVar('PSP_MERCHANT_GIAM_CLIENT_SECRET') ?? '',
+  /**
+   * The demo registration ("Espresso Works"), and its secret.
+   *
+   * Defaults rather than requiring configuration, the same way PSP's own registration at the bank
+   * (`leafypay-psp`) already does: the id is a public identifier, seeded as a literal in GIAM's own
+   * fixture and never read from an environment variable on GIAM's side, so naming it here fabricates
+   * nothing GIAM did not already register. The secret defaults to `clientSecretFor(id)`, the exact
+   * function the seeder itself calls when nothing overrides it, so an unconfigured merchant and a
+   * freshly seeded GIAM agree without either side reading a shared variable. Both stay overridable,
+   * for the one case that needs a DIFFERENT, non-derivable secret: a staging or production
+   * deployment, which pins one through PSP_MERCHANT_GIAM_CLIENT_SECRET precisely because that value
+   * must not be the one anyone holding this open-source repo can already compute.
+   */
+  clientId: () => envVar('PSP_MERCHANT_GIAM_CLIENT_ID') ?? DEFAULT_CLIENT_ID,
+  // Derived from the ID actually in force (a custom PSP_MERCHANT_GIAM_CLIENT_ID included), never
+  // hardcoded to the default: a merchant pointed at a DIFFERENT registration must derive THAT
+  // registration's secret, not the demo one's.
+  clientSecret: () => envVar('PSP_MERCHANT_GIAM_CLIENT_SECRET') ?? clientSecretFor(ENV.clientId()),
   // This app's public base URL (local default 8082; container listens on 8080 behind ingress).
   baseUrl: () => envVar('PSP_MERCHANT_BASE_URL') ?? 'http://localhost:8082',
   // Redirect URI defaults to <baseUrl>/api/auth/callback but can be overridden per env.
