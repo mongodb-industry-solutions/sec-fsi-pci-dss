@@ -126,8 +126,8 @@ export const ENV = {
     `${envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081'}/doc`,
   // No built-in default: an unconfigured merchant must authenticate as nobody, not as a guess.
   // Read the demo values with `npm run clients:credentials --prefix backend` in the sec-giam repo.
-  clientId: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_ID') ?? '',
-  clientSecret: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_SECRET') ?? '',
+  clientId: () => envVar('PSP_MERCHANT_GIAM_CLIENT_ID') ?? '',
+  clientSecret: () => envVar('PSP_MERCHANT_GIAM_CLIENT_SECRET') ?? '',
   // This app's public base URL (local default 8082; container listens on 8080 behind ingress).
   baseUrl: () => envVar('PSP_MERCHANT_BASE_URL') ?? 'http://localhost:8082',
   // Redirect URI defaults to <baseUrl>/api/auth/callback but can be overridden per env.

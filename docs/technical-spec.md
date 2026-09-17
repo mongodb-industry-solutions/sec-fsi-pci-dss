@@ -3071,6 +3071,18 @@ PSP_BANKCORE_GIAM_RESOURCE_SERVER=bankcore
 # derives the secret from the client id when unset, same as PSP's.
 PSP_BANKCORE_GIAM_CLIENT_ID=bankcore-backend
 PSP_BANKCORE_GIAM_CLIENT_SECRET=
+# The PSP's OWN client for calling the bank AS A REGISTERED THIRD PARTY (AISP/PISP), a SEPARATE
+# identity from PSP_GIAM_CLIENT_ID above: one is "the PSP acting as itself" at its own resource
+# server, this is "the PSP acting as a third party" at the bank's. Read at seed time to write both
+# the bank's verifier and the PSP's own credential record.
+PSP_BANKCORE_TPP_CLIENT_ID=leafypay-psp
+PSP_BANKCORE_TPP_CLIENT_SECRET=
+
+# The MERCHANT'S own client (Espresso Works), for its authorization_code and CIBA sign-in flows and
+# the client_credentials calls it makes as itself. Same naming convention as every OTHER service's
+# pair above: <SERVICE>_GIAM_CLIENT_ID/_SECRET.
+PSP_MERCHANT_GIAM_CLIENT_ID=oauth001-0000-4000-8000-000000000001
+PSP_MERCHANT_GIAM_CLIENT_SECRET=
 
 # Browser-facing authority addresses. Separate variables on purpose: these are navigated to or fetched
 # from the page, so they are published addresses, never service names. The realm is resolved from the

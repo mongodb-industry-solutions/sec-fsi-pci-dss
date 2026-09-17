@@ -111,8 +111,8 @@ envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod
   # Merchant OAuth client id/secret + session cookie key — populate these keys in the
   # sec-fsi-pci-dss-secrets-prod secret (values never live in this file).
-  PSP_MERCHANT_OAUTH_CLIENT_ID: sec-fsi-pci-dss-secrets-prod
-  PSP_MERCHANT_OAUTH_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
+  PSP_MERCHANT_GIAM_CLIENT_ID: sec-fsi-pci-dss-secrets-prod
+  PSP_MERCHANT_GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
   PSP_MERCHANT_SESSION_SECRET: sec-fsi-pci-dss-secrets-prod
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-prod
   # Bank database, separate from the PSP one on the same cluster.
