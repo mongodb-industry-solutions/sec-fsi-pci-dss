@@ -110,6 +110,36 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     return card;
   });
 
+  fastify.get('/cards/:cardToken/movements', {
+    preValidation: requireStaff('movements', 'view'),
+    schema: {
+      tags: ['admin'],
+      summary: 'Read one card\'s movements',
+      description:
+        'The holds and settlements this bank recorded against one card, newest first. The same ledger the '
+        + 'account\'s movements come from, narrowed to the entries this card itself authorised.',
+      security: [{ adminAuth: [] }],
+      params: { type: 'object', required: ['cardToken'], properties: { cardToken: { type: 'string' } } },
+      querystring: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer', minimum: 1 },
+          limit: { type: 'integer', minimum: 1, maximum: MAX_LIMIT },
+        },
+      },
+      response: { 200: PAGED_RESPONSE, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    const { cardToken } = request.params as { cardToken: string };
+    const page = await searchIssuedCards(fastify.db, { reference: cardToken, limit: 1 });
+    const card = page.results[0];
+    if (!card) return reply.status(404).send({ error: 'No such card at this issuer' });
+    if (refuseIfNotOwn(request, reply, card.holderReference)) return reply;
+
+    const query = request.query as Record<string, string | number>;
+    return searchMovements(fastify.db, { ...query, card: cardToken } as never);
+  });
+
   fastify.post('/cards', {
     preValidation: requireStaff('issuedCards', 'manage'),
     schema: {
@@ -694,6 +724,31 @@ export async function bankDataAdminController(fastify: FastifyInstance) {
     if (!holder) return reply.status(404).send({ error: 'No such account holder at this bank' });
     if (refuseIfNotOwn(request, reply, holderReference)) return reply;
     return holder;
+  });
+
+  fastify.post('/holders/:holderReference/self-disclosure', {
+    preValidation: requireStaff('accountHolders', 'view'),
+    schema: {
+      tags: ['admin'],
+      summary: 'Reveal your own name and contact',
+      description: 'The same disclosure as the staff route, restricted to a self-scoped caller\'s own record.',
+      security: [{ adminAuth: [] }],
+      params: {
+        type: 'object',
+        required: ['holderReference'],
+        properties: { holderReference: { type: 'string' } },
+      },
+      response: { 200: { type: 'object', additionalProperties: true }, 401: ERROR, 403: ERROR, 404: ERROR },
+    },
+  }, async (request, reply) => {
+    if (!request.staff?.selfScoped) {
+      return reply.status(403).send({ error: 'This route is for an account holder\'s own record, not staff' });
+    }
+    const { holderReference } = request.params as { holderReference: string };
+    if (refuseIfNotOwn(request, reply, holderReference)) return reply;
+    const disclosure = await discloseHolder(fastify.db, holderReference);
+    if (!disclosure) return reply.status(404).send({ error: 'No such account holder at this bank' });
+    return disclosure;
   });
 
   fastify.post('/holders/:holderReference/disclosures', {

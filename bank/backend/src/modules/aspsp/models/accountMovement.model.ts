@@ -26,6 +26,9 @@ export interface AccountMovementRecord {
   movementBalanceAfter: number;
   // Ties the movement to whatever caused it: a payment, a card authorisation, a return.
   movementCorrelationId: string;
+  // Which card authorised it, for the card-kind movements. Absent on a transfer or a deposit: those were
+  // never authorised by a card, so the field would only ever be empty on them.
+  cardReference?: string;
   movementRemittanceInformation?: string;
   movementValueDateTime: string;
   bianServiceDomain: string;

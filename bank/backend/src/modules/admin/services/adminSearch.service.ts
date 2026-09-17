@@ -305,6 +305,7 @@ export async function countHoldersByStatus(db: Db): Promise<Record<string, numbe
 
 export interface MovementQuery {
   account?: string;
+  card?: string;
   kind?: string;
   direction?: string;
   page?: number;
@@ -323,6 +324,7 @@ export interface MovementAdminView {
   movementAmount: number;
   movementCurrency: string;
   movementBalanceAfter: number;
+  cardReference?: string;
   movementRemittanceInformation?: string;
   movementValueDateTime: string;
 }
@@ -334,6 +336,7 @@ export async function searchMovements(db: Db, query: MovementQuery): Promise<Pag
   // anybody asks for, and it is the shape a self-scope binding narrows onto (bindOwnAccountHolder resolves
   // the holder to accounts first, this resolves one of those accounts to its movements).
   if (query.account) filter.accountArrangementInstanceReference = query.account;
+  if (query.card) filter.cardReference = query.card;
   if (query.kind) filter.movementKind = query.kind as AccountMovementRecord['movementKind'];
   if (query.direction) filter.movementDirection = query.direction as AccountMovementRecord['movementDirection'];
 

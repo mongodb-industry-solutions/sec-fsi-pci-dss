@@ -10,6 +10,7 @@ import { StatusBadge } from '../data/StatusBadge';
 import { BankError } from '../States';
 import { JsonView } from '../JsonView';
 import { CardLimits } from './CardLimits';
+import { CardMovements } from './CardMovements';
 import type { CardRow } from './CardsList';
 import { useCapabilities } from '../../lib/capabilities';
 
@@ -102,6 +103,14 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
       ? `cards/${encodeURIComponent(cardToken)}/disclosures`
       : `cards/${encodeURIComponent(cardToken)}/self-disclosure`,
   );
+  // Same split for the owner's name and contact: a staff reveal is an employee disclosing someone
+  // else's data, a cardholder reading their own is not, so each is its own route.
+  const discloseHolder = () => admin.disclose<{ accountHolderName?: string; accountHolderEmailAddress?: string }>(
+    capabilities?.canRevealHolderContact
+      ? `holders/${encodeURIComponent(String(card.holderReference))}/disclosures`
+      : `holders/${encodeURIComponent(String(card.holderReference))}/self-disclosure`,
+  );
+  const canRevealHolder = capabilities?.canRevealHolderContact || capabilities?.canSelfDisclose;
 
   return (
     <div className="space-y-4">
@@ -175,8 +184,33 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
         >
           {card.holderReference ? (
             <>
-              <Field label="Name">{holder?.accountHolderNameMasked ?? '••••'}</Field>
-              <Field label="Contact">{holder?.accountHolderEmailMasked ?? '••••'}</Field>
+              {canRevealHolder ? (
+                <>
+                  <Reveal
+                    label="Name"
+                    masked={holder?.accountHolderNameMasked}
+                    href={`/holders/${encodeURIComponent(String(card.holderReference))}`}
+                    fetchValue={async () => (await discloseHolder()).accountHolderName ?? 'not held'}
+                  />
+                  <Reveal
+                    label="Contact"
+                    masked={holder?.accountHolderEmailMasked}
+                    fetchValue={async () => (await discloseHolder()).accountHolderEmailAddress ?? 'not held'}
+                  />
+                </>
+              ) : (
+                <>
+                  <Field label="Name">
+                    <Link
+                      href={`/holders/${encodeURIComponent(String(card.holderReference))}`}
+                      className="text-accent hover:underline"
+                    >
+                      {holder?.accountHolderNameMasked ?? '••••'}
+                    </Link>
+                  </Field>
+                  <Field label="Contact">{holder?.accountHolderEmailMasked ?? '••••'}</Field>
+                </>
+              )}
               <Field label="Country">{holder?.accountHolderCountryCode}</Field>
               <Field label="Reference" mono>{String(card.holderReference)}</Field>
             </>
@@ -264,6 +298,16 @@ export function CardDetail({ cardToken }: { cardToken: string }) {
           description="What this card may authorise in one transaction. Read per call, so a change applies to the next authorisation."
         >
           <CardLimits cardToken={cardToken} initial={card.limits} onSaved={reload} />
+        </Panel>
+      )}
+
+      {/* ── Movements ──────────────────────────────────────────────────────────────────────────── */}
+      {capabilities?.canViewMovements && (
+        <Panel
+          title="Recent activity"
+          description="The holds and settlements this card itself authorised. Newest first."
+        >
+          <CardMovements cardToken={cardToken} />
         </Panel>
       )}
 
