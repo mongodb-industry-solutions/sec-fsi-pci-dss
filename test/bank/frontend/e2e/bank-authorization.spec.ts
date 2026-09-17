@@ -51,9 +51,10 @@ test.describe('the bank console honours the role it authenticated', () => {
     await expect(page.getByRole('menuitem', { name: /audit records/i })).toHaveCount(0);
     await expect(page.getByRole('menuitem', { name: /third-party registrations/i })).toHaveCount(0);
     // Their own records are still reachable: the binding narrows what is inside the screen, it does
-    // not remove the screen.
-    await expect(page.getByRole('menuitem', { name: /^accounts$/i })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /card estate/i })).toBeVisible();
+    // not remove the screen. Worded for the person, not for the bank: "My accounts" and "My cards",
+    // not the staff-facing "Accounts" and "Card estate".
+    await expect(page.getByRole('menuitem', { name: /^my accounts$/i })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: /^my cards$/i })).toBeVisible();
   });
 
   test("an account holder's own accounts screen names nobody but them", async ({ page }) => {

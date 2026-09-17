@@ -17,8 +17,9 @@ import { test, expect, Page } from '@playwright/test';
 const BANK_UI = process.env.BANK_UI_URL ?? 'http://localhost:8084';
 
 // A seeded persona holding the bank's administrator role, and the demo password behind the seed
-// fixture's credential hashes.
-const BANK_ADMIN = 'Samuel Adeyemi';
+// fixture's credential hashes. The login field takes the sign-in slug, not the display name: the
+// authority resolves an identity by userName, and this one's is 'samuel.adeyemi'.
+const BANK_ADMIN = 'samuel.adeyemi';
 const DEMO_PASSWORD = 'demo-password';
 
 // Small, medium, large. The small one is a 380px phone, which is narrower than most and therefore the honest
@@ -104,8 +105,11 @@ test.describe('the bank administration app', () => {
   // AUTHORITY, which is the property under test everywhere else.
   test.beforeEach(async ({ page }) => {
     await page.goto(`${BANK_UI}/api/auth/login`, { waitUntil: 'domcontentloaded' });
-    await page.getByLabel(/email or user name/i).fill(BANK_ADMIN);
-    await page.getByLabel(/^password$/i).fill(DEMO_PASSWORD);
+    // By id, not by accessible name: the password field's label carries a "More information" button
+    // whose text joins the accessible name, so `getByLabel(/^password$/i)` never matches it and the
+    // fill hangs until timeout.
+    await page.locator('#login').fill(BANK_ADMIN);
+    await page.locator('#password').fill(DEMO_PASSWORD);
     await page.getByRole('button', { name: /^sign in$/i }).click();
     await page.waitForURL(`${BANK_UI}/**`, { timeout: 20000 });
   });
