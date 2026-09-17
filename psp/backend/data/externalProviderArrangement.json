@@ -540,6 +540,14 @@
             "X-Request-ID": "{correlationId}"
           },
           "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "verificationValue",
+              "targetPath": "cvv"
+            }
+          ]
         }
       },
       {
@@ -551,6 +559,14 @@
             "X-Request-ID": "{correlationId}"
           },
           "mapping": []
+        },
+        "inbound": {
+          "mapping": [
+            {
+              "sourcePath": "cardNumber",
+              "targetPath": "pan"
+            }
+          ]
         }
       }
     ],
