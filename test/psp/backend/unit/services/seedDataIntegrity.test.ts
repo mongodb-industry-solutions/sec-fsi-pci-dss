@@ -111,6 +111,36 @@ describe('v33 seed-data integrity: referential integrity', () => {
     expect(offenders.map((a) => a.payoutAccountInstanceReference)).toEqual([]);
   });
 
+  it('a payout account renamed by `supersedes` does not also live on under its old reference', () => {
+    /**
+     * THE DEFECT THIS PINS. `pau00066`/`pau00067` were renamed to `pau00077`/`pau00078` (matching
+     * the fixture's own convention: a payout reference and its bank account share a suffix), and
+     * the seeder upserts by reference, which never deletes a document whose reference stopped
+     * appearing. The old pair kept answering every list call alongside the new one: Antonio
+     * Membrides showed two "default" accounts with the identical IBAN, because both were, in every
+     * field but the reference, the same account.
+     *
+     * `supersedes` is how a fixture author declares the old reference should be retired
+     * (seedPayoutAccounts.ts deletes it), and this is the fixture-side half of that contract: the
+     * old reference must actually be gone from the live set, not still declared as its own record.
+     */
+    const superseded = new Set(payoutAccounts.flatMap((a) => (a.supersedes as string[] | undefined) ?? []));
+    const stillLive = [...superseded].filter((ref) => payoutRefs.has(ref));
+    expect(stillLive).toEqual([]);
+  });
+
+  it('at most one payout account per party is flagged default', () => {
+    const byParty = new Map<string, string[]>();
+    for (const account of payoutAccounts) {
+      if (!account.payoutAccountIsDefault) continue;
+      const held = byParty.get(account.partyInstanceReference) ?? [];
+      held.push(account.payoutAccountInstanceReference);
+      byParty.set(account.partyInstanceReference, held);
+    }
+    const offenders = [...byParty.entries()].filter(([, refs]) => refs.length > 1);
+    expect(offenders).toEqual([]);
+  });
+
   it('no card is funded by an account belonging to a different party', () => {
     const accountOwner = new Map(payoutAccounts.map((a) => [a.payoutAccountInstanceReference, a.partyInstanceReference]));
     const offenders = cards.filter((c) => {

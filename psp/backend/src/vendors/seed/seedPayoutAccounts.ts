@@ -19,7 +19,31 @@ export async function seedPayoutAccounts(db: Db) {
 
   let upserted = 0;
   let backfilled = 0;
+  let retired = 0;
   for (const record of records) {
+    /**
+     * A record renamed its own reference names the OLD one here, so the seed can retire it rather
+     * than leave it behind.
+     *
+     * Every other field here is upserted by reference, which is additive by construction: nothing
+     * ever removes a document whose reference stopped appearing in the fixture. That is correct
+     * for a live payout account a person added at runtime, and it is exactly wrong for a fixture
+     * record that was renamed, which is what left Antonio Membrides' first account seeded twice,
+     * under `pau00066` AND its replacement `pau00077`, both flagged default, both the same IBAN.
+     *
+     * Declared per record rather than inferred by diffing the collection against the fixture: an
+     * inferred prune would delete anything a demo session created live between reseeds, which is
+     * real data this seeder has no business touching. This only ever removes a reference an author
+     * explicitly named as superseded, so it is exactly as targeted as an author intended.
+     */
+    const supersedes = Array.isArray(record.supersedes) ? (record.supersedes as string[]) : [];
+    delete record.supersedes;
+    if (supersedes.length) {
+      const result = await db.collection(PAYOUT_ACCOUNT_COLLECTION).deleteMany({
+        payoutAccountInstanceReference: { $in: supersedes },
+      });
+      retired += result.deletedCount ?? 0;
+    }
     // Every real bank account (and e-wallet) must carry banking identifiers. Backfill a valid,
     // DETERMINISTIC demo IBAN + routing when the seed data omits them (idempotent: keyed by the
     // account reference). The only remaining internal_ledger is the PSP revenue account, which is
@@ -51,7 +75,9 @@ export async function seedPayoutAccounts(db: Db) {
     );
     upserted++;
   }
-  console.log(`  ${PAYOUT_ACCOUNT_COLLECTION}: ${upserted} upserted (${backfilled} IBAN backfilled)`);
+  console.log(
+    `  ${PAYOUT_ACCOUNT_COLLECTION}: ${upserted} upserted (${backfilled} IBAN backfilled, ${retired} superseded reference(s) retired)`,
+  );
 
   // Link merchants to the bank account they are settled into
   for (const [merchantRef, payoutRef] of Object.entries(MERCHANT_SETTLEMENT_ACCOUNT)) {

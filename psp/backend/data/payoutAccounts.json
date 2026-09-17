@@ -2164,7 +2164,10 @@
     "payoutAccountCorrespondentBic": "DEUTDEFFXXX",
     "payoutAccountAspspReference": "bank0001-0000-4000-8000-000000000001",
     "payoutAccountBankAccountReference": "acc00077-0000-4000-8000-000000000077",
-    "payoutAccountConsentReference": "cns00077-0000-4000-8000-000000000077"
+    "payoutAccountConsentReference": "cns00077-0000-4000-8000-000000000077",
+    "supersedes": [
+      "pau00066-0000-4000-8000-000000000066"
+    ]
   },
   {
     "payoutAccountInstanceReference": "pau00078-0000-4000-8000-000000000078",
@@ -2196,6 +2199,9 @@
     "payoutAccountCorrespondentBic": "DEUTDEFFXXX",
     "payoutAccountAspspReference": "bank0001-0000-4000-8000-000000000001",
     "payoutAccountBankAccountReference": "acc00078-0000-4000-8000-000000000078",
-    "payoutAccountConsentReference": "cns00077-0000-4000-8000-000000000077"
+    "payoutAccountConsentReference": "cns00077-0000-4000-8000-000000000077",
+    "supersedes": [
+      "pau00067-0000-4000-8000-000000000067"
+    ]
   }
 ]
