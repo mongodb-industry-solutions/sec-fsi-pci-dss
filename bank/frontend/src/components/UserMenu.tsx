@@ -3,10 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
-  Bug, ChevronDown, CreditCard, FileClock, Globe2, Home, KeyRound, Laptop, Landmark, LifeBuoy, LogOut,
-  ScrollText, Users,
+  Bug, ChevronDown, Globe2, Home, KeyRound, Laptop, LifeBuoy, LogOut,
 } from 'lucide-react';
 import { useDebugMode } from '../lib/debugMode';
+import { accessFor } from '../lib/access';
+import { destinationsFor } from '../lib/destinations';
 
 /**
  * The signed-in person, and everything they can reach, in the header.
@@ -20,6 +21,7 @@ interface Session {
   signedIn: boolean;
   userName?: string;
   roles?: string[];
+  accountHolderRef?: string;
 }
 
 // One colour per bank role. A role with no entry falls back rather than rendering an empty circle.
@@ -46,30 +48,10 @@ function initials(name: string): string {
 }
 
 /**
- * Where each destination can actually be reached from, by role.
- *
- * Offered to everybody until now, which meant an account holder was shown Parties, Audit records and
- * Third-party registrations and met a 403 on each: the menu promised authority the token does not
- * carry. A destination with no `roles` is open to anybody signed in.
+ * "Bank home" is not in the destination catalog: it is open to anybody signed in, whatever they
+ * hold, so it sits ahead of the destinations that come from `lib/destinations` below.
  */
-const ITEMS: Array<{ href: string; label: string; icon: typeof Home; roles?: string[]; selfLabel?: string }> = [
-  { href: '/', label: 'Bank home', icon: Home },
-  { href: '/accounts', label: 'Accounts', icon: Landmark },
-  { href: '/cards', label: 'Card estate', icon: CreditCard },
-  // Reached by the account holder too, and it is their OWN record they arrive at: the list is
-  // narrowed server side by the self binding, so this is the same destination rather than a second
-  // one built for them. Only the label differs, because "Parties" is not what a person calls
-  // themselves.
-  {
-    href: '/holders',
-    label: 'Parties',
-    selfLabel: 'My details',
-    icon: Users,
-    roles: ['bank_operations', 'bank_card_officer', 'bank_compliance', 'bank_customer'],
-  },
-  { href: '/records/audit', label: 'Audit records', icon: ScrollText, roles: ['bank_compliance', 'bank_admin'] },
-  { href: '/records/tpp/registrations', label: 'Third-party registrations', icon: FileClock, roles: ['bank_compliance', 'bank_admin'] },
-];
+const HOME_ITEM = { href: '/', label: 'Bank home', icon: Home };
 
 export function UserMenu({ authorityUi }: { authorityUi: string }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -114,10 +96,10 @@ export function UserMenu({ authorityUi }: { authorityUi: string }) {
   const held = session.roles ?? [];
   const role = held.find((candidate) => candidate in ROLE_LABEL) ?? held[0] ?? '';
   const avatar = ROLE_AVATAR[role] ?? 'bg-gray-600';
-  const selfScoped = held.includes('bank_customer');
-  const destinations = ITEMS
-    .filter((item) => !item.roles || item.roles.some((allowed) => held.includes(allowed)))
-    .map((item) => (selfScoped && item.selfLabel ? { ...item, label: item.selfLabel } : item));
+  const destinations = [
+    HOME_ITEM,
+    ...destinationsFor(accessFor(held), { menuOnly: true, accountHolderRef: session.accountHolderRef }),
+  ];
 
   /** This app only. The authority's own session, and every other app sharing it, stays live. */
   async function signOutHere() {

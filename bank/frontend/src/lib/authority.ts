@@ -207,6 +207,8 @@ export interface StaffSession {
   subjectId: string;
   userName?: string;
   roles: string[];
+  /** Present for a self-scoped role (bank_customer): the record's own reference at this bank. */
+  accountHolderRef?: string;
 }
 
 /**
@@ -249,7 +251,7 @@ export async function currentStaff(): Promise<StaffSession | null> {
   if (segments.length !== 3) return null;
   try {
     const claims = JSON.parse(Buffer.from(segments[1], 'base64url').toString('utf8')) as {
-      sub?: string; roles?: unknown; exp?: number;
+      sub?: string; roles?: unknown; exp?: number; account_holder?: unknown;
     };
     if (!claims.sub) return null;
     if (claims.exp && claims.exp * 1000 < Date.now()) return null;
@@ -263,10 +265,12 @@ export async function currentStaff(): Promise<StaffSession | null> {
     // slug somebody signs in with, so preferring it greeted every person by their login instead of
     // their name. The PSP and the merchant already resolve it in this order.
     const userName = profile.name ?? profile.preferred_username;
+    const accountHolderRef = typeof claims.account_holder === 'string' ? claims.account_holder : undefined;
     return {
       subjectId: claims.sub,
       ...(userName ? { userName } : {}),
       roles: Array.isArray(claims.roles) ? claims.roles.map(String) : [],
+      ...(accountHolderRef ? { accountHolderRef } : {}),
     };
   } catch {
     return null;
