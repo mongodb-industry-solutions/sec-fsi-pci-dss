@@ -104,6 +104,12 @@ export const config = {
     audience: pspEnv('BANKCORE_GIAM_AUDIENCE', 'bankcore')!,
     resourceServerName: pspEnv('BANKCORE_GIAM_RESOURCE_SERVER', 'bankcore')!,
     registrationToken: pspEnv('BANKCORE_GIAM_REGISTRATION_TOKEN') ?? pspEnv('GIAM_ADMIN_TOKEN'),
+    // This bank's OWN client credentials, for the calls it makes as itself rather than on behalf of
+    // a person. Absent means it was never registered to act as itself, and it degrades rather than
+    // fabricating an identity. Mirrors PSP's identical pair (GIAM_CLIENT_ID/GIAM_CLIENT_SECRET),
+    // under this bank's own env prefix so the two services never read each other's credential.
+    clientId: pspEnv('BANKCORE_GIAM_CLIENT_ID', 'bankcore-backend')!,
+    clientSecret: pspEnv('BANKCORE_GIAM_CLIENT_SECRET'),
     jwksCacheSeconds: parseInt(pspEnv('BANKCORE_GIAM_JWKS_CACHE_SECONDS', '900')!, 10),
   },
 

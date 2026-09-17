@@ -3066,6 +3066,11 @@ GIAM_JWKS_CACHE_SECONDS=900
 PSP_BANKCORE_GIAM_ISSUER_URL=http://giam:8080/realms/LeafyIdp
 PSP_BANKCORE_GIAM_AUDIENCE=bankcore
 PSP_BANKCORE_GIAM_RESOURCE_SERVER=bankcore
+# This bank's OWN client, for the calls it makes as itself, mirroring PSP_GIAM_CLIENT_ID/_SECRET
+# above under its own prefix so the two services never read each other's credential. The authority
+# derives the secret from the client id when unset, same as PSP's.
+PSP_BANKCORE_GIAM_CLIENT_ID=bankcore-backend
+PSP_BANKCORE_GIAM_CLIENT_SECRET=
 
 # Browser-facing authority addresses. Separate variables on purpose: these are navigated to or fetched
 # from the page, so they are published addresses, never service names. The realm is resolved from the
