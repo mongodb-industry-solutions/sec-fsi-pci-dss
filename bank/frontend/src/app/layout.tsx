@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
-import { Landmark } from 'lucide-react';
+import { Landmark, LifeBuoy } from 'lucide-react';
 import './globals.css';
 import { AuthGate } from '../components/AuthGate';
 import { UserMenu } from '../components/UserMenu';
@@ -21,7 +21,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: a browser extension (translation tools, password managers) can stamp
+    // its own attribute onto <html> before React hydrates. That is not a real mismatch to fix, so
+    // this is scoped to the one element extensions actually touch, not the tree beneath it.
+    <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         {/* Wraps header and page: the toggle lives in the menu, the panels it reveals live in the page. */}
         <DebugModeProvider>
@@ -37,8 +40,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="ml-auto rounded-full border border-bank-ink/20 px-2 py-0.5 text-[10px] uppercase tracking-wide text-bank-ink/70">
               ASPSP
             </span>
-            {/* Right of the badge, and it renders nothing until somebody is signed in. Resolved here,
-                server side, because this app inlines no NEXT_PUBLIC_* address into the browser bundle. */}
+            {/* Public on purpose: it explains the roles and what each may do, which is exactly what
+                somebody deciding whether to sign in, or which of several accounts to sign in with,
+                needs to read first. Gating it behind the account menu meant it was reachable only
+                after the choice it exists to inform. */}
+            <Link
+              href="/help"
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-bank-ink/80 transition hover:bg-white/10 hover:text-bank-ink"
+            >
+              <LifeBuoy size={15} aria-hidden />
+              <span className="hidden sm:inline">Help</span>
+            </Link>
+            {/* Resolved here, server side, because this app inlines no NEXT_PUBLIC_* address into the
+                browser bundle. Renders nothing until somebody is signed in. */}
             <UserMenu authorityUi={authorityUiPublic()} />
           </div>
         </header>
