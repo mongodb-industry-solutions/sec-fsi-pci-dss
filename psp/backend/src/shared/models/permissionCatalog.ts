@@ -56,7 +56,9 @@ export interface PermissionDeclaration {
  * The authority stores what was last registered, so a mismatch is visible as drift rather than
  * discovered when a permission silently fails to resolve.
  */
-export const PERMISSION_CATALOG_VERSION = '2';
+// An integer, because that is what the authority's registration contract declares. A string was
+// dropped by its schema validation, so the version it stored never moved.
+export const PERMISSION_CATALOG_VERSION = 2;
 
 /** What this application enforces, as a flat list. */
 export const PERMISSION_CATALOG: PermissionDeclaration[] = [

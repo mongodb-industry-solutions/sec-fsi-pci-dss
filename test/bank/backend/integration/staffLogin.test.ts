@@ -253,8 +253,31 @@ describe('v39 P7.4: an account holder sees their own records and nobody else s',
     const held = await expanded((holder as { token: string }).token, roles);
     expect(held).toContain('accounts:view');
     expect([...held].filter((permission) => permission.endsWith(':manage'))).toEqual([]);
-    // The whole point of the self scope: reading ACCOUNT HOLDERS is reading other people.
-    expect(held).not.toContain('accountHolders:view');
+
+    /**
+     * The self scope, asserted where it is ENFORCED rather than in the catalog.
+     *
+     * An account holder does hold `accountHolders:view`, and has to: their own registered details
+     * are an account holder record, read through the same route. What the scope means is that the
+     * route binds the query to the caller's own reference and refuses a reference that is somebody
+     * else's, so the boundary is in the answer rather than in the permission. Asserting the absence
+     * of the permission asserted a design the bank does not have.
+     */
+    const token = (holder as { token: string }).token;
+    const own = await bank.inject({
+      method: 'GET',
+      url: '/api/v1/admin/holders?reference=hld00073-0000-4000-8000-000000000073',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(own.statusCode).toBe(200);
+
+    // Luis Fernandez's record, named explicitly. Refused rather than quietly rewritten.
+    const other = await bank.inject({
+      method: 'GET',
+      url: '/api/v1/admin/holders?reference=hld00001-0000-4000-8000-000000000001',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(other.statusCode).toBe(403);
   });
 });
 

@@ -39,7 +39,9 @@ export interface BankPermissionDeclaration {
   description: string;
 }
 
-export const BANK_PERMISSION_CATALOG_VERSION = '2';
+// An integer, because that is what the authority's registration contract declares. A string was
+// dropped by its schema validation, so the version it stored never moved.
+export const BANK_PERMISSION_CATALOG_VERSION = 2;
 
 export const BANK_PERMISSION_CATALOG: BankPermissionDeclaration[] = [
   { resource: 'accountHolders', action: 'view', description: 'Read the people and businesses this bank holds accounts for' },

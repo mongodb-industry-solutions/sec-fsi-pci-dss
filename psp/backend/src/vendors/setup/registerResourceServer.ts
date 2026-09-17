@@ -35,7 +35,7 @@ export async function registerResourceServer(): Promise<{ registered: boolean; r
     name: config.giam.resourceServerName,
     realm,
     audience: config.giam.audience,
-    permissionCatalogVersion: PERMISSION_CATALOG_VERSION,
+    catalogVersion: PERMISSION_CATALOG_VERSION,
     permissions: PERMISSION_CATALOG,
   };
 
