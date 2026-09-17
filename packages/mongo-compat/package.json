@@ -1,6 +1,6 @@
 {
   "name": "@leafypay/mongo-compat",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "description": "Which MongoDB this deployment targets (Atlas or Enterprise Advanced, and which version) and what it accepts for Queryable Encryption. Shared by the PSP and bankcore so the compatibility table exists once.",
   "private": true,
   "main": "dist/index.js",

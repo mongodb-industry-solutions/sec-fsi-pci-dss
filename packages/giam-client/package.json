@@ -1,6 +1,6 @@
 {
   "name": "@leafypay/giam-client",
-  "version": "3.1.4",
+  "version": "3.1.5",
   "private": true,
   "description": "The verifier every resource server uses against the identity authority. One implementation, so four cannot disagree about which forgeries to refuse.",
   "main": "dist/index.js",
