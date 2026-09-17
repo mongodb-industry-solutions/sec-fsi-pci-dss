@@ -12,14 +12,15 @@ const nextConfig = {
     NEXT_PUBLIC_PSP_NAME_PRIMARY: process.env.NEXT_PUBLIC_PSP_NAME_PRIMARY || 'Leafy',
     NEXT_PUBLIC_PSP_NAME_SECONDARY: process.env.NEXT_PUBLIC_PSP_NAME_SECONDARY || 'Pay',
   },
-  // Pinned explicitly because the repo has several package-lock.json files and Turbopack would
-  // otherwise infer a root by guessing. It must be the REPO root, not this directory: the app
-  // installs @leafypay/platform-links via `file:../packages/platform-links`, a symlink whose real
-  // path sits outside merchant/, and Turbopack cannot resolve a module below its root ("Can't
-  // resolve '@leafypay/platform-links'"). Node resolution still walks up from each file, so the
-  // merchant-only deps (lucide-react, @radix-ui/*) keep resolving from merchant/node_modules.
+  // Pinned to THIS directory. The repo has several package-lock.json files, so Turbopack would
+  // otherwise infer the REPO root and resolve node_modules from there, and the merchant's own deps
+  // (lucide-react, @radix-ui/*) live only in merchant/node_modules. Rooting it at the repo instead
+  // made every render compile the whole monorepo and left the app's own client components out of
+  // the React Client Manifest ("Could not find the module .../error.tsx#default"), so the shared
+  // @leafypay/platform-links package is installed COPIED rather than symlinked (`--install-links`)
+  // and resolves from inside this root like any other dependency.
   turbopack: {
-    root: require('path').resolve(__dirname, '..'),
+    root: __dirname,
   },
 };
 

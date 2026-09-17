@@ -4,7 +4,7 @@
   "version": "3.1.5",
   "private": true,
   "scripts": {
-    "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix packages/mongo-compat && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --prefix merchant && npm install --prefix bank/frontend",
+    "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix packages/mongo-compat && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --install-links --prefix merchant && npm install --prefix bank/frontend",
     "build:packages": "npm run build --prefix packages/eventbus && npm run build --prefix packages/platform-links && npm run build --prefix packages/mongo-compat",
     "setup:key:master": "npm run setup:key:master --prefix psp/backend",
     "setup:key:rsa": "npm run setup:key:rsa --prefix psp/backend",
@@ -27,7 +27,7 @@
     "dev:bankcore": "npm run dev --prefix bank/backend",
     "dev:bankfront": "npm run dev --prefix bank/frontend",
     "dev:merchant": "npm run dev --prefix merchant",
-    "build": "npm run build:packages && npm run build --prefix psp/frontend && npm run build --prefix psp/backend && npm run build --prefix bank/backend && npm run build --prefix merchant",
+    "build": "npm run build:packages && npm install --install-links --prefix merchant && npm run build --prefix psp/frontend && npm run build --prefix psp/backend && npm run build --prefix bank/backend && npm run build --prefix merchant",
     "build:frontend": "npm run build --prefix psp/frontend",
     "build:backend": "npm run build --prefix psp/backend",
     "build:merchant": "npm run build --prefix merchant",

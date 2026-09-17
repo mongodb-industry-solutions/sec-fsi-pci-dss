@@ -10,8 +10,10 @@ WORKDIR /app
 COPY packages/platform-links/ packages/platform-links/
 RUN cd packages/platform-links && npm install
 
-# Install dependencies (layer cached unless package.json changes)
-COPY merchant/package*.json merchant/
+# Install dependencies (layer cached unless package.json changes). The .npmrc travels with them:
+# it is what installs the shared package copied rather than symlinked, which is what keeps it inside
+# the app's Turbopack root.
+COPY merchant/package*.json merchant/.npmrc merchant/
 RUN cd merchant && npm install
 
 # Copy source and build
