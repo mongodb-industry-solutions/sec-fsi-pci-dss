@@ -86,6 +86,16 @@ export function AccountDetail({ accountReference }: { accountReference: string }
   }
   if (!account) return <div className="py-8 text-sm text-ink-soft">Reading the account…</div>;
 
+  // The same self-disclosure split as the IBAN below: a staff reveal of the owner's name and contact is
+  // an employee disclosing someone else's data, an account holder reading their own is not, so each is
+  // its own route (self-disclosure is refused to anyone but the holder's own record).
+  const discloseHolder = () => admin.disclose<{ accountHolderName?: string; accountHolderEmailAddress?: string }>(
+    capabilities?.canRevealHolderContact
+      ? `holders/${encodeURIComponent(account.accountHolderInstanceReference)}/disclosures`
+      : `holders/${encodeURIComponent(account.accountHolderInstanceReference)}/self-disclosure`,
+  );
+  const canRevealHolder = capabilities?.canRevealHolderContact || capabilities?.canSelfDisclose;
+
   const closed = account.accountStatus === 'closed';
   const holdsFunds = (account.availableAmount ?? 0) !== 0;
 
@@ -164,8 +174,36 @@ export function AccountDetail({ accountReference }: { accountReference: string }
           </Link>
         )}
       >
-        <Field label="Name">{holder?.accountHolderNameMasked ?? '••••'}</Field>
-        <Field label="Contact">{holder?.accountHolderEmailMasked ?? '••••'}</Field>
+        {canRevealHolder ? (
+          <>
+            <Reveal
+              label="Name"
+              masked={holder?.accountHolderNameMasked}
+              href={`/holders/${encodeURIComponent(account.accountHolderInstanceReference)}`}
+              fetchValue={async () => (await discloseHolder()).accountHolderName ?? 'not held'}
+            />
+            <Reveal
+              label="Contact"
+              masked={holder?.accountHolderEmailMasked}
+              fetchValue={async () => (await discloseHolder()).accountHolderEmailAddress ?? 'not held'}
+            />
+          </>
+        ) : (
+          <>
+            <Field label="Name">
+              {/* The value itself is the destination too, alongside the "Open the owner" button above:
+                  a masked name still identifies a record worth opening, and clicking the thing you are
+                  reading is the affordance people reach for first. */}
+              <Link
+                href={`/holders/${encodeURIComponent(account.accountHolderInstanceReference)}`}
+                className="text-accent hover:underline"
+              >
+                {holder?.accountHolderNameMasked ?? '••••'}
+              </Link>
+            </Field>
+            <Field label="Contact">{holder?.accountHolderEmailMasked ?? '••••'}</Field>
+          </>
+        )}
         <Field label="Country">{holder?.accountHolderCountryCode ?? ''}</Field>
         <Field label="Reference" mono>{account.accountHolderInstanceReference}</Field>
       </Panel>

@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 // A value that is encrypted at rest, shown only when an operator asks for it.
@@ -13,7 +14,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 // not in a store, not in the URL, not in local storage.
 
 export function Reveal({
-  label, masked, fetchValue, hint, disabled,
+  label, masked, fetchValue, hint, disabled, href,
 }: {
   label: string;
   masked?: string;
@@ -21,6 +22,8 @@ export function Reveal({
   fetchValue: () => Promise<string>;
   hint?: string;
   disabled?: boolean;
+  /** Where the value itself links to, masked or revealed: a record worth opening stays clickable either way. */
+  href?: string;
 }) {
   const [value, setValue] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -52,9 +55,13 @@ export function Reveal({
       <span className="flex min-w-0 items-center gap-2">
         {hint && <span className="hidden font-mono text-[11px] text-ink-soft sm:inline">{hint}</span>}
         <span className="min-w-0 break-all font-mono text-sm sm:text-right">
-          {error
-            ? <span className="font-sans text-xs text-red-600 dark:text-red-400">{error}</span>
-            : shown ? value : (masked || '••••')}
+          {error ? (
+            <span className="font-sans text-xs text-red-600 dark:text-red-400">{error}</span>
+          ) : href ? (
+            <Link href={href} className="text-accent hover:underline">{shown ? value : (masked || '••••')}</Link>
+          ) : (
+            shown ? value : (masked || '••••')
+          )}
         </span>
         <button
           type="button"

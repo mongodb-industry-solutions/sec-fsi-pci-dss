@@ -54,8 +54,13 @@ export function HolderDetail({ holderReference }: { holderReference: string }) {
   }
   if (!holder) return <div className="py-8 text-sm text-ink-soft">Reading the party…</div>;
 
+  // The staff route is an employee revealing someone else's name and contact, audited as that; an
+  // account holder revealing their own is a different act, so it is a different route
+  // (self-disclosure is refused to anyone but the holder's own record).
   const disclose = () => admin.disclose<{ accountHolderName?: string; accountHolderEmailAddress?: string }>(
-    `holders/${encodeURIComponent(holderReference)}/disclosures`,
+    capabilities?.canRevealHolderContact
+      ? `holders/${encodeURIComponent(holderReference)}/disclosures`
+      : `holders/${encodeURIComponent(holderReference)}/self-disclosure`,
   );
 
   return (
@@ -78,7 +83,7 @@ export function HolderDetail({ holderReference }: { holderReference: string }) {
         title="Protected values"
         description="Personal data the bank holds about its customer, encrypted at rest. Each reveal is its own recorded act."
       >
-        {capabilities?.canRevealHolderContact ? (
+        {(capabilities?.canRevealHolderContact || capabilities?.canSelfDisclose) ? (
           <>
             <Reveal
               label="Name"
