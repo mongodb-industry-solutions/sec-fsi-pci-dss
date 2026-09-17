@@ -1,5 +1,6 @@
 import { FastifyRequest } from 'fastify';
-import { VerifiedClaims } from './tokenVerifier';
+import { VerifiedClaims, verifyAccessToken } from './tokenVerifier';
+import { authorityMachineToken } from './machineToken';
 
 /**
  * Which business record the caller of a token owns.
@@ -31,36 +32,59 @@ export function partyReferenceOf(request: FastifyRequest): string | undefined {
   return claims ? partyReferenceFrom(claims as Pick<VerifiedClaims, 'sub'> & Record<string, unknown>) : undefined;
 }
 
+const TOKEN_EXCHANGE_GRANT = 'urn:ietf:params:oauth:grant-type:token-exchange';
+const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
+
 /**
  * Resolves a subject this application did NOT receive a token for.
  *
  * The merchant flows forward a buyer's subject identifier rather than the buyer's token, so there is
- * no `account_holder` claim to read and the binding has to be asked for. It is fetched from the
- * authority, which holds it, rather than from a local table, which no longer exists.
+ * no `account_holder` claim to read and the binding has to be asked for. It is asked for by RFC 8693
+ * token exchange: this service presents its own machine token and the subject it wants to act for,
+ * and gets back an ORDINARY access token, addressed to this application exactly as any other token
+ * is, which it then verifies exactly as any other token and reads `account_holder` off.
  *
- * The better design is for the merchant to forward the buyer's TOKEN, which carries the binding and
- * proves the buyer was actually present. That is a change to a published integration contract and
- * belongs in its own piece of work, so it is recorded here rather than done quietly in passing.
+ * This used to be a SCIM read (`GET /scim/v2/Users/:id`), gated on a raw shared secret with no
+ * permission narrower than the realm's own break-glass operator credential. The exchange above is
+ * gated on `subjects:actAs`, a permission this service's own credential holds and nothing else does,
+ * so the audit trail records a specific act by a specific application rather than an operator
+ * override with no record of which application invoked it.
  *
  * Fails to `undefined`, never to a guess. Every caller treats an unresolved subject as "no acting
  * party", which yields an empty result rather than somebody else's records.
  */
 export async function resolvePartyReference(subjectId: string): Promise<string | undefined> {
-  const { config } = await import('../../config');
-  const token = config.giam.registrationToken;
-  if (!token || !subjectId) return undefined;
+  if (!subjectId) return undefined;
+
+  const machineToken = await authorityMachineToken();
+  if (!machineToken) return undefined;
 
   try {
-    const realm = config.giam.issuerUrl.replace(/\/+$/, '');
-    const response = await fetch(`${realm}/scim/v2/Users/${encodeURIComponent(subjectId)}`, {
-      headers: { authorization: `Bearer ${token}` },
+    const { config } = await import('../../config');
+    const response = await fetch(`${config.giam.issuerUrl.replace(/\/+$/, '')}/protocol/openid-connect/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: TOKEN_EXCHANGE_GRANT,
+        subject_token: machineToken,
+        subject_token_type: ACCESS_TOKEN_TYPE,
+        requested_subject: subjectId,
+        client_id: config.giam.clientId,
+        client_secret: config.giam.clientSecret ?? '',
+      }),
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok) return undefined;
 
-    const user = await response.json() as Record<string, { accountHolderRef?: string } | undefined>;
-    const extension = user['urn:mongodb:params:scim:schemas:extension:principal:2.0:Principal'];
-    return extension?.accountHolderRef;
+    const { access_token: exchanged } = await response.json() as { access_token?: string };
+    if (!exchanged) return undefined;
+
+    // Verified exactly as any other token this application reads, never merely decoded: the
+    // exchange endpoint is reached over the same network any caller reaches it over, so trusting an
+    // unverified response would make this the one claim in the application read without a signature
+    // check.
+    const claims = await verifyAccessToken(exchanged);
+    return claims ? partyReferenceFrom(claims) : undefined;
   } catch {
     return undefined;
   }

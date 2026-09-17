@@ -23,6 +23,12 @@ export const RESOURCES = [
   'accounts',
   'beneficiaries',
   'paymentRequests',
+  /**
+   * Not a business record: the authority's own token-exchange gate (ADR-004 on the identity
+   * authority). Held by this application's OWN machine credential, never by a person, so it never
+   * appears in a business role's permission list.
+   */
+  'subjects',
 ] as const;
 export type Resource = (typeof RESOURCES)[number];
 
@@ -31,9 +37,11 @@ export type Resource = (typeof RESOURCES)[number];
  *
  * `viewSensitive` gates cardholder and personal data and is the one bound to a time-bound
  * elevation; `investigate` authorises cross-party search, which is deliberately not the same thing
- * as reading one known record.
+ * as reading one known record. `actAs` is the one action that names no data at all: it authorises
+ * exchanging this service's own token for one addressed to a specific person, never a read or a
+ * write on their behalf.
  */
-export const ACTIONS = ['view', 'viewSensitive', 'manage', 'investigate'] as const;
+export const ACTIONS = ['view', 'viewSensitive', 'manage', 'investigate', 'actAs'] as const;
 export type Action = (typeof ACTIONS)[number];
 
 export interface PermissionDeclaration {
@@ -48,7 +56,7 @@ export interface PermissionDeclaration {
  * The authority stores what was last registered, so a mismatch is visible as drift rather than
  * discovered when a permission silently fails to resolve.
  */
-export const PERMISSION_CATALOG_VERSION = '1';
+export const PERMISSION_CATALOG_VERSION = '2';
 
 /** What this application enforces, as a flat list. */
 export const PERMISSION_CATALOG: PermissionDeclaration[] = [
@@ -79,6 +87,7 @@ export const PERMISSION_CATALOG: PermissionDeclaration[] = [
   { resource: 'beneficiaries', action: 'manage', description: 'Add, edit and remove beneficiaries' },
   { resource: 'paymentRequests', action: 'view', description: 'Read payment requests' },
   { resource: 'paymentRequests', action: 'manage', description: 'Create and act on payment requests' },
+  { resource: 'subjects', action: 'actAs', description: 'Exchange this service\'s own token for one addressed to a real subject' },
 ];
 
 /**
