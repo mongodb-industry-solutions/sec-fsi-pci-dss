@@ -176,4 +176,47 @@ describe('v37 P7.1: the card issuer surface', () => {
     expect(response.statusCode).toBe(400);
     expect(response.json().tppMessages?.[0]?.code).toBeTruthy();
   });
+
+  /**
+   * THE DEFECT THIS GUARDS AGAINST. Paying with a saved card sends a token, never a PAN, so the
+   * validation endpoint could not detect a network from `cardNumber` and derived every tokenized
+   * card's CVV as though it were 3 digits, AMEX included. The value AMEX's own cardholder reveals
+   * from the PSP is derived to 4, so the two could never agree and a stored AMEX card could never pay
+   * with its own revealed CVV. Both ends of the same round trip, proven together: whatever this
+   * issuer says an AMEX card's verification value is, this issuer accepts back for that same token.
+   */
+  it('accepts, for a saved AMEX card, the verification value this same issuer just derived for it', async () => {
+    const issued = await app.inject({
+      method: 'POST',
+      url: '/v1/cards',
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
+      payload: { network: 'AMEX', expiryMonth: '12', expiryYear: '31' },
+    });
+    if (issued.statusCode === 503) return;
+    expect(issued.statusCode).toBe(201);
+    const amexToken = issued.json().cardToken as string;
+
+    const revealed = await app.inject({
+      method: 'POST',
+      url: `/v1/cards/${amexToken}/verification-values`,
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
+      payload: {},
+    });
+    if (revealed.statusCode === 503) return;
+    expect(revealed.statusCode).toBe(200);
+    const verificationValue = revealed.json().verificationValue as string;
+    expect(verificationValue).toHaveLength(4);
+
+    const validated = await app.inject({
+      method: 'POST',
+      url: '/v1/cards/validations',
+      headers: { authorization: `Bearer ${await CARD_DATA()}` },
+      // No cardNumber: this is the saved-card path, identified by token alone.
+      payload: { cardToken: amexToken, cvv: verificationValue },
+    });
+    expect(validated.statusCode).toBe(200);
+    const result = validated.json();
+    expect(result.cvvValidationResult).toBe('match');
+    expect(result.responseCode).toBe('00');
+  });
 });

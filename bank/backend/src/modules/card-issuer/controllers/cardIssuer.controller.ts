@@ -115,6 +115,9 @@ export async function cardIssuerController(fastify: FastifyInstance) {
     // Looked up by token, so validating a card we hold needs no PAN. The service code feeds the derivation.
     let serviceCode: string | undefined;
     let expiry = body.expiry;
+    // The token's own registered network, for when the request carries no PAN to detect one from
+    // (see cvvLength below): the same fallback the CVV reveal endpoint already uses.
+    let registeredNetwork: string | undefined;
     if (body.cardToken) {
       const vaulted = await fastify.db.collection<CardIssuerVaultRecord>(CARD_ISSUER_VAULT_COLLECTION)
         .findOne({ paymentCardReference: body.cardToken }, { projection: { _id: 0, cardServiceCode: 1, issuedCardStatus: 1 } });
@@ -125,17 +128,32 @@ export async function cardIssuerController(fastify: FastifyInstance) {
           return { valid: false, responseCode: '14', cvvValidationResult: 'not_provided', reasons: [`card_${vaulted.issuedCardStatus}`] };
         }
       }
-      if (!expiry) {
-        const registered = await fastify.db.collection<IssuedCardRegistryRecord>(ISSUED_CARD_REGISTRY_COLLECTION)
-          .findOne({ paymentCardReference: body.cardToken }, { projection: { _id: 0, paymentCardExpiryMonth: 1, paymentCardExpiryYear: 1 } });
-        if (registered?.paymentCardExpiryMonth && registered.paymentCardExpiryYear) {
-          expiry = `${registered.paymentCardExpiryMonth}/${registered.paymentCardExpiryYear}`;
-        }
+      const registered = await fastify.db.collection<IssuedCardRegistryRecord>(ISSUED_CARD_REGISTRY_COLLECTION)
+        .findOne(
+          { paymentCardReference: body.cardToken },
+          { projection: { _id: 0, paymentCardExpiryMonth: 1, paymentCardExpiryYear: 1, paymentCardNetwork: 1 } },
+        );
+      registeredNetwork = registered?.paymentCardNetwork;
+      if (!expiry && registered?.paymentCardExpiryMonth && registered.paymentCardExpiryYear) {
+        expiry = `${registered.paymentCardExpiryMonth}/${registered.paymentCardExpiryYear}`;
       }
     }
 
-    // Resolved before the rules run, so the rules stay a pure decision.
-    const cvvLength = detectNetwork(String(body.cardNumber ?? '').replace(/\D/g, ''), config.networks.filter((n) => n.enabled))?.cvvLength ?? 3;
+    /**
+     * Resolved before the rules run, so the rules stay a pure decision.
+     *
+     * THE DEFECT THIS FIXES. Paying with a saved card sends a token, never a PAN, so detecting the
+     * network from `cardNumber` found nothing and every tokenized card derived its CVV as though it
+     * were 3 digits, AMEX included. The value a cardholder reveals from the PSP is derived to AMEX's
+     * real 4, so the two disagreed by construction: the reveal was always right and the stored card
+     * could never pay with it. Falls back to the registered network, the same lookup the reveal
+     * endpoint already resolves it from, so a length neither side had to be told about matches on
+     * both sides of the same derivation.
+     */
+    const enabledNetworks = config.networks.filter((n) => n.enabled);
+    const cvvLength = detectNetwork(String(body.cardNumber ?? '').replace(/\D/g, ''), enabledNetworks)?.cvvLength
+      ?? enabledNetworks.find((n) => n.name === registeredNetwork)?.cvvLength
+      ?? 3;
     const derivedCvv = body.cvv
       ? await deriveCvvForCard({ cardToken: body.cardToken, expiry, serviceCode, cvvLength }, request.log)
       : undefined;
