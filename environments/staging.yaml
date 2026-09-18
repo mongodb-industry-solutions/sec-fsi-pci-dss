@@ -18,7 +18,7 @@ env:
   # Browser-facing sign-in → the authorization ENDPOINT on the PUBLIC GIAM console origin.
   PSP_MERCHANT_AUTHORIZE_URL: "https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com/realms/LeafyIdp/protocol/openid-connect/auth"
   # Server-to-server discovery, token and introspection → PRIVATE in-cluster GIAM service.
-  PSP_MERCHANT_ISSUER_URL: "http://sec-giam-web-app:80/realms/LeafyIdp"
+  PSP_MERCHANT_ISSUER_URL: "http://sec-giam-api-web-app:80/realms/LeafyIdp"
   # Server-to-server BUSINESS API → PRIVATE in-cluster backend service. Unchanged: no business
   # endpoint moved, and this variable is the proof that authentication was separable from them.
   PSP_MERCHANT_PSP_BASE_URL: "http://sec-fsi-pci-dss-backend-web-app:80"
@@ -65,11 +65,11 @@ env:
   #
   # PRIVATE in-cluster service: discovery, token, introspection and JWKS, all called server side.
   # Also the bare host the shared link resolver builds absolute endpoints on, so it carries NO realm.
-  GIAM_BASE_URL: "http://sec-giam-web-app:80"
+  GIAM_BASE_URL: "http://sec-giam-api-web-app:80"
   # The platform realm issuer, private for the same reason. PSP_-prefixed deliberately: the shared
   # link resolver reads the UNPREFIXED name as a bare host, and a realm URL there would be joined
   # onto fixture paths that already carry their own realm, producing /realms/x/realms/y.
-  PSP_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/LeafyIdp"
+  PSP_GIAM_ISSUER_URL: "http://sec-giam-api-web-app:80/realms/LeafyIdp"
   # What a token must name in its audience claim to be accepted here, and the name this platform
   # registers its enforcement points under. Both are the realm GIAM seeds for this platform.
   GIAM_AUDIENCE: "leafypay"
@@ -83,7 +83,7 @@ env:
   # The bank is a resource server in the SHARED realm, not a realm of its own (ADR-003). What keeps
   # the institutional boundary structural is its own audience and roles below, which a platform
   # token does not carry. It named `/realms/bankcore` until this line, and no such realm exists.
-  PSP_BANKCORE_GIAM_ISSUER_URL: "http://sec-giam-web-app:80/realms/LeafyIdp"
+  PSP_BANKCORE_GIAM_ISSUER_URL: "http://sec-giam-api-web-app:80/realms/LeafyIdp"
   PSP_BANKCORE_GIAM_AUDIENCE: "bankcore"
   PSP_BANKCORE_GIAM_RESOURCE_SERVER: "bankcore"
   PSP_BANKCORE_GIAM_JWKS_CACHE_SECONDS: "900"
