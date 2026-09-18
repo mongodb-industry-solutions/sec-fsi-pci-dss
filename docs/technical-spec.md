@@ -3956,6 +3956,52 @@ All 50 records include `customerAgreementKycCheck` with BIAN BQ:Step sub-documen
 | Webhook integrity | `X-Webhook-Signature: sha256=<hmac>` signed with per-merchant secret; constant-time comparison |
 | Session TTL | MongoDB TTL index on `checkoutSessionExpiresAt` auto-deletes expired sessions after 30 min |
 | Payment link codes | 8-char charset `[a-z2-9]` excluding ambiguous characters (O/0, I/l); unique index enforced |
+| Saved cards on the hosted page | Resolved only for the authenticated viewer of the browser, via `GET /api/v1/customer/me/cards`, which scopes by the caller's own token. Never resolved from the payment session's stored acting party: the checkout URL is a capability, not a proof of identity, so doing so would disclose the card-on-file set to anyone holding the link |
+
+---
+
+### 8.5.1 Recognising the payer on the hosted payment page (silent authentication)
+
+A payer who arrives from a merchant was authenticated at the identity authority, and the merchant's
+session lives on the merchant's own origin. The provider origin therefore holds no session cookie for
+them, so the hosted pages could not identify the payer and stopped offering their cards on file.
+
+The pages resolve this with a standard OpenID Connect authentication request carrying `prompt=none`,
+through the provider's own routes. No credential and no token is ever handled by the browser, and the
+authority remains the only party asserting who the payer is.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/auth/silent` | GET | Starts an authorization code flow with PKCE and `prompt=none` for the console client, carrying `return_to`. Refuses with 400 when `return_to` is not one of the hosted payment pages |
+| `/api/auth/callback` | GET | Existing callback. Consumes the return path stored for this attempt, revalidates it, and treats `error=login_required` as an ordinary outcome: the browser returns to the payment page with no error reported |
+
+Constraints, all covered by `test/psp/frontend/unit/lib/silentSignIn.test.ts` and
+`test/psp/frontend/unit/silentSignInRoutes.test.ts`:
+
+- `return_to` is an allowlist of `/gateway/checkout/` and `/gateway/pay/`, never a same-origin check,
+  and absolute plus protocol-relative values are refused (open redirect).
+- The return path travels in a cookie keyed by `state`, like the PKCE verifier, and is consumed on
+  read so it cannot be replayed. It is never read from the callback's query string.
+- The attempt is made once per tab and never inside a frame: in a frame the authority's session
+  cookie is third-party and withheld, so the attempt could only fail.
+- The browser navigates with `location.replace`, so a redirect chain leaves no history entry and the
+  back button cannot re-enter the flow.
+
+### 8.5.2 Simulator persona tokens
+
+The simulator acts as a declared demo persona using a real token carrying an `act` claim that names
+the simulator. The exchange runs on the server:
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/api/simulator/token` | POST `{ email }` | Client credentials followed by RFC 8693 token exchange against the authority, returning `{ access_token }`. 403 when the authority declines |
+
+It must not run in the browser, on two independent counts: a confidential client's secret in a user
+agent is not a secret (OAuth 2.0), and the authority publishes cross-origin access for its own origin
+only, so the browser blocks the response and no token can be obtained at all. The credential lives in
+`psp/frontend/src/lib/simulatorCredential.ts`, which is `server-only`, and is no longer part of the
+client bundle. Whether an exchange is permitted stays with the authority (demonstration realm plus
+declared persona) and is deliberately not restated here.
 
 ---
 

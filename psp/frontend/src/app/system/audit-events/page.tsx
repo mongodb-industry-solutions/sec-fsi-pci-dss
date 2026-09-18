@@ -2,7 +2,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink, Download } from 'lucide-react';
+import { Activity, RefreshCw, Search, ChevronDown, ChevronRight, ExternalLink, Download, Copy, Check, Filter } from 'lucide-react';
 import { SectionHeader } from '../../../components/SectionHeader';
 import { Pagination } from '../../../components/Pagination';
 import { api } from '../../../lib/api';
@@ -87,6 +87,34 @@ const SOURCE_STYLES: Record<string, string> = {
 
 // Deep-link an audit event to the business entity it relates to. Customer (KYC) has no
 // dedicated by-id route, so it is shown without a link.
+// Copies an id to the clipboard. The events list truncates ids visually (CSS, not JS), so the
+// value copied here is always the FULL id: this is the fastest way to get one into the `ref`
+// filter, which is what an investigation actually needs (see the placeholder on that input).
+function CopyIdButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }, []);
+  return (
+    <button
+      type="button"
+      onClick={async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(value);
+          setCopied(true);
+          if (timeoutRef.current) clearTimeout(timeoutRef.current);
+          timeoutRef.current = setTimeout(() => setCopied(false), 1200);
+        } catch { /* clipboard unavailable, no-op */ }
+      }}
+      title={copied ? 'Copied' : 'Copy full id'}
+      aria-label="Copy full id"
+      className="p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+    >
+      {copied ? <Check size={11} className="text-green-600" /> : <Copy size={11} />}
+    </button>
+  );
+}
+
 function entityHref(entityType?: string, entityId?: string | null): string | null {
   if (!entityId) return null;
   switch (entityType) {
@@ -397,7 +425,23 @@ function AuditEventsView() {
                         </div>
                         <div className="text-xs text-gray-500 mt-0.5">
                           {ev.entityType && <span className="font-medium">{ENTITY_LABEL[ev.entityType] ?? ev.entityType}</span>}
-                          {ev.entityId && <> · <span className="font-mono">{ev.entityId.slice(0, 16)}…</span></>}
+                          {ev.entityId && (
+                            <> · <span className="inline-flex items-center gap-1 max-w-[220px]">
+                              {/* Truncated with CSS only, never with .slice(): the DOM keeps the full id, so
+                                  triple-click selects it whole even though the row only shows a sliver. */}
+                              <span className="font-mono truncate" title={ev.entityId}>{ev.entityId}</span>
+                              <CopyIdButton value={ev.entityId} />
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setRef(ev.entityId ?? ''); resetToFirst(); }}
+                                title="Filter by this id"
+                                aria-label="Filter by this id"
+                                className="p-0.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+                              >
+                                <Filter size={11} />
+                              </button>
+                            </span></>
+                          )}
                           {ev.performedByRole && <> · <span>{ev.performedByRole}</span></>}
                           {ev.bianServiceDomain && <> · <span className="text-gray-400">{serviceDomainLabel(ev.bianServiceDomain)}</span></>}
                         </div>

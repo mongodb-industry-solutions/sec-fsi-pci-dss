@@ -1,7 +1,9 @@
-// Card Authorization, Stub adapter + Integration Hub routing
+// Card Authorization: PSP-local pre-check, then a deliberate deferral.
 //
-// When no 'card_authorization' provider is registered, falls back to stub (always approve).
-// When a real provider is configured, delegates to integrationDispatch.service.ts.
+// When no 'card_authorization' provider is registered, falls back to stub (always approve). When a
+// real institution IS registered, this no longer dispatches to it: see
+// RESPONSE_CODE_DEFERRED_TO_FUNDS_GATE for why, and the funds gate (providerGroups.ts, onFunds) for
+// where the one real bank call now lives.
 
 import { Db } from 'mongodb';
 import {
@@ -10,13 +12,9 @@ import {
   CardAuthorizationResult,
 } from '../models/cardAuthorization.model';
 import { getActiveProviderForType } from '../../provider/services/integrationRegistry.service';
-import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
 import { CardAuthorizationConfig } from '../../provider/models/externalProviderArrangement.model';
 import { getCardByToken } from '../../customer/services/paymentCard.service';
-import { institutionGroupFor } from '../../../providers/groups/capabilityGroup';
 
-const RESPONSE_CODE_APPROVED = '0000';
-const RESPONSE_CODE_DECLINED = '0190';
 // PSP-level decline: the card-on-file is deactivated/removed (not an issuer decision).
 const RESPONSE_CODE_CARD_INACTIVE = '0540';
 /**
@@ -31,6 +29,22 @@ const RESPONSE_CODE_CARD_INACTIVE = '0540';
  * customer outcome, and a single code for both hides the first inside the second.
  */
 const RESPONSE_CODE_ISSUER_UNAVAILABLE = '0910';
+/**
+ * Approved here without asking anyone, because asking is about to happen anyway, once, somewhere else.
+ *
+ * For a card whose funding account is held at a bank, "does the issuer authorise this" and "does the
+ * funding account have the money" are the SAME question at THAT bank, answered by the SAME hold call
+ * (bankcore has exactly one endpoint for it: an authorisation, in this model, IS a hold). The funds gate
+ * (`funds.check.requested`, resolved once the underlying transaction is created) already makes that one
+ * call correctly, with the account resolved and the request shaped the way the bank actually requires.
+ *
+ * This gate used to also dispatch here, with a request shaped for a different, no-longer-real contract.
+ * Fixing the shape without removing this second call would have meant asking the same bank to hold the
+ * same amount twice for one purchase, which is a real, distinct movement at the bank, not a retry of the
+ * same one. So this gate defers instead: a distinct code, so an investigation can tell "we deferred to
+ * the funds gate" apart from "the issuer said yes", without inventing a second place that holds funds.
+ */
+const RESPONSE_CODE_DEFERRED_TO_FUNDS_GATE = '0002';
 
 export interface CardAuthRequest {
   checkoutSessionInstanceReference: string;
@@ -105,46 +119,15 @@ export async function authorizeCard(
   let providerRef = 'stub';
 
   if (provider && !provider.externalProviderIsInternal) {
-    // Real external provider: delegate via Integration Hub
+    // A real institution is registered, so there IS someone to ask, and this gate defers to the funds
+    // gate to do the asking (see RESPONSE_CODE_DEFERRED_TO_FUNDS_GATE above for why: one bank call per
+    // purchase, not two). The funds gate covers every outcome this branch used to try to read from a
+    // dispatch: no institution behind the account approves locally, a refusal or an unreachable bank
+    // declines, and only a genuine hold counts as approved. Nothing here loses coverage, it moves.
     providerRef = provider.externalProviderArrangementInstanceReference;
-    const dispatchResult = await institutionGroupFor(db, 'card_authorization').ask({
-      event: 'card.authorization.requested',
-      payload: {
-        cardToken: req.cardToken,
-        amount: req.amount,
-        currency: req.currency,
-        mcc: req.mcc,
-        merchantCode: req.merchantCode,
-      },
-      // The card's issuer, and no other. An authorisation is a hold against the account THAT bank holds.
-      subject: { cardToken: req.cardToken },
-      businessContext: {
-        entityType: 'transaction',
-        entityId: req.checkoutSessionInstanceReference,
-        processType: 'card_authorization',
-      },
-    });
-    // The issuer's own answer, read from the BODY. A 200 means the request was understood, not that the
-    // authorisation was granted: the card rails answer a decline successfully, and so does the bank, with
-    // `{ approved: false, responseCode: '51' }`. Judging on the transport status alone turned every decline
-    // it issued into an approval.
-    const answer = (dispatchResult.responseBody ?? {}) as { approved?: unknown; responseCode?: unknown };
-    const transportOk = dispatchResult.status === 'received' && dispatchResult.responseCode === 200;
-
-    if (!transportOk) {
-      // Could not ask. Distinct from being declined, and it is not an approval either.
-      result = 'declined';
-      responseCode = RESPONSE_CODE_ISSUER_UNAVAILABLE;
-    } else if (typeof answer.approved !== 'boolean') {
-      // Answered without a verdict, which means the contract or the mapping is wrong. Reading the silence as
-      // consent is the failure this whole branch exists to avoid.
-      result = 'declined';
-      responseCode = RESPONSE_CODE_ISSUER_UNAVAILABLE;
-    } else {
-      result = answer.approved ? 'approved' : 'declined';
-      responseCode = result === 'approved' ? RESPONSE_CODE_APPROVED : RESPONSE_CODE_DECLINED;
-    }
-    if (result === 'approved') authCode = generateAuthCode();
+    result = 'approved';
+    responseCode = RESPONSE_CODE_DEFERRED_TO_FUNDS_GATE;
+    authCode = generateAuthCode();
   } else {
     // No institution resolved for this card, so there is nobody who can authorise it (v37 P12).
     //
