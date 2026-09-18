@@ -2,6 +2,7 @@ import 'server-only';
 import { cookies } from 'next/headers';
 import { createHash, randomBytes } from 'crypto';
 import { AUTHORITY_ISSUER_URL } from './constants';
+import { safeReturnTo } from './silentSignIn';
 
 /**
  * Signing a person in, by sending them to the authority and taking a code back.
@@ -34,6 +35,14 @@ const REFRESH_COOKIE = 'demo_refresh';
  * value, its cookie existing IS the proof.
  */
 const VERIFIER_COOKIE_PREFIX = 'leafypay.pkce.';
+/**
+ * Where to go once the code has been exchanged, keyed by state for the same reason the verifier is.
+ *
+ * Only the silent flow sets it: an ordinary sign-in always lands on the console. It is a cookie and
+ * not a query parameter on the callback so the authority never carries this app's routing, and it is
+ * validated again on the way out because a cookie is still written from a request.
+ */
+const RETURN_TO_COOKIE_PREFIX = 'leafypay.returnto.';
 const CONSOLE_CLIENT_ID = 'leafypay-console';
 const TIMEOUT_MS = 10000;
 
@@ -76,7 +85,18 @@ export interface LoginStart {
  * this endpoint used to produce before it read `AUTHORITY_ISSUER_URL` here. The realm is not a
  * parameter: it is in that URL's path.
  */
-export function startSignIn(): LoginStart {
+export interface SignInOptions {
+  /**
+   * `none` asks the authority to answer from the session it already holds and to refuse with
+   * `login_required` rather than showing anything. Used by the hosted payment pages to recognise a
+   * payer who signed in at the authority through a merchant.
+   */
+  prompt?: 'none';
+  /** Where to return afterwards. Validated here, and again when it is read back. */
+  returnTo?: string;
+}
+
+export function startSignIn(options: SignInOptions = {}): LoginStart {
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
   const state = randomBytes(16).toString('base64url');
@@ -91,13 +111,31 @@ export function startSignIn(): LoginStart {
   url.searchParams.set('nonce', nonce);
   url.searchParams.set('code_challenge', challenge);
   url.searchParams.set('code_challenge_method', 'S256');
+  if (options.prompt) url.searchParams.set('prompt', options.prompt);
+
+  const returnTo = safeReturnTo(options.returnTo);
 
   return {
     url: url.toString(),
     cookies: [
       { name: `${VERIFIER_COOKIE_PREFIX}${state}`, value: verifier },
+      ...(returnTo ? [{ name: `${RETURN_TO_COOKIE_PREFIX}${state}`, value: returnTo }] : []),
     ],
   };
+}
+
+/**
+ * The return path this attempt stored, consumed so it cannot be replayed.
+ *
+ * Revalidated rather than trusted: it was written from a request, and the check is one function both
+ * ends share. Returns null for an ordinary sign-in, which stored nothing.
+ */
+export async function consumeReturnTo(state: string): Promise<string | null> {
+  const store = await cookies();
+  const name = `${RETURN_TO_COOKIE_PREFIX}${state}`;
+  const stored = store.get(name)?.value;
+  store.delete(name);
+  return safeReturnTo(stored);
 }
 
 /** The attributes the short-lived login cookies carry, in one place. */

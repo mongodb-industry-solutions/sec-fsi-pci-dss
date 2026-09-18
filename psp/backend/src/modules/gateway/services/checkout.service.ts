@@ -41,10 +41,10 @@ export interface CheckoutSessionPublic {
   checkoutSessionExpiresAt: string;
   checkoutSessionReturnUrl: string;
   checkoutSessionCancelUrl: string;
-  // v18: display-safe signal that this session was created on behalf of a logged-in user (the merchant
-  // app forwarded the payer's OAuth identity). The hosted page uses it to offer the payer's saved cards.
-  // The acting party reference itself is NOT surfaced here (identity minimization); saved cards are read
-  // via the session-scoped endpoint, which resolves the owner server-side.
+  // Display-safe signal that this session was created on behalf of a logged-in user (the merchant app
+  // forwarded the payer's identity). The acting party reference itself is NOT surfaced, for identity
+  // minimization, and cards are never resolved from it: the hosted page identifies its own viewer
+  // against the authority and reads that viewer's cards with that viewer's token.
   hasActingUser: boolean;
 }
 

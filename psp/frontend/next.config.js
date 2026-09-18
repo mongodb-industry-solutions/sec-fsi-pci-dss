@@ -13,12 +13,12 @@ try {
 } catch {
     APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || FRONTEND_VERSION;
 }
-// The simulator's client secret is inlined into the browser bundle, so it cannot be derived in the
-// bundle itself: node crypto is not there. It is derived HERE, where Node is available, from the one
-// shared function the authority's seeder also uses, so the two always agree without a literal being
-// written down. Guarded like the requires above, and for the same reason: this image builds from its
-// OWN directory, not the repo root, so packages/ is not in the build context and must not become a
-// declared dependency. In local dev the require resolves from the repo-root node_modules; in a
+// The simulator's client secret, derived HERE from the one shared function the authority's seeder also
+// uses, so the two always agree without a literal being written down. It is read by the SERVER route
+// that performs the exchange and by nothing in the browser, so it is not part of the client bundle;
+// the variable keeps its published name because the seeder reads that same name. Guarded like the
+// requires above, and for the same reason: this image builds from its OWN directory, so packages/ is
+// not in the build context. In local dev the require resolves from the repo-root node_modules; in a
 // container it throws, and the value comes from the environment instead.
 let SIMULATOR_CLIENT_SECRET = process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
 if (!SIMULATOR_CLIENT_SECRET) {

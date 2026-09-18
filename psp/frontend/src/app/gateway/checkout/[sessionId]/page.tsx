@@ -50,12 +50,13 @@ function CheckoutPageInner() {
   const [showCvv, setShowCvv] = useState(false);
   const cvvValid = /^\d{3,4}$/.test(cvv);
 
-  // HYBRID saved-card sourcing for the redirect checkout: PREFER this browser's PSP token (the
-  // viewer's own cards); if there is NO token (e.g. the payer authenticated via merchant SSO), FALL
-  // BACK to the session's acting-party cards, resolved server-side from the session id. When a saved
-  // card is selected we pay with its surrogate TOKEN and hide the name/number/expiry inputs; the
-  // payer supplies only the CVV to authorize. `NEW_CARD` (or no cards) shows the full new-card form.
-  // The optional ?card=<cardToken|cardRef> preselects a card ONLY within the shown set.
+  // Saved cards come from the viewer of THIS browser, and only from there. A payer who arrived from a
+  // merchant holds no session on this origin, so the authority is asked who they are with
+  // `prompt=none`; there is no fallback to the payment session's stored party, because the URL is a
+  // capability rather than a proof of identity. When a saved card is selected we pay with its
+  // surrogate TOKEN and hide the name/number/expiry inputs; the payer supplies only the verification
+  // value to authorize. `NEW_CARD` (or no cards) shows the full new-card form. The optional
+  // ?card=<cardToken|cardRef> preselects a card ONLY within the shown set.
   const wantedCard = searchParams.get('card') ?? searchParams.get('cardToken');
   const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard, viewerName } = useViewerSavedCards(wantedCard);
 
@@ -98,8 +99,8 @@ function CheckoutPageInner() {
         // Initialise countdown
         const expiresAtMs = new Date(data.checkoutSessionExpiresAt).getTime();
         setSecondsLeft(Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000)));
-        // Saved cards are fetched separately by useViewerSavedCards: this browser's own token if
-        // present, else this session's acting-party cards (merchant-SSO payer). No source → no selector.
+        // Saved cards are fetched separately by useViewerSavedCards, from this browser's own session
+        // only. No recognised viewer means no selector.
       }
     } catch {
       setState('error');

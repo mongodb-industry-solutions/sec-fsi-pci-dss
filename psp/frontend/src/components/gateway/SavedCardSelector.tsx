@@ -3,31 +3,56 @@ import { useEffect, useMemo, useState } from 'react';
 import { CreditCard, PlusCircle, Star, UserCheck } from 'lucide-react';
 import { api, type SavedCardDisplay } from '../../lib/api';
 import { getToken, isTokenExpired, decodeToken } from '../../lib/auth';
+import { shouldAttemptSilentSignIn, silentSignInUrl } from '../../lib/silentSignIn';
 
 // Sentinel selection for "enter a new card" in the saved-card picker.
 export const NEW_CARD = 'new';
 
 // ---------------------------------------------------------------------------
-// Saved-card model for BOTH PSP hosted payment pages (redirect checkout AND payment link).
+// Saved-card model for BOTH hosted payment pages (redirect checkout AND payment link).
 //
-// BROWSER-TOKEN ONLY: cards are surfaced ONLY for the AUTHENTICATED viewer of THIS browser,
-// identified by the PSP portal session token (cookie `demo_token`, same origin as /gateway/*).
-// Opening a checkout/link URL WITHOUT being logged in shows NO cards (new-card-only). There is NO
-// fallback to the session/link's stored acting party: doing so would reveal that user's cards to
-// anyone who opens the URL (a security/PCI/GDPR leak). If the payer authenticated only via merchant
-// SSO (no PSP portal token on this origin), they simply enter a new card.
+// BROWSER-TOKEN ONLY: cards are surfaced only for the AUTHENTICATED viewer of THIS browser,
+// identified by the session cookie on this origin. There is no fallback to the payment session's
+// stored acting party: the checkout URL is a capability and not a proof of identity, so resolving
+// cards from it would reveal that person's cards to anyone who opened the link.
 //
-// PCI DSS: rows are display-safe only (surrogate token + masked PAN + network + alias + preferred).
-// No full PAN, no CVV, no expiry.
+// A payer who arrived from a merchant holds no cookie here, because they were authenticated at the
+// AUTHORITY and the merchant's session lives on the merchant's own origin. Rather than trusting the
+// link, this asks the authority who they are with `prompt=none` (see lib/silentSignIn.ts): either it
+// answers from the session it already holds, and the cards are then read with a token minted for
+// THIS browser's subject, or it refuses and the new-card form is what they get.
+//
+// Rows are display-safe only (surrogate token, masked PAN, network, alias, preferred flag). Never a
+// full PAN, never the verification value, never the expiry.
 // ---------------------------------------------------------------------------
+
+/**
+ * Sends the browser through the silent flow, once.
+ *
+ * `replace` rather than `assign`: a redirect chain leaves only its final URL in history, so the
+ * payment page keeps its own entry and the back button does not walk into the flow again. The guard
+ * is written BEFORE leaving, because the refusal comes back to this very page and the decision to
+ * ask has to already be spent.
+ */
+function attemptSilentSignIn(): void {
+  const here = window.location.pathname + window.location.search;
+  const guard = `leafypay.silent.${window.location.pathname}`;
+  if (!shouldAttemptSilentSignIn({
+    hasToken: false,
+    framed: window.self !== window.top,
+    alreadyAttempted: sessionStorage.getItem(guard) === 'done',
+  })) return;
+  sessionStorage.setItem(guard, 'done');
+  window.location.replace(silentSignInUrl(here));
+}
 
 /**
  * Fetch the saved cards to offer on a hosted payment page.
  *
- * SECURITY: cards are shown ONLY for the AUTHENTICATED viewer of THIS browser, identified by the
- * PSP portal session token (cookie `demo_token`, read via getToken()). There is NO fallback to the
- * session/link's stored acting party: opening a checkout/link URL WITHOUT being logged in must never
- * reveal anyone's cards. No token → new-card-only, for both redirect checkout and payment link.
+ * SECURITY: cards are shown only for the AUTHENTICATED viewer of THIS browser, identified by the
+ * session cookie read via getToken(). There is no fallback to the payment session's stored acting
+ * party: opening a payment URL without being signed in must never reveal anyone's cards. With no
+ * session here the authority is asked once, silently; if it refuses, new-card-only.
  *
  * @param wantedCard optional ?card=<cardToken|cardRef> to preselect, honoured ONLY
  *   if it belongs to the fetched cards (never auto-uses a card outside the shown set).
@@ -45,8 +70,12 @@ export function useViewerSavedCards(wantedCard?: string | null) {
     (async () => {
       try {
         const token = getToken();
-        // No authenticated viewer in this browser → never load cards (new-card-only).
-        if (!token || isTokenExpired(token)) return;
+        // Nobody signed in on this origin. Ask the authority once, in case the payer signed in there
+        // through a merchant; until it answers there is no viewer, so no cards are loaded.
+        if (!token || isTokenExpired(token)) {
+          attemptSilentSignIn();
+          return;
+        }
         const name = decodeToken(token)?.name ?? null;
         if (!cancelled) setViewerName(name);
         // The viewer's OWN cards, caller-scoped by the backend from the token itself.
