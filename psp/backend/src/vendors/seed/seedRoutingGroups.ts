@@ -108,14 +108,22 @@ export async function seedRoutingGroups(db: Db): Promise<void> {
   const now = new Date();
 
   for (const def of DEFAULT_GROUP_DEFS) {
-    // Find internal provider for this type (fallback terminal at priority=999)
-    const internal = await providersCol.findOne({
-      externalProviderArrangementType: def.type,
-      externalProviderIsInternal: true,
-    });
+    /**
+     * The provider this capability falls back to when no other member takes the traffic.
+     *
+     * Matched on the TYPE alone. It used to also require `externalProviderIsInternal: true`, which
+     * silently emptied four of these groups: v37 moved card authorisation, card issuing, account
+     * information and payment initiation to BankCore, a real counterparty reached over HTTP, so
+     * those records are correctly external and stopped matching. The groups seeded with no members
+     * at all, and the capability every one of them routes had nothing preconfigured to route to.
+     *
+     * Whether the terminal provider runs in this process or at a bank is not what makes it the
+     * terminal provider; being the one seeded for the capability is.
+     */
+    const fallback = await providersCol.findOne({ externalProviderArrangementType: def.type });
 
-    const members = internal ? [{
-      externalProviderArrangementInstanceReference: internal.externalProviderArrangementInstanceReference,
+    const members = fallback ? [{
+      externalProviderArrangementInstanceReference: fallback.externalProviderArrangementInstanceReference,
       memberPriority: 999,
       memberWeight: 0,
       memberRole: 'fallback' as const,
@@ -143,10 +151,39 @@ export async function seedRoutingGroups(db: Db): Promise<void> {
     );
     console.log(`  routingGroup [${def.type}]: ${result.upsertedCount ? 'created' : 'already exists'} (id: ${def.id})`);
 
-    // Bind internal provider to this default group (idempotent)
-    if (internal) {
+    if (fallback) {
+      /**
+       * The fallback member converges on an EXISTING group too, not only on the one just inserted.
+       *
+       * `$setOnInsert` above is deliberate: the strategy and any member an operator added are
+       * theirs, and a reseed must not revert them. But that also meant a group seeded before its
+       * capability had a provider stayed empty forever, which is how the four BankCore
+       * capabilities came to have a default group with nothing in it. Added by reference so it is
+       * idempotent and so a member already present is left exactly as the operator left it.
+       */
+      await groupsCol.updateOne(
+        {
+          routingGroupInstanceReference: def.id,
+          'routingGroupMembers.externalProviderArrangementInstanceReference': {
+            $ne: fallback.externalProviderArrangementInstanceReference,
+          },
+        },
+        {
+          $push: {
+            routingGroupMembers: {
+              externalProviderArrangementInstanceReference: fallback.externalProviderArrangementInstanceReference,
+              memberPriority: 999,
+              memberWeight: 0,
+              memberRole: 'fallback',
+            },
+          },
+          $set: { recordUpdatedDateTime: now },
+        }
+      );
+
+      // Bind the provider back to its default group (idempotent)
       await providersCol.updateOne(
-        { externalProviderArrangementInstanceReference: internal.externalProviderArrangementInstanceReference },
+        { externalProviderArrangementInstanceReference: fallback.externalProviderArrangementInstanceReference },
         { $set: { routingGroupId: def.id, routingPriority: 999, recordUpdatedDateTime: now } }
       );
     }

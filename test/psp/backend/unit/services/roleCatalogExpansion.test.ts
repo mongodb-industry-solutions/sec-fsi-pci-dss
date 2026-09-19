@@ -178,6 +178,43 @@ describe('telling this application\'s own roles apart from a different resource 
   it('drops a role neither catalog nor this application recognises', () => {
     expect(ownRoleNames(REALM_WIDE, ['not_a_real_role'])).toEqual([]);
   });
+
+  /**
+   * The platform administrator, whose role spans the authority and this application.
+   *
+   * THE DEFECT THIS FIXES. `manager` holds four of leafypay's permissions and twenty-nine of the
+   * authority's realm-administration ones, so a majority of its WHOLE permission list was
+   * unreachable and the role resolved as belonging to nobody: `extractUserRole` fell back to its
+   * default and every provider and routing-group route refused the one role that administers
+   * them. The authority's permissions say what a principal may do AT THE AUTHORITY, which is no
+   * evidence about whose role this is, so they are excluded from the comparison rather than
+   * counted against us.
+   */
+  const CROSS_SERVER: RoleCatalog = {
+    catalogVersion: 1,
+    roles: [
+      {
+        name: 'manager',
+        permissions: ['providers:view', 'providers:manage', 'realms:manage', 'roles:manage', 'sessions:manage'],
+      },
+      { name: 'realm_administrator', permissions: ['realms:manage', 'roles:manage', 'sessions:manage'] },
+    ],
+    permissions: [
+      { permission: 'providers:view', resourceServer: 'leafypay' },
+      { permission: 'providers:manage', resourceServer: 'leafypay' },
+      { permission: 'realms:manage', resourceServer: 'authority' },
+      { permission: 'roles:manage', resourceServer: 'authority' },
+      { permission: 'sessions:manage', resourceServer: 'authority' },
+    ],
+  };
+
+  it('keeps a role that administers this application even when most of its permissions are the authority\'s', () => {
+    expect(ownRoleNames(CROSS_SERVER, ['manager', 'realm_administrator'])).toEqual(['manager']);
+  });
+
+  it('drops a role that is purely the authority\'s, holding nothing here', () => {
+    expect(ownRoleNames(CROSS_SERVER, ['realm_administrator'])).toEqual([]);
+  });
 });
 
 /**

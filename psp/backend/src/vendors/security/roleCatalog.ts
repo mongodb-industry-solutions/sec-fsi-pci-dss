@@ -130,27 +130,48 @@ export function invalidateRoleCatalog(): void {
  * decoration: `accounts` is declared by both leafypay and bankcore, meaning something different at
  * each, so `accounts:view` is a string both catalogs happen to use and matching on ANY overlap
  * would let `bank_customer` back in for holding that one shared permission alongside three
- * (`accountHolders:view`, `movements:view`, `issuedCards:view`) that mean nothing here. A MAJORITY
- * of a role's own permissions falling inside what this resource server declares is what tells a
- * role that is genuinely ours from one merely borrowing a name from a vocabulary it does not
- * belong to; `customer` clears it because every one of its permissions is leafypay's own, and
- * `bank_customer` fails it at one shared string out of four.
+ * (`accountHolders:view`, `movements:view`, `issuedCards:view`) that mean nothing here.
+ *
+ * So the question is comparative: of the permissions a role holds AT A RESOURCE SERVER, do more of
+ * them belong to this one than to any other? `customer` clears it because all of its permissions
+ * are leafypay's, and `bank_customer` fails it at one shared string against three of bankcore's.
+ *
+ * THE DEFECT THIS FIXES. The comparison used to be against the role's WHOLE permission list, and
+ * that list also contains the authority's own realm-administration permissions, which belong to no
+ * resource server's vocabulary. `manager` holds four of leafypay's (`providers:manage`,
+ * `providers:view`, `auditEvents:view`, `modules:view`) and twenty-nine of the authority's, so a
+ * majority of thirty-three was unreachable and the platform administrator resolved as holding no
+ * role here at all: `roleOf` returned undefined, `extractUserRole` fell back to its default, and
+ * every provider and routing-group route refused the one role that administers them. The
+ * authority's permissions are excluded from the comparison rather than counted against us: they
+ * say what a principal may do AT THE AUTHORITY, which tells us nothing about whose role this is.
  *
  * A role neither this catalog nor this application recognises is filtered out too, which is the
  * same default-deny direction as everywhere else here: an unrecognised name grants nothing rather
  * than being guessed at.
  */
 export function ownRoleNames(resolved: RoleCatalog, roles: ReadonlyArray<string>): string[] {
-  const ownPermissions = new Set(
-    resolved.permissions
-      .filter((entry) => entry.resourceServer === config.giam.resourceServerName)
-      .map((entry) => entry.permission),
-  );
+  const ownPermissions = new Set<string>();
+  const resourceServerPermissions = new Set<string>();
+  for (const entry of resolved.permissions) {
+    if (entry.resourceServer === config.giam.resourceServerName) ownPermissions.add(entry.permission);
+    // The authority is the realm itself, not a peer resource server, so its enforcement points are
+    // not evidence of a role belonging elsewhere.
+    if (entry.resourceServer !== config.giam.authorityResourceServerName) {
+      resourceServerPermissions.add(entry.permission);
+    }
+  }
+
   const permissionsByRole = new Map(resolved.roles.map((role) => [role.name, role.permissions]));
   return roles.filter((name) => {
     const permissions = permissionsByRole.get(name);
     if (!permissions || permissions.length === 0) return false;
-    const matching = permissions.filter((permission) => ownPermissions.has(permission)).length;
-    return matching > permissions.length / 2;
+    const ours = permissions.filter((permission) => ownPermissions.has(permission)).length;
+    if (ours === 0) return false;
+    // Held at another resource server and not here: the evidence against the role being ours.
+    const foreign = permissions.filter(
+      (permission) => resourceServerPermissions.has(permission) && !ownPermissions.has(permission),
+    ).length;
+    return ours > foreign;
   });
 }

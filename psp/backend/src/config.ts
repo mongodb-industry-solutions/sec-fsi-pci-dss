@@ -96,6 +96,10 @@ export const config = {
     // What a token must name in its audience claim to be accepted here.
     audience: pspEnv('GIAM_AUDIENCE', 'leafypay')!,
     resourceServerName: pspEnv('GIAM_RESOURCE_SERVER', 'leafypay')!,
+    // The realm's OWN enforcement points, under the name the authority publishes them with. Needed
+    // to tell a realm-administration permission from a peer resource server's one (see
+    // `ownRoleNames`), since only the second says a role belongs to somebody else.
+    authorityResourceServerName: pspEnv('GIAM_AUTHORITY_RESOURCE_SERVER', 'authority')!,
     // Presented when registering the catalog at boot. Absent is survivable: registration is
     // non-fatal, and an unreachable authority must not stop this application serving.
     registrationToken: pspEnv('GIAM_REGISTRATION_TOKEN'),
