@@ -1,7 +1,7 @@
 // Payment Order - Payment Link REST controller
 // Routes mounted at /payment/links → /api/v1/payment/links
 
-import { FastifyInstance } from 'fastify';
+import { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import {
   createPaymentLink,
   resolvePaymentLink,
@@ -12,9 +12,86 @@ import {
 import { getMerchantById } from '../services/merchant.service';
 import { deliverWebhook } from '../services/webhook.service';
 import { dualPermission } from '../../../vendors/middleware/dualAuth';
+import { can } from '../../../vendors/middleware/acl';
+import type { JwtUserPayload } from '../../../shared/models/identity.model';
 
 const LINK_STATUS_ENUM = ['active', 'completed', 'expired', 'deactivated'];
 const USAGE_TYPE_ENUM = ['single_use', 'multi_use'];
+
+/**
+ * The merchant this call acts for, bound to the CALLER's own credential rather than trusted from the
+ * request. Every route below used to read `merchantAgreementInstanceReference` straight out of the
+ * body or querystring, so any authenticated party holding the baseline `merchants:view` permission
+ * (which includes the plain `customer` role) could create, list or deactivate payment links for a
+ * merchant it has no relationship to. `merchants:view` exists so a customer can look up a merchant to
+ * pay, not so it can act as one.
+ *
+ * Three channels, in the order a real caller can arrive in:
+ *  1. OAuth (merchant client_credentials): bound to `merchantContext.merchantId`. A body/query value
+ *     is accepted only if it matches; anything else is impersonating another merchant's credential.
+ *  2. Staff session (`merchants:manage`, e.g. `merchant_officer`, `operations_officer`): back-office
+ *     operators legitimately act on any merchant, so the supplied reference is trusted as before.
+ *  3. Any other session (a `customer` browsing `/system/transfer/request`, or an analyst/auditor with
+ *     only `merchants:view`): bound to a merchant the CALLER actually owns (primary or beneficial
+ *     owner). A reference to a merchant it does not own is refused, not silently ignored, because
+ *     that is the one case that was exploitable end to end and proven live: a `customer` token could
+ *     mint a real payment link, complete with a working `paymentUrl`, against a merchant it had never
+ *     touched.
+ *
+ * Returns undefined and has already sent the reply when the caller may not act for the requested
+ * merchant (or supplied none in the one channel that requires it).
+ */
+export async function resolveActingMerchant(
+  fastify: FastifyInstance,
+  request: FastifyRequest,
+  reply: FastifyReply,
+  requestedMerchantId: string | undefined,
+): Promise<string | undefined> {
+  if (request.merchantContext) {
+    const { merchantId } = request.merchantContext;
+    if (requestedMerchantId && requestedMerchantId !== merchantId) {
+      reply.status(403).send({
+        error: 'access_denied',
+        error_description: 'merchantAgreementInstanceReference does not match the authenticated client',
+      });
+      return undefined;
+    }
+    return merchantId;
+  }
+
+  if (can(request, 'merchants', 'manage')) {
+    if (!requestedMerchantId) {
+      reply.status(400).send({ error: 'merchantAgreementInstanceReference is required' });
+      return undefined;
+    }
+    return requestedMerchantId;
+  }
+
+  const user = (request as FastifyRequest & { user?: JwtUserPayload }).user;
+  if (!user?.partyRef) {
+    reply.status(401).send({ error: 'Unauthenticated' });
+    return undefined;
+  }
+  if (!requestedMerchantId) {
+    // Every caller in this branch (a customer with only merchants:view, or an analyst/auditor) is
+    // required to name the merchant it is acting for: there is no ambient "all of them" answer to
+    // fall back to that would not itself be the vulnerability this function exists to close.
+    reply.status(400).send({ error: 'merchantAgreementInstanceReference is required' });
+    return undefined;
+  }
+
+  const merchant = await getMerchantById(fastify.db, requestedMerchantId) as
+    { merchantOwnerPartyReference?: string; merchantBeneficialOwners?: Array<{ merchantBeneficialOwnerPartyReference?: string }> } | null;
+  const owns = !!merchant && (
+    merchant.merchantOwnerPartyReference === user.partyRef
+    || (merchant.merchantBeneficialOwners ?? []).some((o) => o.merchantBeneficialOwnerPartyReference === user.partyRef)
+  );
+  if (!owns) {
+    reply.status(403).send({ error: 'access_denied', error_description: 'You do not have access to this merchant.' });
+    return undefined;
+  }
+  return requestedMerchantId;
+}
 
 export async function paymentLinkController(fastify: FastifyInstance) {
 
@@ -81,7 +158,10 @@ export async function paymentLinkController(fastify: FastifyInstance) {
       expiresAt?: string;
     };
 
-    const merchant = await getMerchantById(fastify.db, body.merchantAgreementInstanceReference);
+    const merchantId = await resolveActingMerchant(fastify, request, reply, body.merchantAgreementInstanceReference);
+    if (!merchantId) return; // resolveActingMerchant already sent the 401/403
+
+    const merchant = await getMerchantById(fastify.db, merchantId);
     if (!merchant) {
       return reply.status(404).send({ error: 'Merchant not found' });
     }
@@ -89,7 +169,7 @@ export async function paymentLinkController(fastify: FastifyInstance) {
     const baseUrl = process.env.PSP_URL_FRONTEND ?? 'http://localhost:8080';
 
     const result = await createPaymentLink(fastify.db, {
-      merchantAgreementInstanceReference: body.merchantAgreementInstanceReference,
+      merchantAgreementInstanceReference: merchantId,
       merchantName: (merchant as Record<string, unknown>).merchantName as string,
       merchantCategoryCode: (merchant as Record<string, unknown>).merchantCategoryCode as string,
       amount: body.amount,
@@ -148,7 +228,11 @@ export async function paymentLinkController(fastify: FastifyInstance) {
     },
   }, async (request, reply) => {
     const query = request.query as { merchantId?: string; page?: number; limit?: number };
-    const merchantId = query.merchantId ?? '';
+    // Bound to a merchant the caller may act for (see resolveActingMerchant): without it, any
+    // authenticated session, including a plain `customer`, could list any merchant's links by
+    // supplying its reference in the querystring.
+    const merchantId = await resolveActingMerchant(fastify, request, reply, query.merchantId);
+    if (!merchantId) return;
     const page = query.page ?? 1;
     const limit = Math.min(query.limit ?? 20, 100);
 
@@ -341,7 +425,13 @@ export async function paymentLinkController(fastify: FastifyInstance) {
   }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { action: string; merchantAgreementInstanceReference?: string };
-    const merchantId = body.merchantAgreementInstanceReference ?? '';
+
+    // Bound to the caller, not trusted from the body: `deactivatePaymentLink` compares its
+    // `merchantId` argument against the link's owner, so a body carrying the VICTIM's own reference
+    // used to pass that check trivially and deactivate a link belonging to a merchant the caller had
+    // never touched.
+    const merchantId = await resolveActingMerchant(fastify, request, reply, body.merchantAgreementInstanceReference);
+    if (!merchantId) return;
 
     if (body.action === 'deactivate') {
       const result = await deactivatePaymentLink(fastify.db, id, merchantId);
