@@ -1,4 +1,4 @@
-# 🏦 Sec4 Pay: FSI PSP + PCI DSS + MongoDB
+# 🏦 Leafy Pay: FSI PSP + PCI DSS + MongoDB
 
 ![](./psp/frontend/public/app-logo.png)
 
