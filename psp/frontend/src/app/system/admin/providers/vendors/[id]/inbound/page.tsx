@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { Copy, Check, Shield, ShieldOff, FlaskConical, Play, Info } from 'lucide-react';
 import { useIntegration } from '../_context';
 import type { MappingRule, HmacConfig, FieldMappingConfig, ProviderEventConfig, EventFieldMapping } from '../_context';
-import { FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel } from '../_shared';
+import {
+  FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel, EnvironmentRoutes,
+} from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { getInboundSample } from '../_samples';
 import { useNotify, useConfirm } from '../../../../../../../components/ui/ConfirmProvider';
@@ -32,7 +34,7 @@ function CopyBtn({ text }: { text: string }) {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function InboundPage() {
-  const { integration, reload, token } = useIntegration();
+  const { integration, links, reload, token } = useIntegration();
   const notify = useNotify();
   const confirm = useConfirm();
 
@@ -114,7 +116,24 @@ export default function InboundPage() {
   const [running, setRunning]         = useState(false);
   const [runResult, setRunResult]     = useState<{ status: string; latencyMs: number; transformed: Record<string, unknown>; error?: string } | null>(null);
   const effectiveTarget = overrideUrl.trim() || webhookUrl;
-  const endpointInfo = classifyEndpoint(effectiveTarget);
+  const activeBaseUrl = links?.environments.find((e) => e.active)?.resolved;
+  const endpointInfo = classifyEndpoint(effectiveTarget, activeBaseUrl);
+
+  const [savingEnvironments, setSavingEnvironments] = useState(false);
+
+  /** Persists the per-environment base URLs. A blank entry is removed, not stored empty. */
+  async function saveEnvironments(next: Record<string, string>) {
+    setSavingEnvironments(true);
+    try {
+      const cleaned = Object.fromEntries(
+        Object.entries(next).map(([key, value]) => [key, value.trim()]).filter(([, value]) => value),
+      );
+      await api.integrations.update(id, { externalProviderBaseUrlByEnvironment: cleaned }, token);
+      notify('Environment base URLs saved.', 'success');
+      reload(true);
+    } catch (err) { notify((err as Error).message, 'error'); }
+    finally { setSavingEnvironments(false); }
+  }
 
   function parseSample(): Record<string, unknown> | null {
     try {
@@ -252,6 +271,18 @@ export default function InboundPage() {
             : 'No inbound data will be accepted. The callback URL is inactive.'}
         />
       </Card>
+
+      {/* ── Where the provider calls back, per environment ──────────────────── */}
+      {/* This side is OURS: the address handed to an external system. Getting it wrong means a
+          provider holding a URL that stops existing the moment the environment changes. */}
+      <EnvironmentRoutes
+        links={links}
+        direction="inbound"
+        selectedEvent={selectedEvent}
+        storedByEnvironment={integration.externalProviderBaseUrlByEnvironment}
+        saving={savingEnvironments}
+        onSave={saveEnvironments}
+      />
 
       {/* ── Callback endpoint ──────────────────────────────────────────────── */}
       <Card

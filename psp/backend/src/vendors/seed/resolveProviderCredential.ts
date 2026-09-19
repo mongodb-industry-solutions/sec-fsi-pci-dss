@@ -1,15 +1,18 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { absoluteEndpoint, resolvePlatformLinks } from '@leafypay/platform-links';
+import {
+  absoluteEndpoint, hasLinkPlaceholder, linkPlaceholder, PLATFORM_ENVIRONMENTS,
+} from '@leafypay/platform-links';
 import { ExternalProviderArrangement } from '../../modules/provider/models/externalProviderArrangement.model';
 import { clientSecretFor } from '@leafypay/platform-links';
 
-// Turns the hostname-free fixture into the absolute, environment specific link, and fills in the TPP
-// credential the PSP holds against the bank. Promoting local to staging to production is a re-seed.
+// Declares the bank's address in EVERY environment on the provider record, and fills in the TPP
+// credential the PSP holds against it. Promoting local to staging to production is one variable, not a
+// re-seed: the record carries all three and the running deployment selects its own.
 //
-// The credential VALUE comes from the environment at SEED time because a shared secret has to
-// originate somewhere; at runtime only the record is read, with no fallback, since a silent fallback is
-// how two environments end up disagreeing.
+// The credential VALUE still comes from the environment at SEED time, because a shared secret has to
+// originate somewhere and there is nothing environment-shaped about it: the same TPP registration is
+// the one the bank holds. Addresses and secrets are treated differently on purpose.
 const DEFAULT_CLIENT_ID = 'leafypay-psp';
 const DEFAULT_CLIENT_SECRET = clientSecretFor('leafypay-psp');
 
@@ -18,53 +21,47 @@ function fromEnv(name: string, fallback: string): string {
   return value && value.trim() ? value.trim() : fallback;
 }
 
-/**
- * The realm the platform's tokens are issued in, when the configured base URL does not name one.
- *
- * The bank is a CLIENT of this realm and not a realm of its own (ADR-003): what separates the two
- * institutions is the bank's own resource server, roles and token audience, none of which needs a
- * second directory. The fixture used to carry `/realms/bankcore/` instead, which no authority has
- * ever had, so every TPP call the PSP made was refused with `unknown realm` and surfaced three
- * layers up as a transfer that could not reach the rail.
- */
-const DEFAULT_REALM = 'LeafyIdp';
-
-/**
- * The issuer, realm included, from a base URL that may or may not already name one.
- *
- * Both shapes are in use: `GIAM_ISSUER_URL` is the issuer and carries the realm, while
- * `GIAM_BASE_URL` and the default are the authority's ORIGIN and do not. Appending blindly gave
- * `/realms/LeafyIdp/realms/...` under the first and the right answer under the second, which is the
- * kind of difference that only shows up in one deployment.
- */
-function authorityIssuer(baseUrl: string): string {
-  if (/\/realms\/[^/]+/.test(baseUrl)) return baseUrl;
-  return `${baseUrl}/realms/${fromEnv('GIAM_REALM', DEFAULT_REALM)}`;
-}
-
 /** Fills a provider record's `oauth2_cc` credential in place. A record without one is left untouched. */
 export function resolveBankcoreLink(record: ExternalProviderArrangement): void {
   const oauth2 = record.authConfig?.scheme === 'oauth2_cc' ? record.authConfig.oauth2 : undefined;
   if (!oauth2) return;
 
-  const { bankcoreBaseUrl, authorityBaseUrl } = resolvePlatformLinks();
   oauth2.clientId = fromEnv('BANKCORE_TPP_CLIENT_ID', DEFAULT_CLIENT_ID);
   oauth2.clientSecretPlaintext = fromEnv('BANKCORE_TPP_CLIENT_SECRET', DEFAULT_CLIENT_SECRET);
-  // The fixture holds the relative standard path; the ISSUER is the environment's.
+  // The fixture holds the relative standard path; the ISSUER is named, and bound where it is used.
   //
   // It is the AUTHORITY's host, not the bank's. The bank stopped issuing tokens and is a resource
   // server that only verifies them, so a credential resolved against the bank asks for a token at a
   // service that has none to give, and the call that follows arrives with no bearer at all.
-  if (!oauth2.tokenEndpoint.startsWith('http')) {
-    oauth2.tokenEndpoint = absoluteEndpoint(authorityIssuer(authorityBaseUrl), oauth2.tokenEndpoint);
+  if (!oauth2.tokenEndpoint.startsWith('http') && !hasLinkPlaceholder(oauth2.tokenEndpoint)) {
+    oauth2.tokenEndpoint = absoluteEndpoint(linkPlaceholder('authorityIssuer'), oauth2.tokenEndpoint);
   }
-  // The bank's base URL goes on the same record as its credential (P4.1). Picking the two from different
+  // The bank's address goes on the same record as its credential (P4.1). Picking the two from different
   // records is how a token ends up presented at the wrong bank.
+  //
+  // EVERY environment's address, indexed by environment id, and not the one this seeder happens to be
+  // run in. The same record is restored into local, staging and production, where the bank answers on
+  // three different hosts (and in staging on an in-cluster name a browser could not reach at all), so a
+  // single baked host is right in exactly the environment it was written in. The entry for the running
+  // environment is selected at dispatch time by `providerBaseUrl`.
+  //
+  // The entries name the platform link rather than restating its hosts, because the bank IS a platform
+  // service and its addresses are already declared in `LINK_MATRIX`. A third-party provider would carry
+  // literal URLs here instead; both shapes resolve the same way.
   //
   // It lands in a field of its own rather than replacing `externalProviderApiEndpoint`, because that field
   // still holds the loopback path the built-in engine answers on, and the kill switch decides which of the
   // two is used. Flipping it would break the built-in path the moment the records are seeded.
-  record.externalProviderBaseUrl = bankcoreBaseUrl;
+  //
+  // A fixture that already declares its own map is left alone: a real provider's hosts are its own, and
+  // the seeder has no business overwriting them with the bank's.
+  if (!record.externalProviderBaseUrlByEnvironment) {
+    record.externalProviderBaseUrlByEnvironment = Object.fromEntries(
+      PLATFORM_ENVIRONMENTS.map((environmentId) => [environmentId, linkPlaceholder('bankcore')]),
+    );
+  }
+  // Kept as the single-address fallback for any reader that has not been taught about the map.
+  record.externalProviderBaseUrl = linkPlaceholder('bankcore');
 
   declareWhatItServes(record);
 }

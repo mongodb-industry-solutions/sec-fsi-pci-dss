@@ -13,11 +13,18 @@
  * The realm belongs to the environment, not to a fixture, so the resolver composes it and these
  * tests pin both issuer shapes the deployments actually use: with the realm in the base URL and
  * without it.
+ *
+ * The seeder now writes the LINK NAME (`{{authorityIssuer}}`) rather than a resolved host, because
+ * the same record is restored into environments where the authority answers on a different address.
+ * These tests therefore assert the resolved value, which is what is presented at the token endpoint,
+ * rather than the stored one. Every property they were written to protect is unchanged; what moved
+ * is the moment the host is bound.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveBankcoreLink } from '../../../../../psp/backend/src/vendors/seed/resolveProviderCredential';
+import { resolveLinks } from '@leafypay/platform-links';
 import type { ExternalProviderArrangement } from '../../../../../psp/backend/src/modules/provider/models/externalProviderArrangement.model';
 
 const FIXTURE = join(process.cwd(), 'psp', 'backend', 'data', 'externalProviderArrangement.json');
@@ -25,14 +32,21 @@ const records = JSON.parse(readFileSync(FIXTURE, 'utf8')) as ExternalProviderArr
 
 const credentialed = records.filter((r) => r.authConfig?.scheme === 'oauth2_cc');
 
-/** Resolves a copy under a given authority issuer, without disturbing the fixture. */
+/**
+ * Seeds a copy under a given authority issuer and returns the endpoint AS PRESENTED.
+ *
+ * Both halves in one helper on purpose: the stored value and the bound value are only correct
+ * together, and a test that checked one without the other is how a record that looks right and
+ * dials the wrong host gets through.
+ */
 function resolvedUnder(issuer: string, record: ExternalProviderArrangement): string {
   const previous = process.env.GIAM_ISSUER_URL;
   process.env.GIAM_ISSUER_URL = issuer;
   try {
     const copy = JSON.parse(JSON.stringify(record)) as ExternalProviderArrangement;
     resolveBankcoreLink(copy);
-    return copy.authConfig!.scheme === 'oauth2_cc' ? copy.authConfig!.oauth2.tokenEndpoint : '';
+    const stored = copy.authConfig!.scheme === 'oauth2_cc' ? copy.authConfig!.oauth2.tokenEndpoint : '';
+    return stored ? resolveLinks(stored) : '';
   } finally {
     if (previous === undefined) delete process.env.GIAM_ISSUER_URL;
     else process.env.GIAM_ISSUER_URL = previous;
@@ -48,6 +62,18 @@ describe('seeded provider token endpoints', () => {
     for (const record of credentialed) {
       const path = record.authConfig!.scheme === 'oauth2_cc' ? record.authConfig!.oauth2.tokenEndpoint : '';
       expect(path, record.externalProviderArrangementInstanceReference).not.toMatch(/\/realms\//);
+    }
+  });
+
+  it('stores the link name rather than a host, so one record serves every environment', () => {
+    for (const record of credentialed) {
+      const copy = JSON.parse(JSON.stringify(record)) as ExternalProviderArrangement;
+      resolveBankcoreLink(copy);
+      const seeded = copy.authConfig!.scheme === 'oauth2_cc' ? copy.authConfig!.oauth2.tokenEndpoint : '';
+      // The seeded record is hostname free: a host written here is correct in exactly the environment
+      // the seeder ran in, and this database is promoted into others.
+      expect(seeded, record.externalProviderArrangementInstanceReference).toContain('{{authorityIssuer}}');
+      expect(seeded, record.externalProviderArrangementInstanceReference).not.toMatch(/^https?:\/\//);
     }
   });
 

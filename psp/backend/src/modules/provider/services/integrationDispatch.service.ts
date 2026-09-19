@@ -1,5 +1,7 @@
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
+import { platformEnvironment, resolveLinks } from '@leafypay/platform-links';
+import { declaredFor, providerBaseUrl, resolveConfiguredUrl } from './providerLink.service';
 import {
   EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION,
   IntegrationEvent,
@@ -13,6 +15,7 @@ import {
 import {
   getActiveProviderForType,
   updateHealthStatus,
+  healthFromResponseCode,
   hashPayload,
 } from './integrationRegistry.service';
 import { applyMappings } from './fieldMapping.service';
@@ -316,9 +319,29 @@ async function dispatchExternal(
   // dispatched through the same pipeline as a single-endpoint connector, instead of needing its own client.
   const { url: templatedUrl, consumed } = applyPathTemplate(wire.url ?? '', mappedPayload);
 
-  // A host-less path resolves against the provider's own base URL when it has one (a real ASPSP), and
-  // against the PSP's otherwise (the built-in loopback engines). Absolute URLs pass through unchanged.
-  const targetUrl = resolveServiceUrl(templatedUrl, provider.externalProviderBaseUrl);
+  // Where that path actually goes in THIS environment: the route's own host map if it declares one,
+  // else the provider's, and a route with no path at all takes this environment's entry whole. Falls
+  // back to the PSP's own host for the built-in loopback engines, which declare neither.
+  const configured = resolveConfiguredUrl(
+    provider, 'outbound', templatedUrl, wire.baseUrlByEnvironment, platformEnvironment(),
+  );
+  if (configured.error) {
+    // A configuration fault, reported as one. Dispatching at a half-resolved address would reach
+    // whatever answers there, which for a payment is worse than not dispatching.
+    await logEvent(db, {
+      arrangementId: provider.externalProviderArrangementInstanceReference,
+      type: 'dispatch', status: 'error', triggeredBy, payload,
+      latencyMs: 0, error: configured.error, businessContext,
+    });
+    return {
+      provider: 'external',
+      arrangementId: provider.externalProviderArrangementInstanceReference,
+      status: 'error',
+      latencyMs: 0,
+      error: configured.error,
+    };
+  }
+  const targetUrl = configured.resolved ?? resolveServiceUrl(templatedUrl, providerBaseUrl(provider));
 
   // A GET or DELETE with a JSON body is not a request most servers will read, and some reject it outright.
   // The fields that went INTO the path are dropped from the body either way: sending them twice invites a
@@ -371,7 +394,7 @@ async function dispatchExternal(
       response: { status: res.status, headers: responseHeaders, body: responseBody },
     });
 
-    await updateHealthStatus(db, arrangementId, res.ok ? 'ok' : 'degraded');
+    await updateHealthStatus(db, arrangementId, healthFromResponseCode(res.status));
 
     // The response is translated through the provider's INBOUND mapping before it leaves here.
     //
@@ -486,7 +509,28 @@ export async function testIntegration(
     return { status: 'ok', latencyMs: 0 };
   }
 
-  if (!provider.externalProviderApiEndpoint) {
+  /**
+   * What to probe, in the order a record may declare it.
+   *
+   * `externalProviderApiEndpoint` alone was not enough. v37 moved four capabilities to the bank and
+   * those records carry no such field: they carry a base URL and per-event standard paths. So this
+   * returned `error` for every one of them WITHOUT recording an event or touching the health status,
+   * which is how a provider that had never been probed read as a provider that had failed.
+   */
+  const probePath = provider.externalProviderApiEndpoint
+    ?? (provider.externalProviderEvents ?? []).find((e) => e.outbound?.url)?.outbound?.url;
+  if (!probePath) {
+    return { status: 'error', latencyMs: 0 };
+  }
+
+  let targetUrl: string;
+  try {
+    targetUrl = resolveServiceUrl(probePath, providerBaseUrl(provider));
+  } catch (err) {
+    // An unresolvable link is a configuration fault, not an unreachable service: recorded as such so
+    // whoever reads the health status is not sent looking for a network problem.
+    await logEvent(db, { arrangementId: id, type: 'test', status: 'error', triggeredBy: 'system_admin.test', latencyMs: 0, error: (err as Error).message });
+    await updateHealthStatus(db, id, 'unknown');
     return { status: 'error', latencyMs: 0 };
   }
 
@@ -494,9 +538,12 @@ export async function testIntegration(
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), provider.externalProviderTimeoutMs ?? 5000);
-    const res = await fetch(provider.externalProviderApiEndpoint, {
+    // The credential too: a probe that omits it is answered with 401 by any real provider, and the
+    // registry recorded that as the provider being degraded.
+    const authHeaders = await buildAuthHeaders(provider.authConfig, provider.externalProviderArrangementType);
+    const res = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true' },
+      headers: { 'Content-Type': 'application/json', 'X-Integration-Test': 'true', ...authHeaders },
       body: JSON.stringify({ test: true, source: 'psp-demo' }),
       signal: controller.signal,
     });
@@ -505,7 +552,7 @@ export async function testIntegration(
     const status = res.ok ? 'ok' : 'error';
 
     await logEvent(db, { arrangementId: id, type: 'test', status: res.ok ? 'received' : 'error', triggeredBy: 'system_admin.test', latencyMs, responseCode: res.status });
-    await updateHealthStatus(db, id, res.ok ? 'ok' : 'degraded');
+    await updateHealthStatus(db, id, healthFromResponseCode(res.status));
 
     return { status, latencyMs, responseCode: res.status };
   } catch (err) {
@@ -575,7 +622,7 @@ export async function testMapping(
  * field, so the question is whether there is ANYTHING to call.
  */
 function reachableOverTheWire(provider: ExternalProviderArrangement): boolean {
-  return Boolean(provider.externalProviderBaseUrl || provider.externalProviderApiEndpoint);
+  return Boolean(declaredFor(provider, platformEnvironment()) || provider.externalProviderApiEndpoint);
 }
 
 function mapInbound(
@@ -594,16 +641,20 @@ function mapInbound(
 }
 
 export function resolveServiceUrl(url: string, providerBaseUrl?: string): string {
-  if (/^https?:\/\//i.test(url)) return url;
+  // A stored value may NAME its link (`{{bankcore}}`) instead of carrying a host, in either field.
+  // Bound first, so everything below reasons about a real address. An unknown name throws here rather
+  // than leaving `{{bankore}}` in the URL to fail as a DNS error three layers from the typo.
+  const resolvedUrl = resolveLinks(url);
+  if (/^https?:\/\//i.test(resolvedUrl)) return resolvedUrl;
   // v37 P6.2d: the PROVIDER's own base URL wins for a host-less path, and only then the PSP's own.
   //
   // Without this a configured standard path (`/v1/accounts/{accountId}/balances`) resolved against
   // PSP_BASE_URL and was sent to the PSP itself, so a real ASPSP could not be reached through this pipeline
   // at all and needed a bespoke client instead. The bank's base URL lives on the same record as its
   // credential precisely so the two cannot be picked from different records.
-  const raw = providerBaseUrl?.trim() || process.env.PSP_BASE_URL || '127.0.0.1:8081';
+  const raw = resolveLinks(providerBaseUrl?.trim() ?? '') || process.env.PSP_BASE_URL || '127.0.0.1:8081';
   const base = (/^https?:\/\//i.test(raw) ? raw : `http://${raw}`).replace(/\/$/, '');
-  return base + (url.startsWith('/') ? url : `/${url}`);
+  return base + (resolvedUrl.startsWith('/') ? resolvedUrl : `/${resolvedUrl}`);
 }
 
 export interface RunTestResult {
@@ -638,7 +689,8 @@ export async function runIntegrationTest(
   id: string,
   direction: 'outbound' | 'inbound',
   payload: Record<string, unknown>,
-  overrideUrl?: string
+  overrideUrl?: string,
+  eventName?: string,
 ): Promise<RunTestResult> {
   const { getIntegration } = await import('./integrationRegistry.service');
   const provider = await getIntegration(db, id);
@@ -659,16 +711,36 @@ export async function runIntegrationTest(
       payload: transformed,
       latencyMs: 0,
       meta: { test: true, direction: 'inbound' },
+      // What was RECEIVED, captured the same way a real callback captures it. Without this the event
+      // recorded that a callback arrived and not what it contained, which is the half of the evidence
+      // an audit of an inbound integration is actually after.
+      request: { method: 'POST', body: transformed },
     });
     return { direction, executed: true, status: 'received', latencyMs: 0, transformed, appliedRules: rules.length };
   }
 
   // outbound: real HTTP dispatch to the override URL or the configured endpoint
-  const rawTarget = overrideUrl?.trim() || provider.externalProviderApiEndpoint;
+  //
+  // The per-event outbound path is consulted before the vendor-global endpoint, and the provider's own
+  // base URL is passed to the resolver. Neither used to be true, and for the four capabilities v37 moved
+  // to the bank that made this button untestable: those records carry no `externalProviderApiEndpoint`
+  // at all, so a test either refused with "No endpoint configured" or, with an override typed in,
+  // resolved the bank's standard path against the PSP and tested the PSP against itself.
+  const configured = provider.externalProviderEvents ?? [];
+  const selected = eventName
+    ? configured.find((e) => e.event === eventName)?.outbound
+    : configured.find((e) => e.outbound?.url)?.outbound;
+  const configuredHeaders = selected?.headers;
+  const perEvent = eventName
+    ? configured.find((e) => e.event === eventName)?.outbound?.url
+    // No event named: the first one that HAS an outbound path, so a record whose first event is
+    // inbound-only does not read as having no endpoint at all.
+    : configured.find((e) => e.outbound?.url)?.outbound?.url;
+  const rawTarget = overrideUrl?.trim() || perEvent || provider.externalProviderApiEndpoint;
   if (!rawTarget) {
     return { direction, executed: false, status: 'error', latencyMs: 0, transformed, appliedRules: rules.length, error: 'No endpoint configured and no override URL provided.' };
   }
-  const targetUrl = resolveServiceUrl(rawTarget);
+  const targetUrl = resolveServiceUrl(rawTarget, providerBaseUrl(provider));
 
   // The credential is obtained BEFORE the clock starts, as it is on the live path above.
   //
@@ -677,6 +749,22 @@ export async function runIntegrationTest(
   // provider at all: on a cold token cache the two together exceeded the budget, and the provider was
   // marked degraded for a delay that was never its own.
   const authHeaders = await buildAuthHeaders(provider.authConfig, provider.externalProviderArrangementType);
+
+  /**
+   * The DECLARED headers too, templated from the payload exactly as the live path does it.
+   *
+   * Without them this button was not testing the integration, it was testing a different request.
+   * A Berlin Group API carries the consent in `Consent-ID` and the trace in `X-Request-ID`, so the
+   * bank refused every test with "Consent-ID header is required" while the real dispatch of the same
+   * event succeeded. A test whose failures do not correspond to the thing being tested is worse than
+   * no test, because it sends whoever ran it looking for a fault that is not there.
+   */
+  const declaredHeaders: Record<string, string> = {};
+  for (const [name, template] of Object.entries(configuredHeaders ?? {})) {
+    const { url: value } = applyPathTemplate(template, transformed);
+    // An unfilled placeholder is dropped rather than sent literally, as on the live path.
+    if (!value.includes('{')) declaredHeaders[name] = value;
+  }
 
   const start = Date.now();
   try {
@@ -687,6 +775,7 @@ export async function runIntegrationTest(
       headers: {
         'Content-Type': 'application/json',
         'X-Integration-Test': 'true',
+        ...declaredHeaders,
         ...authHeaders,
       },
       body: JSON.stringify(transformed),
@@ -701,7 +790,7 @@ export async function runIntegrationTest(
       payload: transformed, responseCode: res.status, latencyMs,
       meta: { test: true, direction: 'outbound', targetUrl, override: !!overrideUrl, responseBody },
     });
-    await updateHealthStatus(db, id, res.ok ? 'ok' : 'degraded');
+    await updateHealthStatus(db, id, healthFromResponseCode(res.status));
     return { direction, executed: true, status, latencyMs, responseCode: res.status, responseBody, transformed, appliedRules: rules.length, targetUrl };
   } catch (err) {
     const latencyMs = Date.now() - start;
@@ -716,17 +805,91 @@ export async function runIntegrationTest(
   }
 }
 
+/**
+ * Which way the data went, for an event that records the type of interaction rather than a direction.
+ *
+ * Derived rather than stored, so no migration and no second field to disagree with the first. A
+ * `dispatch` is this platform calling the provider and a `callback` is the provider calling back; a
+ * `test` is either and says which in its meta; a health check is a probe we sent.
+ */
+export function directionOf(event: IntegrationEvent): 'outbound' | 'inbound' {
+  if (event.integrationEventType === 'callback') return 'inbound';
+  if (event.integrationEventType === 'test') {
+    return (event.integrationEventMeta?.direction as string) === 'inbound' ? 'inbound' : 'outbound';
+  }
+  return 'outbound';
+}
+
+export interface IntegrationEventQuery {
+  direction?: 'outbound' | 'inbound';
+  type?: IntegrationEvent['integrationEventType'];
+  status?: IntegrationEvent['integrationEventStatus'];
+  /** ISO timestamps, inclusive. */
+  from?: string;
+  to?: string;
+  /** Free text over the interaction, the trigger and the error. */
+  q?: string;
+}
+
+/**
+ * A provider's interaction log, filtered.
+ *
+ * The filters are the ones an audit actually asks for: which direction, what outcome, over what
+ * window. Direction especially, because "are this provider's callbacks arriving at all" cannot be
+ * answered by a list that shows outbound and inbound interleaved and labels neither.
+ *
+ * Filtering happens in the QUERY and not on the returned page: filtering a page client-side reports
+ * "3 errors" when the collection holds three hundred and the page happened to contain three, which
+ * is a wrong answer rather than a partial one.
+ */
 export async function getIntegrationEvents(
   db: Db,
   arrangementId: string,
   page = 1,
-  limit = 20
-): Promise<{ events: IntegrationEvent[]; total: number }> {
+  limit = 20,
+  filters: IntegrationEventQuery = {},
+): Promise<{ events: Array<IntegrationEvent & { direction: 'outbound' | 'inbound' }>; total: number }> {
   const col = db.collection<IntegrationEvent>(EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION);
-  const query = { externalProviderArrangementInstanceReference: arrangementId };
+
+  const query: Record<string, unknown> = { externalProviderArrangementInstanceReference: arrangementId };
+  if (filters.type) query.integrationEventType = filters.type;
+  if (filters.status) query.integrationEventStatus = filters.status;
+  if (filters.direction === 'inbound') {
+    // The same derivation as `directionOf`, expressed as a query so the count is the real count.
+    query.$or = [
+      { integrationEventType: 'callback' },
+      { integrationEventType: 'test', 'integrationEventMeta.direction': 'inbound' },
+    ];
+  } else if (filters.direction === 'outbound') {
+    query.$nor = [
+      { integrationEventType: 'callback' },
+      { integrationEventType: 'test', 'integrationEventMeta.direction': 'inbound' },
+    ];
+  }
+  if (filters.from || filters.to) {
+    query.recordCreatedDateTime = {
+      ...(filters.from ? { $gte: new Date(filters.from) } : {}),
+      ...(filters.to ? { $lte: new Date(filters.to) } : {}),
+    };
+  }
+  if (filters.q?.trim()) {
+    // Escaped: an operator pasting a reference containing a bracket would otherwise get an invalid
+    // regex error instead of a search.
+    const needle = new RegExp(filters.q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+    query.$and = [{
+      $or: [
+        { integrationEventType: needle },
+        { integrationEventTriggeredBy: needle },
+        { integrationEventErrorMessage: needle },
+        { integrationEventPayloadHash: needle },
+        { 'integrationEventRequest.url': needle },
+      ],
+    }];
+  }
+
   const [events, total] = await Promise.all([
     col.find(query).sort({ recordCreatedDateTime: -1 }).skip((page - 1) * limit).limit(limit).toArray(),
     col.countDocuments(query),
   ]);
-  return { events, total };
+  return { events: events.map((event) => ({ ...event, direction: directionOf(event) })), total };
 }

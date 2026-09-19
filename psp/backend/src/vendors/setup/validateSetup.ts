@@ -1,4 +1,4 @@
-import { MongoClient } from 'mongodb';
+import { Db, MongoClient } from 'mongodb';
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
@@ -7,6 +7,7 @@ import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 import { config } from '../../config';
 import { describeTarget, versionMismatch, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
+import { assertLinks, type LinkAssertion } from '@leafypay/platform-links';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -328,6 +329,52 @@ async function readEncryptedFields(client: MongoClient, dbName: string): Promise
   return stored;
 }
 
+/**
+ * Every link a provider record NAMES resolves in this environment, and to the right kind of host.
+ *
+ * This is the check the environment-bound records were missing. A record stores `{{bankcore}}` and the
+ * address is bound when the call is made, which is what lets one seeded database be promoted from local
+ * to Kanopy to production; the cost of binding late is that an environment missing the variable does not
+ * fail until a payment is dispatched. Proving it at setup moves that failure to the one moment somebody
+ * is actually looking at the output.
+ *
+ * Private, not public: these are server-to-server links. An ingress hostname here would mean the PSP
+ * leaves the cluster and comes back in to reach the bank, and in staging that route may not exist at all.
+ */
+async function checkProviderLinks(db: Db, existingSet: Set<string>): Promise<void> {
+  console.log('\n4b. Provider links (per environment)');
+
+  if (!existingSet.has('externalProviderArrangement')) {
+    check('skip', 'provider links - collection missing');
+    return;
+  }
+
+  const providers = await db.collection('externalProviderArrangement')
+    .find({}, { projection: { _id: 0 } })
+    .toArray()
+    .catch(() => [] as Record<string, unknown>[]);
+
+  const assertions: LinkAssertion[] = [];
+  for (const provider of providers) {
+    const id = String(provider.externalProviderArrangementInstanceReference);
+    const baseUrl = provider.externalProviderBaseUrl as string | undefined;
+    if (baseUrl) assertions.push({ name: `${id} base URL (private)`, value: baseUrl, expected: 'private' });
+    const auth = provider.authConfig as { scheme?: string; oauth2?: { tokenEndpoint?: string } } | undefined;
+    const tokenEndpoint = auth?.scheme === 'oauth2_cc' ? auth.oauth2?.tokenEndpoint : undefined;
+    if (tokenEndpoint) {
+      assertions.push({ name: `${id} token endpoint (private)`, value: tokenEndpoint, expected: 'private' });
+    }
+  }
+
+  if (assertions.length === 0) {
+    check('skip', 'provider links - no record names a link');
+    return;
+  }
+  for (const result of assertLinks(assertions)) {
+    check(result.ok ? 'pass' : 'fail', result.name, result.detail);
+  }
+}
+
 async function checkMongoDB(client: MongoClient): Promise<void> {
   const dbName = config.mongodb.dbName;
   const kmsConfig = getKmsConfig();
@@ -408,6 +455,8 @@ async function checkMongoDB(client: MongoClient): Promise<void> {
       check('warn', `${collection} - index check error: ${(e as Error).message}`);
     }
   }
+
+  await checkProviderLinks(db, existingSet);
 
   // -- Key vault --------------------------------------------------------------─
   console.log(`\n5. QE key vault (${kmsConfig.namespace})`);

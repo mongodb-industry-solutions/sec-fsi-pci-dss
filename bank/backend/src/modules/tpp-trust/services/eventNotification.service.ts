@@ -1,6 +1,7 @@
 import { Db } from 'mongodb';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
+import { resolveLinks } from '@leafypay/platform-links';
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
   TppEventSubscriptionControlRecord, TppWebhookDeliveryLogRecord, TppEventType, DeliveryOutcome,
@@ -157,9 +158,21 @@ export async function notifyTpp(
   const backoffMs = subscription.tppEventSubscriptionRetryPolicy?.backoffMs ?? 0;
   let detail: string | undefined;
 
+  // The subscription NAMES the receiver; its address is this environment's, because the same record is
+  // restored into local, staging and production and the TPP answers on a different host in each.
+  // Unresolvable is reported as a configuration fault and never retried: no number of attempts fixes
+  // a link name this platform does not have.
+  let callbackUrl: string;
+  try {
+    callbackUrl = resolveLinks(subscription.tppEventSubscriptionCallbackUrl);
+  } catch (err) {
+    await recordDelivery(db, subscription, input, 1, 'failed', eventId, undefined, (err as Error).message);
+    return { outcome: 'failed', attempts: 1, eventId, detail: (err as Error).message };
+  }
+
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
-      const response = await fetchImpl(subscription.tppEventSubscriptionCallbackUrl, {
+      const response = await fetchImpl(callbackUrl, {
         method: 'POST',
         headers: {
           // RFC 8935: a push delivery carries the token as the body with this media type.

@@ -57,6 +57,8 @@ export interface EventFieldMapping {
 // (its own URL, mapping, auth, retries, timeout, callback). There is NO vendor base URL.
 export interface ProviderEventOutboundConfig {
   url?: string;
+  // This route's own host per environment, overriding the provider's. Absent means the provider's.
+  baseUrlByEnvironment?: Record<string, string>;
   httpMethod?: string;
   mapping?: EventFieldMapping[];
   auth?: AuthConfig;
@@ -65,6 +67,8 @@ export interface ProviderEventOutboundConfig {
 }
 export interface ProviderEventInboundConfig {
   callbackUrl?: string;
+  // The host this platform is told to receive on, per environment. Absent means the `{{psp}}` link.
+  baseUrlByEnvironment?: Record<string, string>;
   mapping?: EventFieldMapping[];
   auth?: AuthConfig;
   referenceLocation?: 'body' | 'header';
@@ -84,6 +88,12 @@ export interface Integration {
   externalProviderIsInternal: boolean;
   externalProviderMode: string;
   externalProviderApiEndpoint?: string;
+  // The link this record NAMES for its own host (`{{bankcore}}`), not an address. What it resolves to
+  // in this environment arrives separately, in `ResolvedLinks`, because only the server can bind it.
+  externalProviderBaseUrl?: string;
+  // The provider's base URL in each environment, indexed by the environment's own id. What the
+  // Environments editor writes; the deployment's `PSP_ENVIRONMENT` selects the entry that applies.
+  externalProviderBaseUrlByEnvironment?: Record<string, string>;
   externalProviderApiKeyPrefix?: string;
   externalProviderHealthStatus?: string;
   externalProviderLastHealthCheckAt?: string;
@@ -103,6 +113,33 @@ export interface Integration {
   bianControlRecordType: string;
   pciDssRequirements: string[];
   recordCreatedDateTime: string;
+}
+
+/**
+ * Where this provider's routes go, in EVERY environment, as the server resolved them.
+ *
+ * Separate from `Integration` on purpose: the record is what is stored and editable, this is a view
+ * of what the stored value means. Conflating them would invite a save that writes a resolved host
+ * back over the declaration, which is the portability this whole indirection buys.
+ */
+export interface ResolvedLinks {
+  activeEnvironment: string;
+  environments: Array<{
+    environmentId: string;
+    active: boolean;
+    declared?: string;
+    resolved?: string;
+    error?: string;
+    routes: Array<{
+      event: string;
+      direction: 'outbound' | 'inbound';
+      httpMethod?: string;
+      path?: string;
+      declared?: string;
+      resolved?: string;
+      error?: string;
+    }>;
+  }>;
 }
 
 export const TYPE_LABEL: Record<string, string> = {
@@ -128,6 +165,7 @@ export const TYPE_CATEGORY_PATH: Record<string, string> = {
 
 interface CtxValue {
   integration: Integration | null;
+  links: ResolvedLinks | null;
   loading: boolean;
   loadError: string | null;
   /** reload(true) refreshes the integration in-place without toggling the loading state,
@@ -137,13 +175,14 @@ interface CtxValue {
 }
 
 const IntegrationCtx = createContext<CtxValue>({
-  integration: null, loading: true, loadError: null, reload: () => {}, token: '',
+  integration: null, links: null, loading: true, loadError: null, reload: () => {}, token: '',
 });
 
 export function IntegrationProvider({ children }: { children: React.ReactNode }) {
   const { id } = useParams<{ id: string }>();
   const token = getToken() ?? '';
   const [integration, setIntegration] = useState<Integration | null>(null);
+  const [links, setLinks] = useState<ResolvedLinks | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -151,7 +190,10 @@ export function IntegrationProvider({ children }: { children: React.ReactNode })
     if (!silent) setLoading(true);
     setLoadError(null);
     api.integrations.get(id, token)
-      .then(d => setIntegration(d.integration as unknown as Integration))
+      .then(d => {
+        setIntegration(d.integration as unknown as Integration);
+        setLinks((d.links as unknown as ResolvedLinks) ?? null);
+      })
       .catch((err: unknown) => {
         const msg = (err as Error)?.message ?? 'Failed to load';
         // On a silent refresh, keep the current view rather than swapping to an error screen.
@@ -163,7 +205,7 @@ export function IntegrationProvider({ children }: { children: React.ReactNode })
   useEffect(() => { reload(); }, [reload]);
 
   return (
-    <IntegrationCtx.Provider value={{ integration, loading, loadError, reload, token }}>
+    <IntegrationCtx.Provider value={{ integration, links, loading, loadError, reload, token }}>
       {children}
     </IntegrationCtx.Provider>
   );

@@ -9,6 +9,7 @@ import {
   FieldMapping,
   IntegrationAuthConfig,
   RetryPolicy,
+  ProviderBaseUrlByEnvironment,
 } from '../models/externalProviderArrangement.model';
 
 const DEFAULT_TIMEOUT_MS = 5000;
@@ -20,6 +21,9 @@ export interface ResolvedOutbound {
   // Declared per event, templated from the payload at dispatch time.
   headers: Record<string, string>;
   url?: string;
+  // This route's own host per environment, when it declares one. Carried through so the dispatcher
+  // resolves the same address the admin screen shows for it.
+  baseUrlByEnvironment?: ProviderBaseUrlByEnvironment;
   httpMethod: string;
   mapping: FieldMapping[];
   auth?: IntegrationAuthConfig;
@@ -46,6 +50,7 @@ export function resolveEventOutbound(vendor: ExternalProviderArrangement, event:
   const ev = findEvent(vendor, event)?.outbound;
   return {
     url: ev?.url ?? vendor.externalProviderApiEndpoint,
+    ...(ev?.baseUrlByEnvironment ? { baseUrlByEnvironment: ev.baseUrlByEnvironment } : {}),
     httpMethod: ev?.httpMethod ?? DEFAULT_HTTP_METHOD,
     headers: ev?.headers ?? {},
     mapping: ev?.mapping ?? vendor.fieldMappingConfig?.outbound ?? [],

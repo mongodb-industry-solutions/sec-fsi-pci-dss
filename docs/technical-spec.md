@@ -630,6 +630,15 @@ export interface ExternalProviderArrangement {
 
   // Outbound REST (external providers only)
   externalProviderApiEndpoint?: string;
+  // Base URL when the provider's API is a REST resource api rather than a single endpoint. Holds an
+  // absolute URL or the NAME of a platform link (`{{bankcore}}`), bound when the call is made.
+  externalProviderBaseUrl?: string;
+  // The provider's base URL in EVERY environment, indexed by environment id:
+  //   { development: 'http://localhost:8083', staging: 'https://bank-api.staging.example/' }
+  // The deployment names itself through PSP_ENVIRONMENT and the matching entry applies, so one
+  // registration serves local, staging and production and promoting is a variable, not a re-seed.
+  // Takes precedence over externalProviderBaseUrl when it has an entry for the running environment.
+  externalProviderBaseUrlByEnvironment?: Partial<Record<PlatformEnvironment, string>>;
   externalProviderApiKeyHash?: string;                    // bcrypt, NEVER returned in API responses
   externalProviderApiKeyPrefix?: string;                  // visible prefix for UI (e.g. "fds_live_...")
   externalProviderAuthScheme?: IntegrationAuth;
@@ -2920,6 +2929,47 @@ Global listings sort by `recordCreatedDateTime` (demo-scale collscan; no support
 ---
 
 ## 7. Environment Variables Reference
+
+### 7.0 Service links: which environment, not which host
+
+Every inter-service address in the platform is declared as a NAMED LINK, and the deployment says
+which environment it is. One variable selects the column:
+
+```bash
+PSP_ENVIRONMENT=development     # 'development' | 'staging' | 'production'; unset means development
+```
+
+The addresses for every link in every environment are declared once, in `LINK_MATRIX`
+(`packages/platform-links/src/index.ts`). A stored record holds the NAME (`{{bankcore}}`,
+`{{psp}}`, `{{pspFrontend}}`, `{{authority}}`, `{{authorityIssuer}}`) and the address is bound when
+the call is made, against the environment the process is actually running in.
+
+Why the indirection: the same seeded database is promoted from local to Kanopy to production, where
+a service answers on a different host and in staging on an in-cluster name a browser cannot reach at
+all. A host baked in at seed time is correct in exactly the environment the seeder ran in.
+
+Precedence, narrowest first:
+
+1. A route's own `baseUrlByEnvironment` entry (per event, per direction).
+2. The provider's `externalProviderBaseUrlByEnvironment` entry.
+3. The per-link environment variable (`PSP_BANKCORE_BASE_URL`, `PSP_BASE_URL`, …), when it holds an
+   absolute http(s) URL. A value that cannot be a host is ignored rather than accepted.
+4. `LINK_MATRIX[link][PSP_ENVIRONMENT]`.
+
+Failure is loud at every step. An unknown environment name and an unknown link name both throw where
+they are read, and `setup:check` binds every provider record's links so a wrong host is reported at
+setup rather than at the first dispatch. A route with no path and no per-environment URL is reported
+as unconfigured; it is never resolved to a bare host.
+
+Two shapes for a route, chosen by whether a path is given:
+
+- WITH a path, the environment entry is a host and the path is appended. Preferred: the operation is
+  the same everywhere, so stating it once keeps the environments from drifting.
+- WITHOUT a path, the environment entry is the WHOLE URL. For services that do not agree on their
+  paths, such as a sandbox exposing `/sandbox/v2/score` where production exposes `/v2/score`.
+
+Direction matters for the default: an outbound route belongs to the provider, an inbound callback is
+an address on THIS platform, so it defaults to `{{psp}}` and never inherits the provider's host.
 
 ```bash
 # .env  (see psp/backend/src/vendors/setup/env.example for full reference)

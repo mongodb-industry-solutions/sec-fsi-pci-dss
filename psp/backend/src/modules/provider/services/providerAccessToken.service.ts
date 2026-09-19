@@ -1,4 +1,6 @@
 import { Db } from 'mongodb';
+import { resolveLinks } from '@leafypay/platform-links';
+import { tryProviderBaseUrl } from './providerLink.service';
 import { IntegrationProviderType, OAuth2Config } from '../models/externalProviderArrangement.model';
 import { getActiveProvidersForType } from './integrationRegistry.service';
 import { getL1QEClient } from '../../../vendors/encryption/roleClients';
@@ -28,7 +30,7 @@ export interface AccessTokenResult {
 }
 
 export interface ProviderEndpointResult {
-  // Absolute base URL of the provider, as the seeded record holds it.
+  // Absolute base URL of the provider: the link the record names, bound to this environment.
   baseUrl?: string;
   error?: string;
 }
@@ -61,9 +63,10 @@ function oauth2ConfigOf(
 /**
  * Resolves where the provider of a capability lives, from the record rather than from the environment.
  *
- * This is what makes repointing the PSP at another bank a data change: the seeder writes the absolute
- * endpoint per environment, and nothing at runtime falls back to a variable, because a silent fallback is
- * how two environments end up disagreeing about which bank they are talking to.
+ * This is what makes repointing the PSP at another bank a data change: WHICH service is answered by the
+ * record, and only its address in this environment comes from configuration. An unresolvable name is an
+ * error and never a fallback, because a silent fallback is how two environments end up disagreeing about
+ * which bank they are talking to.
  */
 export async function getProviderBaseUrl(
   providerType: IntegrationProviderType,
@@ -77,13 +80,16 @@ export async function getProviderBaseUrl(
   }
   // The credential and the address belong to the same record: a provider carrying one without the other
   // is misconfigured, and picking them from different records is how a token ends up at the wrong bank.
-  const provider = providers.find((candidate) => (
-    oauth2ConfigOf(candidate) && candidate.externalProviderBaseUrl?.startsWith('http')
-  ));
-  if (!provider) {
-    return { error: `no active ${providerType} provider carries an absolute base URL with credentials` };
+  //
+  // The record declares its address PER ENVIRONMENT and may name a platform link rather than a host,
+  // so it is bound to this environment before it is judged: testing `startsWith('http')` on the raw
+  // value rejected every record the seeder writes.
+  for (const candidate of providers) {
+    if (!oauth2ConfigOf(candidate)) continue;
+    const { baseUrl } = tryProviderBaseUrl(candidate);
+    if (baseUrl?.startsWith('http')) return { baseUrl: baseUrl.replace(/\/$/, '') };
   }
-  return { baseUrl: provider.externalProviderBaseUrl!.replace(/\/$/, '') };
+  return { error: `no active ${providerType} provider carries a resolvable base URL with credentials` };
 }
 
 /**
@@ -123,8 +129,17 @@ export async function getProviderAccessToken(
   });
   if (scope) body.set('scope', scope);
 
+  // The record names the authority; the address is this environment's. Resolved here rather than at
+  // seed time so the same record works in a cluster where the authority is an in-cluster service.
+  let tokenEndpoint: string;
   try {
-    const response = await fetchImpl(oauth2.tokenEndpoint, {
+    tokenEndpoint = resolveLinks(oauth2.tokenEndpoint);
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+
+  try {
+    const response = await fetchImpl(tokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
       body: body.toString(),

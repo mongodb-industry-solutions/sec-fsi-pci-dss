@@ -632,6 +632,7 @@
           "accounts",
           "balances",
           "transactions",
+          "funds-confirmations",
           "demo-credits"
         ],
         "tokenCachingEnabled": true
@@ -738,8 +739,7 @@
         "clientId": "",
         "tokenEndpoint": "protocol/openid-connect/token",
         "scopes": [
-          "payments",
-          "funds-confirmations"
+          "payments"
         ],
         "tokenCachingEnabled": true
       }

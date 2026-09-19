@@ -188,6 +188,7 @@ export async function listIntegrations(
 type UpdateablePatch = Partial<Pick<
   ExternalProviderArrangement,
   | 'externalProviderApiEndpoint'
+  | 'externalProviderBaseUrlByEnvironment'
   | 'externalProviderTriggerEvents'
   | 'externalProviderEvents'
   | 'externalProviderMode'
@@ -326,6 +327,22 @@ export async function getActiveProvidersForType(
     if (!a.externalProviderIsInternal && b.externalProviderIsInternal) return 1;
     return (a.routingPriority ?? 100) - (b.routingPriority ?? 100);
   });
+}
+
+/**
+ * The health a response code implies, which is not the same as whether the request succeeded.
+ *
+ * A 4xx means the provider is up, reachable, authenticated against and behaving to specification: it
+ * READ our request and refused it. That is a fault in what we sent, and recording it against the
+ * provider's health is how a healthy bank came to be shown as degraded because one request carried a
+ * consent id it did not recognise, or a scope we had forgotten to ask for. Whoever saw that badge went
+ * looking for a problem at the bank, and the problem was in our own configuration.
+ *
+ * 5xx is the provider failing, which is what degraded is for. Transport failure and timeout are
+ * unreachable, and stay the caller's to report.
+ */
+export function healthFromResponseCode(code: number): 'ok' | 'degraded' {
+  return code >= 500 ? 'degraded' : 'ok';
 }
 
 export async function updateHealthStatus(

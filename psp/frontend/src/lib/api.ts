@@ -1901,8 +1901,11 @@ export const api = {
       const qs = params ? '?' + new URLSearchParams(Object.entries(params).filter(([,v]) => v) as [string,string][]).toString() : '';
       return apiFetch<{ integrations: Record<string, unknown>[] }>(`/api/v1/providers/vendors${qs}`, {}, token);
     },
+    // `links` is the server's binding of the link names the record stores, for this environment.
     get: (id: string, token: string) =>
-      apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/providers/vendors/${id}`, {}, token),
+      apiFetch<{ integration: Record<string, unknown>; links?: Record<string, unknown> }>(
+        `/api/v1/providers/vendors/${id}`, {}, token,
+      ),
     create: (body: Record<string, unknown>, token: string) =>
       apiFetch<{ integration: Record<string, unknown>; apiKey?: string }>(
         '/api/v1/providers/vendors', { method: 'POST', body: JSON.stringify(body) }, token
@@ -1919,15 +1922,28 @@ export const api = {
       apiFetch<{ status: string; latencyMs: number }>(`/api/v1/providers/vendors/${id}/test`, { method: 'POST' }, token),
     suspend: (id: string, token: string) =>
       apiFetch<{ integration: Record<string, unknown> }>(`/api/v1/providers/vendors/${id}/suspend`, { method: 'POST' }, token),
-    events: (id: string, token: string, page = 1, limit = 20) =>
-      apiFetch<{ events: Record<string, unknown>[]; total: number; page: number }>(
-        `/api/v1/providers/vendors/${id}/events?page=${page}&limit=${limit}`, {}, token
-      ),
+    // Filters are applied in the QUERY, not on the returned page: a page-local filter reports "3
+    // errors" when the collection holds three hundred, which is a wrong answer rather than a partial one.
+    events: (
+      id: string,
+      token: string,
+      page = 1,
+      limit = 20,
+      filters: {
+        direction?: string; type?: string; status?: string; from?: string; to?: string; q?: string;
+      } = {},
+    ) => {
+      const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+      for (const [key, value] of Object.entries(filters)) if (value) qs.set(key, value);
+      return apiFetch<{ events: Record<string, unknown>[]; total: number }>(
+        `/api/v1/providers/vendors/${id}/events?${qs.toString()}`, {}, token,
+      );
+    },
     testMapping: (id: string, body: { direction: 'outbound' | 'inbound'; payload: Record<string, unknown> }, token: string) =>
       apiFetch<{ original: Record<string, unknown>; transformed: Record<string, unknown>; appliedRules: number; errors: string[] }>(
         `/api/v1/providers/vendors/${id}/test-mapping`, { method: 'POST', body: JSON.stringify(body) }, token
       ),
-    runTest: (id: string, body: { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string }, token: string) =>
+    runTest: (id: string, body: { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string; eventName?: string }, token: string) =>
       apiFetch<{
         direction: 'outbound' | 'inbound'; executed: boolean; status: string; latencyMs: number;
         responseCode?: number; responseBody?: unknown; transformed: Record<string, unknown>; appliedRules: number; targetUrl?: string; error?: string;

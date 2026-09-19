@@ -3,7 +3,9 @@ import { useState, useEffect } from 'react';
 import { FlaskConical, Play, Info } from 'lucide-react';
 import { useIntegration } from '../_context';
 import type { MappingRule, FieldMappingConfig, ProviderEventConfig, EventFieldMapping } from '../_context';
-import { FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel } from '../_shared';
+import {
+  FieldMappingMatrix, SaveBtn, Card, StatusToggle, FieldLabel, EnvironmentRoutes,
+} from '../_shared';
 import { api } from '../../../../../../../lib/api';
 import { getOutboundSample } from '../_samples';
 import { useNotify } from '../../../../../../../components/ui/ConfirmProvider';
@@ -63,7 +65,7 @@ function CategorySettings({
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OutboundPage() {
-  const { integration, reload, token } = useIntegration();
+  const { integration, links, reload, token } = useIntegration();
   const notify = useNotify();
 
   if (!integration) return null;
@@ -76,6 +78,7 @@ export default function OutboundPage() {
   const isInternal = integration.externalProviderIsInternal;
 
   const [togglingStatus, setTogglingStatus] = useState(false);
+  const [savingEnvironments, setSavingEnvironments] = useState(false);
   const [endpoint, setEndpoint]       = useState(integration.externalProviderApiEndpoint ?? '');
   const [httpMethod, setHttpMethod]   = useState(fmc.outboundHttpMethod ?? 'POST');
   const [mode, setMode]               = useState(integration.externalProviderMode ?? 'sync');
@@ -126,7 +129,10 @@ export default function OutboundPage() {
   const [running, setRunning]         = useState(false);
   const [runResult, setRunResult]     = useState<{ status: string; latencyMs: number; responseCode?: number; responseBody?: unknown; targetUrl?: string; transformed: Record<string, unknown>; error?: string } | null>(null);
   const effectiveTarget = overrideUrl.trim() || endpoint;
-  const endpointInfo = classifyEndpoint(effectiveTarget);
+  // The provider's own host in THIS environment, as the server resolved it. Without it a relative
+  // path reads as the PSP's own API, which for a bank-served capability is the wrong system entirely.
+  const activeBaseUrl = links?.environments.find((e) => e.active)?.resolved;
+  const endpointInfo = classifyEndpoint(effectiveTarget, activeBaseUrl);
 
   async function toggleStatus() {
     setTogglingStatus(true);
@@ -211,11 +217,31 @@ export default function OutboundPage() {
     if (!endpointInfo.valid) { notify('Enter a valid URL (https://… or an internal /path).', 'error'); return; }
     setRunning(true); setTestError(''); setRunResult(null);
     try {
-      const r = await api.integrations.runTest(id, { direction: 'outbound', payload: parsed, overrideUrl: overrideUrl.trim() || undefined }, token);
+      const r = await api.integrations.runTest(id, { direction: 'outbound', payload: parsed, overrideUrl: overrideUrl.trim() || undefined, eventName: selectedEvent || undefined }, token);
       setRunResult(r);
       notify(`Run test ${r.status}${r.responseCode ? ` (HTTP ${r.responseCode})` : ''}. See the Events tab.`, r.status === 'received' ? 'success' : 'error');
     } catch (err) { setTestError((err as Error).message); }
     finally { setRunning(false); }
+  }
+
+  /**
+   * Persists the per-environment base URLs.
+   *
+   * A blank entry is REMOVED rather than stored as an empty string: an empty address resolves to a
+   * URL with no host and fails as a malformed request, where an absent one correctly reads as "this
+   * provider is not configured for that environment".
+   */
+  async function saveEnvironments(next: Record<string, string>) {
+    setSavingEnvironments(true);
+    try {
+      const cleaned = Object.fromEntries(
+        Object.entries(next).map(([key, value]) => [key, value.trim()]).filter(([, value]) => value),
+      );
+      await api.integrations.update(id, { externalProviderBaseUrlByEnvironment: cleaned }, token);
+      notify('Environment base URLs saved.', 'success');
+      reload(true);
+    } catch (err) { notify((err as Error).message, 'error'); }
+    finally { setSavingEnvironments(false); }
   }
 
   const endpointPlaceholder = isInternal
@@ -265,6 +291,16 @@ export default function OutboundPage() {
           </p>
         )}
       </Card>
+
+      {/* ── Where this route goes, per environment ─────────────────────────── */}
+      <EnvironmentRoutes
+        links={links}
+        direction="outbound"
+        selectedEvent={selectedEvent}
+        storedByEnvironment={integration.externalProviderBaseUrlByEnvironment}
+        saving={savingEnvironments}
+        onSave={saveEnvironments}
+      />
 
       {/* ── Endpoint + transport ───────────────────────────────────────────── */}
       <Card

@@ -28,6 +28,11 @@ const h = vi.hoisted(() => {
 vi.mock('../../../../../psp/backend/src/modules/provider/services/integrationRegistry.service', () => ({
   getActiveProviderForType: h.findOne,
   updateHealthStatus: vi.fn().mockResolvedValue(undefined),
+  // The real one, not a stub: it is a pure function of the response code, and a mock of it would be
+  // asserting that this test file agrees with itself. An entry missing here is also not inert, since
+  // the dispatcher calls it inside the try that decides the outcome, so the absence surfaces as a
+  // dispatch that failed rather than as an undefined function.
+  healthFromResponseCode: (code: number) => (code >= 500 ? 'degraded' : 'ok'),
   hashPayload: vi.fn().mockReturnValue('hash-abc'),
 }));
 

@@ -15,11 +15,124 @@ import {
   runIntegrationTest,
   getIntegrationEvents,
 } from '../services/integrationDispatch.service';
+import {
+  platformEnvironment, PLATFORM_ENVIRONMENTS, type PlatformEnvironment,
+} from '@leafypay/platform-links';
+import { declaredFor, providerBaseUrl, resolveConfiguredUrl } from '../services/providerLink.service';
+import type { ExternalProviderArrangement } from '../models/externalProviderArrangement.model';
 
 const E = { type: 'object', properties: { error: { type: 'string' } } };
 
+/**
+ * The capability segment the inbound callback route is served under, for a provider's type.
+ *
+ * Mirrors `GROUP_HANDLER` in the callback controller, which is the thing that actually answers, so a
+ * URL shown here is a URL that resolves. The provider type doubles as the segment for the
+ * capabilities whose key IS the type; the rest are named because they are not.
+ */
+const CALLBACK_GROUP: Partial<Record<string, string>> = {
+  fraud_detection: 'fds',
+  aml_monitoring: 'aml',
+  kyc_identity: 'kyc',
+  kyb_business: 'kyb',
+  hrp_sanctions: 'hrp',
+  card_authorization: 'card-authorization',
+  card_issuer: 'card-issuer',
+};
+
+function callbackGroupFor(providerType: string): string {
+  return CALLBACK_GROUP[providerType] ?? 'generic';
+}
+
 function isAuthorized(request: AuthenticatedRequest): boolean {
   return request.userRole === 'manager';
+}
+
+/**
+ * Where this provider's configured paths go, in EVERY environment, with the active one marked.
+ *
+ * The admin screens used to render the stored value and nothing else, so the four capabilities the
+ * bank serves showed `/v1/cards/validations` with a note reading "this points to the PSP internal
+ * API; the request will be handled in-process". Both halves were wrong: the path is the bank's, and it
+ * is dispatched out of this process to another institution. An operator reading that screen was being
+ * told the opposite of what happens.
+ *
+ * Every environment and not only the running one, because the record declares all of them and the
+ * point of declaring them is that they can be reviewed and corrected in one place, before the
+ * deployment that would otherwise be the first thing to discover a wrong host. Computed per response
+ * rather than stored: a stored copy is one more thing that can disagree with the environment.
+ */
+function resolvedLinksFor(provider: ExternalProviderArrangement): {
+  activeEnvironment: PlatformEnvironment;
+  environments: Array<{
+    environmentId: PlatformEnvironment;
+    active: boolean;
+    /** What the record holds for this environment, which may be a platform link name. */
+    declared?: string;
+    resolved?: string;
+    error?: string;
+    /** Every configured route, both directions, resolved for this environment. */
+    routes: Array<{
+      event: string;
+      direction: 'outbound' | 'inbound';
+      httpMethod?: string;
+      path?: string;
+      declared?: string;
+      resolved?: string;
+      error?: string;
+    }>;
+  }>;
+} {
+  const activeEnvironment = platformEnvironment();
+  const events = provider.externalProviderEvents ?? [];
+
+  const environments = PLATFORM_ENVIRONMENTS.map((environmentId) => {
+    const env = { ...process.env, PSP_ENVIRONMENT: environmentId };
+    const declared = declaredFor(provider, environmentId);
+    let resolved: string | undefined;
+    let error: string | undefined;
+    try {
+      resolved = providerBaseUrl(provider, env);
+    } catch (err) {
+      error = (err as Error).message;
+    }
+
+    const routes = events.flatMap((entry) => {
+      const built: Array<{
+        event: string; direction: 'outbound' | 'inbound'; httpMethod?: string;
+        path?: string; declared?: string; resolved?: string; error?: string;
+      }> = [];
+      const outbound = entry.outbound;
+      if (outbound?.url || outbound?.baseUrlByEnvironment) {
+        built.push({
+          event: entry.event,
+          direction: 'outbound',
+          httpMethod: outbound.httpMethod ?? 'POST',
+          ...resolveConfiguredUrl(provider, 'outbound', outbound.url, outbound.baseUrlByEnvironment, environmentId, env),
+        });
+      }
+      // The inbound path falls back to the CONVENTIONAL one, which is what the provider is told to
+      // call when the record stores nothing. It was derived in the browser from a frontend variable,
+      // so the address handed to an external system was assembled somewhere that cannot know the
+      // deployment's own hosts. Derived here instead, from the same convention the receiver serves.
+      const inbound = entry.inbound;
+      const inboundPath = inbound?.callbackUrl
+        ?? `/api/v1/providers/${callbackGroupFor(provider.externalProviderArrangementType)}`
+          + `/${provider.externalProviderArrangementInstanceReference}`
+          + `/${encodeURIComponent(entry.event)}/callback`;
+      built.push({
+        event: entry.event,
+        direction: 'inbound',
+        httpMethod: 'POST',
+        ...resolveConfiguredUrl(provider, 'inbound', inboundPath, inbound?.baseUrlByEnvironment, environmentId, env),
+      });
+      return built;
+    });
+
+    return { environmentId, active: environmentId === activeEnvironment, declared, resolved, error, routes };
+  });
+
+  return { activeEnvironment, environments };
 }
 
 export async function integrationRegistryController(fastify: FastifyInstance) {
@@ -137,7 +250,11 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const integration = await getIntegration(fastify.db, id);
       if (!integration) return reply.status(404).send({ error: 'Integration not found' });
-      return { integration };
+      // The record NAMES its links; the admin screens have to show the address this environment will
+      // actually dial, and they cannot resolve it themselves (the resolution reads this process's
+      // environment, and these are browser-rendered pages). Computed per response rather than stored,
+      // because a stored copy would be one more thing that can disagree with the environment.
+      return { integration, links: resolvedLinksFor(integration) };
     },
   });
 
@@ -156,6 +273,10 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
         type: 'object',
         properties: {
           externalProviderApiEndpoint:       { type: 'string' },
+          // The provider's address per environment. `additionalProperties` rather than an enum of the
+          // three names, because an unknown key must be REPORTED by the resolver (which names the
+          // valid ones) and not silently dropped by the schema before anyone sees it.
+          externalProviderBaseUrlByEnvironment: { type: 'object', additionalProperties: { type: 'string' } },
           externalProviderTriggerEvents:     { type: 'array', items: { type: 'string' } },
           externalProviderEvents:            { type: 'array', items: { type: 'object', additionalProperties: true } },
           externalProviderMode:              { type: 'string', enum: ['sync','async'] },
@@ -181,8 +302,19 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       const { id } = request.params as { id: string };
       const body = request.body as Record<string, unknown>;
 
+      /**
+       * Copied field by field, so a body key that is not updateable cannot reach the database.
+       *
+       * The list has to be kept in step with `UpdateablePatch`, and it was not: `externalProviderEvents`
+       * was declared updateable, accepted by the schema, sent by the outbound and inbound screens on
+       * every save, and dropped here. The request answered 200 with the record unchanged, so every
+       * per-event edit an operator made was discarded while the UI reported success. The same omission
+       * swallowed the per-environment base URLs. Anything added to `UpdateablePatch` belongs here too.
+       */
       const patch: Parameters<typeof updateIntegration>[2] = {};
       if (body.externalProviderApiEndpoint !== undefined)       patch.externalProviderApiEndpoint   = body.externalProviderApiEndpoint as string;
+      if (body.externalProviderBaseUrlByEnvironment !== undefined) patch.externalProviderBaseUrlByEnvironment = body.externalProviderBaseUrlByEnvironment as never;
+      if (body.externalProviderEvents !== undefined)            patch.externalProviderEvents        = body.externalProviderEvents as never;
       if (body.externalProviderTriggerEvents !== undefined)     patch.externalProviderTriggerEvents = body.externalProviderTriggerEvents as string[];
       if (body.externalProviderMode !== undefined)              patch.externalProviderMode          = body.externalProviderMode as never;
       if (body.externalProviderTimeoutMs !== undefined)         patch.externalProviderTimeoutMs     = body.externalProviderTimeoutMs as number;
@@ -313,6 +445,9 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
           direction:   { type: 'string', enum: ['outbound', 'inbound'] },
           payload:     { type: 'object' },
           overrideUrl: { type: 'string' },
+          // Which event's config to test. Outbound config is per event, so without this the test
+          // ran against whichever one happened to be first and reported a result for another route.
+          eventName:   { type: 'string' },
         },
       },
       response: { 200: { type: 'object', additionalProperties: true }, 403: E, 404: E },
@@ -321,9 +456,12 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       if (!isAuthorized(request as unknown as AuthenticatedRequest))
         return reply.status(403).send({ error: 'Forbidden' });
       const { id } = request.params as { id: string };
-      const { direction, payload, overrideUrl } = request.body as { direction: 'outbound' | 'inbound'; payload: Record<string, unknown>; overrideUrl?: string };
+      const { direction, payload, overrideUrl, eventName } = request.body as {
+        direction: 'outbound' | 'inbound'; payload: Record<string, unknown>;
+        overrideUrl?: string; eventName?: string;
+      };
       try {
-        return await runIntegrationTest(fastify.db, id, direction, payload, overrideUrl);
+        return await runIntegrationTest(fastify.db, id, direction, payload, overrideUrl, eventName);
       } catch (err) {
         if ((err as { code?: number }).code === 404) return reply.status(404).send({ error: 'Integration not found' });
         throw err;
@@ -402,8 +540,16 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
       querystring: {
         type: 'object',
         properties: {
-          page:  { type: 'string' },
-          limit: { type: 'string' },
+          page:      { type: 'string' },
+          limit:     { type: 'string' },
+          // Direction is the filter an audit reaches for first: "are this provider's callbacks
+          // arriving" is unanswerable from a list that interleaves both and labels neither.
+          direction: { type: 'string', enum: ['outbound', 'inbound'] },
+          type:      { type: 'string', enum: ['dispatch', 'callback', 'health_check', 'test'] },
+          status:    { type: 'string', enum: ['sent', 'received', 'error', 'timeout'] },
+          from:      { type: 'string' },
+          to:        { type: 'string' },
+          q:         { type: 'string' },
         },
       },
       response: { 200: { type: 'object', additionalProperties: true }, 403: E },
@@ -413,8 +559,18 @@ export async function integrationRegistryController(fastify: FastifyInstance) {
         return reply.status(403).send({ error: 'Forbidden' });
 
       const { id } = request.params as { id: string };
-      const { page, limit } = request.query as { page?: string; limit?: string };
-      return getIntegrationEvents(fastify.db, id, parseInt(page ?? '1'), parseInt(limit ?? '20'));
+      const { page, limit, ...filters } = request.query as {
+        page?: string; limit?: string;
+        direction?: 'outbound' | 'inbound';
+        type?: 'dispatch' | 'callback' | 'health_check' | 'test';
+        status?: 'sent' | 'received' | 'error' | 'timeout';
+        from?: string; to?: string; q?: string;
+      };
+      // Capped, because this endpoint also backs the evidence export and an uncapped limit is an
+      // unbounded response on a timeseries collection.
+      const requested = parseInt(limit ?? '20');
+      const bounded = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 500) : 20;
+      return getIntegrationEvents(fastify.db, id, parseInt(page ?? '1'), bounded, filters);
     },
   });
 }

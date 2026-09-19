@@ -34,6 +34,59 @@ describe('FR-v6 Integration Hub routes', () => {
     await app.close();
   });
 
+  // ── PATCH allowlist ─────────────────────────────────────────────────────────
+  //
+  // THE DEFECT THESE GUARD AGAINST. The PATCH handler copies body keys into the update one at a
+  // time, that list drifted from the declared updateable fields, and a key missing from it was
+  // dropped in silence: the request answered 200 with the record unchanged. `externalProviderEvents`
+  // was in that state, so every per-event edit made on the Outbound and Inbound screens was
+  // discarded while the UI reported success. A round trip is the only thing that catches it, because
+  // the response is a 200 either way.
+
+  skip('PATCH persists the per-event configuration it reports as saved', async () => {
+    const events = [{
+      event: 'transaction.authorized',
+      outbound: { url: '/v1/score', httpMethod: 'POST', mapping: [] },
+      inbound: { mapping: [] },
+    }];
+    const patched = await supertest(app.server)
+      .patch(`/api/v1/providers/vendors/${createdId}`)
+      .set(SYSTEM_ADMIN_HEADERS)
+      .send({ externalProviderEvents: events });
+    expect(patched.status).toBe(200);
+
+    const reread = await supertest(app.server)
+      .get(`/api/v1/providers/vendors/${createdId}`)
+      .set(SYSTEM_ADMIN_HEADERS);
+    expect(reread.body.integration.externalProviderEvents?.[0]?.outbound?.url).toBe('/v1/score');
+  });
+
+  skip('PATCH persists the per-environment base URLs and resolves the active one', async () => {
+    const patched = await supertest(app.server)
+      .patch(`/api/v1/providers/vendors/${createdId}`)
+      .set(SYSTEM_ADMIN_HEADERS)
+      .send({ externalProviderBaseUrlByEnvironment: {
+        development: 'http://localhost:9100',
+        staging: 'https://sandbox.vendor.example',
+        production: 'https://api.vendor.example',
+      } });
+    expect(patched.status).toBe(200);
+
+    const reread = await supertest(app.server)
+      .get(`/api/v1/providers/vendors/${createdId}`)
+      .set(SYSTEM_ADMIN_HEADERS);
+    expect(reread.body.integration.externalProviderBaseUrlByEnvironment?.staging)
+      .toBe('https://sandbox.vendor.example');
+    // Every environment is reported, with the running one marked, so a wrong host is visible before
+    // the deployment that would otherwise be the first thing to find it.
+    const byId = Object.fromEntries(
+      (reread.body.links?.environments ?? []).map((e: { environmentId: string }) => [e.environmentId, e]),
+    );
+    expect(byId.staging.resolved).toBe('https://sandbox.vendor.example');
+    expect(byId.production.resolved).toBe('https://api.vendor.example');
+    expect(byId[reread.body.links.activeEnvironment].active).toBe(true);
+  });
+
   // ── Role guard ──────────────────────────────────────────────────────────────
 
   skip('GET /api/v1/integrations returns 403 for non-system_admin', async () => {

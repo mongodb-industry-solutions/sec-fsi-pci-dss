@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Plus, Trash2, Info } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Plus, Trash2, Info, ExternalLink, AlertTriangle } from 'lucide-react';
 import type { MappingRule } from './_context';
 import { JsonEditor } from '../../../../../../components/json/JsonEditor';
 
@@ -306,5 +306,132 @@ export function FieldLabel({ label, hint }: { label: string; hint: string }) {
         </span>
       </span>
     </span>
+  );
+}
+
+
+// ── EnvironmentRoutes ─────────────────────────────────────────────────────────
+//
+// Where a configured route actually goes, in every environment, and the place to change it.
+//
+// It exists because a stored path cannot answer that question. A record holds the standard path
+// (`/v1/cards/validations`) and the host it belongs to varies by deployment: loopback locally, an
+// in-cluster service name in staging, an ingress host in production. The screen used to render the
+// path alone, under a note claiming the request was handled inside this process, which for every
+// capability the bank serves was the opposite of what happens. This is the screen where somebody
+// checks where cardholder data is sent, so the answer has to be on it, for all environments at once
+// rather than only the one that happens to be running.
+//
+// Editable here and not only in a manifest, because the addresses are provider data: a new vendor is
+// registered through this UI and its sandbox and production hosts are part of registering it.
+
+export interface EnvironmentRoute {
+  event: string;
+  direction: 'outbound' | 'inbound';
+  httpMethod?: string;
+  path?: string;
+  declared?: string;
+  resolved?: string;
+  error?: string;
+}
+
+export interface EnvironmentView {
+  environmentId: string;
+  active: boolean;
+  declared?: string;
+  resolved?: string;
+  error?: string;
+  routes: EnvironmentRoute[];
+}
+
+export function EnvironmentRoutes({
+  links, direction, selectedEvent, storedByEnvironment, onSave, saving,
+}: {
+  links: { activeEnvironment: string; environments: EnvironmentView[] } | null;
+  direction: 'outbound' | 'inbound';
+  selectedEvent: string;
+  /** The provider-level map as stored, which is what the inputs edit. */
+  storedByEnvironment?: Record<string, string>;
+  onSave: (next: Record<string, string>) => Promise<void> | void;
+  saving?: boolean;
+}) {
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [dirty, setDirty] = useState(false);
+
+  // Re-seeded from the record whenever it changes, unless the operator has started editing: taking
+  // their half-typed host away on a background refresh is worse than showing a stale one.
+  useEffect(() => {
+    if (!dirty) setDraft({ ...(storedByEnvironment ?? {}) });
+  }, [storedByEnvironment, dirty]);
+
+  if (!links) return null;
+
+  return (
+    <Card
+      title="Environments"
+      subtitle={`Base URL per environment. The running deployment is ${links.activeEnvironment}; its row is the one in use.`}
+    >
+      <div className="space-y-3">
+        {links.environments.map((env) => {
+          const route = env.routes.find((r) => r.event === selectedEvent && r.direction === direction)
+            ?? env.routes.find((r) => r.direction === direction);
+          return (
+            <div
+              key={env.environmentId}
+              className={`rounded-lg border p-3 space-y-2 ${
+                env.active ? 'border-[#00ED64] bg-[#00ED64]/5' : 'border-gray-200'
+              }`}
+            >
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-gray-800">{env.environmentId}</span>
+                {env.active && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#001E2B] text-[#00ED64] font-medium">
+                    in use here
+                  </span>
+                )}
+              </div>
+
+              <input
+                value={draft[env.environmentId] ?? ''}
+                onChange={(e) => { setDirty(true); setDraft({ ...draft, [env.environmentId]: e.target.value }); }}
+                placeholder={direction === 'inbound' ? '{{psp}}' : 'https://api.provider.example or {{bankcore}}'}
+                className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-xs font-mono"
+              />
+
+              {/* The full target, which is the thing being asked about. Shown per environment so a
+                  wrong host is visible before the deployment that would otherwise discover it. */}
+              {env.error ? (
+                <p className="flex items-start gap-1.5 text-[11px] text-red-700">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />{env.error}
+                </p>
+              ) : route?.error ? (
+                <p className="flex items-start gap-1.5 text-[11px] text-red-700">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />{route.error}
+                </p>
+              ) : route?.resolved ? (
+                <p className="flex items-start gap-1.5 text-[11px] text-gray-600">
+                  <ExternalLink size={12} className="mt-0.5 shrink-0" />
+                  <span className="font-mono break-all">
+                    {direction === 'outbound' && route.httpMethod ? `${route.httpMethod} ` : ''}{route.resolved}
+                  </span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-gray-400">No route configured for this environment.</p>
+              )}
+            </div>
+          );
+        })}
+
+        <div className="flex items-center gap-3">
+          <SaveBtn onClick={async () => { await onSave(draft); setDirty(false); }} saving={!!saving} saved={false} label="Save base URLs" />
+          {/* A path is optional on purpose: without one, each environment's entry is the whole URL,
+              which is how two deployments of the same service can disagree about their paths. */}
+          <p className="text-[11px] text-gray-400">
+            With a path configured above, these are hosts and the path is appended. With no path, each
+            entry is the complete URL for that environment.
+          </p>
+        </div>
+      </div>
+    </Card>
   );
 }

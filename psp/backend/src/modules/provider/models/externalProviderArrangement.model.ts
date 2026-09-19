@@ -1,3 +1,5 @@
+import type { PlatformEnvironment } from '@leafypay/platform-links';
+
 // Collection names migrated to pure control records (dev.v7 plan, Fase 2). The constant
 // IDENTIFIERS keep their INTEGRATION_* names until the module rename in Fase 3, only the stored
 // collection VALUES change here, so no importer needs touching and the DB is BIAN-clean.
@@ -30,6 +32,18 @@ export type IntegrationStatus  = 'active' | 'inactive' | 'test' | 'suspended';
 export type IntegrationMode    = 'sync' | 'async';
 export type IntegrationAuth    = 'bearer' | 'api_key' | 'hmac' | 'oauth2_cc';
 export type IntegrationHealth  = 'ok' | 'degraded' | 'unreachable' | 'unknown';
+
+/**
+ * A provider's base URL in each environment, indexed by the environment's own id.
+ *
+ * The key is the value `PSP_ENVIRONMENT` carries (`development`, `staging`, `production`), so the
+ * entry is selected with no mapping in between. The value is an absolute URL, or the name of a
+ * platform link when the provider is a platform service whose addresses are declared centrally.
+ *
+ * Partial on purpose: a provider that does not exist in one environment has no entry for it, and
+ * that must read as "not configured here" rather than as an empty address.
+ */
+export type ProviderBaseUrlByEnvironment = Partial<Record<PlatformEnvironment, string>>;
 export type RoutingStrategy    = 'primary_fallback' | 'round_robin' | 'weighted' | 'parallel';
 
 // ── Field Mapping ─────────────────────────────────────────────────────────────
@@ -250,7 +264,16 @@ export interface RetryPolicy {
 // mapping, auth, retries and timeout are NEVER vendor-global, always per event. There is no vendor
 // base URL. The inbound callback is per event+vendor (§7.7).
 export interface ProviderEventOutboundConfig {
-  url?: string;                          // outbound endpoint the PSP calls for THIS event
+  url?: string;                          // outbound PATH the PSP calls for THIS event
+  /**
+   * This route's host in each environment, overriding the provider-level map.
+   *
+   * Absent means "the provider's own address", which is the normal case: a bank serves every one of
+   * its operations on one host. It exists for the provider that does not, such as a vendor whose
+   * sandbox sits on a different domain from the operation being configured, and so that the screen
+   * where a URL is set can always show the path and its per-environment hosts together.
+   */
+  baseUrlByEnvironment?: ProviderBaseUrlByEnvironment;
   httpMethod?: 'POST' | 'GET' | 'PUT' | 'PATCH' | 'DELETE';
   // v37 P6.2d: declared headers, templated from the payload the same way the url is. Berlin Group carries
   // the consent in `Consent-ID` and the trace in `X-Request-ID`, so a standard bank API cannot be driven by
@@ -263,7 +286,16 @@ export interface ProviderEventOutboundConfig {
   timeoutMs?: number;
 }
 export interface ProviderEventInboundConfig {
-  callbackUrl?: string;                  // inbound callback URL the vendor calls for THIS event (§7.7)
+  callbackUrl?: string;                  // inbound callback PATH (or absolute URL) the vendor calls (§7.7)
+  /**
+   * The host the provider is told to call back on, per environment.
+   *
+   * This side is OURS, not theirs: it is the address at which this platform receives. It matters for
+   * the same reason the outbound side does and slightly more, because it is a value handed to an
+   * external system, so getting it wrong means a provider holding an address that stops existing
+   * the moment the environment changes. Absent means the `{{psp}}` link.
+   */
+  baseUrlByEnvironment?: ProviderBaseUrlByEnvironment;
   mapping?: FieldMapping[];              // inbound attribute mapping for this event
   auth?: IntegrationAuthConfig;          // per-event inbound auth (e.g. hmacInbound, anti-spoofing)
   referenceLocation?: 'body' | 'header'; // where clientReference (= correlationId) travels (§7.7)
@@ -288,11 +320,29 @@ export interface ExternalProviderArrangement {
   externalProviderApiKeyHash?: string;       // bcrypt, never returned
   externalProviderApiKeyPrefix?: string;
   externalProviderAuthScheme?: IntegrationAuth;
-  // Absolute base URL of a provider whose API is a REST RESOURCE api rather than a single endpoint (v37).
+  // Base URL of a provider whose API is a REST RESOURCE api rather than a single endpoint (v37).
   // `externalProviderApiEndpoint` stays the one-endpoint dispatch target the Hub posts to; a provider like
   // an ASPSP has a path and a method per operation, so its adapter needs the host and builds the rest.
-  // Written by the seeder per environment, so repointing at another provider is a data change.
+  //
+  // Holds either an absolute URL or the NAME of a platform link (`{{bankcore}}`), bound to this
+  // environment when the call is made. The fallback for a provider that answers on one address
+  // everywhere; a provider that does not declares the list below instead.
   externalProviderBaseUrl?: string;
+  /**
+   * The provider's address in EVERY environment, declared once, indexed by environment id.
+   *
+   *     { development: 'http://localhost:8083', staging: 'https://bank-api.staging.example/' }
+   *
+   * This is what makes one registration work in all of them: the deployment names itself through
+   * `PSP_ENVIRONMENT` and the matching entry is the base URL, so promoting local to staging to
+   * production is one variable rather than a re-seed or a hand edit. A third-party provider with a
+   * sandbox host and a production host is the same case as the bank with a loopback and an in-cluster
+   * name, and both are declared here.
+   *
+   * Takes precedence over `externalProviderBaseUrl` when it has an entry for the current environment,
+   * and each entry may itself be a platform link name so a platform service is declared in one place.
+   */
+  externalProviderBaseUrlByEnvironment?: ProviderBaseUrlByEnvironment;
   // v37 P6.3: what this provider SERVES, which is what an entity-bound capability resolves on. A linked
   // account or a registered card names its institution directly; a freshly typed IBAN or PAN is matched
   // against these declared identifiers instead. Seeded data, so a second bank is a record.
