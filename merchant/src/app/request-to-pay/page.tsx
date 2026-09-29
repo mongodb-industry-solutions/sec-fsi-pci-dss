@@ -3,7 +3,7 @@
 // OAuth session (no CIBA). Server component, scope-gated (read:rtp for view, write:rtp for actions).
 import { redirect } from 'next/navigation';
 import { HandCoins } from 'lucide-react';
-import { PspClient, PspError } from '@/lib/PspClient';
+import { PspClient, pspFailure } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { EmptyState } from '@/components/ui/Bits';
@@ -18,12 +18,12 @@ export default async function RequestToPayPage() {
   const c = await PspClient.fromSession();
   let inbox: Array<Record<string, unknown>> = [];
   let outbox: Array<Record<string, unknown>> = [];
-  let error: string | undefined;
+  let failure: { message: string; status?: number } | undefined;
   try {
     inbox = (await c!.listRtpRequests('inbox')).results ?? [];
     outbox = (await c!.listRtpRequests('outbox')).results ?? [];
   } catch (e) {
-    error = e instanceof PspError ? e.message : 'Failed to load requests';
+    failure = pspFailure(e, 'Failed to load requests');
   }
 
   const pending = inbox.filter((r) => ['presented', 'delivered', 'viewed'].includes(String(r.status)));
@@ -34,7 +34,7 @@ export default async function RequestToPayPage() {
         <HandCoins className="h-6 w-6 text-leaf-deep" aria-hidden /> Request to Pay
       </h1>
 
-      {error ? <PspUnavailable message={error} /> : (
+      {failure ? <PspUnavailable {...failure} /> : (
         <div className="space-y-8">
           <section>
             <h2 className="mb-3 text-lg font-semibold">Requests awaiting your approval</h2>

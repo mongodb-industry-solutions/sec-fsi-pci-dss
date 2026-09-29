@@ -16,7 +16,7 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-backend
-      dockerfile: backend/Dockerfile
+      dockerfile: psp/backend/Dockerfile
       context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
@@ -32,8 +32,8 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-frontend
-      dockerfile: frontend/Dockerfile
-      context: frontend/
+      dockerfile: psp/frontend/Dockerfile
+      context: psp/frontend/
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
@@ -42,6 +42,18 @@ steps:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
         - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.staging.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
+        # Private only: bankcore has no public hostname, so there is no public counterpart.
+        - NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=http://sec-fsi-pci-dss-bankcore-web-app:80
+        # The authority deploys from its own repository; this is the in-cluster service its chart publishes.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-web-app:80
+        # PUBLIC and required: this is the realm's authorize endpoint as the BROWSER reaches it, which
+        # every sign-in redirect (this app's own, and the compatibility shim other apps still use)
+        # targets. Left unset here, it silently fell back to the frontend's localhost dev default,
+        # baked into the staging bundle at build time, so every sign-in redirected to a dead address.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=https://sec-giam-api.industrysolutions.staging.corp.mongodb.com/api/v1/realms/LeafyIdp
+        # PUBLIC, unlike the bank's API: the simulator links to the bank's own app, so a browser navigates to
+        # it and a private in-cluster host would be unreachable from one.
+        - NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC=https://sec-fsi-pci-dss-bank-frontend.industrysolutions.staging.corp.mongodb.com
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -54,10 +66,44 @@ steps:
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-merchant
       dockerfile: merchant/Dockerfile
-      context: merchant/
+      context: ./
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-bankcore
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-bankcore
+      dockerfile: bank/backend/Dockerfile
+      context: .
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-bank-frontend
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-bank-frontend
+      dockerfile: bank/frontend/Dockerfile
+      context: bank/frontend/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      # No build_args: this image ships no NEXT_PUBLIC_* argument (see bank/frontend/Dockerfile), so
+      # every host it needs is resolved server side at runtime from the values_files below instead.
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -81,6 +127,40 @@ steps:
         # can hit /api/v1/* and /doc directly, matching the frontend. Kanopy web-app ingress defaults
         # to authenticated=true; false makes it public. NOTE: verify the flag name against the Kanopy
         # web-app chart 4.25.0 on the first staging run (drone-helm fails the upgrade if it is wrong).
+        - ingress.authenticated=false
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.staging.corp.mongodb.com
+      kubernetes_token:
+        from_secret: staging_kubernetes_token
+      values_files:
+        - environments/staging.yaml
+
+  - name: deploy-bankcore-staging
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-bankcore
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
+        # ONE replica while the notification signing key is local to the pod (v37). Two replicas would
+        # sign with two different keys while publishing one key set, so a receiver would reject roughly
+        # half the notifications. Same constraint the backend has for its OAuth keys.
+        - replicaCount=1
+        # Public ingress so the Open Banking API can be reviewed and exercised in Swagger. Publishing
+        # the docs opens nothing: every operation needs an access token issued to a REGISTERED TPP,
+        # and AIS/PIS additionally need a consent in `valid`. The diagnostics endpoints require the
+        # platform admin token. The PSP still reaches the bank in-cluster, never through this host.
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-bankcore.industrysolutions.staging.corp.mongodb.com
+        # Same flag the backend uses: Kanopy defaults the ingress to corp Okta SSO, and false makes it
+        # reachable for review. Verify the flag name against web-app chart 4.25.0 on the first run.
         - ingress.authenticated=false
         - mesh.enabled=true
       wait: true
@@ -137,6 +217,29 @@ steps:
       values_files:
         - environments/staging.yaml
 
+  - name: deploy-bank-frontend-staging
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-bank-frontend
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bank-frontend
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-bank-frontend.industrysolutions.staging.corp.mongodb.com
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.staging.corp.mongodb.com
+      kubernetes_token:
+        from_secret: staging_kubernetes_token
+      values_files:
+        - environments/staging.yaml
+
 ---
 kind: pipeline
 type: kubernetes
@@ -155,7 +258,7 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-backend
-      dockerfile: backend/Dockerfile
+      dockerfile: psp/backend/Dockerfile
       context: .
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
@@ -171,8 +274,8 @@ steps:
       create_repository: true
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-frontend
-      dockerfile: frontend/Dockerfile
-      context: frontend/
+      dockerfile: psp/frontend/Dockerfile
+      context: psp/frontend/
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
@@ -181,6 +284,16 @@ steps:
         - NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE=http://sec-fsi-pci-dss-backend-web-app:80
         - NEXT_PUBLIC_PSP_URL_MERCHANT=https://sec-fsi-pci-dss-merchant.industrysolutions.prod.corp.mongodb.com
         - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
+        # Private only: bankcore has no public hostname, so there is no public counterpart.
+        - NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=http://sec-fsi-pci-dss-bankcore-web-app:80
+        # The authority deploys from its own repository; this is the in-cluster service its chart publishes.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-web-app:80
+        # PUBLIC and required: see the staging pipeline's identical entry for why this cannot be left unset.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=https://sec-giam-api.industrysolutions.prod.corp.mongodb.com/api/v1/realms/LeafyIdp
+        # PUBLIC, unlike the bank's API: the simulator links to the bank's own app, so a browser navigates to
+        # it and a private in-cluster host would be unreachable from one. Missing here previously, even
+        # though bank/frontend was never built or deployed by this pipeline at all until now.
+        - NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC=https://sec-fsi-pci-dss-bank-frontend.industrysolutions.prod.corp.mongodb.com
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -193,10 +306,43 @@ steps:
       registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
       repo: industrysolutions/sec-fsi-pci-dss-merchant
       dockerfile: merchant/Dockerfile
-      context: merchant/
+      context: ./
       tags:
         - git-${DRONE_COMMIT_SHA:0:7}
         - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-bankcore
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-bankcore
+      dockerfile: bank/backend/Dockerfile
+      context: .
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      access_key:
+        from_secret: ecr_access_key
+      secret_key:
+        from_secret: ecr_secret_key
+
+  - name: publish-bank-frontend
+    image: plugins/kaniko-ecr
+    settings:
+      create_repository: true
+      registry: 795250896452.dkr.ecr.us-east-1.amazonaws.com
+      repo: industrysolutions/sec-fsi-pci-dss-bank-frontend
+      dockerfile: bank/frontend/Dockerfile
+      context: bank/frontend/
+      tags:
+        - git-${DRONE_COMMIT_SHA:0:7}
+        - latest
+      # No build_args: see the staging pipeline's identical entry.
       access_key:
         from_secret: ecr_access_key
       secret_key:
@@ -228,6 +374,40 @@ steps:
       values_files:
         - environments/production.yaml
 
+  - name: deploy-bankcore-production
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-bankcore
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bankcore
+        # ONE replica while the notification signing key is local to the pod (v37). Two replicas would
+        # sign with two different keys while publishing one key set, so a receiver would reject roughly
+        # half the notifications. Same constraint the backend has for its OAuth keys.
+        - replicaCount=1
+        # Public ingress so the Open Banking API can be reviewed and exercised in Swagger. Publishing
+        # the docs opens nothing: every operation needs an access token issued to a REGISTERED TPP,
+        # and AIS/PIS additionally need a consent in `valid`. The diagnostics endpoints require the
+        # platform admin token. The PSP still reaches the bank in-cluster, never through this host.
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-bankcore.industrysolutions.prod.corp.mongodb.com
+        # Same flag the backend uses: Kanopy defaults the ingress to corp Okta SSO, and false makes it
+        # reachable for review. Verify the flag name against web-app chart 4.25.0 on the first run.
+        - ingress.authenticated=false
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.prod.corp.mongodb.com
+      kubernetes_token:
+        from_secret: production_kubernetes_token
+      values_files:
+        - environments/production.yaml
+
   - name: deploy-frontend-production
     image: public.ecr.aws/kanopy/drone-helm:v3
     settings:
@@ -242,6 +422,29 @@ steps:
         - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-frontend
         - ingress.enabled=true
         - ingress.hosts[0]=sec-fsi-pci-dss-frontend.industrysolutions.prod.corp.mongodb.com
+        - mesh.enabled=true
+      wait: true
+      timeout: 300s
+      api_server: https://api.prod.corp.mongodb.com
+      kubernetes_token:
+        from_secret: prod_kubernetes_token
+      values_files:
+        - environments/production.yaml
+
+  - name: deploy-bank-frontend-production
+    image: public.ecr.aws/kanopy/drone-helm:v3
+    settings:
+      chart: mongodb/web-app
+      chart_version: 4.25.0
+      add_repos:
+        - mongodb=https://10gen.github.io/helm-charts
+      namespace: industrysolutions
+      release: sec-fsi-pci-dss-bank-frontend
+      values:
+        - image.tag=git-${DRONE_COMMIT_SHA:0:7}
+        - image.repository=795250896452.dkr.ecr.us-east-1.amazonaws.com/industrysolutions/sec-fsi-pci-dss-bank-frontend
+        - ingress.enabled=true
+        - ingress.hosts[0]=sec-fsi-pci-dss-bank-frontend.industrysolutions.prod.corp.mongodb.com
         - mesh.enabled=true
       wait: true
       timeout: 300s

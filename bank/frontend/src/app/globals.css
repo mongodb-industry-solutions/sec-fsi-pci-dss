@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme-aware from the start: an operator on a dark desktop and one on a phone in daylight get the same
+   screen, and neither has to fight it. Every colour is a token so the dark block only redefines values. */
+:root {
+  --canvas: #f4f7fa;
+  --surface: #ffffff;
+  --surface-alt: #f8fafc;
+  --border: #dfe6ee;
+  --ink: #0b1f2a;
+  --ink-soft: #55697a;
+  --bank: #0b3d5c;
+  --bank-ink: #ffffff;
+  --accent: #1c7fb8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #0a1620;
+    --surface: #10222f;
+    --surface-alt: #16303f;
+    --border: #23414f;
+    --ink: #e8f1f7;
+    --ink-soft: #93aabb;
+    --bank: #061b28;
+    --bank-ink: #e8f1f7;
+    --accent: #4aa8dd;
+  }
+}
+
+html {
+  /* Never a horizontal scrollbar on the page itself: wide content scrolls inside its own container. */
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--canvas);
+  color: var(--ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Touch targets. A 44px minimum is the difference between usable and infuriating on a phone. */
+@media (pointer: coarse) {
+  a,
+  button {
+    min-height: 44px;
+  }
+}

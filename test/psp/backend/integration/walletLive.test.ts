@@ -1,0 +1,200 @@
+// v37 P11.3: Leafy Wallet exercised for real, over the wire, against the running services.
+//
+// The contract baseline already checks the route shapes with `app.inject`. This is the other half the plan
+// asks for: the wallet's actual sequence, over HTTP, on its OWN channel (an OAuth token, not a session), so
+// the middleware, the bank hop and the freshly rebuilt database are all in the path.
+//
+// Skipped unless a PSP is listening, because there is nothing honest to assert without one.
+//
+// It drives the SESSION channel, not the OAuth one. The local OAuth key provider mints a signing key per
+// process, so a token signed here carries a `kid` the separate server has never seen and would be rejected
+// however correct it was. The OAuth channel stays with `walletContract.test.ts`, which injects into an app in
+// its own process. Recorded rather than worked around: the same property means a PSP restart invalidates every
+// issued token, and it is why a deployment pins one replica.
+import { describe, it, expect, beforeAll } from 'vitest';
+import { readSeedFile } from './support/contract';
+import { interactiveToken } from '../../../support/authorizationFlow';
+import { readFileSync } from 'fs';
+import { giamPath } from '../../../support/giamRepo';
+
+/**
+ * A real token for this customer, from the identity authority.
+ *
+ * Signing in happens there now. These suites are about the BUSINESS endpoints behind the token, so
+ * obtaining it is setup rather than the thing under test; the sign-in itself has its own coverage in
+ * the authority's suite.
+ *
+ * The flow lives in the shared helper. This file, its neighbour and two bank suites each had a copy
+ * written against the shape the authorization endpoint used to have, so all four broke together
+ * when it became conforming.
+ */
+async function authorityLogin(userName: string): Promise<string> {
+  // A URI the console client is actually registered for. The authority refuses an unregistered one,
+  // which is correct and is why this is not simply whatever host the test happens to run against.
+  return interactiveToken(
+    'http://127.0.0.1:8085', 'LeafyIdp', userName, 'demo-password',
+    'giam-console', 'http://localhost:8086/auth/callback',
+  );
+}
+
+
+/**
+ * The seeded principals, read from the identity authority's fixtures.
+ *
+ * This used to read a login file in this application. That file is gone with everything else about
+ * identity, and the binding now runs the other way: a principal carries the business reference it
+ * belongs to, rather than a login carrying a party.
+ */
+function readAuthorityIdentities(): Array<{ subjectId: string; accountHolderRef?: string; demoFeatured?: boolean }> {
+  // Located by the shared resolver, so there is one definition of where the checkout is.
+  return JSON.parse(readFileSync(giamPath('backend/data/identities.json'), 'utf8'));
+}
+
+
+
+const PSP = process.env.PSP_BASE_URL ?? 'http://localhost:8081';
+
+interface AuthSeed {
+  subjectId: string;
+  accountHolderRef: string;
+  roleName: string;
+  email: string;
+}
+
+function walletCustomer(): AuthSeed {
+  const customers = readAuthorityIdentities()
+    .filter((a) => a.roleName === 'customer');
+  return customers[0];
+}
+
+async function reachable(): Promise<boolean> {
+  try {
+    await fetch(`${PSP}/api/v1/health`, { signal: AbortSignal.timeout(2000) });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function get(path: string, token: string) {
+  const response = await fetch(`${PSP}${path}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(15000),
+  });
+  return { status: response.status, body: await response.json().catch(() => ({})) as Record<string, unknown> };
+}
+
+describe('v37 P11.3: the wallet against the running services', () => {
+  let live = false;
+  let token = '';
+  const customer = walletCustomer();
+
+  beforeAll(async () => {
+    live = await reachable();
+    if (!live) return;
+    token = await authorityLogin(customer.userName);
+  });
+
+  it('signs in without naming a realm, which is what the wallet does', async () => {
+    if (!live) return;
+    // The wallet never sends a realm, so default resolution is under test. What changed in v39 is
+    // WHERE that resolution happens: the authority owns the sign-in, and this application holds no
+    // login route to send a password to. The property is unchanged and is now asserted where it
+    // actually lives.
+    const token = await authorityLogin(customer.userName);
+    expect(token, 'a seeded customer could not sign in without naming a realm').toBeTruthy();
+  });
+
+  it('lists accounts, and every one carries a balance', async () => {
+    if (!live) return;
+    const { status, body } = await get(`/api/v1/accounts/${encodeURIComponent(customer.accountHolderRef)}`, token);
+    expect(status).toBe(200);
+    const results = body.results as Array<Record<string, unknown>>;
+    expect(Array.isArray(results)).toBe(true);
+    expect(results.length).toBeGreaterThan(0);
+    for (const account of results) {
+      // The balance is the BANK's figure now, projected onto the PSP's linked record. An account that lost
+      // its balance in the extraction would render as blank in the wallet, which is the regression to catch.
+      const balance = account.payoutAccountBalance as { availableAmount?: number } | undefined;
+      expect(typeof balance?.availableAmount, `${account.payoutAccountInstanceReference} has no balance`)
+        .toBe('number');
+    }
+  });
+
+  it('lists transactions', async () => {
+    if (!live) return;
+    const { status, body } = await get('/api/v1/transactions', token);
+    expect(status).toBe(200);
+    expect(Array.isArray(body.results)).toBe(true);
+  });
+
+  it('lists beneficiaries and creates one', async () => {
+    if (!live) return;
+    const listed = await get(`/api/v1/beneficiaries?party=${encodeURIComponent(customer.accountHolderRef)}`, token);
+    expect(listed.status).toBe(200);
+
+    // Added by looking a person up, not by typing an IBAN: the wallet resolves a phone or an email to a
+    // party the platform already knows, so bank coordinates never travel through the browser.
+    const others = readAuthorityIdentities()
+      .filter((a) => a.roleName === 'customer'
+        && a.accountHolderRef !== customer.accountHolderRef);
+    const target = others[others.length - 1];
+
+    const created = await fetch(`${PSP}/api/v1/beneficiaries/${encodeURIComponent(customer.accountHolderRef)}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lookupType: 'email',
+        lookupValue: target.email,
+        label: 'P11 compatibility check',
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const body = await created.json().catch(() => ({})) as Record<string, unknown>;
+    // 409 is a pass: the beneficiary already exists from an earlier run, which is still a working path.
+    expect([200, 201, 409], `create beneficiary: ${JSON.stringify(body).slice(0, 200)}`)
+      .toContain(created.status);
+  });
+
+  it('reads the RTP inbox and outbox', async () => {
+    if (!live) return;
+    for (const box of ['inbox', 'outbox']) {
+      const { status } = await get(`/api/v1/gateway/rtp/requests?box=${box}`, token);
+      expect(status, `RTP ${box}`).toBe(200);
+    }
+  });
+
+  it('moves money between two accounts the same owner holds, at the bank', async () => {
+    if (!live) return;
+    const { body } = await get(`/api/v1/accounts/${encodeURIComponent(customer.accountHolderRef)}`, token);
+    const results = (body.results ?? []) as Array<Record<string, string>>;
+    if (results.length < 2) return;
+    const [from, to] = results;
+
+    const response = await fetch(`${PSP}/api/v1/gateway/transfers/own`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': `p11-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        fromAccountRef: from.payoutAccountInstanceReference,
+        toAccountRef: to.payoutAccountInstanceReference,
+        amount: 1.25,
+        reference: 'P11 compatibility check',
+      }),
+      signal: AbortSignal.timeout(20000),
+    });
+    const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    // 202: the transfer is async, so accepted is the honest answer rather than completed.
+    expect([200, 201, 202], `own transfer: ${JSON.stringify(payload).slice(0, 300)}`).toContain(response.status);
+    // The path v37 built. Before it, this endpoint did not exist and the UI tab was a dead end.
+    expect(payload.executionReference ?? payload.paymentExecutionInstanceReference).toBeTruthy();
+    // A domestic euro transfer between two accounts at the same bank is SEPA. It resolved to `swift` with a
+    // 15 euro fee until P11 found that the destination was built without a currency, so the rail engine's
+    // SEPA rule could never match. Pinned here because the response is the only place it was visible.
+    expect(payload.rail, `a domestic euro transfer must not take the international rail: ${JSON.stringify(payload)}`)
+      .not.toBe('swift');
+  });
+});

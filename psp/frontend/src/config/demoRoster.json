@@ -1,0 +1,5 @@
+{
+  "_comment": "Declarative criteria for the curated demo roster. The principals live at the identity authority. Both the /system login picker and the /simulator call GET /api/v1/system/users with these filters, so they always draw from the SAME deterministic set. No emails or ids are hardcoded here, only filter criteria. Merchants are not here: they are platform records, read from GET /api/v1/merchants/picker.",
+  "login": { "featured": true },
+  "simulatorPersonas": { "featured": true, "role": ["customer"] }
+}

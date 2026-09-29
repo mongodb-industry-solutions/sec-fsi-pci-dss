@@ -2,7 +2,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Users, Send } from 'lucide-react';
-import { PspClient, PspError } from '@/lib/PspClient';
+import { PspClient, pspFailure } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { EmptyState, InfoHint } from '@/components/ui/Bits';
@@ -20,12 +20,12 @@ export default async function BeneficiariesPage() {
 
   const c = await PspClient.fromSession();
   let results: any[] = [];
-  let error: string | undefined;
+  let failure: { message: string; status?: number } | undefined;
   try {
     const data = await c!.listBeneficiaries();
     results = data.results ?? [];
   } catch (e) {
-    error = e instanceof PspError ? e.message : 'Failed to load beneficiaries';
+    failure = pspFailure(e, 'Failed to load beneficiaries');
   }
 
   // Fetch the user's source accounts once (server-side) so each row's send control can offer a
@@ -52,8 +52,8 @@ export default async function BeneficiariesPage() {
         </div>
       </div>
 
-      {error ? (
-        <PspUnavailable message={error} />
+      {failure ? (
+        <PspUnavailable {...failure} />
       ) : results.length === 0 ? (
         <EmptyState icon={<Users className="h-8 w-8" />} title="No saved beneficiaries yet" hint={`Payees you add in ${BRAND.full} will appear here.`} />
       ) : (

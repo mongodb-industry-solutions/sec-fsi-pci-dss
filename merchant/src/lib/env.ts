@@ -5,14 +5,12 @@
 // values injected by docker-compose / Kubernetes). The .env files are OPTIONAL conveniences for
 // temporarily customizing the environment, never a hard requirement. Precedence for every var:
 //   process.env (incl. merchant/.env.local loaded by Next)  >  repo-root .env  >  built-in default
-// Missing .env files never obstruct startup, and a missing value never throws here. Enforcement of
-// "the client must be registered and authorized" lives at the PSP authorization server, which
-// rejects an unknown / unauthenticated client: the merchant must not fabricate credentials, so an
-// unset client id/secret resolves to empty and the PSP declines the flow (invalid_client).
+// Missing .env files never obstruct startup, and a missing value never throws here.
 import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
+import { clientSecretFor } from '@leafypay/platform-links';
 
 // Optional fallback: parse the repo-root .env (one level above the merchant package). Read-only,
 // loaded once, best-effort. In containers the parent .env usually doesn't exist and env comes from
@@ -54,6 +52,11 @@ function envVar(name: string): string | undefined {
   return v && v.length > 0 ? v : undefined;
 }
 
+// GIAM's own seed fixture names this registration by this literal id ("Espresso Works"); it is a
+// public identifier, not a secret, so defaulting to it here fabricates nothing GIAM did not already
+// register on its own.
+const DEFAULT_CLIENT_ID = 'oauth001-0000-4000-8000-000000000001';
+
 // Ephemeral, per-process session key used ONLY when PSP_MERCHANT_SESSION_SECRET is unset. Random
 // (not a predictable/forgeable hardcoded value), so the app stays usable for local dev without any
 // config; sessions simply don't survive a restart / span replicas. Set the env var in real deploys.
@@ -66,35 +69,56 @@ function fallbackSessionSecret(): string {
   return ephemeralSessionSecret;
 }
 
+/**
+ * v39 P9.6: the address of the AUTHORITY and the address of the APPLICATION are now two things.
+ *
+ * They used to be one, and five browser-facing links were derived from it by string-replacing
+ * `/auth/authorize`. Repointing the authorize URL to the identity authority would therefore have
+ * dragged the portal, the dashboard, the simulator and the credentials page along with it, to a host
+ * that does not serve any of them. The plan calls this the single most likely regression in the whole
+ * extraction, and it is: nothing would fail at build time and four links would quietly go to the
+ * wrong product.
+ *
+ * So the five derive from the APPLICATION's front end, which is where those pages actually live, and
+ * each still accepts an explicit override.
+ */
+const APPLICATION_FRONTEND = 'http://localhost:8080';
+
+function applicationFrontend(): string {
+  return (envVar('PSP_MERCHANT_APP_FRONTEND_URL') ?? APPLICATION_FRONTEND).replace(/\/+$/, '');
+}
+
 export const ENV = {
-  // PSP API base: OIDC discovery + all API endpoints (backend, host port 8081).
+  // The BUSINESS API. Stays with the application: this is where payments, beneficiaries and
+  // transfers live, and none of them moved.
   pspBaseUrl: () => envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081',
-  // Browser-facing PSP consent/login page (PSP frontend). Backend /authorize returns JSON, not UI.
-  pspAuthorizeUrl: () => envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize',
+  /**
+   * The ISSUER. Discovery, token and introspection, at the identity authority.
+   *
+   * Split from the business API because they are different systems now. One environment variable
+   * repoints authentication without touching a single business endpoint, which is the property that
+   * makes the authority replaceable.
+   */
+  issuerUrl: () => envVar('PSP_MERCHANT_ISSUER_URL') ?? 'http://localhost:8085/api/v1/realms/LeafyIdp',
+  // The authorization ENDPOINT as the BROWSER reaches it: the authority's sign-in page is a client of
+  // that endpoint now and ignores OAuth parameters, so a request sent there strands the person.
+  pspAuthorizeUrl: () =>
+    envVar('PSP_MERCHANT_AUTHORIZE_URL')
+    ?? 'http://localhost:8086/api/v1/realms/LeafyIdp/protocol/oidc/auth',
   // Browser-facing PSP front-channel logout page (single sign-out): clears the PSP portal session
   // cookie same-origin, then bounces back to this app. Derived from the authorize URL by default.
-  pspLogoutUrl: () =>
-    envVar('PSP_MERCHANT_LOGOUT_URL') ??
-    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/auth/logout'),
+  pspLogoutUrl: () => envVar('PSP_MERCHANT_LOGOUT_URL') ?? `${applicationFrontend()}/auth/logout`,
   // Browser-facing PSP portal root (same PSP frontend origin as authorize), for the "PSP portal"
   // link in the merchant UI. Derived from the authorize URL by default.
-  pspPortalUrl: () =>
-    envVar('PSP_MERCHANT_PORTAL_URL') ??
-    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/'),
+  pspPortalUrl: () => envVar('PSP_MERCHANT_PORTAL_URL') ?? `${applicationFrontend()}`,
   // Browser-facing PSP dashboard (the signed-in PSP app home). Derived from the authorize URL.
-  pspDashboardUrl: () =>
-    envVar('PSP_MERCHANT_DASHBOARD_URL') ??
-    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/system'),
+  pspDashboardUrl: () => envVar('PSP_MERCHANT_DASHBOARD_URL') ?? `${applicationFrontend()}/system`,
   // Browser-facing PSP simulator hub (same PSP frontend origin as authorize). Lets the merchant demo
   // link back to the simulator. Derived from the authorize URL by default.
-  pspSimulatorUrl: () =>
-    envVar('PSP_MERCHANT_SIMULATOR_URL') ??
-    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/simulator'),
+  pspSimulatorUrl: () => envVar('PSP_MERCHANT_SIMULATOR_URL') ?? `${applicationFrontend()}/simulator`,
   // Browser-facing PSP passwordless credentials management page (PSP frontend). Lets the merchant link the
   // user to Sec4 Pay to manage/revoke their enrolled keys. Derived from the authorize URL by default.
-  pspCredentialsUrl: () =>
-    envVar('PSP_MERCHANT_CREDENTIALS_URL') ??
-    (envVar('PSP_MERCHANT_AUTHORIZE_URL') ?? 'http://localhost:8080/auth/authorize').replace('/auth/authorize', '/system/profile/credentials'),
+  pspCredentialsUrl: () => envVar('PSP_MERCHANT_CREDENTIALS_URL') ?? `${applicationFrontend()}/system/profile/credentials`,
   // Docs links shown in /help. Both must be BROWSER-reachable in every environment.
   // Wiki: static public GitHub wiki. Swagger: the backend /doc UI, its PUBLIC URL (PSP_MERCHANT_PSP_BASE_URL
   // is the in-cluster private URL, not browser-reachable), so set PSP_MERCHANT_SWAGGER_URL per deploy;
@@ -103,11 +127,24 @@ export const ENV = {
   apiDocsUrl: () =>
     envVar('PSP_MERCHANT_SWAGGER_URL') ??
     `${envVar('PSP_MERCHANT_PSP_BASE_URL') ?? 'http://localhost:8081'}/doc`,
-  // Client credentials have NO built-in default: the merchant must never fabricate a client identity.
-  // If unset they resolve to '' and the PSP declines the flow (invalid_client): enforcement belongs
-  // to the authorization server, so an unconfigured merchant cannot authenticate, yet nothing crashes.
-  clientId: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_ID') ?? '',
-  clientSecret: () => envVar('PSP_MERCHANT_OAUTH_CLIENT_SECRET') ?? '',
+  /**
+   * The demo registration ("Espresso Works"), and its secret.
+   *
+   * Defaults rather than requiring configuration, the same way PSP's own registration at the bank
+   * (`leafypay-psp`) already does: the id is a public identifier, seeded as a literal in GIAM's own
+   * fixture and never read from an environment variable on GIAM's side, so naming it here fabricates
+   * nothing GIAM did not already register. The secret defaults to `clientSecretFor(id)`, the exact
+   * function the seeder itself calls when nothing overrides it, so an unconfigured merchant and a
+   * freshly seeded GIAM agree without either side reading a shared variable. Both stay overridable,
+   * for the one case that needs a DIFFERENT, non-derivable secret: a staging or production
+   * deployment, which pins one through PSP_MERCHANT_GIAM_CLIENT_SECRET precisely because that value
+   * must not be the one anyone holding this open-source repo can already compute.
+   */
+  clientId: () => envVar('PSP_MERCHANT_GIAM_CLIENT_ID') ?? DEFAULT_CLIENT_ID,
+  // Derived from the ID actually in force (a custom PSP_MERCHANT_GIAM_CLIENT_ID included), never
+  // hardcoded to the default: a merchant pointed at a DIFFERENT registration must derive THAT
+  // registration's secret, not the demo one's.
+  clientSecret: () => envVar('PSP_MERCHANT_GIAM_CLIENT_SECRET') ?? clientSecretFor(ENV.clientId()),
   // This app's public base URL (local default 8082; container listens on 8080 behind ingress).
   baseUrl: () => envVar('PSP_MERCHANT_BASE_URL') ?? 'http://localhost:8082',
   // Redirect URI defaults to <baseUrl>/api/auth/callback but can be overridden per env.

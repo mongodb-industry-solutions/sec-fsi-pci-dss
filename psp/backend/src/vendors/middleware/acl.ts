@@ -1,0 +1,103 @@
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { Resource, Action, hasPermission } from '../../shared/models/permissionCatalog';
+import type { AuthenticatedRequest } from '../../shared/models/identity.model';
+import { canReadSensitive } from './rbac';
+
+/**
+ * The authorization guard, reading a claim.
+ *
+ * v39 P6.4: this used to load a role from a collection this application owned, merge it with an
+ * in-code fallback matrix, and cache the result for thirty seconds per process. All of that is gone
+ * along with the collection it read.
+ *
+ * What replaced it is smaller and stricter: the authority resolves a principal's permissions at
+ * issuance and writes them into the token, so the check is a claim read. No lookup, no cache, no
+ * fallback matrix. Removing the cache removes a real defect as well as code: a thirty-second
+ * per-process cache meant a permission change took up to thirty seconds to apply, and took a
+ * different amount of time on each replica.
+ *
+ * The trade is stated rather than hidden. A permission change now reaches a live token only when the
+ * next one is issued, which is a longer window than thirty seconds. Access tokens are short-lived for
+ * that reason, and the operations where being wrong is expensive ask the authority directly instead
+ * of trusting the claim.
+ */
+
+/**
+ * What the caller may do: the permissions carried explicitly, plus what their roles expand to.
+ *
+ * v40 made `roles` the default carrier, so reading `permissions` alone would deny everything on an
+ * ordinary token. The union is correct rather than convenient: a token that narrowed still carries
+ * its roles, and a caller holding either form holds the authority.
+ *
+ * Default deny throughout. An absent claim, an unexpanded role and an unloaded catalog all grant
+ * nothing, because an unresolved authority must never read as an unrestricted one.
+ */
+function permissionsOf(request: FastifyRequest): Set<string> {
+  const user = (request as FastifyRequest & {
+    user?: { permissions?: string[]; roles?: string[]; effectivePermissions?: string[] };
+  }).user;
+  // `effectivePermissions` is set by the verifier when it has expanded the roles against the
+  // published catalog. Where it is present it already includes the explicit permissions.
+  if (user?.effectivePermissions) return new Set(user.effectivePermissions);
+  return new Set(user?.permissions ?? []);
+}
+
+function roleOf(request: FastifyRequest): string | undefined {
+  // `user.role`, not `user.roles?.[0]`: the former is already narrowed to this application's own
+  // roles (see `ownRoleNames` in vendors/security/roleCatalog.ts), the latter is the raw,
+  // unscoped list a role from a DIFFERENT resource server (e.g. a bank role) can also ride along
+  // on. `canReadSensitive` below reasons about this value, so a wrong pick here is not cosmetic.
+  const user = (request as FastifyRequest & { user?: { role?: string } }).user;
+  return (request as unknown as AuthenticatedRequest).userRole ?? user?.role;
+}
+
+export function can(request: FastifyRequest, resource: Resource, action: Action): boolean {
+  return hasPermission(permissionsOf(request), resource, action);
+}
+
+/**
+ * Route guard. Default deny, and the refusal is machine-readable so the interface can render it.
+ *
+ * `viewSensitive` additionally requires the elevation on top of the permission, so holding the role
+ * is not the same as exercising it: an investigator still needs an approved elevation, while an
+ * auditor whose whole role is sensitive read-only oversight passes on the permission alone.
+ */
+export function requirePermission(resource: Resource, action: Action) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const role = roleOf(request);
+
+    if (!can(request, resource, action)) {
+      return reply.status(403).send({
+        error: `Access denied: your role does not permit ${action} on ${resource}.`,
+        code: 'ACL_DENIED',
+        resource,
+        action,
+        role: role ?? null,
+      });
+    }
+
+    if (action === 'viewSensitive') {
+      const elevation = (request as unknown as AuthenticatedRequest).elevation;
+      if (role && !canReadSensitive(role as never, Boolean(elevation))) {
+        return reply.status(403).send({
+          error: 'Access denied: sensitive access requires an active escalation token.',
+          code: 'ESCALATION_REQUIRED',
+          resource,
+          action,
+          role,
+        });
+      }
+    }
+  };
+}
+
+/**
+ * Kept as a no-op so the call sites that invalidated the old cache still compile.
+ *
+ * There is no cache to invalidate: permissions travel in the token. The function goes with the last
+ * of those call sites in the deletion pass, and leaving it as a silent no-op until then is better
+ * than leaving code that clears a map nothing reads.
+ */
+export function invalidateRoleCache(): void {
+  // Intentionally empty. See above.
+}

@@ -1,0 +1,318 @@
+import { FastifyRequest, FastifyReply } from 'fastify';
+import { attachRbacContext } from './rbac';
+import { tryMerchantContext } from './validateMerchantToken';
+import { verifyAccessToken, VerifiedClaims } from '../security/tokenVerifier';
+import { expandRoles, roleCatalog, ownRoleNames } from '../security/roleCatalog';
+
+// Route-level opt-out of the global HS256 auth preHandler (self-guarded / OAuth / internal routes).
+// `dualAuth` accepts EITHER the PSP session JWT (HS256) OR a merchant OAuth Bearer (RS256): the route's
+// own dualPermission() preHandler then authorizes by RBAC action (session) or scope (merchant) (v23).
+declare module 'fastify' {
+  interface FastifyContextConfig {
+    skipAuth?: boolean;
+    dualAuth?: boolean;
+  }
+}
+
+/**
+ * v39 P6.4: this application no longer authenticates anyone.
+ *
+ * What used to happen here was a signature check against a secret this application held, a lookup in
+ * a user collection it owned, and a session-epoch read from that collection. All three are gone. What
+ * remains is what a resource server does: verify a signature against the authority's PUBLISHED key
+ * set, check the issuer and the expiry, and read the claims.
+ *
+ * The public-path allowlist, the method-scoped public paths and the customer-blocked prefixes STAY.
+ * Those are this application's policy about its own routes, not identity, and moving them to the
+ * authority would make it responsible for a route list it has no way to know.
+ *
+ * The session-epoch read is gone rather than relocated. The epoch travels IN the token now, so a
+ * whole generation can be refused without a lookup; until the revocation stream lands, the bound on a
+ * withdrawn session is the access-token lifetime, which is short for exactly this reason.
+ */
+
+/** What a verified caller looks like to a route handler. */
+export interface AuthenticatedUser extends VerifiedClaims {
+  /** The role names the authority resolved, for the checks that still reason in roles. */
+  roles: string[];
+  /**
+   * The single role the checks that reason in the SINGULAR read, narrowed to this application's
+   * own roles first (see `ownRoleNames`). Undefined when the token holds none of this
+   * application's own roles at all.
+   */
+  role?: string;
+}
+
+// Exact URL matches that bypass JWT auth
+const PUBLIC_EXACT: Set<string> = new Set([
+  '/',
+  '/health',
+  '/api/v1/system/health',
+  '/api/v1/system/users',
+  '/api/v1/auth/register',
+  '/api/v1/auth/domains',
+  // OAuth2/OIDC authorization-server endpoints: authenticated by client credentials, PKCE,
+  // or their own RS256 access token, NOT the PSP session JWT. Exact paths only, so the
+  // session-protected /auth/me, /auth/grants and /auth/keys stay behind the middleware.
+  '/api/v1/auth/jwks',
+  '/api/v1/auth/authorize',
+  '/api/v1/auth/token',
+  '/api/v1/auth/userinfo',
+  '/api/v1/auth/introspect',
+  '/api/v1/auth/revoke',
+  '/api/v1/transactions/merchants',
+  // Simulator mode: transaction CREATION without a user session. Method-scoped below: the collection
+  // GET on the same path must never be public, or it would list every movement in the platform.
+  '/api/v1/transactions',
+  // Admin login does its own credential check
+  '/api/v1/admin/login',
+]);
+
+// URL prefixes that bypass JWT auth (Swagger UI and its static assets)
+// Admin run/logs endpoints handle their own admin token verification internally
+// Checkout and payment-link CREATION now require a valid JWT (no longer open). Only the buyer-facing
+// routes (resolve/pay a link or session) opt out per-route via `config: { skipAuth: true }`, since the
+// buyer is not logged in (hosted payment page). The simulator authenticates as the selected demo
+// user and calls these real authenticated endpoints (no open /system/simulator surface).
+// Internal stub endpoints use X-Integration-Source header validation instead of JWT (ADR-025)
+const PUBLIC_PREFIXES: string[] = ['/doc', '/public', '/api/v1/admin', '/api/v1/internal'];
+
+// Prefixes that bypass JWT auth only for GET requests (simulator read-only mode).
+// Mutation routes (PATCH /fraud/:id, POST /fraud/:id/escalate) still require JWT.
+// NOTE: if a Bearer token IS present on these routes, it is validated and the role
+// is checked  -  customers are denied even on public-GET routes.
+const PUBLIC_GET_PREFIXES: string[] = ['/api/v1/fraud'];
+
+// Some public paths are only public for SOME methods. `/api/v1/transactions` is public so the
+// simulator can create a payment with no session; its GET is the movement collection and must stay
+// authenticated (v36: it would otherwise return every movement to an anonymous caller).
+const PUBLIC_EXACT_METHODS: Record<string, ReadonlySet<string>> = {
+  '/api/v1/transactions': new Set(['POST']),
+};
+
+function methodIsPublic(path: string, method: string): boolean {
+  const allowed = PUBLIC_EXACT_METHODS[path];
+  return !allowed || allowed.has(method);
+}
+
+// URL prefixes and exact paths that the `customer` role is never allowed to access.
+// Customers use /api/v1/auth/me for their own profile; they must not query other
+// customers' data through the general customer search or investigation endpoints.
+const CUSTOMER_BLOCKED_PREFIXES: string[] = [
+  '/api/v1/fraud',
+  '/api/v1/customer',   // QE equality searches  -  customer must use /auth/me instead
+  '/api/v1/modules',    // v29: built-in module admin surfaces (global card/account admin) are staff-only.
+                        // The customer role has cards:[view,manage] for OWN cards (scope own), so the
+                        // ACL permission alone would let it reach the global list; block by prefix (PCI DSS).
+];
+
+// Exact paths blocked for customers even when the prefix is otherwise public
+const CUSTOMER_BLOCKED_EXACT: Set<string> = new Set([
+  '/api/v1/audit-events',
+]);
+
+// Carve-out: a customer MAY manage their own stored cards even though the general
+// /api/v1/customer search prefix is blocked. The card sub-routes enforce ownership in-handler
+// (the path :customerId must match the caller's own agreement), so allowing the customer here
+// does not expose other customers' data. Pattern: /api/v1/customer/{id}/cards[/{cardId}].
+const CUSTOMER_OWN_CARD_PATH = /^\/api\/v1\/customer\/[^/]+\/cards(\/[^/]+){0,2}$/;
+function isCustomerBlocked(role: string | undefined, url: string): boolean {
+  if (role !== 'customer') return false;
+  const path = url.split('?')[0];
+  if (CUSTOMER_OWN_CARD_PATH.test(path)) return false; // own-card management is allowed
+  return CUSTOMER_BLOCKED_PREFIXES.some((p) => url.startsWith(p)) || CUSTOMER_BLOCKED_EXACT.has(path);
+}
+
+// Investigation (Fraud Diagnosis) is restricted to fraud analyst and auditor
+// roles. The platform/integration `manager`, `merchant_officer` and `customer` roles must
+// not read or act on fraud cases (PCI DSS least privilege). The unauthenticated
+// simulator (no token) keeps read-only access; the role check only applies when a token is
+// present, so an authenticated non-analyst role is denied on BOTH read and mutation routes.
+const INVESTIGATION_PREFIX = '/api/v1/fraud';
+const INVESTIGATION_ROLES = new Set(['level1_analyst', 'level2_investigator', 'security_auditor']);
+function blockedFromInvestigation(role: string | undefined, path: string): boolean {
+  return path.startsWith(INVESTIGATION_PREFIX) && !!role && !INVESTIGATION_ROLES.has(role);
+}
+
+async function tryVerifyToken(authHeader: string | undefined): Promise<AuthenticatedUser | null> {
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const bearer = authHeader.slice(7);
+  const claims = await verifyAccessToken(bearer);
+  if (!claims) return null;
+
+  const roles = Array.isArray(claims.roles) ? claims.roles as string[] : [];
+  const explicit = Array.isArray(claims.permissions) ? claims.permissions as string[] : [];
+
+  /**
+   * The roles, expanded into the permissions this application enforces.
+   *
+   * Done HERE, once, at the edge where the token is read, for the same reason `partyRef` is: every
+   * guard downstream reads the result, and a resolution that happens per call site is one that some
+   * call site will forget.
+   *
+   * Leaving this out was not cosmetic. Since v40 an ordinary token carries roles and NO explicit
+   * permissions, so the guard resolved an empty set and refused every caller on every guarded
+   * route, a realm administrator included. Null when the catalog has never resolved, which the
+   * guard treats as "fall back to the explicit claims" and therefore still denies.
+   */
+  const expanded = await expandRoles(bearer, roles, explicit);
+  // Cached by expandRoles' own call above within the TTL, so this costs nothing extra: which of
+  // these roles are actually LeafyPay's, so a bank role riding along on the same token is never
+  // the one taken below.
+  const catalog = await roleCatalog(bearer);
+  const ownRoles = catalog ? ownRoleNames(catalog, roles) : roles;
+
+  return {
+    ...claims,
+    roles,
+    ...(expanded ? { effectivePermissions: expanded } : {}),
+    /**
+     * The business record this principal owns, under the name the rest of this service already uses.
+     *
+     * The authority carries the binding as `account_holder`, which is its vocabulary and correctly
+     * says nothing about what the reference means. Everything here calls it `partyRef`, in hundreds
+     * of places, and renaming those would be a large change for no behavioural gain.
+     *
+     * So the translation happens ONCE, here, at the edge where the token is read. Leaving it out was
+     * a real defect and not a cosmetic one: own-scope resolution silently found nothing, so a
+     * customer asking for their own beneficiaries looked like a cross-party search and was refused
+     * for lacking an investigator's permission. The failure blamed authorisation for a binding that
+     * was never populated.
+     */
+    partyRef: typeof claims.account_holder === 'string' ? claims.account_holder : undefined,
+    /**
+     * The single role, under the name the rest of this service reads.
+     *
+     * The authority resolves every role a principal holds and carries them as a list, which is the
+     * honest shape. Much of this codebase still asks "what role is this" in the singular, and those
+     * checks are the ones own-scope resolution depends on: a customer whose role did not resolve
+     * fell through to the cross-party branch and was refused for lacking an investigator permission,
+     * which is a confusing way to be told a claim was never read.
+     *
+     * Narrowing a list to its first element is a real loss of information, so it is done here, once,
+     * and only for the checks that have not yet been rewritten as permission checks.
+     *
+     * Narrowed to THIS application's own roles first (`ownRoleNames`): a principal can hold a role
+     * at another resource server on the same token, and index 0 of the unfiltered array is whichever
+     * one the authority happened to list first, not necessarily this application's.
+     */
+    role: ownRoles.length > 0 ? String(ownRoles[0]) : undefined,
+  };
+}
+
+/**
+ * The role a check reasons about.
+ *
+ * Read from the token rather than from a collection. Several route checks are still expressed in
+ * terms of a single role name, and rewriting all of them into permission checks is a larger change
+ * than this phase should carry; what matters here is that the value is one the AUTHORITY asserted.
+ */
+function roleOf(user: AuthenticatedUser | undefined): string | undefined {
+  // `user.role` (singular), not `user.roles[0]`: the former is already narrowed to this
+  // application's own roles by tryVerifyToken, the latter is the raw, unscoped list a bank role
+  // can also ride along on.
+  return user?.role;
+}
+
+export async function authMiddleware(request: FastifyRequest, reply: FastifyReply) {
+  const { url, method } = request;
+  // Match against the pathname only: query strings (e.g. ?featured=true) must
+  // not break public-route matching.
+  const path = url.split('?')[0];
+
+  // Routes that opt out of JWT via `config: { skipAuth: true }` validate their own
+  // caller identity in-handler. The internal capability-module engines (ADR-029:
+  // /api/v1/modules/<cap>/score|screen) use the X-Integration-Source header instead
+  // of a Bearer token: the EDA dispatcher calls them server-to-server, not as a user.
+  const routeConfig = (request.routeOptions?.config ?? {}) as { skipAuth?: boolean; dualAuth?: boolean };
+  if (routeConfig.skipAuth) {
+    await attachRbacContext(request);
+    return;
+  }
+
+  // Dual-auth capability route (v23): accept a first-party session JWT OR a merchant OAuth Bearer.
+  // Authenticate here; the route's dualPermission() preHandler authorizes (RBAC action or scope).
+  if (routeConfig.dualAuth) {
+    /**
+     * The channel is chosen by WHO obtained the token, not by which verifier answers first.
+     *
+     * It used to try the session channel first and fall through only when verification failed. That
+     * worked while the two channels used different signatures: a merchant's OAuth token could not
+     * verify as a first-party session JWT, so it fell through. Since v39 both are the same RS256
+     * token from the same authority, so the session channel matched everything and the merchant
+     * channel became unreachable, silently. The merchant then met the first-party contract, which
+     * expects the party in the URL instead of resolving the owner from the token.
+     *
+     * The merchant channel is asked first because it is the SPECIFIC one: it matches only when the
+     * token names a registered, active OAuth client belonging to an active merchant. Anything else is
+     * a first-party session by elimination.
+     */
+    const merchant = await tryMerchantContext(request);
+    if (merchant) {
+      request.merchantContext = merchant;
+      attachRbacContext(request);
+      return;
+    }
+    const sessionPayload = await tryVerifyToken(request.headers.authorization);
+    if (sessionPayload) {
+      (request as FastifyRequest & { user: AuthenticatedUser }).user = sessionPayload;
+      attachRbacContext(request);
+      return;
+    }
+    return reply.status(401).send({ error: 'invalid_token', error_description: 'A valid session or OAuth token is required.' });
+  }
+
+  if (PUBLIC_EXACT.has(path) && methodIsPublic(path, method)) {
+    await attachRbacContext(request);
+    return;
+  }
+  if (PUBLIC_PREFIXES.some((p) => path.startsWith(p))) {
+    await attachRbacContext(request);
+    return;
+  }
+
+  if (method === 'GET' && PUBLIC_GET_PREFIXES.some((p) => path.startsWith(p))) {
+    // Simulator mode: allow unauthenticated GET requests.
+    // But if a Bearer token is present, validate it and enforce customer block.
+    const payload = await tryVerifyToken(request.headers.authorization);
+    if (payload) {
+      (request as FastifyRequest & { user: AuthenticatedUser }).user = payload;
+      const role = roleOf(payload);
+      if (isCustomerBlocked(role, url)) {
+        return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
+      }
+      if (blockedFromInvestigation(role, path)) {
+        return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
+      }
+    }
+    await attachRbacContext(request);
+    return;
+  }
+
+  // All other routes require a valid JWT
+  const authHeader = request.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return reply.status(401).send({ error: 'Authorization header required' });
+  }
+
+  const payload = await tryVerifyToken(authHeader);
+  if (!payload) {
+    return reply.status(401).send({ error: 'Invalid or expired token' });
+  }
+  (request as FastifyRequest & { user: AuthenticatedUser }).user = payload;
+
+  // Customers are blocked from investigation, customer-search, and audit endpoints (but may
+  // manage their own stored cards: see isCustomerBlocked). They use /api/v1/auth/me otherwise.
+  const role = roleOf(payload);
+  if (isCustomerBlocked(role, url)) {
+    return reply.status(403).send({ error: 'Access denied: this endpoint is not available to the customer role' });
+  }
+
+  // Investigation is for fraud analyst/auditor roles only; deny manager/officer/etc.
+  if (blockedFromInvestigation(role, path)) {
+    return reply.status(403).send({ error: 'Access denied: investigation is restricted to fraud analyst and auditor roles' });
+  }
+
+  // The role and any elevation are resolved once, here, rather than by each service for itself.
+  await attachRbacContext(request);
+}

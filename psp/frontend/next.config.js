@@ -1,0 +1,98 @@
+/** @type {import('next').NextConfig} */
+// Load the repo-root .env so a single global file configures every app in local dev (the backend
+// already does this). Guarded: in Docker (frontend-only build context) the root .env / dotenv module
+// are absent, and the values then come from the container environment or the defaults below.
+try { require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') }); } catch { /* no root .env in this context */ }
+const { version: FRONTEND_VERSION } = require('./package.json');
+// The canonical project version lives in the repo-root package.json. In Docker (Kaniko) the build
+// context is the psp/frontend/ dir only, so the repo root is not present: fall back to a build-arg env
+// or the frontend version instead of crashing on a missing module.
+let APP_VERSION;
+try {
+    APP_VERSION = require('../../package.json').version;
+} catch {
+    APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || FRONTEND_VERSION;
+}
+// The simulator's client secret, derived HERE from the one shared function the authority's seeder also
+// uses, so the two always agree without a literal being written down. It is read by the SERVER route
+// that performs the exchange and by nothing in the browser, so it is not part of the client bundle;
+// the variable keeps its published name because the seeder reads that same name. Guarded like the
+// requires above, and for the same reason: this image builds from its OWN directory, so packages/ is
+// not in the build context. In local dev the require resolves from the repo-root node_modules; in a
+// container it throws, and the value comes from the environment instead.
+let SIMULATOR_CLIENT_SECRET = process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
+if (!SIMULATOR_CLIENT_SECRET) {
+    try {
+        SIMULATOR_CLIENT_SECRET = require('@leafypay/platform-links').clientSecretFor(
+            process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_ID || 'leafypay-simulator',
+        );
+    } catch {
+        // Left empty on purpose: the authority declines the flow, which is the correct outcome for an
+        // unconfigured simulator, and is a far clearer failure than a fabricated credential.
+    }
+}
+
+const nextConfig = {
+    env: {
+        NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET: SIMULATOR_CLIENT_SECRET,
+        NEXT_PUBLIC_FRONTEND_VERSION: FRONTEND_VERSION,
+        NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+        // Product name (compound, two words). Inlined so the client bundle picks up the value from the
+        // root .env / environment; defaults keep the current name when unset.
+        NEXT_PUBLIC_PSP_NAME_PRIMARY: process.env.NEXT_PUBLIC_PSP_NAME_PRIMARY || 'Leafy',
+        NEXT_PUBLIC_PSP_NAME_SECONDARY: process.env.NEXT_PUBLIC_PSP_NAME_SECONDARY || 'Pay',
+        // Public frontend URL (same value the backend uses for deep links), inlined for the share QR.
+        NEXT_PUBLIC_PSP_URL_FRONTEND: process.env.PSP_URL_FRONTEND || '',
+    },
+    allowedDevOrigins: ['127.0.0.1', 'localhost'],
+    async rewrites() {
+        const backendUrl =
+            process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE ||
+            process.env.NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC ||
+            'http://localhost:8081';
+        // Merchant health is probed server-side (same-origin proxy) so the admin monitoring page never
+        // does a cross-origin browser fetch (avoids CORS + public-ingress dependency). Prefer the
+        // in-cluster private URL, fall back to the public one, then localhost for dev.
+        const merchantUrl = (
+            process.env.NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE ||
+            process.env.NEXT_PUBLIC_PSP_URL_MERCHANT ||
+            'http://localhost:8082'
+        ).replace(/\/+$/, '');
+        // bankcore is probed the same way, and for a stronger reason: it is a PRIVATE service with no
+        // public ingress, so there is no public URL to fall back to. A browser fetch would fail as a
+        // CORS error locally and as unreachable in staging, which is the same bug with two symptoms.
+        const bankcoreUrl = (
+            process.env.NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE ||
+            'http://localhost:8083'
+        ).replace(/\/+$/, '');
+        // The identity authority is probed the same way. It does have a public host (a token's issuer
+        // has to be reachable by a browser), but the probe runs server side, so the private one is
+        // preferred and the issuer origin is only the fallback.
+        const authorityUrl = (
+            process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE ||
+            (process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER || 'http://localhost:8085/api/v1/realms/LeafyIdp')
+                .replace(/\/realms\/.*$/, '')
+        ).replace(/\/+$/, '');
+        return [
+            // This array form is applied AFTER the filesystem, so the app's own /api/auth/* route
+            // handlers (the sign-in redirect and its callback) win over this catch-all.
+            { source: '/api/:path*', destination: `${backendUrl}/api/:path*` },
+            { source: '/health', destination: `${backendUrl}/health` },
+            // Per-service health aliases. They exist only because bare /health on this origin is
+            // already the backend's; each one forwards to that service's OWN /health, which is also
+            // the path the deploy platform probes.
+            { source: '/health/merchant', destination: `${merchantUrl}/health` },
+            { source: '/health/bankcore', destination: `${bankcoreUrl}/health` },
+            { source: '/health/giam', destination: `${authorityUrl}/health` },
+            // Swagger UI of the bank, same-origin so it works in every environment. The API behind it
+            // needs a registered TPP's credentials, so publishing the docs opens nothing.
+            { source: '/doc/bankcore', destination: `${bankcoreUrl}/doc` },
+            { source: '/doc/bankcore/:path*', destination: `${bankcoreUrl}/doc/:path*` },
+            // The PROVIDER's own reference, same origin for the same reason. Declared AFTER the bank's, since
+            // Next matches in order and `/doc/:path*` would otherwise swallow `/doc/bankcore`.
+            { source: '/doc', destination: `${backendUrl}/doc` },
+            { source: '/doc/:path*', destination: `${backendUrl}/doc/:path*` },
+        ];
+    },
+};
+module.exports = nextConfig;

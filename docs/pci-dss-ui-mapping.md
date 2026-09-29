@@ -257,39 +257,39 @@ Captured from the UI on 2026-08-06, immediately before the references were strip
 | `config: roleGuide.ts` | PCI DSS Req 7 | 'Does not manage providers or modules; that is the manager role (separation of duties, PCI DSS Req 7).', |
 | `config: roleGuide.ts` | Req 10, Req 3.2/3.3, Req 7 | pci: ['Req 3.2/3.3', 'Req 7', 'Req 10'], |
 | `config: roleGuide.ts` | Req 10, Req 12, Req 8 | pci: ['Req 8', 'Req 10', 'Req 12'], |
-| `frontend/src/app/system/admin/_components/IntegrationCategoryPage.tsx` | PCI DSS Req 12.8.1 | debugInfo={'PCI DSS Req 12.8.1'} |
-| `frontend/src/app/system/admin/integrations/[id]/_shared.tsx` | Req. | <th className="px-3 py-2 font-medium w-14 text-center">Req.</th> |
-| `frontend/src/app/system/admin/modules/_components/CardsAdminPanel.tsx` | PCI DSS Req 3.2 | <p className="text-xs text-gray-400">CVV and PIN are never accepted or stored (PCI DSS Req 3.2). PAN is display-safe (masked) only.</p> |
-| `frontend/src/app/system/admin/providers/vendors/[id]/_shared.tsx` | Req. | <th className="px-3 py-2 font-medium w-14 text-center">Req.</th> |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.6 | <><Em>Req 3.6:</Em> How the CMK is managed in AWS KMS, DEK rotation schedules, and the KMS key policy.</>, |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 7 | <><Em>Req 7:</Em> Whether access to the decryption capability is role-restricted.</>, |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10 | <><Em>Req 10:</Em> Whether every field-access event is audited.</>, |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.6 | tags: ['QSA', 'AOC', 'CMK', 'DEK', 'KMS', 'key management', 'Req 3.6'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 1 | ['Req 1–2 (Network security)', 'IP Access Lists, VPC Peering, Private Endpoints, tenant isolation between clusters'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.4 | ['Req 3.4 (CHD unreadable at rest)', 'AES-256 encryption at rest on all storage volumes and backup media'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 4 | ['Req 4 (Encryption in transit)', 'TLS 1.2+ enforced on all client connections; cannot be disabled'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 7 | ['Req 7–8 (Access control & auth)', 'Atlas RBAC, MFA on Atlas console, LDAP integration, privileged access management'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10 | ['Req 10 (Audit logging)', 'Atlas Audit Log infrastructure, maintained and secured by MongoDB'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 11 | ['Req 11–12 (Vuln. management)', 'MongoDB patching program, security scanning, and information security policies'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.4 | <><Em>Req 3.4:</Em> CHD field is encrypted before the BSON document leaves the application server. MongoDB never receives plaintext, so it cannot appe |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.6 | <><Em>Req 3.6:</Em> The CMK is held exclusively by the customer in AWS KMS. Revoking the CMK immediately renders all QE-encrypted data unreadable from |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 7 | <><Em>Req 7:</Em> A user with full Atlas admin credentials querying without the QE client receives only opaque binary ciphertext. The restriction is < |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10 | <><Em>Req 10:</Em> Every decryption event occurs in the application layer, where it can be logged with full business context: user, role, fraud case,  |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10, Req 3.4, Req 3.6, Req 7 | tags: ['QE', 'PCI DSS', 'Req 3.4', 'Req 3.6', 'Req 7', 'Req 10', 'threat model', 'certification'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.4 | tags: ['Req 3.4', 'PAN', 'tokenization', 'non-storage', 'maskedPan', 'Visa Token Service'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.1 | [<Code>cardholderConsentTimestamp</Code>, 'Required: Req 3.1 + network rules'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.7 | [<><Code>mandateStatus</Code> (active / cancelled / expired)</>, 'Required for Req 3.7 purge logic'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.1 | <><Em>Explicit cardholder consent (Req 3.1 + network rules):</Em> The save-card step must present an explicit consent checkbox and record the <Code>ca |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 7 | <><Em>Scope-limited access to the charge trigger (Req 7):</Em> Only the payment processing service should be able to initiate a new charge. Fraud inve |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.7 | <><Em>Periodic purge of unused stored cards (Req 3.7):</Em> Stored card data must be deleted when the customer cancels the mandate, when the card expi |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.3, Req 3.7 | tags: ['recurring payment', 'save card', 'v4', 'consent', 'mandate', 'CVV', 'Req 3.3', 'Req 3.7'], |
-| `frontend/src/app/system/help/_QASection.tsx` | PCI DSS Req 7.1 | <P>This is one of the most important design decisions in the v2 architecture. The short answer is: <Em>a job title is not a justification</Em>. PCI DS |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 7.1 | ['Req 7.1: Restrict access by business need', 'The token proves the business need: a specific case, at a specific time, approved by the L2 investigato |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 7.2 | ['Req 7.2: Access control based on need to know', 'Access requires role + valid token + case match. This is two-factor access control on sensitive dat |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10.2 | ['Req 10.2: Audit trail for access to CHD', 'Every sensitive field access writes a field_accessed audit event with: timestamp, role, caseId, and the e |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10.3 | ['Req 10.3: Protect audit logs from destruction', 'Audit events are written to fraudDiagnosisCaseEvents with no delete API exposed.'], |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 10, Req 7 | tags: ['RBAC', 'escalation token', 'Req 7', 'Req 10', 'need-to-know', 'audit', 'level2_investigator'], |
-| `frontend/src/app/system/help/_QASection.tsx` | PCI DSS Req 3.2 | <P>The CVV is Sensitive Authentication Data: PCI DSS Req 3.2 forbids storing it after authorization, in cleartext or ciphertext. The built-in issuer t |
-| `frontend/src/app/system/help/_QASection.tsx` | Req 3.2 | tags: ['CVV', 'SAD', 'Req 3.2', 'HMAC', 'CVK', 'envelope encryption', 'derivation', 'cvvMode'], |
+| `psp/frontend/src/app/system/admin/_components/IntegrationCategoryPage.tsx` | PCI DSS Req 12.8.1 | debugInfo={'PCI DSS Req 12.8.1'} |
+| `psp/frontend/src/app/system/admin/integrations/[id]/_shared.tsx` | Req. | <th className="px-3 py-2 font-medium w-14 text-center">Req.</th> |
+| `psp/frontend/src/app/system/admin/modules/_components/CardsAdminPanel.tsx` | PCI DSS Req 3.2 | <p className="text-xs text-gray-400">CVV and PIN are never accepted or stored (PCI DSS Req 3.2). PAN is display-safe (masked) only.</p> |
+| `psp/frontend/src/app/system/admin/providers/vendors/[id]/_shared.tsx` | Req. | <th className="px-3 py-2 font-medium w-14 text-center">Req.</th> |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.6 | <><Em>Req 3.6:</Em> How the CMK is managed in AWS KMS, DEK rotation schedules, and the KMS key policy.</>, |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 7 | <><Em>Req 7:</Em> Whether access to the decryption capability is role-restricted.</>, |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10 | <><Em>Req 10:</Em> Whether every field-access event is audited.</>, |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.6 | tags: ['QSA', 'AOC', 'CMK', 'DEK', 'KMS', 'key management', 'Req 3.6'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 1 | ['Req 1–2 (Network security)', 'IP Access Lists, VPC Peering, Private Endpoints, tenant isolation between clusters'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.4 | ['Req 3.4 (CHD unreadable at rest)', 'AES-256 encryption at rest on all storage volumes and backup media'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 4 | ['Req 4 (Encryption in transit)', 'TLS 1.2+ enforced on all client connections; cannot be disabled'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 7 | ['Req 7–8 (Access control & auth)', 'Atlas RBAC, MFA on Atlas console, LDAP integration, privileged access management'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10 | ['Req 10 (Audit logging)', 'Atlas Audit Log infrastructure, maintained and secured by MongoDB'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 11 | ['Req 11–12 (Vuln. management)', 'MongoDB patching program, security scanning, and information security policies'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.4 | <><Em>Req 3.4:</Em> CHD field is encrypted before the BSON document leaves the application server. MongoDB never receives plaintext, so it cannot appe |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.6 | <><Em>Req 3.6:</Em> The CMK is held exclusively by the customer in AWS KMS. Revoking the CMK immediately renders all QE-encrypted data unreadable from |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 7 | <><Em>Req 7:</Em> A user with full Atlas admin credentials querying without the QE client receives only opaque binary ciphertext. The restriction is < |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10 | <><Em>Req 10:</Em> Every decryption event occurs in the application layer, where it can be logged with full business context: user, role, fraud case,  |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10, Req 3.4, Req 3.6, Req 7 | tags: ['QE', 'PCI DSS', 'Req 3.4', 'Req 3.6', 'Req 7', 'Req 10', 'threat model', 'certification'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.4 | tags: ['Req 3.4', 'PAN', 'tokenization', 'non-storage', 'maskedPan', 'Visa Token Service'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.1 | [<Code>cardholderConsentTimestamp</Code>, 'Required: Req 3.1 + network rules'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.7 | [<><Code>mandateStatus</Code> (active / cancelled / expired)</>, 'Required for Req 3.7 purge logic'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.1 | <><Em>Explicit cardholder consent (Req 3.1 + network rules):</Em> The save-card step must present an explicit consent checkbox and record the <Code>ca |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 7 | <><Em>Scope-limited access to the charge trigger (Req 7):</Em> Only the payment processing service should be able to initiate a new charge. Fraud inve |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.7 | <><Em>Periodic purge of unused stored cards (Req 3.7):</Em> Stored card data must be deleted when the customer cancels the mandate, when the card expi |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.3, Req 3.7 | tags: ['recurring payment', 'save card', 'v4', 'consent', 'mandate', 'CVV', 'Req 3.3', 'Req 3.7'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | PCI DSS Req 7.1 | <P>This is one of the most important design decisions in the v2 architecture. The short answer is: <Em>a job title is not a justification</Em>. PCI DS |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 7.1 | ['Req 7.1: Restrict access by business need', 'The token proves the business need: a specific case, at a specific time, approved by the L2 investigato |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 7.2 | ['Req 7.2: Access control based on need to know', 'Access requires role + valid token + case match. This is two-factor access control on sensitive dat |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10.2 | ['Req 10.2: Audit trail for access to CHD', 'Every sensitive field access writes a field_accessed audit event with: timestamp, role, caseId, and the e |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10.3 | ['Req 10.3: Protect audit logs from destruction', 'Audit events are written to fraudDiagnosisCaseEvents with no delete API exposed.'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 10, Req 7 | tags: ['RBAC', 'escalation token', 'Req 7', 'Req 10', 'need-to-know', 'audit', 'level2_investigator'], |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | PCI DSS Req 3.2 | <P>The CVV is Sensitive Authentication Data: PCI DSS Req 3.2 forbids storing it after authorization, in cleartext or ciphertext. The built-in issuer t |
+| `psp/frontend/src/app/system/help/_QASection.tsx` | Req 3.2 | tags: ['CVV', 'SAD', 'Req 3.2', 'HMAC', 'CVK', 'envelope encryption', 'derivation', 'cvvMode'], |
 | `merchant/src/app/help/page.tsx` | SAQ A | in <Chip tone="accent">PCI DSS SAQ A</Chip> scope. |
 | `merchant/src/app/layout.tsx` | SAQ A | Espresso Works Ltd, external merchant demo. No card data handled here (PCI DSS SAQ A). |

@@ -1,6 +1,14 @@
 import { defineConfig } from 'vitest/config';
+import { resolve } from 'path';
 
 export default defineConfig({
+  resolve: {
+    // v37: run the shared package from source, so a test never sees a stale dist build.
+    alias: {
+      '@leafypay/eventbus': resolve(__dirname, 'packages/eventbus/src/index.ts'),
+      '@leafypay/platform-links': resolve(__dirname, 'packages/platform-links/src/index.ts'),
+    },
+  },
   test: {
     globals: true,
     setupFiles: ['./test/setup.ts'],
@@ -10,19 +18,26 @@ export default defineConfig({
     testTimeout: 30000,
     // Use jsdom for frontend tests, node for backend tests
     environmentMatchGlobs: [
-      ['test/frontend/**', 'jsdom'],
-      ['test/backend/**', 'node'],
+      ['test/psp/frontend/**', 'jsdom'],
+      ['test/psp/backend/**', 'node'],
+      // v37: bankcore is a second Fastify service, so its suites run in node like the backend's.
+      ['test/bank/backend/**', 'node'],
+      // The merchant is a third app, driven over HTTP like the others.
+      ['test/merchant/**', 'node'],
     ],
     include: [
-      'test/frontend/unit/**/*.test.{ts,tsx}',
-      'test/frontend/integration/**/*.test.{ts,tsx}',
-      'test/backend/unit/**/*.test.ts',
-      'test/backend/integration/**/*.test.ts',
+      'test/psp/frontend/unit/**/*.test.{ts,tsx}',
+      'test/psp/frontend/integration/**/*.test.{ts,tsx}',
+      'test/psp/backend/unit/**/*.test.ts',
+      'test/psp/backend/integration/**/*.test.ts',
+      'test/bank/backend/unit/**/*.test.ts',
+      'test/bank/backend/integration/**/*.test.ts',
+      'test/merchant/integration/**/*.test.ts',
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['frontend/src/**', 'backend/src/**'],
+      include: ['psp/frontend/src/**', 'psp/backend/src/**', 'bank/backend/src/**'],
       exclude: ['**/__tests__/**', '**/node_modules/**'],
     },
   },

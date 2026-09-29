@@ -26,7 +26,7 @@ Full business context, problem statement, and storyline are in [PRD.md](PRD.md).
 - Specify the dual-mode frontend: Simulator Mode (presenter-controlled, no login) and Application Mode (JWT login, role-based routing).
 - Define the JWT authentication design (local HS256 domain, pre-seeded demo users, extensible to MS Entra ID).
 - Specify the Fastify REST API surface and request/response contracts.
-- Define the `backend/bin/setup.ts` and `backend/bin/seed.ts` scripts so the demo is installable in one sequence of commands.
+- Define the `psp/backend/bin/setup.ts` and `psp/backend/bin/seed.ts` scripts so the demo is installable in one sequence of commands.
 - Identify the risks specific to QE implementation and specify mitigations.
 - Break the work into five independently deliverable phases aligned with v1, v2, v3, v4, and v5.
 
@@ -67,20 +67,28 @@ AWS KMS
 
 ### 3.2 Repository structure decision
 
-Two named top-level folders per IST Engineering Standards:
+One folder per institution, each holding its own applications:
 
 ```
-frontend/     ← Next.js 14 App Router
-backend/      ← Fastify 4 (controllers / services / models / encryption)
-  bin/        ← setup.ts + seed.ts (owned by backend; invoked via npm --prefix backend)
-  data/       ← JSON seed files (one per collection; consumed only by backend/bin/seed.ts)
-test/         ← All automated tests (Vitest unit + integration, Playwright E2E)
-  backend/    ←   mirrors backend/src/: unit/services/ + integration/routes/
-  frontend/   ←   mirrors frontend/src/: unit/lib/ + unit/components/ + e2e/
-docs/         ← PRD, roadmap, technical-spec, this EP
+psp/               ← Leafy Pay, the payment service provider
+  frontend/        ← Next.js 14 App Router
+  backend/         ← Fastify 4 (controllers / services / models / encryption)
+    bin/           ← setup.ts + seed.ts (owned by the backend; invoked via npm --prefix psp/backend)
+    data/          ← JSON seed files (one per collection; consumed only by psp/backend/bin/seed.ts)
+bank/              ← the bank (ASPSP)
+  backend/         ← Fastify 4, its own database, Open Banking API
+merchant/          ← external merchant demo (Next.js, no database)
+packages/          ← shared workspaces (event bus, platform links)
+test/              ← All automated tests (Vitest unit + integration, Playwright E2E)
+  psp/backend/     ←   mirrors psp/backend/src/: unit/services/ + integration/routes/
+  psp/frontend/    ←   mirrors psp/frontend/src/: unit/lib/ + unit/components/ + e2e/
+  bank/backend/    ←   mirrors bank/backend/src/
+docs/              ← PRD, roadmap, technical-spec, this EP
 ```
 
-`bin/` and `data/` live inside `backend/` because they call `backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix backend` and `npm run setup:seed --prefix backend`.
+The test tree mirrors the source tree, so an application's suites move with it.
+
+`bin/` and `data/` live inside `psp/backend/` because they call `psp/backend/src/vendors/` directly. The root `package.json` delegates with `npm run setup:db --prefix psp/backend` and `npm run setup:seed --prefix psp/backend`.
 
 No `packages/` shared workspace. The backend owns all MongoDB access and all encryption logic. The frontend is a pure HTTP consumer. Shared TypeScript base config lives in `tsconfig.base.json`.
 
@@ -198,13 +206,18 @@ All tests live in `test/` at the repository root, organised by layer and type (I
 ```
 test/
 ├── setup.ts                          ← global Vitest setup
-├── backend/
-│   ├── unit/services/                ← mirrors backend/src/services/
-│   └── integration/routes/           ← mirrors backend/src/controllers/
-└── frontend/
-    ├── unit/lib/                     ← mirrors frontend/src/lib/
-    ├── unit/components/              ← mirrors frontend/src/app/components/
-    └── e2e/                          ← Playwright flow specs
+├── psp/
+│   ├── backend/
+│   │   ├── unit/services/            ← mirrors psp/backend/src/services/
+│   │   └── integration/routes/       ← mirrors psp/backend/src/controllers/
+│   └── frontend/
+│       ├── unit/lib/                 ← mirrors psp/frontend/src/lib/
+│       ├── unit/components/          ← mirrors psp/frontend/src/app/components/
+│       └── e2e/                      ← Playwright flow specs
+└── bank/
+    └── backend/
+        ├── unit/                     ← mirrors bank/backend/src/
+        └── integration/              ← Open Banking route + contract suites
 ```
 
 | Level | Scope | Tool | Location |
@@ -298,7 +311,7 @@ PCI CDE boundary at code level: modules `customer`, `transactions`, and `gateway
 #### 3.8.5 Backend source structure
 
 ```
-backend/src/
+psp/backend/src/
 ├── shared/
 │   ├── models/
 │   │   ├── risk.model.ts             RiskSeverity · FraudTriggerInput
@@ -405,8 +418,8 @@ The API URL surface follows REST nesting and module semantics: `/api/v1/customer
 
 | Phase | Scope | Dependency | Version |
 |---|---|---|---|
-| **P1** | `backend/bin/setup.ts`: 7 collections, DEK provisioning, indexes | None | v1 |
-| **P2** | `backend/bin/seed.ts`: synthetic data for all 7 collections (incl. 5 demo users) | P1 | v1 |
+| **P1** | `psp/backend/bin/setup.ts`: 7 collections, DEK provisioning, indexes | None | v1 |
+| **P2** | `psp/backend/bin/seed.ts`: synthetic data for all 7 collections (incl. 5 demo users) | P1 | v1 |
 | **P3** | Backend: QE client, KMS provider factory, `encryptedFieldsMap` | P1 | v1 |
 | **P3a** | Backend: JWT auth middleware + `POST /api/v1/auth/login` endpoint | P3 | v1 |
 | **P4** | Backend: payment API (`POST /transactions`, `POST /cards`) | P3 | v1 |
@@ -956,7 +969,7 @@ Debug Mode is a **demo-only feature** and must not be enabled in any production 
 #### Architecture
 
 ```
-frontend/src/
+psp/frontend/src/
   context/
     DebugContext.tsx: React context + useDebugMode() hook
   components/debug/
@@ -1250,7 +1263,7 @@ Adopt the **Internal-First integration pattern** for all six compliance integrat
 
 ### Context
 
-The existing codebase has a devops `admin` controller (`backend/src/modules/admin/controllers/admin.controller.ts`) with 7 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
+The existing codebase has a devops `admin` controller (`psp/backend/src/modules/admin/controllers/admin.controller.ts`) with 8 endpoints: `POST /admin/login`, `POST /admin/run`, `POST /admin/exec`, `GET /admin/logs` (SSE stream), `GET /admin/system`, `GET /admin/drop-impact` (read-only preview of what a drop would delete: target server, database, key vault, collection inventory, Atlas roles and users), `GET /admin/env`, `POST /admin/restart`. This is an infrastructure-management tool for demo operators, not a business user.
 
 The Integration Hub (v6) requires a business role that can:
 - Register, configure, and suspend external compliance providers
@@ -1689,7 +1702,7 @@ ADR-004 established the dual-mode frontend. In practice the Simulator had drifte
 **Context.** Event handling was scattered: a per-case in-process `EventEmitter` (`caseEventBus`) plus direct writes to three event collections (`businessProcessEvent`, `complianceProcessEvent`, `externalProviderArrangementActionLog`). Following the real-PSP model, a card payment must wait for the issuer's decision (and other real-time risk checks) from providers with asynchronous flows, while the client waits for the outcome, and an investigation must be able to follow the whole journey across subsystems, not chase scattered logs.
 
 **Decision.**
-1. **EventBus vendor (port/adapter), one instance for ALL events** (`backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus`, no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
+1. **EventBus vendor (port/adapter), one instance for ALL events** (`psp/backend/src/vendors/eventbus`). The system depends only on the `EventBus` port (`publish`/`subscribe`); the default `EventBusInProcess` adapter uses Node `EventEmitter` (name-indexed exact dispatch + `eventType\0correlationId` composite keys for journey-scoped subscriptions + a small wildcard list). Migrating to Kafka/RabbitMQ swaps only the adapter in `initEventBus`, no publisher/consumer changes. The former `caseEventBus` signals run on the same bus, marked `transient` (delivered, not persisted).
 2. **`DomainEvent` envelope + correlated event store** (`domainEvent` collection). Every event carries `eventId` (idempotency), `eventType` (dotted, module-prefixed), `correlationId` (= the journey, the `cardTransactionInstanceReference` for a payment), `causationId`, `businessProcess`, `partitionKey` (Kafka-ready). CHD is stripped on publish (`sanitizeDeep`, single CHD blocklist owned by the vendor). The legacy `emitProcessEvent`/`emitComplianceEvent`/`logEvent` also mirror to the store with correlation. `GET /api/v1/events/trail/:correlationId` returns the ordered journey.
 3. **Two-phase async payment authorization.** `POST /transactions` creates the transaction `pending` and returns `202`; the client subscribes to `GET /api/v1/transactions/:id/stream` (SSE, public by txn UUID, no CHD) for the outcome. **Phase 1 (gate):** `card-issuer` + `fds` + `hrp` (sanctions) run in parallel, out-of-band; each funnels a `*.completed` verdict onto the bus and `PaymentAuthorizationSaga` aggregates them, any hard decline → `payment.declined` (short-circuit), all approve → `payment.authorized`. Only eligibility gates hard-decline (`card-issuer`, `funds`, and `hrp` sanctions as a regulatory block); `fds` is a risk gate whose `review`/`decline` recommendation authorizes the payment and opens a fraud case for L1/L2 instead of declining it. CHD (PAN/CVV/expiry) goes straight to the issuer via dispatch, never on the bus. **Phase 2 (post-auth, async):** `PostAuthorizationProcess` runs AML monitoring (never blocks the authorized payment) and enriches the fraud case from the correlated trail (`fraudDiagnosisCase.subsystemSignals`).
 4. **Backward compatibility.** `createTransaction` is kept as a synchronous wrapper (initiate + await the terminal event) so the gateway (checkout / payment-link) is unchanged.
@@ -2237,7 +2250,7 @@ least-privilege regression (PCI DSS 7.2.2, EBA §31(a)) introduced for a UI conv
 
 ### ADR-054: the data generator is additive and refuses to clobber
 
-**Decision.** `bin/seed-generate.ts` reads the existing `backend/data/*.json`, keeps every record it
+**Decision.** `bin/seed-generate.ts` reads the existing `psp/backend/data/*.json`, keeps every record it
 finds byte-for-byte, and only appends what is needed to reach its target floors. `write()` refuses to
 reduce any collection's record count and fails the run unless `--force` is passed. A second run over
 its own output is a no-op, so the generator is safe to invoke at any point in the lifecycle.
@@ -2683,3 +2696,384 @@ surface: add a normalizer, not a branch in a caller.
 detail and the dashboard stat pin themselves to `kind=card` to keep the card document shape. Response
 schemas gained the movement fields as additive optional properties (they are strict, so an undeclared
 field would be stripped). No collection, index, DEK or seed change.
+
+---
+
+## ADR-064: bankcore as a physically separate institution, and the ledger boundary (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** The PSP owned the account ledger. Balances, holds and settlements were rows in
+`payoutAccountArrangement`, and every money movement was a local atomic update. Three consequences made this
+untenable for a demo that claims to show Open Banking. A payment service provider does not hold customer
+funds, so the architecture asserted something no regulator would accept. Peer to peer transfers CREDITED the
+recipient locally, which is to say they invented money that no institution had moved. And an account to
+account transfer had no path at all: the endpoint existed, the UI called it, and it was a dead end.
+
+**Decision:**
+
+1. **A separate service with its own database.** `bankcore/` is an ASPSP with its own Fastify app, its own
+   Mongo database and its own event bus instance. It is not a module of the PSP and it shares no collection
+   with it. The only shared thing is the Queryable Encryption key vault, so no new key material and no second
+   rotation story is introduced.
+2. **The bank owns the ledger.** `accountArrangement` holds the authoritative balance; `accountMovement`
+   records every mutation explicitly so the ledger is reconcilable rather than inferred from a running total.
+   The PSP's `payoutAccountArrangement` survives as a LINKED ACCOUNT record: it keeps the reference every
+   consumer already reads, and its balance becomes a projection.
+3. **The PSP stops moving money.** A delegated execution records that it was delegated BEFORE dispatch, and
+   the payout orchestration returns before any local balance movement when it was. The decision is on the
+   record, not re-derived later from a runtime flag, because a flag that changes between the write and the
+   read produces two different histories of the same payment.
+4. **Fail closed at the boundary.** An unreachable bank declines. A funds gate that fails open authorises a
+   payment nobody checked, and after this change the thing that could not be reached is precisely the
+   authoritative balance.
+
+**Consequences.** The PSP can no longer answer "what is the balance" from its own database, which is correct
+and is the point. Anything that needs a real balance calls the bank. A funds CONFIRMATION cannot substitute
+for a hold, because a yes or no is not a reservation and two concurrent authorisations would both pass it, so
+the hold moved to the bank as its own operation (ADR-065's boundary carries the answer back).
+
+**Rejected: keeping the ledger at the PSP behind an interface.** It would have preserved every one of the
+three defects while adding indirection, and the demo's claim is precisely that the institution holding the
+money is a different institution.
+
+---
+
+## ADR-065: the service boundary is a webhook carrying a security event token (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** Two services with two event buses cannot subscribe to each other. The bank changes things the
+PSP is not watching for: a consent becomes valid, a payment reaches a settled status. The PSP needs to know
+without polling, and the notification has to be verifiable, because a message that changes a payment's state
+on the strength of an unauthenticated POST is a state machine anyone can drive.
+
+**Decision:**
+
+1. **Push, signed, over HTTP.** The bank delivers a Security Event Token (RFC 8417) by push (RFC 8935),
+   signed RS256 with the bank's own key, published at a JWKS endpoint (RFC 7517).
+2. **The receiver pins what it accepts.** RS256 only, the key matched by `kid`, issuer and audience checked.
+   A verification failure caused by OUR side answers 400, not 401: telling the sender it was unauthorised
+   when the fault is local sends whoever is debugging in the wrong direction.
+3. **Delivery is evidence.** Every attempt is a row in `tppWebhookDeliveryLog`, outcome included. A silent
+   failure is the worst case for a notification channel, and the log is what makes it visible.
+4. **Notification never throws.** A failed delivery must not roll back the state change it was reporting.
+   The same `jti` is reused across retries so a receiver can deduplicate.
+
+**Consequences.** The boundary is auditable from both sides: the bank has the attempt log, the PSP has the
+compliance events. A field name mismatch between the two halves is NOT caught by unit tests on either side,
+which is exactly how one was found in P5.2: the payload said `paymentReference` and the subscriber read
+`paymentExecutionInstanceReference`, both individually correct and tested, and the transfer stayed in flight.
+Contract tests across the boundary earn their place because of that class of defect.
+
+---
+
+## ADR-066: routing resolvers are declared per capability, not assumed (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** With one bank, "which provider serves this capability" had one answer, so the router could pick
+the active provider for a type. With a real ASPSP the question changes: which bank serves THIS account. Some
+capabilities are bound to an entity (an account belongs to one bank; a card was issued by one issuer) and
+others are not (fraud scoring, sanctions screening: any configured provider will do).
+
+**Decision:**
+
+1. **Each capability declares its resolution kind.** Entity-bound capabilities name the key they resolve on;
+   strategy-bound ones keep the existing group behaviour. The kind is DECLARED in a table, not inferred from
+   the payload, so a new capability cannot silently inherit the wrong one.
+2. **The debtor decides, never the creditor.** An account-bound resolution reads the party being debited. A
+   creditor at another institution must not select the provider that moves the payer's money.
+3. **A registered issuer beats a BIN guess.** Card issuer resolution prefers an explicitly registered issuer
+   and falls back to BIN range matching. A card outside every declared range is REFUSED rather than routed to
+   a default: nothing could say which issuer owns it, and picking one would be fabricating a routing decision.
+4. **One dispatch pipeline.** The resolver is injected before any strategy runs, so provider selection cannot
+   fork into a second code path that is not audited.
+
+**Consequences.** The concurrent risk gates stay separate. Once the funds gate became "one hop to the bank"
+it looked collapsible into a single composite call with the issuer check, the fraud score and the sanctions
+screen, and a test now forbids it: a fused call has one verdict, so a decline stops saying WHICH control
+declined, and the compliance narrative an investigator reads is built from the separate verdicts.
+
+---
+
+## ADR-067: TPP registration is the authorisation model at the bank (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** The bank needed to authorise the PSP without inheriting the PSP's identity system. A token
+minted by the platform must not open the banking API, or the boundary between the two institutions is
+decorative.
+
+**Decision:**
+
+1. **Registered third parties, client credentials.** `tppRegistration` holds the client id, a bcrypt secret
+   hash, the granted scopes and the roles. Tokens are the bank's own, signed with the bank's own key, with
+   `iss` and `aud` naming the bank.
+2. **Scopes are per operation group, and separately granted.** Berlin Group's own access names for the
+   account surface (`accounts`, `balances`, `transactions`), plus scopes for what no standard covers:
+   `card-authorisations` places a hold, `card-data` reads a card number, `credit-assessments` reads
+   creditworthiness. `card-data` is deliberately not folded into `card-authorisations`, because a token that
+   can hold funds must not thereby be able to read a PAN.
+3. **Refuse identically on unknown client and wrong secret.** Both answer the same refusal, so the endpoint
+   cannot be used to enumerate which client ids exist.
+4. **Authorise before reporting availability.** A 503 is returned only AFTER the caller has been
+   authorised. An unauthenticated caller learning the state of the bank's database is a free reconnaissance
+   signal.
+5. **Consent is a separate gate from the token.** `resolveConsent` is the single place an account access is
+   judged, and "created" is not "authorised": a consent must reach a usable status before it opens anything.
+
+**Consequences.** Every bank endpoint is authorised the same way, and the middleware distinguishes 401 (no
+token) from 403 (wrong scope or role) so an integrator can tell a missing grant from a missing token. The
+scopes are granted in the seeded registration, so adding a capability means granting its scope explicitly.
+
+---
+
+## ADR-068: two tokenisation owners, and neither replaces the other (v37)
+
+**Status:** Accepted (2026-08-19).
+
+**Context:** The platform now has two institutions that both hold something called a card token. The obvious
+reading is that one is redundant. It is not, and the confusion is expensive: deleting either one breaks a
+different guarantee.
+
+**Decision:**
+
+1. **The issuer vault is at the bank.** `cardIssuerVault` holds the full PAN, encrypted with an equality
+   query type so a card can be located by its exact number over ciphertext with no client-side decryption.
+   PCI DSS assigns scope to whoever stores a PAN, and that is the institution that ISSUED the card.
+2. **The acceptance token vault stays at the PSP.** `cardEtokenProcedure` and the surrogate token on
+   `paymentCardManagement` are acceptance-side: they let the provider operate a card on file while holding
+   BIN plus last four and no cardholder data. This mirrors the EMVCo split between acceptance tokens and
+   issuer or network tokens.
+3. **The PSP reaches cardholder data only by asking.** Reveal, exact-PAN search and verification value
+   derivation are calls to the issuer. The reveal is modelled as creating a reveal, not reading a resource,
+   because each call is an act of disclosure to be authorised and recorded; the search is a POST because a
+   PAN in a query string lands in access logs and browser history.
+4. **The verification key derivation did not change.** It moved with the vault byte for byte and reuses the
+   same provisioned key, since every seeded card's CVV depends on it. Fixed vectors in a test pin the
+   algorithm now that the PSP's copy is gone.
+5. **De-scoping is asserted, not claimed.** A test proves no PAN field, no vault reference, no PAN data
+   encryption key and no seeder writing a number remains anywhere in `psp/backend/src`.
+
+**Two naming corrections, recorded because both are traps.** `paymentCardRegistry` at the PSP dedupes
+ACCEPTED card instruments and carries the holder count the fraud engine reads as a shared-card signal; the
+bank's record of what it issued is a different thing and is called `issuedCardRegistry`. `customerCreditRatingState`
+at the PSP holds transaction-monitoring risk flags and no score at all, despite the BIAN name; the bank's
+assessment is `creditAssessmentState`. In both cases the v37 plan said the PSP collection moves, and in both
+cases it must not, because the PSP reads it for fraud investigation, which does not move.
+
+**Consequences.** A demo can show a PAN search over ciphertext at the institution that is meant to be in
+scope for it, and show the provider operating a full card flow without ever holding one. The cost is a network
+hop for three operations that used to be local reads, and one more place where a misconfigured provider
+endpoint produces a 502 instead of a value.
+
+## ADR-069: the provider performs no banking operation, and gives up its fallback to do it (v37 P12)
+
+**Context.** The provider carried its own implementations of four bank capabilities: a card-issuer engine that
+validated a card's format, network and verification value; a card-authorisation stub that approved or declined;
+an account-information engine that judged an account and its funds; a payment-initiation engine that moved a
+transfer. Each was reachable as an INTERNAL provider, dispatched to a loopback path back into the provider's
+own API, and `PSP_BANKCORE_ENABLED=false` selected them over the bank. The funds gate did the same thing with
+the ledger: with the bank disabled or the account unlinked, it held money against the provider's own balance.
+
+That was the right shape while the provider was the only participant. It is the wrong one for a provider whose
+role is to reach SEVERAL banks: an institution's own decisions cannot be reimplemented per integration, and a
+provider that holds a balance is a provider that has become a bank.
+
+**Decision.** No banking operation is performed inside the provider. The four engines are deleted, along with
+their controllers, their loopback endpoints, their internal-handler declarations and their configuration
+screens. Each capability is reached at an institution over that institution's API: Open Banking where a
+standard exists (accounts, balances, transactions, consents, payments, periodic payments, funds confirmation),
+and the card industry's own conventions where none does (ISO/IEC 7812, Luhn, ISO 8583 response codes), which is
+stated rather than dressed up as Open Banking.
+
+Resolution is by the DATA and refuses rather than guessing: an account's servicing institution, a freshly typed
+IBAN's bank code, a card's issuer. An account the provider cannot reach at a bank is refused with
+`funding_account_not_linked_to_a_bank`, not decided locally.
+
+What the provider keeps is what it owns: the cards its customers have on file, their payout accounts, the
+consents it holds, its own audit trail, and the routing that decides which institution serves each request.
+
+**What was rejected.** Keeping the engines as a fallback behind the flag. It reads like prudence and is the
+opposite: two implementations of one decision means the demo can silently exercise the wrong one, and the
+fallback is the one nobody looks at, so it drifts. The card engine had already drifted, holding its own copy of
+each network's verification-value length while the bank held the authoritative one.
+
+Also rejected: moving the provider's cards-on-file and payout-account administration to the bank. Those are the
+provider's records. A card on file is a tokenised instrument the provider holds under its own obligations, and a
+payout account POINTS AT an account the bank services rather than being one. Moving them would have made the
+bank administer another institution's data, which is the same mistake in the other direction.
+
+**Consequences, including the one that costs something.**
+
+`PSP_BANKCORE_ENABLED=false` is no longer a fallback. Previously it restored a working provider-only mode, which
+made a regression one variable away from isolated; now it can only stop the provider talking to the bank, and
+there is nothing left to talk to instead. The safety property an earlier decision in this plan relied on is
+gone, deliberately, and the replacement is that the failure is LOUD: a capability that cannot be routed refuses
+with the reason, and the funds gate fails closed.
+
+An unlinked account can no longer be paid from. One seeded payout account is in that state, and it now declines
+rather than approving against a balance nobody stands behind. That is the correct answer to "authorise this
+against money I do not hold", and it is visible instead of silent.
+
+
+---
+
+## v39: extracting identity into an authority
+
+### ADR-070: identity leaves the applications entirely, rather than being shared between them
+
+**Context.** LeafyPay authenticated people, issued tokens, held roles and signed with its own key.
+BankCore verified those tokens using a secret the two services shared, and the merchant and the wallet
+each integrated against LeafyPay's authentication surface directly. Every application that needed a
+login grew one.
+
+**Decision.** Every identity, credential, role, session, token, grant and security event moves to a
+standalone authority. The applications become relying parties and resource servers: they verify tokens
+against a published key set and read claims. None of them stores a principal, decides a permission from
+a local table, or holds a signing key.
+
+**Why not a shared library.** A library would have kept the behaviour consistent and changed nothing
+about the failure mode: each application would still hold credentials, still have a place to write
+principals to, and still be able to drift by not upgrading. The problem was never that the code
+differed. It was that four systems each had the authority to say who somebody is.
+
+**Consequence.** A network hop appears on the authentication path, and an outage at the authority stops
+sign-in everywhere. That is a real cost and it is the right trade: the alternative is four places that
+can each be wrong about who you are, and no single answer to "who has access".
+
+### ADR-071: a realm is a trust and key boundary; a tenant is a data boundary inside it
+
+**Context.** The platform had an "authentication domain", which conflated the protocol a login used
+with the population it served. Adding a second identity source looked like adding a second tenant.
+
+**Decision.** Two records. A realm has its own issuer, its own signing keys and its own clients: a token
+from one realm is meaningless in another. A tenant is an organisational division inside a realm, and
+every record carries one.
+
+**Why.** Conflating them is the mistake that makes multi-tenancy unretrofittable. Separating a tenant
+later means re-keying every record; separating a realm later means re-issuing every token. Neither is a
+migration anybody completes.
+
+### ADR-072: per-instance signing keys with a shared published key set
+
+**Context.** An identity service is usually made highly available by sharing one private key across
+replicas, which needs a KMS, a shared volume or a shared secret. All three are operational burdens and
+each is a single point of compromise.
+
+**Decision.** Each replica holds its own key pair on its own node and registers only the PUBLIC half. A
+realm's key set is the union of every active public key, so every replica publishes an identical set and
+a token signed by one verifies at any other.
+
+**Why this is better isolation, not worse.** Compromising a node yields one key, and revoking it removes
+one entry from the set rather than rotating the signer for the whole deployment. Scaling up needs
+nothing; scaling down is covered by a lease and a publication grace period, which must be at least the
+access-token lifetime or a scale-down signs live users out.
+
+### ADR-073: no capability is gated by environment
+
+**Context.** The easy way to make a demonstration safe is a check for whether this is production.
+
+**Decision.** No code asks which environment it is running in. Hardening is configuration. A weaker
+configuration warns, is documented, and serves; it does not refuse to start.
+
+**Why.** A capability that exists only outside production has never been tested where it matters, and a
+refusal keyed on an environment variable is one variable away from not refusing. Impersonation is the
+concrete case: it is bounded by a REALM flag and by the target being a declared demo persona, so the
+same build is correct for a booth and for a bank.
+
+### ADR-074: one pipeline for people and machines
+
+**Context.** Machine authentication is usually bolted on: a separate endpoint, a separate token shape, a
+separate path that skips the parts written for humans.
+
+**Decision.** A person signing in and a service presenting a credential resolve a principal, get
+authorised, receive a token and produce an audit event through the same code. They differ only in the
+authentication method, which is a port.
+
+**Why.** A second pipeline is how one of the two ends up without an audit trail, and it is always the
+machine one. A service identity here has an owner, a lifecycle, an assurance level and a revocation
+path, which is what stops service accounts becoming permanent unattributable credentials.
+
+### ADR-075: delegation is the default and impersonation the exception
+
+**Context.** RFC 8693 supports both, and they are not equivalent for accountability.
+
+**Decision.** An exchange produces a DELEGATED token by default: the subject stays the person and the
+acting party is named in the actor claim. Impersonation must be asked for explicitly and is refused
+unless the realm permits it and the target is a declared demo persona.
+
+**Why.** Impersonation replaces the subject, so every system downstream sees only the person and the
+agent's part in what happened is gone. No amount of logging elsewhere reconstructs it. The five
+multi-hop rules are enforced at the token endpoint rather than documented, because a rule held by
+convention survives until somebody adds a fourth hop in a hurry.
+
+### ADR-076: an elevation is a time-bound role assignment, not a signed capability
+
+**Context.** Temporary case-scoped access was a signed token the application minted and each service
+verified for itself.
+
+**Decision.** An elevation is a role assignment with an expiry, a justification and an approval,
+recorded at the authority. The approver can never be the requester.
+
+**Why.** The token design was sound in what it did and weak in what it could not do: nobody could ask
+who held elevated access, and an elevation granted in error ran to its expiry regardless of what anyone
+decided afterwards. Both are ordinary questions during an incident. Expressing it as a role assignment
+means it resolves through the same decision point as every other assignment, with no second code path to
+keep in step.
+
+### ADR-077: provisioning says a principal exists; it never says it may operate
+
+**Context.** SCIM lets an external directory create principals here.
+
+**Decision.** A SCIM create lands as pending unless the realm auto-approves, and the active flag a client
+sends on create is ignored. A provisioning client may correct a name or deactivate somebody; it may not
+assign a role.
+
+**Why.** A create that silently confers operational capability turns a directory sync into a privilege
+escalation path. If an upstream directory could grant roles here, whoever administers it could grant
+themselves anything.
+
+### ADR-078: the applications keep their permission CATALOG and lose their role TABLE
+
+**Context.** Deleting authorisation from an application entirely would mean the authority knowing what a
+fraud case is.
+
+**Decision.** Each application declares the resources and actions it enforces, and registers that catalog
+with the authority. The authority holds who has which role and resolves permissions into the token. The
+application reads a claim.
+
+**Why.** The catalog is domain knowledge and belongs where the domain is. The assignment is an access
+decision and belongs where access decisions are made. Splitting them this way is what lets the authority
+carry no financial vocabulary while still answering every authorisation question.
+
+### ADR-079: a compatibility proxy, so an out-of-scope client changes nothing
+
+**Context.** The wallet resolves business and authentication calls from a single base URL. Repointing it
+would move the account and transfer endpoints too.
+
+**Decision.** LeafyPay keeps a transparent reverse proxy on the old authentication paths, forwarding an
+explicit allowlist to the authority. It parses nothing, verifies nothing, caches nothing, holds no secret
+and no state.
+
+**Why, and when it goes.** It is deprecated in its own API document with a stated removal condition: it
+goes when the wallet splits its base URL, which is one variable. The rule that keeps it honest is that
+the moment it makes a decision about a token it has stopped being a proxy and become a second
+authorization server.
+
+### ADR-080: the extraction is enforced by source assertions, not by review
+
+**Context.** Deleting an identity implementation once is easy. Keeping it deleted is not, because the
+next person who needs a user lookup or a token will write one.
+
+**Decision.** A test suite asserts against SOURCE that no consumer mints a token, stores principal
+credentials, seeds principals, creates identity collections, publishes issuer metadata or holds a role
+table. Legitimate exceptions are named individually rather than pattern-matched.
+
+**Why it is a source test.** A runtime test proves the routes are gone; a source test proves the
+CAPABILITY is gone, which is the thing that creeps back. The suite justified itself immediately: it
+found eight surviving violations on its first run, including a service still minting a token with a
+shared secret and a client-secret generator, both of which had survived a deliberate deletion pass.
+Naming each exception rather than loosening the pattern means a second offender cannot hide behind an
+allowance made for the first.

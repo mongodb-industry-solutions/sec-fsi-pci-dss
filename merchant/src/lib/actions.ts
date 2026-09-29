@@ -35,7 +35,11 @@ async function client(): Promise<PspClient> {
 function toResult(fn: () => Promise<ActionResult>): Promise<ActionResult> {
   return fn().catch((e) => {
     if (e instanceof PspError) {
-      if (e.isAuth) return { ok: false, message: 'Not authorised (scope not granted or session expired).' };
+      // Told apart, because the two need different things from the reader: one is a permission they
+      // never granted, the other is a session that ended and can be started again. Saying "scope not
+      // granted or session expired" left them to work out which.
+      if (e.isExpiredSession) return { ok: false, message: 'Your session expired. Reload the page to sign in again.' };
+      if (e.isAuth) return { ok: false, message: 'Not authorised: this permission was not granted.' };
       // PspClient already extracts `error_description` into the message: show the REASON, and keep the
       // status only as a fallback when the PSP sent none ("PSP error 402" tells a merchant nothing).
       const reason = (e.message ?? '').trim();

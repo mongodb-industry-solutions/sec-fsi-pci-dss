@@ -1,5 +1,6 @@
 // Graceful degradation (E-12): friendly notices instead of broken pages.
 import { Lock, TriangleAlert } from 'lucide-react';
+import { SessionExpired } from './SessionExpired';
 
 export function ScopeMissing({ scope }: { scope: string }) {
   return (
@@ -17,7 +18,10 @@ export function ScopeMissing({ scope }: { scope: string }) {
   );
 }
 
-export function PspUnavailable({ message }: { message?: string }) {
+export function PspUnavailable({ message, status }: { message?: string; status?: number }) {
+  // A refused token is not an unavailable service, and saying so in the same red box is what made
+  // an ordinary expiry read as a fault. It has its own notice, which also does something about it.
+  if (status === 401) return <SessionExpired />;
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-[color-mix(in_srgb,var(--err)_35%,transparent)] bg-[var(--err-bg)] p-6">
       <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-[var(--err)]" aria-hidden />

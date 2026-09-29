@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [develop, staging, giam]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# GIAM moved to its own repository (mongodb-industry-solutions/sec-giam) and carries its own pipeline:
+# its API contract job, spec-lint and unit suite live there now, not here.
+jobs:
+  checks:
+    name: Type-check and unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install workspaces
+        run: |
+          npm install --no-audit --no-fund
+          npm install --prefix packages/eventbus --no-audit --no-fund
+          npm install --prefix packages/platform-links --no-audit --no-fund
+          npm install --prefix psp/backend --no-audit --no-fund
+          npm install --prefix psp/frontend --no-audit --no-fund
+          npm install --prefix bank/backend --no-audit --no-fund
+
+      - name: Build shared packages
+        run: npm run build:packages
+
+      - name: Type-check
+        run: npm run type-check
+
+      - name: Unit tests
+        run: npm run test:unit

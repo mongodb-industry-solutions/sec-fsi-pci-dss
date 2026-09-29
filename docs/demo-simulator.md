@@ -137,7 +137,7 @@ Before any payment flow starts, the presenter selects **which integration patter
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-**Config source:** `frontend/src/config/simulator-methods.json`, controls which methods and scenarios are visible. Setting `enabled: false` hides a method; `comingSoon: true` shows a disabled card.
+**Config source:** `psp/frontend/src/config/simulator-methods.json`, controls which methods and scenarios are visible. Setting `enabled: false` hides a method; `comingSoon: true` shows a disabled card.
 
 **State persistence:** Selections are stored in `sessionStorage` (`sim_method`, `sim_scenario`) and survive navigation within the simulator. Cleared on "Restart Simulation."
 
@@ -1006,7 +1006,7 @@ interface FraudDiagnosisCase {
 ## 6. Frontend Route Structure (Next.js App Router)
 
 ```
-frontend/src/app/
+psp/frontend/src/app/
 ├── page.tsx                         # Mode selector landing
 ├── layout.tsx                       # Root layout (LeafyGreen theme)
 ├── simulator/
@@ -1049,13 +1049,20 @@ Role-based routing is enforced in `demo/layout.tsx`. After JWT verification, the
 
 ### 7.1 Token flow
 
+Since v39 this application issues no tokens and has no login endpoint. Signing in is a redirect to
+the identity authority, exactly as in the bank's console and the merchant app:
+
 ```
-POST /api/v1/auth/login
-Body: { username, password, domain }
-Response: { token: "<JWT>", user: { name, role, email } }
+GET /api/auth/login              (this app)   -> 302 to the authority console, with PKCE + state
+GET /api/auth/callback?code=...  (this app)   -> exchanges the code, sets the session cookie
 ```
 
-The JWT is a signed HS256 token (secret from `JWT_SECRET` env var). Payload:
+The exchange runs server side in the Next.js route handler, against
+`PSP_GIAM_ISSUER_URL/protocol/oidc/token`. The registered client is `leafypay-console`
+(public, PKCE required), whose redirect URI is `<app>/api/auth/callback`.
+
+The resulting access token is RS256, signed by the authority and verified against its published key
+set. Its payload carries the claims the authority asserts:
 
 ```json
 {
@@ -1070,13 +1077,16 @@ The JWT is a signed HS256 token (secret from `JWT_SECRET` env var). Payload:
 
 The `domain` field is the extension point. When domain is `msentra`, the backend delegates token validation to the MS Entra ID endpoint instead of verifying locally. In v1, only `local` is active.
 
-### 7.2 Pre-populated user selector
+### 7.2 The demo roster
 
-`GET /api/v1/system/users` returns the list of demo users (name, email, role) without passwords. The login screen calls this endpoint on mount to populate the dropdown. Selecting a user auto-fills the email and a known test password.
+`GET /api/v1/system/users` returns the demo accounts (name, email, role) without passwords. The
+sign-in screen no longer calls it: the roster is offered by the authority's own sign-in page, scoped
+by the `demoRoster` field of the client that started the flow. A password is never entered in this
+application, so there is nothing here to pre-fill.
 
 ### 7.3 API security
 
-All `/api/v1/*` endpoints except `/api/v1/auth/login`, `/api/v1/system/users`, and `/api/v1/health` require a valid `Authorization: Bearer <JWT>` header. Missing or invalid tokens return HTTP 401. Role enforcement (e.g., L2 collections) returns HTTP 403.
+All `/api/v1/*` endpoints except `/api/v1/system/users` and `/api/v1/health` require a valid `Authorization: Bearer <token>` header. Missing or invalid tokens return HTTP 401. Role enforcement (e.g., L2 collections) returns HTTP 403.
 
 In the Simulator mode, requests include a synthetic `X-Demo-Role` header instead of a JWT. The backend treats this header as trusted in demo/simulator mode. The role controls which collections are queried.
 
@@ -1085,7 +1095,7 @@ In the Simulator mode, requests include a synthetic `X-Demo-Role` header instead
 ## 8. Shared Backend Vendors Structure
 
 ```
-backend/
+psp/backend/
 ├── bin/
 │   ├── setup.ts             # Calls src/vendors/setup/runSetup()
 │   └── seed.ts              # Calls src/vendors/seed/runSeed()
@@ -1115,13 +1125,13 @@ backend/
         └── rbac.ts                  # Role-based access enforcement
 ```
 
-`backend/bin/` scripts are thin wrappers; the root `package.json` delegates to `backend/package.json`:
+`psp/backend/bin/` scripts are thin wrappers; the root `package.json` delegates to `psp/backend/package.json`:
 
 ```json
 // root package.json
-{ "setup:db": "npm run setup:db --prefix backend", "setup:seed": "npm run seed --prefix backend" }
+{ "setup:db": "npm run setup:db --prefix psp/backend", "setup:seed": "npm run seed --prefix psp/backend" }
 
-// backend/package.json
+// psp/backend/package.json
 { "setup:db": "ts-node bin/setup.ts", "seed": "ts-node bin/seed.ts" }
 ```
 
@@ -1354,6 +1364,11 @@ The panel shows the live MongoDB document with encrypted fields displayed as `Bi
 
 ## 12. Login UX: Enhanced (Ch-05)
 
+> **Superseded by v39.** Both variants below described a credential form owned by this application.
+> The application no longer has one: its sign-in screen is a single button that redirects to the
+> authority, and the roster and debug conveniences described here now belong to the authority's own
+> sign-in page. Kept as the record of what the screen used to do.
+
 ### 12.1 Business Mode Login (Debug OFF)
 
 Standard credential form: unchanged from the current implementation. A subtle "Demo hints?" toggle reveals available usernames without passwords.
@@ -1399,7 +1414,7 @@ The **featured roster** (13 users, `customerAuthenticationDemoFeatured: true`) d
 All passwords: `demo-password` (shared bcrypt hash; the plaintext is a fixed demo convention, centralized as `DEMO_PASSWORD` in the frontend).
 
 **Simulator merchant:** Okafor Digital Services (`m0000002`), owned by Amara Okafor (`b0000058`, KYB-verified). All simulator payments are processed through this merchant.  
-**Simulator authentication:** the Simulator obtains a **real JWT per role** via `POST /api/v1/auth/login` (no auth bypass). Escalate (L1) → approve (L2) → resolve actions hit the real `/api/v1/fraud/*` endpoints and persist, a case escalated in the Simulator appears as `escalated` when logging into Application mode as an L2 user.  
+**Simulator authentication:** the Simulator obtains a **real token per role** from the authority, by exchanging its own client credential for a token carrying an `act` claim that names the Simulator (no auth bypass, and every simulated action reads as "the Simulator, acting as X"). Escalate (L1) → approve (L2) → resolve actions hit the real `/api/v1/fraud/*` endpoints and persist, a case escalated in the Simulator appears as `escalated` when logging into Application mode as an L2 user.  
 **Simulator history:** after a simulator payment, the payer (`luis`/`julia`/`amara`) can log in to `/system/payment/history` and see the transaction, read from the real API (`GET /api/v1/transactions/all`, scoped to their own account). The previous `localStorage` mirror was removed.
 
 ---
@@ -1510,7 +1525,7 @@ Adds payment method selection and scenario selection to the Simulator before the
 
 ### 14.1 Simulator Config File
 
-**Location:** `frontend/src/config/simulator-methods.json`
+**Location:** `psp/frontend/src/config/simulator-methods.json`
 
 This file is the single source of truth for which methods and scenarios are visible in the Simulator. Editing this file is the only change required to show/hide a method or scenario, no code changes needed.
 
@@ -1545,7 +1560,7 @@ All simulator selections persist across navigation with a `sim_` prefix:
 | `sim_checkout_session` | JSON | `{ sessionId, paymentPageUrl, amount, merchant }` for redirection flow |
 | `sim_payment_link` | JSON | `{ code, url, amount, merchant }` for payment link flow |
 
-**Manager:** `frontend/src/components/simulator/SimulatorStateManager.ts` provides typed `getState()`, `setState(partial)`, `clearState()` helpers.
+**Manager:** `psp/frontend/src/components/simulator/SimulatorStateManager.ts` provides typed `getState()`, `setState(partial)`, `clearState()` helpers.
 
 ### 14.3 Callback Route: `/simulator/payment/callback`
 
@@ -1790,8 +1805,13 @@ After login, David accesses the standard merchant portal (Ch-04 §10.4):
 ## Bank transfer UX (/system/transfer/bank): add-on (dev plan v17)
 
 Two tabs:
-- Registered account: send to an own account or a saved contact; no bank details required. Executes as
-  an external bank transfer (async): funds are held on submit and settle after T+N ("pending settlement").
+- Registered account: send to an own account or a saved contact; no bank details required.
+  - An own account goes to `POST /api/v1/gateway/transfers/own`, added in v37: the destination is sent as
+    its REFERENCE, never its IBAN, and the bank holding the source account moves the money over the same
+    rails as any other credit transfer. Before v37 this path was a dead end, which earlier revisions of
+    this document described as working.
+  - A saved contact executes as an external bank transfer (async): funds are held on submit and settle
+    after T+N ("pending settlement").
 - New bank account: enter destination country, IBAN/routing/account and BIC. The rail (SEPA/ACH/SWIFT) is
   auto-detected and shown as a badge with the quoted fee; details validate live (preview endpoint). "Send
   wire" submits and the success screen polls live status (pending -> settled/failed). A "recurring (Direct
@@ -1804,9 +1824,11 @@ Two tabs:
 **Real system (`/system/**`):** RTP is "a transfer that needs the payer's approval", so it lives inside
 the Transfer area (no separate silo). Transfer hub gains a **Request to Pay** card → `/system/transfer/rtp`
 (payee creates a request; on create it is presented to the payer and a shared QR is offered). The payer sees
-**"Requests awaiting your approval"** directly on the Transfer hub (`RtpPendingInbox`): approve (with a
-funding-account selector) runs funds check + FDS/HRP/AML + VoP then creates the linked P2P transfer, or
-reject. Notifications fire on delivery (payer) and approval/settlement (payee); the alert clears on approve/reject.
+**"Requests awaiting your approval"** in payment history (`/system/payment/history`), NOT on the transfer
+hub: approve (with a funding-account selector) runs funds check + FDS/HRP/AML + VoP then creates the linked
+P2P transfer, or reject. Earlier revisions of this document placed the panel on the transfer hub and named a
+component `RtpPendingInbox` that has never existed; history is where the code puts it, and where a payer
+looking for something they have to act on would reasonably look. Notifications fire on delivery (payer) and approval/settlement (payee); the alert clears on approve/reject.
 
 **VoP admin (`/system/admin/modules/vop`):** dedicated data-driven config dashboard (match thresholds,
 matching strategy toggles, decision policy, market gating), editable by admin/manager like FDS. VoP also

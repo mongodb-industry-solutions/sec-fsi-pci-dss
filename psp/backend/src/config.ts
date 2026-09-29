@@ -1,0 +1,215 @@
+import * as dotenv from 'dotenv';
+import { resolve } from 'path';
+import { resolveQeProfile, MongoDeploymentType } from '@leafypay/mongo-compat';
+
+dotenv.config({ path: resolve(__dirname, '../../../.env') });
+
+// Reads PSP_-prefixed env var for app-specific vars with no existing meaningful prefix.
+// Falls back to legacy unprefixed name, then to default.
+function pspEnv(name: string, fallback?: string): string | undefined {
+  return process.env[`PSP_${name}`] ?? process.env[name] ?? fallback;
+}
+
+// Reads an env var directly (no PSP_ prefix). Used for standard globals (PORT, HOST)
+// and already-prefixed external-system vars (MONGODB_*, ATLAS_*, AWS_CMK_ARN, AWS_REGION).
+function env(name: string, fallback?: string): string | undefined {
+  return process.env[name] ?? fallback;
+}
+
+// Default target: the current Atlas rapid release. Both knobs always have a value, so nothing
+// downstream has to cope with "unset".
+const DEFAULT_MONGODB_VERSION = '9.0.0';
+const QE_PROFILE = resolveQeProfile(env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!);
+
+export const config = {
+  nodeEnv: process.env.NODE_ENV ?? 'development',
+
+  server: {
+    host: env('HOST', '0.0.0.0')!,
+    port: parseInt(env('PORT', '8081')!, 10),
+    corsOrigin: pspEnv('CORS_ORIGIN', 'http://localhost:3000')!,
+    baseUrl: pspEnv('BASE_URL', 'http://127.0.0.1:8081')!,
+    urlFrontend: pspEnv('URL_FRONTEND', 'http://localhost:3000')!,
+    projectRoot: pspEnv('PROJECT_ROOT'),
+  },
+
+  mongodb: {
+    uri: env('MONGODB_URI', '')!,
+    uriLevel1: env('MONGODB_URI_LEVEL1'),
+    uriLevel2: env('MONGODB_URI_LEVEL2'),
+    dbName: env('MONGODB_DB_NAME', 'pcidb')!,
+    cryptSharedLibPath: env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
+    // Deployment kind. 'atlas' provisions custom roles and DB users through the Atlas Admin API;
+    // 'ea' (Enterprise Advanced, self-managed) has no such API, so setup skips those steps.
+    type: (env('MONGODB_TYPE', 'atlas')! === 'ea' ? 'ea' : 'atlas') as MongoDeploymentType,
+    // Target server version. Decides the QE text-search query type names and limits (see
+    // qeCapabilities). The crypt_shared library must match it.
+    version: env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!,
+  },
+
+  rtp: {
+    // v28 Request to Pay (RTP). Gates RTP routes + lifecycle subscriber.
+    enabled: pspEnv('RTP_ENABLED', 'true') !== 'false',
+    // Verification of Payee capability (market-gated; when off the engine returns not_supported).
+    vop: pspEnv('RTP_VOP', 'true') !== 'false',
+    // ISO 3166-1 alpha-2 markets where VoP is supported (EU Instant Payments Reg + UK CoP).
+    vopMarkets: (pspEnv('RTP_VOP_MARKETS', 'ES,FR,DE,IT,NL,IE,PT,BE,AT,FI,GB')!).split(',').map((s) => s.trim().toUpperCase()),
+  },
+
+  qe: {
+    // Query types and limits for the declared server version. Everything QE-text-search related
+    // reads this, so a new version is one table entry in qeCapabilities and nothing else.
+    profile: QE_PROFILE,
+    // QE text search follows the version by default. PSP_QE_TEXT_SEARCH is an escape hatch only:
+    // set it to false to degrade text fields to QE:equality (still encrypted, still lookup-tier,
+    // exact-searchable) on a cluster that misbehaves. Changing it requires recreating collections.
+    textSearch: pspEnv('QE_TEXT_SEARCH') !== undefined
+      ? pspEnv('QE_TEXT_SEARCH') !== 'false'
+      : QE_PROFILE.textSearch,
+  },
+
+  demo: {
+    // "What does Atlas see?" raw-ciphertext view (GET /system/demo/raw/:collection/:id). It bypasses
+    // QE auto-decryption to show the stored documents, so it is the core of the encryption story and
+    // stays ALLOWED in every environment, including NODE_ENV=production (this is a demo system).
+    // Set PSP_DEMO_RAW_DOCUMENTS=false to turn it off on a deployment that must behave as
+    // production-ready, or on any environment holding real cardholder data.
+    rawDocuments: pspEnv('DEMO_RAW_DOCUMENTS', 'true') !== 'false',
+  },
+
+  kms: {
+    provider: (pspEnv('KMS_PROVIDER', 'local')!) as 'local' | 'aws',
+    localMasterKey: pspEnv('KMS_LOCAL_MASTER_KEY') ?? pspEnv('LOCAL_MASTER_KEY'),
+    keyVaultUri: pspEnv('KMS_KEY_VAULT_URI'),
+    keyVaultDatabase: pspEnv('KMS_KEY_VAULT_DATABASE', 'encryption')!,
+    keyVaultCollection: pspEnv('KMS_KEY_VAULT_COLLECTION', '__keyVault')!,
+    awsCmkArn: env('AWS_CMK_ARN') ?? env('AWS_KMS_KEY_ARN'),
+    awsRegion: env('AWS_REGION', 'us-east-1')!,
+  },
+
+  // v39: this application is a relying party and a resource server against the identity authority.
+  // It holds no user store, no role table and no signing key; what it holds is the address of the
+  // issuer it trusts and the name it registers its enforcement points under.
+  giam: {
+    // The realm issuer. Everything else is discovered from it, so a deployment configures one URL.
+    issuerUrl: pspEnv('GIAM_ISSUER_URL', 'http://127.0.0.1:8085/api/v1/realms/LeafyIdp')!,
+    // What a token must name in its audience claim to be accepted here.
+    audience: pspEnv('GIAM_AUDIENCE', 'leafypay')!,
+    resourceServerName: pspEnv('GIAM_RESOURCE_SERVER', 'leafypay')!,
+    // The realm's OWN enforcement points, under the name the authority publishes them with. Needed
+    // to tell a realm-administration permission from a peer resource server's one (see
+    // `ownRoleNames`), since only the second says a role belongs to somebody else.
+    authorityResourceServerName: pspEnv('GIAM_AUTHORITY_RESOURCE_SERVER', 'authority')!,
+    // Presented when registering the catalog at boot. Absent is survivable: registration is
+    // non-fatal, and an unreachable authority must not stop this application serving.
+    registrationToken: pspEnv('GIAM_REGISTRATION_TOKEN'),
+    // This service's OWN client credentials, for the calls it makes as itself rather than on behalf
+    // of a person. Absent means it was never registered to act as itself, and it degrades rather
+    // than fabricating an identity.
+    clientId: pspEnv('GIAM_CLIENT_ID', 'leafypay-backend')!,
+    clientSecret: pspEnv('GIAM_CLIENT_SECRET'),
+    // How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old
+    // public key can only validate signatures the authority itself produced.
+    jwksCacheSeconds: parseInt(pspEnv('GIAM_JWKS_CACHE_SECONDS', '900')!, 10),
+  },
+
+  oauth: {
+    keyProvider: (pspEnv('OAUTH_KEY_PROVIDER', 'local')!) as 'local' | 'aws',
+    keyStoreDir: pspEnv('OAUTH_KEY_STORE_DIR', './keys')!,
+    awsKeyArn: pspEnv('OAUTH_AWS_KEY_ARN'),
+    awsRegion: pspEnv('OAUTH_AWS_REGION', 'us-east-1')!,
+  },
+
+  atlas: {
+    publicKey: env('ATLAS_PUBLIC_KEY'),
+    privateKey: env('ATLAS_PRIVATE_KEY'),
+    projectId: env('ATLAS_PROJECT_ID'),
+    dbUserLevel1: env('ATLAS_DB_USER_LEVEL1'),
+    dbUserLevel1Password: env('ATLAS_DB_USER_LEVEL1_PASSWORD'),
+    dbUserLevel2: env('ATLAS_DB_USER_LEVEL2'),
+    dbUserLevel2Password: env('ATLAS_DB_USER_LEVEL2_PASSWORD'),
+  },
+
+  kafka: {
+    brokers: (pspEnv('KAFKA_BROKERS', 'localhost:9092')!).split(',').map((s) => s.trim()),
+    clientId: pspEnv('KAFKA_CLIENT_ID', 'pci-psp')!,
+    ssl: pspEnv('KAFKA_SSL', 'false') === 'true',
+    saslMechanism: pspEnv('KAFKA_SASL_MECHANISM'),
+    saslUsername: pspEnv('KAFKA_SASL_USERNAME'),
+    saslPassword: pspEnv('KAFKA_SASL_PASSWORD'),
+  },
+
+  rabbitmq: {
+    url: pspEnv('RABBITMQ_URL', 'amqp://localhost')!,
+  },
+
+  app: {
+    // Product / system name (single source of truth). Compound name, two words (styled separately in
+    // the UIs). Override via PSP_NAME_PRIMARY / PSP_NAME_SECONDARY; defaults to the current name.
+    namePrimary: pspEnv('NAME_PRIMARY', 'Leafy')!.trim(),
+    nameSecondary: pspEnv('NAME_SECONDARY', 'Pay')!.trim(),
+    get name() { return `${this.namePrimary} ${this.nameSecondary}`.trim(); },
+    adminUser: pspEnv('ADM_USER'),
+    adminPass: pspEnv('ADM_PASS'),
+    jwtSecret: pspEnv('JWT_SECRET', 'dev-secret-change-me')!,
+    jwtExpiresIn: pspEnv('JWT_EXPIRES_IN', '24h')!,
+    fraudAmountThreshold: parseFloat(pspEnv('FRAUD_AMOUNT_THRESHOLD', '500')!),
+    riskMccList: (pspEnv('RISK_MCC_LIST', '5812,6011,7995')!).split(',').map((s) => s.trim()),
+    eventBusEngine: (pspEnv('EVENT_BUS_ENGINE', 'in-process')!) as 'in-process' | 'kafka' | 'rabbitmq',
+    eventBusTopicPrefix: pspEnv('EVENT_BUS_TOPIC_PREFIX', 'pci.psp')!,
+    seedDataDir: pspEnv('SEED_DATA_DIR'),
+  },
+
+  bankcore: {
+    // v37 kill switch, default ON since the P4 gate passed (P4.7): the bank holds the ledger, the PSP
+    // reads balances from it, initiates payments through it and authorises cards against it. Setting
+    // `PSP_BANKCORE_ENABLED=false` restores the built-in engines, which is what makes a regression one
+    // environment variable away from being isolated rather than a revert.
+    //
+    // The escape hatch has to be RELIABLE in the off direction, which is the whole point of a kill switch,
+    // so the common falsy spellings all disable it. Requiring the exact string `false` would mean an
+    // operator typing `off` under pressure leaves the bank enabled and thinks they turned it off.
+    enabled: !['false', 'off', 'no', '0'].includes((pspEnv('BANKCORE_ENABLED', 'true') ?? '').trim().toLowerCase()),
+    // Private, service-to-service. The only bankcore URL: the browser never talks to the bank.
+    baseUrl: pspEnv('BANKCORE_BASE_URL', 'http://localhost:8083')!,
+    // Bootstrap only: everything else about the TPP relationship is a seeded record.
+    dbUri: pspEnv('BANKCORE_DB_URI') ?? env('MONGODB_URI', '')!,
+    dbName: pspEnv('BANKCORE_DB_NAME', 'bankcoredb')!,
+    // Shared keyvault: bankcore reuses the PSP DEKs, so there is no new key material. It is the KMS
+    // namespace, not the application database, which is what getKmsConfig() builds.
+    keyVaultNamespace: pspEnv('BANKCORE_KEY_VAULT_NAMESPACE')
+      ?? `${pspEnv('KMS_KEY_VAULT_DATABASE', 'encryption')}.${pspEnv('KMS_KEY_VAULT_COLLECTION', '__keyVault')}`,
+    cryptSharedLibPath: pspEnv('BANKCORE_CRYPT_SHARED_LIB_PATH')
+      ?? env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
+    // 'automatic' lands a new PSD2 consent valid; 'manual' leaves it received for an operator.
+    consentMode: (pspEnv('BANKCORE_CONSENT_MODE', 'automatic')!) as 'automatic' | 'manual',
+    port: parseInt(pspEnv('BANKCORE_PORT', '8083')!, 10),
+    eventBusEngine: (pspEnv('BANKCORE_EVENT_BUS_ENGINE', 'in-process')!) as 'in-process' | 'kafka' | 'rabbitmq',
+  },
+
+  payout: {
+    // Builtin payment-initiation module: simulated settlement delays (T+N)
+    settlementDelayT1Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T1_MS', '3000')!, 10),
+    settlementDelayT2Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T2_MS', '6000')!, 10),
+    settlementDelayT3Ms: parseInt(pspEnv('PAYOUT_SETTLEMENT_DELAY_T3_MS', '9000')!, 10),
+    // Set to 'false' in staging to simulate 5% random rail failures
+    paymentInitiationAlwaysSucceed: pspEnv('PAYMENT_INITIATION_ALWAYS_SUCCEED', 'true') === 'true',
+    // Builtin account-information module
+    aisAlwaysVerify: pspEnv('AIS_ALWAYS_VERIFY', 'true') === 'true',
+    // Counterparty Administration: beneficiary registry limits
+    beneficiaryMaxPerUser: parseInt(pspEnv('BENEFICIARY_MAX_PER_USER', '100')!, 10),
+    beneficiaryRateLimitRpm: parseInt(pspEnv('BENEFICIARY_RATE_LIMIT_RPM', '20')!, 10),
+    // v17.1 Bank transfers: sandbox mode (transfers are simulated end to end; no real rail effect)
+    sandbox: pspEnv('PAYOUT_SANDBOX', 'true') === 'true',
+    // v17.1 Recurring mandate scheduler poll interval (ms); 0 disables the background runner.
+    mandateSchedulerMs: parseInt(pspEnv('PAYOUT_MANDATE_SCHEDULER_MS', '60000')!, 10),
+    // v17.1 Rail fee schedule (config-driven, single source; consumed by FeeCalculator)
+    railFees: {
+      sepa: parseFloat(pspEnv('PAYOUT_FEE_SEPA', '0')!),
+      ach: parseFloat(pspEnv('PAYOUT_FEE_ACH', '0.25')!),
+      swift: parseFloat(pspEnv('PAYOUT_FEE_SWIFT', '15')!),
+      localBank: parseFloat(pspEnv('PAYOUT_FEE_LOCAL_BANK', '0')!),
+      swiftCorrespondentSurcharge: parseFloat(pspEnv('PAYOUT_FEE_SWIFT_CORRESPONDENT', '10')!),
+    },
+  },
+} as const;

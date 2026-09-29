@@ -1,0 +1,323 @@
+///66: P2P (peer-to-peer) bank transfer to a saved beneficiary.
+// v17.1 (ADR-039/040): a beneficiary transfer is an EXTERNAL bank transfer, not an internal
+// ledger move. Execution is dispatched through the payment_initiation provider (never a direct
+// builtin import). Funds are held on the sender at submission (available -> pending) and the
+// recipient is credited only when the provider emits bank.transfer.settled (async, T+N),
+// handled by PayoutOrchestrationProcess. On failure the hold is released.
+// PCI DSS: every transfer creates an immutable paymentExecutionProcedure audit record.
+
+import { Db } from 'mongodb';
+import { v4 as uuidv4 } from 'uuid';
+import { COUNTERPARTY_COLLECTION, CounterpartyArrangement } from '../../customer/models/counterpartyArrangement.model';
+import { getPayoutAccount, getDefaultPayoutAccount } from './payoutAccount.service';
+import { holdAvailableFunds, releaseReservation } from './payoutAccountBalance.service';
+import { PAYMENT_EXECUTION_COLLECTION, PaymentExecutionProcedure } from '../models/paymentExecution.model';
+import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
+import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { initiatePaymentAtBank, selectPaymentProduct } from '../../../providers/payment-initiation/services/bankcorePis.client';
+import { emitProcessEvent, emitComplianceEvent } from '../../provider/services/businessProcessEvent.service';
+import { screenTransfer, openTransferFraudCase } from './transferRiskGate';
+import { RISK_HOLD_STEP } from './transferReview.service';
+
+export interface P2PTransferInput {
+  initiatorPartyRef: string;         // the customer initiating the transfer
+  counterpartyArrangementRef: string; // beneficiary token
+  fromAccountRef: string;            // sender's payout account
+  amount: number;
+  note?: string;
+  merchantAgreementReference?: string; // set when initiated via a merchant portal (OAuth on-behalf-of)
+}
+
+export interface P2PTransferResult {
+  transferReference: string;
+  amount: number;
+  currency: string;
+  status: 'submitted' | 'completed' | 'failed' | 'exception' | 'pending';
+  failureReason?: string;
+  holdReason?: string;               // set with status 'pending': held for investigation, not delivered
+  recipientAccountRef?: string;
+  recipientHint?: string;
+}
+
+function fail(amount: number, currency: string, reason: string): P2PTransferResult {
+  return { transferReference: '', amount, currency, status: 'failed', failureReason: reason };
+}
+
+export async function executeP2PTransfer(
+  db: Db,
+  input: P2PTransferInput,
+): Promise<P2PTransferResult> {
+  const { initiatorPartyRef, counterpartyArrangementRef, fromAccountRef, amount } = input;
+
+  if (amount <= 0) return fail(amount, '', 'Amount must be greater than zero.');
+
+  // 1. Verify the beneficiary arrangement exists, is active, and belongs to the initiator
+  const arrangement = await db
+    .collection<CounterpartyArrangement>(COUNTERPARTY_COLLECTION)
+    .findOne({ counterpartyArrangementReference: counterpartyArrangementRef, ownerPartyReference: initiatorPartyRef, counterpartyArrangementStatus: 'active' });
+  if (!arrangement) return fail(amount, '', 'Beneficiary not found or no longer active.');
+
+  // 2. Verify the sender's account belongs to the initiator and is active
+  const senderAccount = await getPayoutAccount(db, fromAccountRef);
+  if (!senderAccount || senderAccount.partyInstanceReference !== initiatorPartyRef || senderAccount.payoutAccountStatus !== 'active') {
+    return fail(amount, '', 'Source account not found or not active.');
+  }
+  // Currency is always the sender account's native currency (server-authoritative: client hint is ignored).
+  const transferCurrency = senderAccount.payoutAccountCurrency;
+
+  // 3. Resolve the recipient's payout account: currency-matched active default, then any active
+  const recipientPartyRef = arrangement.counterpartyPartyReference;
+  let recipientAccount: PayoutAccountArrangement | null = await db
+    .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+    .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountCurrency: transferCurrency, payoutAccountStatus: 'active', payoutAccountIsDefault: true });
+  if (!recipientAccount) {
+    recipientAccount = await db
+      .collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountCurrency: transferCurrency, payoutAccountStatus: 'active' });
+  }
+  if (!recipientAccount) {
+    recipientAccount = await getDefaultPayoutAccount(db, recipientPartyRef)
+      ?? await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+          .findOne({ partyInstanceReference: recipientPartyRef, payoutAccountStatus: 'active' });
+  }
+  if (!recipientAccount) return fail(amount, transferCurrency, 'Recipient has no active payout account.');
+
+  const transferRef = uuidv4();
+  const now = new Date();
+
+  // 3b. Pre-initiation risk gate (G4c): FDS + HRP + AML via providers, BEFORE any funds move.
+  const screen = await screenTransfer(db, {
+    transferRef, amount, currency: transferCurrency,
+    initiatorPartyRef, sourceAccountRef: fromAccountRef,
+    destinationCountry: recipientAccount.payoutAccountCountryCode,
+  });
+  // A risk signal holds the transfer instead of rejecting it: hold the sender funds FIRST so the money
+  // is immobilised, then park the execution in `pending` with no rail dispatch (ADR-060).
+  if (screen.hold) {
+    const heldFunds = await holdAvailableFunds(db, fromAccountRef, amount);
+    if (!heldFunds) return fail(amount, transferCurrency, 'Insufficient available balance.');
+    const heldExec: PaymentExecutionProcedure = {
+      paymentExecutionInstanceReference: transferRef,
+      paymentOrderInstanceReference: transferRef,
+      beneficiaryType: 'user',
+      initiatorPartyReference: initiatorPartyRef,
+      beneficiaryPartyReference: recipientPartyRef,
+      beneficiaryArrangementReference: counterpartyArrangementRef,
+      ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
+      sourcePayoutAccountReference: fromAccountRef,
+      resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
+      grossAmount: amount, netAmount: amount, feeAmount: 0, currency: transferCurrency,
+      routingNote: 'P2P transfer held for investigation by the pre-initiation risk gate',
+      paymentExecutionStatus: 'pending',
+      initiatedAt: now,
+      resolutionLog: [{ stepName: RISK_HOLD_STEP, stepOutcome: 'fallback', stepNote: screen.indicators.join(', ') || 'risk hold', stepDateTime: now }],
+      bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+      recordCreatedDateTime: now, recordUpdatedDateTime: now, schemaVersion: 1,
+    };
+    // Compensation: past the reservation, a failure must never leave the sender's funds held with no
+    // execution to release them (the same invariant the payout process states for its own reservation).
+    try {
+      await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(heldExec);
+    } catch (err) {
+      await releaseReservation(db, fromAccountRef, amount).catch(() => { /* best effort */ });
+      console.error('[p2p] could not persist the held execution; hold released:', err);
+      return fail(amount, transferCurrency, 'Could not hold this transfer for review. No funds were moved.');
+    }
+    // Open an L1-reviewable fraud investigation case for the negative HRP/FDS/AML evaluation.
+    await openTransferFraudCase(db, {
+      transferRef, initiatorPartyRef, indicators: screen.indicators, score: screen.score, amount,
+      currency: transferCurrency, destinationRef: recipientAccount.payoutAccountInstanceReference,
+      kind: 'p2p', beneficiaryLabel: arrangement.counterpartyLabel,
+    });
+    emitComplianceEvent(db, {
+      entityType: 'execution', entityId: transferRef,
+      processType: 'payment_processing', processAction: 'transfer.held.for.review', processOutcome: 'pending',
+      performedByPartyReference: initiatorPartyRef, performedByRole: 'customer',
+      eventSummary: { amount, currency: transferCurrency, indicators: screen.indicators, score: screen.score, heldAccount: fromAccountRef },
+      bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    });
+    // Accepted and held: the funds are reserved on the sender account and nothing reached the rail.
+    return {
+      transferReference: transferRef, amount, currency: transferCurrency,
+      status: 'pending', holdReason: screen.reason ?? 'Held for security review.',
+      recipientAccountRef: recipientAccount.payoutAccountInstanceReference, recipientHint: arrangement.counterpartyLabel,
+    };
+  }
+
+  // 4. Hold sender funds (available -> pending), conditional on sufficient available balance.
+  //
+  // Skipped entirely when the debtor account is held at a bank: the BANK debits it, and a local hold would
+  // move a projection that the next balance read overwrites. A hold the authoritative ledger knows nothing
+  // about is not a hold, it is a display artefact.
+  const sourceAccount = await db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+    .findOne({ payoutAccountInstanceReference: fromAccountRef });
+  const delegateToBank = Boolean(
+    sourceAccount?.payoutAccountBankAccountReference
+    && sourceAccount?.payoutAccountAspspReference
+    && sourceAccount?.payoutAccountConsentReference,
+  );
+
+  const held = delegateToBank ? true : await holdAvailableFunds(db, fromAccountRef, amount);
+  if (!held) return fail(amount, transferCurrency, 'Insufficient available balance.');
+
+  // 5. Create the immutable execution in routing state. sourcePayoutAccountReference marks this
+  //    as a P2P transfer so the settlement handler clears the sender hold and credits the recipient.
+  const rail = recipientAccount.payoutAccountPreferredRail ?? senderAccount.payoutAccountPreferredRail;
+  const execution: PaymentExecutionProcedure = {
+    paymentExecutionInstanceReference: transferRef,
+    paymentOrderInstanceReference: transferRef,
+    beneficiaryType: 'user',
+    initiatorPartyReference: initiatorPartyRef,
+    beneficiaryPartyReference: recipientPartyRef,
+    beneficiaryArrangementReference: counterpartyArrangementRef,
+    ...(input.merchantAgreementReference ? { merchantAgreementReference: input.merchantAgreementReference } : {}),
+    sourcePayoutAccountReference: fromAccountRef,
+    resolvedPayoutAccountReference: recipientAccount.payoutAccountInstanceReference,
+    // Recorded BEFORE dispatch, so the settlement handler that runs later knows what was actually done
+    // rather than what the configuration happens to say by then (P5.3).
+    ...(delegateToBank ? { paymentExecutionDelegatedToAspsp: true } : {}),
+    grossAmount: amount,
+    netAmount: amount,
+    feeAmount: 0,
+    currency: transferCurrency,
+    paymentExecutionRail: rail,
+    routingNote: input.note ? `${input.note}` : 'P2P transfer via beneficiary portal',
+    // ISO 20022 remittance info: the clean concept/note the user typed (queryable for AML/FDS).
+    ...(input.note ? { paymentExecutionRemittanceInformation: input.note } : {}),
+    paymentExecutionStatus: 'routing',
+    initiatedAt: now,
+    resolutionLog: [
+      { stepName: 'p2p.initiated', stepOutcome: 'found', stepNote: `beneficiary=${counterpartyArrangementRef}`, stepDateTime: now },
+    ],
+    bianServiceDomain: 'Payment Execution',
+    bianControlRecordType: 'PaymentExecutionProcedure',
+    recordCreatedDateTime: now,
+    recordUpdatedDateTime: now,
+    schemaVersion: 1,
+  };
+  await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).insertOne(execution);
+
+  // 6. Dispatch the transfer through the payment_initiation provider (ADR-039). Settlement arrives
+  //    asynchronously as bank.transfer.settled/failed and is applied by PayoutOrchestrationProcess.
+  let submitted: boolean;
+  let dispatchNote: string;
+
+  if (delegateToBank && sourceAccount) {
+    // As PISP, to the bank that holds the DEBTOR account. The PSP never contacts the creditor's institution:
+    // it is not a clearing participant, and reaching the beneficiary's bank is the debtor bank's job.
+    const initiated = await initiatePaymentAtBank({
+      debtorAccount: sourceAccount,
+      creditorIban: recipientAccount.payoutAccountIban ?? '',
+      creditorName: arrangement.counterpartyLabel ?? 'Beneficiary',
+      creditorAgentBic: recipientAccount.payoutAccountBicSwift,
+      amount,
+      currency: transferCurrency,
+      remittanceInformation: input.note ?? 'Transfer',
+      endToEndIdentification: transferRef,
+      // The product is the PSP's own derivation from the corridor, which is legitimate TPP work since it is
+      // part of the standard endpoint path. It is NOT a choice of execution rail, which is the bank's.
+      product: selectPaymentProduct({
+        currency: transferCurrency,
+        creditorCountryCode: recipientAccount.payoutAccountCountryCode,
+        // This platform's rail vocabulary has no separate instant SEPA entry, so an instant product is not
+        // requested from the rail alone. When one is added, this is the single place that decides it.
+        instant: false,
+      }),
+    });
+    submitted = Boolean(initiated.bankPaymentReference);
+    dispatchNote = submitted
+      ? `aspsp payment=${initiated.bankPaymentReference} status=${initiated.transactionStatus}`
+      : `aspsp refused: ${initiated.error}`;
+    if (submitted) {
+      await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
+        { paymentExecutionInstanceReference: transferRef },
+        { $set: { aspspPaymentReference: initiated.bankPaymentReference, recordUpdatedDateTime: new Date() } },
+      );
+    }
+  } else {
+    const dispatch = await dispatchProvider(
+      db,
+      'payment_initiation',
+      'provider.payment_initiation.transfer.requested',
+      {
+        clientReference: transferRef,
+        paymentExecutionInstanceReference: transferRef,
+        railType: rail,
+        amount,
+        currency: transferCurrency,
+        settlementSchedule: 'T+1',
+        paymentReference: input.note ?? 'P2P transfer',
+      },
+      { entityType: 'execution', entityId: transferRef, processType: 'payment_processing' },
+    );
+    submitted = dispatch.status === 'sent' || dispatch.status === 'received';
+    dispatchNote = `provider=${dispatch.provider} rail=${rail}`;
+  }
+
+  if (!submitted) {
+    // Compensate: release the hold so funds never vanish, mark the execution failed. There is nothing to
+    // release when the BANK was asked to hold, and releasing anyway would credit the customer.
+    if (!delegateToBank) await releaseReservation(db, fromAccountRef, amount);
+    await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
+      { paymentExecutionInstanceReference: transferRef },
+      { $set: { paymentExecutionStatus: 'failed', failureReason: `PISP dispatch: ${dispatchNote}`, recordUpdatedDateTime: new Date() } },
+    );
+    return {
+      transferReference: transferRef, amount, currency: transferCurrency,
+      status: 'failed', failureReason: 'Transfer could not be submitted to the payment rail.',
+      recipientAccountRef: recipientAccount.payoutAccountInstanceReference, recipientHint: arrangement.counterpartyLabel,
+    };
+  }
+
+  await db.collection<PaymentExecutionProcedure>(PAYMENT_EXECUTION_COLLECTION).updateOne(
+    { paymentExecutionInstanceReference: transferRef },
+    {
+      $set: { paymentExecutionStatus: 'in_flight', recordUpdatedDateTime: new Date() },
+      $push: { resolutionLog: { stepName: 'provider.payment_initiation.transfer', stepOutcome: 'found', stepNote: dispatchNote, stepDateTime: new Date() } },
+    },
+  );
+
+  // EDA: notify compliance subscribers (P2PComplianceProcess → FDS + HRP + AML) at submission.
+  void (async () => {
+    const { getEventBus, makeEvent } = await import('../../../vendors/eventbus');
+    void getEventBus().publish(makeEvent({
+      eventType: 'p2p.transfer.completed',
+      correlationId: transferRef,
+      businessProcess: 'payment_processing',
+      source: 'psp.p2p',
+      payload: { transferRef, amount, currency: transferCurrency, initiatorPartyRef, sourceAccountRef: fromAccountRef, recipientAccountRef: recipientAccount.payoutAccountInstanceReference },
+      bian: { serviceDomain: 'Payment Execution', controlRecord: 'PaymentExecutionProcedure' },
+    }));
+  })();
+
+  // EDA: business + compliance audit (submitted). Correlated by the execution reference.
+  emitProcessEvent(db, {
+    entityType: 'execution', entityId: transferRef,
+    processType: 'payment_processing', processAction: 'bank.transfer.submitted',
+    processOutcome: 'in_flight',
+    performedByPartyReference: initiatorPartyRef, performedByRole: 'customer',
+    eventSummary: {
+      amount, currency: transferCurrency, fromAccount: fromAccountRef,
+      toAccount: recipientAccount.payoutAccountInstanceReference,
+      beneficiaryArrangement: counterpartyArrangementRef, beneficiaryLabel: arrangement.counterpartyLabel, rail,
+    },
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+  });
+  emitComplianceEvent(db, {
+    entityType: 'execution', entityId: transferRef,
+    processType: 'payment_processing', processAction: 'bank.transfer.funds.held',
+    processOutcome: 'in_flight',
+    performedByPartyReference: initiatorPartyRef, performedByRole: 'customer',
+    eventSummary: { grossAmount: amount, currency: transferCurrency, debitAccount: fromAccountRef, creditAccount: recipientAccount.payoutAccountInstanceReference, beneficiaryType: 'user' },
+    bianServiceDomain: 'Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+  });
+
+  return {
+    transferReference: transferRef,
+    amount,
+    currency: transferCurrency,
+    status: 'submitted',
+    recipientAccountRef: recipientAccount.payoutAccountInstanceReference,
+    recipientHint: arrangement.counterpartyLabel,
+  };
+}

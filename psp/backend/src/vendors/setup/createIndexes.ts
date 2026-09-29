@@ -1,0 +1,469 @@
+import { MongoClient, Db, IndexSpecification, CreateIndexesOptions, IndexDescription, MongoServerError } from 'mongodb';
+import { MERCHANT_WEBHOOK_LOG_COLLECTION } from '../../modules/gateway/models/merchantWebhookLog.model';
+import { PAYOUT_ACCOUNT_COLLECTION } from '../../modules/gateway/models/payoutAccount.model';
+import { PAYMENT_EXECUTION_COLLECTION } from '../../modules/gateway/models/paymentExecution.model';
+import { COUNTERPARTY_COLLECTION } from '../../modules/customer/models/counterpartyArrangement.model';
+import { IDEMPOTENCY_COLLECTION } from '../../modules/gateway/services/idempotency.service';
+import { PAYMENT_REQUEST_COLLECTION } from '../../modules/gateway/models/paymentRequest.model';
+import { QR_REPRESENTATION_COLLECTION } from '../../modules/gateway/models/qrRepresentation.model';
+import { RTP_ALIAS_DIRECTORY_CACHE_COLLECTION } from '../../modules/gateway/models/rtpAliasDirectoryCache.model';
+import { DEMO_TEAM_CONTACT_COLLECTION } from '../../modules/system/models/demoTeamContact.model';
+import { CARD_AUTHORIZATION_COLLECTION } from '../../modules/gateway/models/cardAuthorization.model';
+import { PAYMENT_ORDER_COLLECTION } from '../../modules/gateway/models/paymentOrder.model';
+import { config } from '../../config';
+
+// ── Self-healing index helpers ────────────────────────────────────────────────
+
+/**
+ * Creates a single index with two self-healing modes:
+ *  - Code 85/86 (IndexOptionsConflict/IndexKeySpecsConflict): drops the stale
+ *    index by name and recreates it with the correct spec.
+ *  - E11000/11001 on a unique index: aggregates duplicates, keeps the oldest
+ *    document per duplicate group (lowest _id), deletes the rest, then retries.
+ */
+async function ensureIndex(
+  db: Db,
+  collection: string,
+  keySpec: IndexSpecification,
+  options: CreateIndexesOptions = {},
+): Promise<void> {
+  try {
+    await db.collection(collection).createIndex(keySpec, options);
+  } catch (err) {
+    const e = err as MongoServerError;
+
+    if (e.code === 85 || e.code === 86) {
+      // Index exists with wrong options: drop by auto-name and recreate.
+      const autoName = Object.entries(keySpec as Record<string, unknown>)
+        .map(([k, v]) => `${k}_${v}`)
+        .join('_');
+      const indexName = options.name ?? autoName;
+      await db.collection(collection).dropIndex(indexName).catch(() => {});
+      await db.collection(collection).createIndex(keySpec, options);
+      console.log(`  repaired: ${collection}[${indexName}] options conflict → recreated`);
+      return;
+    }
+
+    if ((e.code === 11000 || e.code === 11001) && options.unique) {
+      // Unique index blocked by duplicate data.
+      // Group documents by the unique key, keep the oldest (lowest _id), drop the rest.
+      const fields = Object.keys(keySpec as Record<string, unknown>);
+      const groupId =
+        fields.length === 1
+          ? `$${fields[0]}`
+          : fields.reduce<Record<string, string>>((acc, f) => { acc[f] = `$${f}`; return acc; }, {});
+
+      const groups = await db
+        .collection(collection)
+        .aggregate<{ _id: unknown; ids: unknown[]; count: number }>([
+          { $group: { _id: groupId, ids: { $push: '$_id' }, count: { $sum: 1 } } },
+          { $match: { count: { $gt: 1 } } },
+        ])
+        .toArray();
+
+      let removed = 0;
+      for (const g of groups) {
+        // Sort ascending so index-0 is the oldest ObjectId / earliest UUID.
+        const sorted = (g.ids as unknown[]).sort((a, b) =>
+          String(a).localeCompare(String(b)),
+        );
+        const [, ...toDelete] = sorted;
+        if (toDelete.length) {
+          // toDelete contains MongoDB _id values (ObjectId or string); cast needed for TS.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const res = await db.collection(collection).deleteMany({ _id: { $in: toDelete as any[] } });
+          removed += res.deletedCount;
+        }
+      }
+      console.log(
+        `  repaired: ${collection}.{${fields.join(', ')}}, removed ${removed} duplicate(s), retrying unique index`,
+      );
+      // Final attempt: let it throw if it still fails.
+      await db.collection(collection).createIndex(keySpec, options);
+      return;
+    }
+
+    throw e;
+  }
+}
+
+/**
+ * Creates a batch of indexes for one collection.  On any failure falls back to
+ * per-index creation via ensureIndex so that every index gets individual
+ * self-healing (options conflicts and duplicate-key repairs).
+ */
+async function ensureIndexes(
+  db: Db,
+  collection: string,
+  indexes: IndexDescription[],
+): Promise<void> {
+  try {
+    await db.collection(collection).createIndexes(indexes);
+  } catch {
+    // Batch failed: run each index individually so ensureIndex can self-heal.
+    for (const idx of indexes) {
+      const { key, ...opts } = idx;
+      await ensureIndex(db, collection, key as IndexSpecification, opts as CreateIndexesOptions);
+    }
+  }
+}
+
+// ── Main index creation ───────────────────────────────────────────────────────
+
+export async function createIndexes(client: MongoClient) {
+  const db = client.db(config.mongodb.dbName);
+
+  // Party Data Management
+  // partyMobilePhoneNumber is QE-encrypted (no unique index possible), so uniqueness is
+  // enforced on its blind-index digest: a keyed HMAC stored in plaintext. See digest.ts.
+  await ensureIndexes(db, 'party', [
+    { key: { partyInstanceReference: 1 }, unique: true },
+    // Partial: phone is optional (self-registered parties may omit it). Only documents that
+    // actually carry a digest participate in the uniqueness constraint.
+    { key: { partyMobilePhoneNumberDigest: 1 }, unique: true, partialFilterExpression: { partyMobilePhoneNumberDigest: { $exists: true } } },
+    // v39 P3: the identity key on the business record, which is how a token resolves to a party
+    // without consulting the login collection. Partial for the same reason as the phone digest: a
+    // party that cannot sign in has no subject, and the internal ledger owner is one of those.
+    // Unique because two business records answering to one subject would make that resolution
+    // ambiguous in a way no caller could detect.
+    { key: { subjectId: 1 }, unique: true, partialFilterExpression: { subjectId: { $exists: true } } },
+  ]);
+
+  // Card Transaction Log
+  await ensureIndexes(db, 'cardTransactionLog', [
+    { key: { cardTransactionInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },
+    { key: { cardTransactionDateTime: -1 } },
+    { key: { cardTransactionStatus: 1 } },
+    { key: { merchantAgreementInstanceReference: 1, cardTransactionDateTime: -1 } },
+    // v18 (A-06): runtime merchant commission revenue aggregation (dashboard). Sparse, only
+    // fee-bearing acquiring payments carry the attribution sub-doc.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+  ]);
+
+  // Customer Agreement Procedure
+  // v27: helper index on the plaintext KYC status (NOT a QE field). QE-encrypted KYC leaves
+  // (riskScore, riskRating, etc.) are searched via QE and must NOT carry btree/unique indexes.
+  await ensureIndexes(db, 'customerAgreementProcedure', [
+    { key: { customerAgreementInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+    { key: { customerAgreementStatus: 1 } },
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1 } },
+    // v31: KYC admin-list ESR index. The default list filters on kycCheckStatus and sorts by
+    // recordUpdatedDateTime, so the sort key must immediately follow the equality prefix (ESR) to sort
+    // FROM the index with no blocking SORT. customerSegment is an OPTIONAL, low-selectivity filter and
+    // is applied as a residual predicate (kept out of the index so the sort stays index-served whether
+    // or not segment is supplied). Verified via explain(): IXSCAN, no SORT stage. Leaves are plaintext.
+    { key: { 'customerAgreementKycCheck.customerAgreementKycCheckStatus': 1, recordUpdatedDateTime: -1 } },
+  ]);
+
+  // Payment Card Management (the per-customer card-on-file arrangement).
+  // A customer may hold a given card (token) only once → unique compound index dedups per customer.
+  await ensureIndexes(db, 'paymentCardManagement', [
+    { key: { paymentCardInstanceReference: 1 }, unique: true },
+    { key: { paymentCardReference: 1 } },
+    { key: { customerAgreementInstanceReference: 1 } },
+    { key: { customerAgreementInstanceReference: 1, paymentCardReference: 1 }, unique: true },
+    // v30 non-CHD truncated-PAN search: BIN prefix (+ network) and last4 equality/suffix.
+    { key: { paymentCardBin: 1 } },
+    { key: { paymentCardLast4: 1 } },
+  ]);
+
+  // Payment Card Registry (the physical card, one per token). Token is the unique identity;
+  // the holder array is indexed so "which cards does this customer hold" and FDS shared-card lookups
+  // are fast.
+  await ensureIndexes(db, 'paymentCardRegistry', [
+    { key: { paymentCardReference: 1 }, unique: true },
+    { key: { cardHolderAgreementReferences: 1 } },
+    { key: { cardHolderCount: -1 } },
+  ]);
+
+  // Fraud Diagnosis, instance reference (natural primary key)
+  await ensureIndexes(db, 'fraudDiagnosisCase', [
+    { key: { fraudDiagnosisInstanceReference: 1 }, unique: true },
+    { key: { cardTransactionInstanceReference: 1 } },
+    { key: { customerAgreementInstanceReference: 1 } },
+    { key: { fraudDiagnosisCaseStatus: 1, fraudDiagnosisCaseSeverity: -1 } },
+  ]);
+
+  // Fraud Diagnosis, human-readable business key (unique constraint).
+  // ensureIndex deduplicates the collection automatically when E11000 occurs
+  // (runtime-generated cases can share a reference if the counter is ever reset).
+  await ensureIndex(
+    db,
+    'fraudDiagnosisCase',
+    { fraudDiagnosisCaseReference: 1 },
+    { unique: true },
+  );
+
+  await ensureIndexes(db, 'fraudDiagnosisCaseEvents', [
+    { key: { fraudDiagnosisInstanceReference: 1, actionDateTime: -1 } },
+  ]);
+
+  // Customer Questions (ADR-031)
+  await ensureIndexes(db, 'fraudDiagnosisCustomerQuestion', [
+    { key: { customerQuestionInstanceReference: 1 }, unique: true },
+    { key: { cardTransactionInstanceReference: 1 } },
+    { key: { fraudDiagnosisInstanceReference: 1, askedDateTime: -1 } },
+    { key: { partyInstanceReference: 1, questionStatus: 1 } },
+  ]);
+
+  // ADR-031: Notifications (per-party, read/unread)
+  await ensureIndexes(db, 'notification', [
+    { key: { notificationInstanceReference: 1 }, unique: true },
+    { key: { recipientPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { recipientPartyReference: 1, notificationStatus: 1 } },
+    { key: { recipientPartyReference: 1, notificationType: 1, relatedReference: 1 } },
+  ]);
+
+  // dev.v8: Event Store (EDA). Unique eventId = idempotency; the rest power correlated trails,
+  // per-business-process grouping and type/time queries for audit and investigation.
+  await ensureIndexes(db, 'domainEvent', [
+    { key: { eventId: 1 }, unique: true },
+    { key: { correlationId: 1, occurredAt: 1 } },
+    { key: { businessProcess: 1, occurredAt: -1 } },
+    { key: { eventType: 1, occurredAt: -1 } },
+    { key: { partitionKey: 1, occurredAt: 1 } },
+  ]);
+
+
+
+
+
+  // Customer Credit Rating State
+  await ensureIndexes(db, 'customerCreditRatingState', [
+    { key: { customerCreditRatingInstanceReference: 1 }, unique: true },
+    { key: { customerAgreementReference: 1 } },
+  ]);
+
+  // Open Banking: Consent Agreement
+  await ensureIndexes(db, 'consentAgreement', [
+    { key: { consentAgreementInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1 } },
+    { key: { consentRecipientIdentifier: 1 } },
+    { key: { consentStatus: 1, consentExpiryDateTime: 1 } },
+  ]);
+
+  // Open Banking: Consent Access Log
+  await ensureIndexes(db, 'consentAccessLog', [
+    { key: { consentAccessLogInstanceReference: 1 }, unique: true },
+    { key: { consentAgreementInstanceReference: 1, accessDateTime: -1 } },
+    { key: { accessDateTime: -1 } },
+  ]);
+
+  // Merchant Agreement Procedure
+  await ensureIndexes(db, 'merchantAgreementProcedure', [
+    { key: { merchantAgreementInstanceReference: 1 }, unique: true },
+    { key: { merchantAgreementStatus: 1 } },
+    { key: { merchantCategoryCode: 1 } },
+    { key: { merchantOwnerPartyReference: 1 } },
+    // v31: KYB admin-list ESR compound (Equality: merchantAgreementStatus, merchantRiskCategory;
+    // Sort: recordUpdatedDateTime desc). Sorts from the index, no blocking SORT.
+    { key: { merchantAgreementStatus: 1, merchantRiskCategory: 1, recordUpdatedDateTime: -1 } },
+    // v31: multikey reverse lookup "which merchants does this party own" (beneficial-owner scoping).
+    // Bounded multikey (owners array is capped) → safe; equality predicate, IXSCAN, no COLLSCAN.
+    { key: { 'merchantBeneficialOwners.merchantBeneficialOwnerPartyReference': 1 } },
+  ]);
+
+  // Merchant lifecycle audit trail (append-only, PCI DSS)
+  await ensureIndexes(db, 'merchantAgreementEvents', [
+    { key: { merchantAgreementInstanceReference: 1, eventDateTime: 1 } },
+  ]);
+
+  // Checkout Session Log (TTL on expiry field)
+  await ensureIndexes(db, 'checkoutSessionLog', [
+    { key: { checkoutSessionInstanceReference: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { checkoutSessionMerchantReference: 1, merchantAgreementInstanceReference: 1 } },
+    { key: { checkoutSessionExpiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // Demo-only: IST team contacts for the public "About us" page (single sorted read)
+  await ensureIndexes(db, DEMO_TEAM_CONTACT_COLLECTION, [
+    { key: { demoTeamContactInstanceReference: 1 }, unique: true },
+    { key: { active: 1, displayOrder: 1 } },
+  ]);
+
+  // Payment Order Procedure. Lookups are by its own reference, the merchant's own order id, and status.
+  await ensureIndexes(db, PAYMENT_ORDER_COLLECTION, [
+    { key: { paymentOrderInstanceReference: 1 }, unique: true },
+    { key: { paymentOrderReference: 1 }, unique: true },
+    { key: { paymentOrderMerchantReference: 1 } },
+    { key: { paymentOrderExecutionReference: 1 }, sparse: true },
+  ]);
+
+  // Counters: one document per sequence, addressed by name.
+  await ensureIndexes(db, 'counters', [
+    { key: { _id: 1 } },
+  ]);
+
+  // Card Authorization Record. v37: the collection was created implicitly by its first insert, so it
+  // had no indexes at all; every lookup is by its own reference or by the checkout session.
+  await ensureIndexes(db, CARD_AUTHORIZATION_COLLECTION, [
+    { key: { cardAuthorizationInstanceReference: 1 }, unique: true },
+    { key: { checkoutSessionInstanceReference: 1 } },
+    { key: { cardTransactionInstanceReference: 1 }, sparse: true },
+    { key: { cardAuthorizationRequestDateTime: -1 } },
+  ]);
+
+  // Payment Link Record
+  await ensureIndexes(db, 'paymentLinkRecord', [
+    { key: { paymentLinkInstanceReference: 1 }, unique: true },
+    { key: { paymentLinkCode: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { paymentLinkStatus: 1 } },
+    { key: { paymentLinkExpiresAt: 1 }, expireAfterSeconds: 0, sparse: true },
+  ]);
+
+  // External Provider Arrangement (Ch-07), registry of providers/vendors
+  // (dev.v7 Fase 2: renamed from legacy 'integrationRegistry').
+  // Drop the old unique (type+endpoint) index if it still exists: replaced with non-unique
+  // to support multi-provider configurations (ADR-010).
+  await db.collection('externalProviderArrangement')
+    .dropIndex('externalProviderArrangementType_1_externalProviderApiEndpoint_1')
+    .catch(() => { /* index may not exist: safe to ignore */ });
+
+  await ensureIndexes(db, 'externalProviderArrangement', [
+    { key: { externalProviderArrangementInstanceReference: 1 }, unique: true },
+    { key: { externalProviderArrangementType: 1, externalProviderArrangementStatus: 1 } },
+    { key: { externalProviderIsInternal: 1 } },
+    { key: { externalProviderArrangementType: 1, externalProviderApiEndpoint: 1 }, sparse: true },
+    { key: { routingGroupId: 1 }, sparse: true },
+    { key: { routingPriority: 1, externalProviderArrangementType: 1 } },
+  ]);
+
+  // External Provider Arrangement Portfolio (Ch-07), routing groups
+  // (dev.v7 Fase 2: renamed from legacy 'integrationRoutingGroups').
+  await ensureIndexes(db, 'externalProviderArrangementPortfolio', [
+    { key: { routingGroupInstanceReference: 1 }, unique: true },
+    { key: { routingGroupProviderType: 1, routingGroupStatus: 1 } },
+    { key: { isDefaultGroup: 1 }, sparse: true },
+  ]);
+
+  // External Provider Arrangement Action Log, timeseries (ADR-025)
+  // (dev.v7 Fase 2: renamed from legacy 'integrationEvents').
+  // TTL is managed by the timeseries collection definition; no manual TTL index needed.
+  await ensureIndexes(db, 'externalProviderArrangementActionLog', [
+    { key: { externalProviderArrangementInstanceReference: 1, recordCreatedDateTime: -1 } },
+    { key: { integrationEventType: 1, recordCreatedDateTime: -1 } },
+    { key: { 'businessContext.entityType': 1, 'businessContext.entityId': 1, recordCreatedDateTime: -1 }, sparse: true },
+  ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
+
+  // dev.v7 Fase 2: capabilityModuleConfiguration, internal Module engine config (ADR-029).
+  // Implicitly created here via createIndex; documents seeded in Fase 4.
+  await ensureIndexes(db, 'capabilityModuleConfiguration', [
+    { key: { capabilityModuleInstanceReference: 1 }, unique: true },
+    { key: { capability: 1 }, unique: true },
+    { key: { moduleDomain: 1 } },
+  ]);
+
+  // ADR-025: Business Process Events, timeseries
+  await ensureIndexes(db, 'businessProcessEvent', [
+    { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
+    { key: { processType: 1, eventDateTime: -1 } },
+    { key: { processAction: 1, processOutcome: 1 } },
+    // v18: "user x merchant x action" activity view (audit).
+    // Not sparse: timeseries collections reject the sparse option.
+    { key: { merchantAgreementReference: 1, actingPartyReference: 1, eventDateTime: -1 } },
+  ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
+
+  // ADR-025: Compliance Process Events, timeseries
+  await ensureIndexes(db, 'complianceProcessEvent', [
+    { key: { entityType: 1, entityId: 1, eventDateTime: -1 } },
+    { key: { processType: 1, eventDateTime: -1 } },
+  ]).catch(() => { /* timeseries collection may not exist on the very first run */ });
+
+
+
+
+  // v39 P2: the OAuth client registry, now a collection of its own.
+  //
+  // The client id is unique globally rather than per owner: it is the identity a presented token
+  // resolves back to, and it is resolved without an owner in hand, so a duplicate would make that
+  // resolution ambiguous rather than merely untidy.
+  await ensureIndexes(db, 'oauthClient', [
+    { key: { oauthClientId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1 } },
+    { key: { merchantAgreementInstanceReference: 1, oauthClientStatus: 1 } },
+  ]);
+
+  // Integration keys. Verification loads an owner's active keys and compares, because bcrypt is
+  // salted and a presented key cannot be looked up by its hash, so the owner-and-status pair is the
+  // index that matters.
+  await ensureIndexes(db, 'apiKey', [
+    { key: { keyId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1, keyStatus: 1 } },
+  ]);
+
+  // v39: indexes for the identity collections live with those collections, at the authority.
+
+  // merchantWebhookDeliveryLog indexes (ADR-038)
+  await ensureIndexes(db, MERCHANT_WEBHOOK_LOG_COLLECTION, [
+    { key: { logId: 1 }, unique: true },
+    { key: { merchantAgreementInstanceReference: 1, deliveredAt: -1 } },
+    { key: { merchantAgreementInstanceReference: 1, webhookEventType: 1, deliveredAt: -1 } },
+  ]);
+
+  // Payout Account Arrangement (v17)
+  // Partial unique index: at most one default account per party (sparse on the true flag).
+  await ensureIndexes(db, PAYOUT_ACCOUNT_COLLECTION, [
+    { key: { payoutAccountInstanceReference: 1 }, unique: true },
+    { key: { partyInstanceReference: 1, payoutAccountStatus: 1 } },
+    { key: { partyInstanceReference: 1, payoutAccountIsDefault: 1 }, sparse: true },
+  ]);
+
+  // Payment Execution Procedure (v17)
+  await ensureIndexes(db, PAYMENT_EXECUTION_COLLECTION, [
+    { key: { paymentExecutionInstanceReference: 1 }, unique: true },
+    { key: { paymentOrderInstanceReference: 1 } },
+    { key: { cardTransactionInstanceReference: 1 }, sparse: true },
+    { key: { paymentExecutionStatus: 1, recordCreatedDateTime: -1 } },
+    // v18: merchant commission revenue aggregation (dashboard). Sparse, only fee-bearing execs.
+    { key: { 'fee.feeMerchantReference': 1, 'fee.feeCollectedDateTime': -1 }, sparse: true },
+    // v18: merchant-scoped transaction history (data isolation). Sparse, only merchant-initiated execs.
+    { key: { merchantAgreementReference: 1, initiatorPartyReference: 1 }, sparse: true },
+  ]);
+
+  // Counterparty Arrangement / Beneficiary Registry (v17)
+  // Unique on (owner, counterparty) pair: prevents duplicate entries for same beneficiary.
+  await ensureIndexes(db, COUNTERPARTY_COLLECTION, [
+    { key: { counterpartyArrangementReference: 1 }, unique: true },
+    { key: { ownerPartyReference: 1, counterpartyArrangementStatus: 1 } },
+    { key: { ownerPartyReference: 1, counterpartyPartyReference: 1 }, unique: true },
+  ]);
+
+  // v37: the recurring mandate is RETIRED, not moved. A standing order is `periodicPaymentProcedure` at the
+  // bank, on Berlin Group's own resource, with its own due-date index. Indexing a collection here that
+  // nothing should write would create it empty and invite someone to write to it again.
+
+  // v17.1: Idempotency store, unique composite key (first writer wins under a race).
+  await ensureIndexes(db, IDEMPOTENCY_COLLECTION, [
+    { key: { idempotencyKey: 1 }, unique: true },
+  ]);
+
+  // (v28): Request to Pay canonical record. Inbox/outbox + expiry-sweeper + linkage queries.
+  await ensureIndexes(db, PAYMENT_REQUEST_COLLECTION, [
+    { key: { paymentRequestInstanceReference: 1 }, unique: true },
+    { key: { requesterPartyReference: 1, recordCreatedDateTime: -1 } },
+    { key: { payerPartyReference: 1, status: 1, expiresAt: 1 } },
+    { key: { status: 1, expiresAt: 1 } },
+    { key: { invoiceReference: 1 }, sparse: true },
+    { key: { linkedPaymentExecutionReference: 1 }, sparse: true },
+    { key: { idempotencyKey: 1 }, unique: true, partialFilterExpression: { idempotencyKey: { $exists: true } } },
+  ]);
+
+  // Directory Entry (v28): RTP alias resolution cache, hashed alias PK + TTL.
+  await ensureIndexes(db, RTP_ALIAS_DIRECTORY_CACHE_COLLECTION, [
+    { key: { aliasHash: 1 }, unique: true },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+
+  // (v28): shared QR representation, PK, subject lookup, TTL.
+  await ensureIndexes(db, QR_REPRESENTATION_COLLECTION, [
+    { key: { qrRepresentationInstanceReference: 1 }, unique: true },
+    { key: { subjectType: 1, subjectReference: 1 } },
+    { key: { expiresAt: 1 }, expireAfterSeconds: 0 },
+  ]);
+  // Note: paymentRequestEvent is a timeseries collection; its meta index is defined on the
+  // collection itself (createCollections.ts), not here.
+}

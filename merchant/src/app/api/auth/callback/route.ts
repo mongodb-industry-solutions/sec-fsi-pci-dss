@@ -94,7 +94,6 @@ export async function GET(req: NextRequest) {
     attachSession(res, {
       accessToken: tokens.access_token,
       refreshToken: tokens.refresh_token,
-      idToken: tokens.id_token,
       expiresAt: expiresAtFrom(tokens.expires_in),
       grantedScopes,
       sub,

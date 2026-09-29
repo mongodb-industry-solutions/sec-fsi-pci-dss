@@ -1,0 +1,72 @@
+{
+  "services": [
+    {
+      "id": "api-server",
+      "name": "API Server",
+      "description": "Backend Fastify server, runtime, crypto lib, KMS",
+      "type": "api",
+      "url": "/api/v1/system/health",
+      "detailUrl": "/api/v1/system/health?detail=server",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": true
+    },
+    {
+      "id": "mongodb",
+      "name": "MongoDB",
+      "description": "Database connectivity, version, and collections",
+      "type": "atlas",
+      "url": "/api/v1/system/health",
+      "detailUrl": "/api/v1/system/health?detail=db",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": true
+    },
+    {
+      "id": "merchant-app",
+      "name": "Merchant App",
+      "description": "External merchant demo (Espresso Works), Next.js SSO/API client. Probed at its own /health through the frontend proxy",
+      "type": "http",
+      "url": "/health/merchant",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": false
+    },
+    {
+      "id": "bankcore",
+      "name": "Bankcore (ASPSP)",
+      "description": "Open Banking bank (ASPSP): account ledger, card issuer vault, PSD2 consent. Probed at bankcore's own /health through the frontend proxy, since /health on this origin belongs to the backend",
+      "type": "http",
+      "url": "/health/bankcore",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": false
+    },
+    {
+      "id": "giam",
+      "name": "GIAM (Identity Authority)",
+      "description": "Identity authority: realms, tokens, sessions and signing keys. Probed at its own /health through the frontend proxy, which also reports its datastore",
+      "type": "http",
+      "url": "/health/giam",
+      "detailUrl": "/health/giam",
+      "method": "GET",
+      "enabled": true,
+      "intervalMs": 30000,
+      "timeoutMs": 10000,
+      "expectedStatus": 200,
+      "useApiBase": false
+    }
+  ]
+}

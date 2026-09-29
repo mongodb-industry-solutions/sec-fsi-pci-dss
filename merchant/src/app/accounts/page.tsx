@@ -1,7 +1,7 @@
 // Accounts (C-16): the user's payout accounts, masked IBAN only (GDPR/PSD2), default flagged.
 import { redirect } from 'next/navigation';
 import { Wallet, Landmark, Lock } from 'lucide-react';
-import { PspClient, PspError } from '@/lib/PspClient';
+import { PspClient, pspFailure } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { Chip, EmptyState, InfoHint } from '@/components/ui/Bits';
@@ -14,12 +14,12 @@ export default async function AccountsPage() {
 
   const c = await PspClient.fromSession();
   let results: any[] = [];
-  let error: string | undefined;
+  let failure: { message: string; status?: number } | undefined;
   try {
     const data = await c!.listAccounts();
     results = data.results ?? [];
   } catch (e) {
-    error = e instanceof PspError ? e.message : 'Failed to load accounts';
+    failure = pspFailure(e, 'Failed to load accounts');
   }
 
   return (
@@ -29,8 +29,8 @@ export default async function AccountsPage() {
         <InfoHint label={`Payout accounts held at ${BRAND.full}. IBANs are always masked, so the merchant never receives them in clear (GDPR / PSD2).`} />
       </h1>
 
-      {error ? (
-        <PspUnavailable message={error} />
+      {failure ? (
+        <PspUnavailable {...failure} />
       ) : results.length === 0 ? (
         <EmptyState icon={<Wallet className="h-8 w-8" />} title="No accounts found" hint={`Payout accounts you add in ${BRAND.full} will appear here.`} />
       ) : (

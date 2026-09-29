@@ -1,0 +1,72 @@
+[
+  {
+    "counterpartyBankInstanceReference": "cpb-bbva-001",
+    "counterpartyBankName": "BBVA",
+    "counterpartyBankBic": "BBVAESMMXXX",
+    "counterpartyBankCountryCode": "ES",
+    "counterpartyBankIbanBankCodes": ["0182"],
+    "counterpartyBankSchemes": ["sepa", "sepa_instant"],
+    "counterpartyBankCutOffTime": "17:00",
+    "counterpartyBankStatus": "reachable",
+    "bianServiceDomain": "Correspondent Bank Directory",
+    "bianControlRecordType": "CounterpartyBank",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "counterpartyBankInstanceReference": "cpb-santander-001",
+    "counterpartyBankName": "Santander",
+    "counterpartyBankBic": "BSCHESMMXXX",
+    "counterpartyBankCountryCode": "ES",
+    "counterpartyBankIbanBankCodes": ["0049"],
+    "counterpartyBankSchemes": ["sepa", "sepa_instant"],
+    "counterpartyBankCutOffTime": "17:00",
+    "counterpartyBankStatus": "reachable",
+    "bianServiceDomain": "Correspondent Bank Directory",
+    "bianControlRecordType": "CounterpartyBank",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "counterpartyBankInstanceReference": "cpb-deutsche-001",
+    "counterpartyBankName": "Deutsche Bank",
+    "counterpartyBankBic": "DEUTDEFFXXX",
+    "counterpartyBankCountryCode": "DE",
+    "counterpartyBankIbanBankCodes": ["37040044"],
+    "counterpartyBankSchemes": ["sepa", "swift"],
+    "counterpartyBankCutOffTime": "16:00",
+    "counterpartyBankStatus": "reachable",
+    "bianServiceDomain": "Correspondent Bank Directory",
+    "bianControlRecordType": "CounterpartyBank",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "counterpartyBankInstanceReference": "cpb-chase-001",
+    "counterpartyBankName": "JPMorgan Chase",
+    "counterpartyBankBic": "CHASUS33XXX",
+    "counterpartyBankCountryCode": "US",
+    "counterpartyBankIbanBankCodes": ["021000021"],
+    "counterpartyBankSchemes": ["ach", "swift"],
+    "counterpartyBankCorrespondentBic": "DEUTDEFFXXX",
+    "counterpartyBankCutOffTime": "15:00",
+    "counterpartyBankStatus": "reachable",
+    "bianServiceDomain": "Correspondent Bank Directory",
+    "bianControlRecordType": "CounterpartyBank",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  },
+  {
+    "counterpartyBankInstanceReference": "cpb-offline-001",
+    "counterpartyBankName": "Meridian Trust",
+    "counterpartyBankBic": "MERIGB2LXXX",
+    "counterpartyBankCountryCode": "GB",
+    "counterpartyBankIbanBankCodes": ["MERI"],
+    "counterpartyBankSchemes": ["sepa"],
+    "counterpartyBankStatus": "unreachable",
+    "bianServiceDomain": "Correspondent Bank Directory",
+    "bianControlRecordType": "CounterpartyBank",
+    "recordCreatedDateTime": "2026-08-18T00:00:00.000Z",
+    "schemaVersion": 1
+  }
+]
