@@ -12,6 +12,7 @@ import {
 import { api } from '../../lib/api';
 import { BRAND } from '../../config/brand';
 import { getToken, clearToken, decodeToken, isTokenExpired } from '../../lib/auth';
+import { EXPIRED_QUERY, EXPIRED_REASON } from '../../lib/session';
 import { ROLE_LABELS } from '../../lib/constants';
 import { useDebugMode } from '../../lib/debugMode';
 import { UserMenu } from '../../components/UserMenu';
@@ -90,12 +91,18 @@ const ROLE_ACCENT: Record<string, { iconBg: string; iconText: string; badge: str
 
 function LoginForm() {
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
 
-  // The callback route can only redirect, so it reports a failed exchange by query string.
+  // The callback route can only redirect, so it reports a failed exchange by query string. An
+  // expiry arrives the same way, and is NOT an error: nothing went wrong, the session simply ran
+  // out. Shown as a plain notice, because dressing it in red is what made people report it as a
+  // fault in the first place.
   useEffect(() => {
-    const reported = new URLSearchParams(window.location.search).get('signin_error');
+    const params = new URLSearchParams(window.location.search);
+    const reported = params.get('signin_error');
     if (reported) setError(reported);
+    setExpired(params.get(EXPIRED_QUERY) === EXPIRED_REASON);
   }, []);
 
   return (
@@ -109,6 +116,12 @@ function LoginForm() {
 
         {error && (
           <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{error}</div>
+        )}
+
+        {expired && !error && (
+          <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-sm text-amber-800">
+            Your session expired and you were signed out. Sign in again to continue where you left off.
+          </div>
         )}
 
         <a

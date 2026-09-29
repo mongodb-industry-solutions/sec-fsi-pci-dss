@@ -1,4 +1,14 @@
 import { API_BASE_URL } from './constants';
+import { getToken } from './auth';
+import { endSession, isSessionRefusal, renewSession } from './session';
+
+/** A refusal that still knows what it was. The status is what tells a session apart from a role. */
+export class ApiError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
 
 async function apiFetch<T>(
   path: string,
@@ -9,19 +19,33 @@ async function apiFetch<T>(
   // GET) that still carries `Content-Type: application/json` makes Fastify's JSON parser
   // reject it with FST_ERR_CTP_EMPTY_JSON_BODY ("Body cannot be empty…"). This surfaced
   // when leaving a routing group (DELETE with no body).
-  const headers: Record<string, string> = {
-    ...(options?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  const send = (bearer?: string) => {
+    const headers: Record<string, string> = {
+      ...(options?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
+    };
+    return fetch(`${API_BASE_URL}${path}`, {
+      ...options,
+      headers: { ...headers, ...((options?.headers as Record<string, string>) ?? {}) },
+    });
   };
 
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: { ...headers, ...((options?.headers as Record<string, string>) ?? {}) },
-  });
+  let res = await send(token);
+
+  // The session token was refused. Renew once and send the request again, because the common reason
+  // is an access token that expired between being read and being used, and the refresh token behind
+  // it is usually still good. Only when the renewal is refused too is the session actually over, and
+  // then it ends properly instead of leaving a half-signed-in page on screen.
+  if (isSessionRefusal(res.status, token)) {
+    const renewed = await renewSession();
+    const fresh = renewed ? getToken() : undefined;
+    if (fresh && fresh !== token) res = await send(fresh);
+    else endSession();
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error?: string }).error ?? res.statusText);
+    throw new ApiError(res.status, (err as { error?: string }).error ?? res.statusText);
   }
 
   return res.json() as Promise<T>;

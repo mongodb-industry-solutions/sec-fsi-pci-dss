@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { getToken, decodeToken, isTokenExpired } from '../../lib/auth';
+import { endSession, renewSession } from '../../lib/session';
 import { DebugModeProvider } from '../../lib/debugMode';
 import { DemoSidebar, MobileBottomNav } from '../../components/DemoSidebar';
 import { UserMenu } from '../../components/UserMenu';
@@ -14,7 +15,6 @@ import { BRAND } from '../../config/brand';
 const NO_SHELL_PATHS = ['/system'];
 
 function DemoShell({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
@@ -22,17 +22,26 @@ function DemoShell({ children }: { children: React.ReactNode }) {
     document.title = BRAND.full;
   }, []);
 
+  // Arriving on a page with a token that is gone or spent. It used to bounce straight to the sign-in
+  // screen with no explanation and no attempt to recover, which threw people out mid-task for an
+  // access token that had merely aged past its fifteen minutes while the refresh behind it was
+  // still good. Renew first; only a refused renewal is the end of the session, and then it says so.
   useEffect(() => {
     if (pathname === '/system') return;
+    let cancelled = false;
 
     const token = getToken();
-    if (!token || isTokenExpired(token)) {
-      router.replace('/system');
-      return;
-    }
+    if (token && !isTokenExpired(token)) { setUser(decodeToken(token)); return; }
 
-    setUser(decodeToken(token));
-  }, [pathname, router]);
+    void renewSession().then((renewed) => {
+      if (cancelled) return;
+      const fresh = renewed ? getToken() : undefined;
+      if (fresh && !isTokenExpired(fresh)) setUser(decodeToken(fresh));
+      else endSession();
+    });
+
+    return () => { cancelled = true; };
+  }, [pathname]);
 
   if (NO_SHELL_PATHS.includes(pathname)) {
     return <>{children}</>;

@@ -173,7 +173,14 @@ function persistSession(
   store.set(SESSION_COOKIE, tokens.accessToken, readable);
   // The access token carries no name and no email, by design. The id_token is the only answer to
   // "who is this", so the screens get it too; it is never sent anywhere as a credential.
-  if (tokens.idToken) store.set(IDENTITY_COOKIE, tokens.idToken, readable);
+  //
+  // A renewal does not have to return one, and the refresh_token grant usually does not. Writing it
+  // only when one arrives meant the identity cookie kept its ORIGINAL fifteen-minute life while the
+  // session went on being renewed around it: the person stayed signed in and the header lost their
+  // name, showing the neutral "Signed in" fallback that reads as a fault. Renewal does not change
+  // who somebody is, so the answer already held is re-stamped with the new lifetime.
+  const identity = tokens.idToken ?? store.get(IDENTITY_COOKIE)?.value;
+  if (identity) store.set(IDENTITY_COOKIE, identity, readable);
   if (tokens.refreshToken) {
     store.set(REFRESH_COOKIE, tokens.refreshToken, {
       httpOnly: true,
