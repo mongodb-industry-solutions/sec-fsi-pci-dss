@@ -44,8 +44,9 @@ steps:
         - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
         # Private only: bankcore has no public hostname, so there is no public counterpart.
         - NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=http://sec-fsi-pci-dss-bankcore-web-app:80
-        # The authority deploys from its own repository; this is the in-cluster service its chart publishes.
-        - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-web-app:80
+        # The authority deploys from its own repository; this is the in-cluster service its chart
+        # publishes, and its API half: the chart names it sec-giam-api-web-app, not sec-giam-web-app.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-api-web-app:80
         # PUBLIC and required: this is the realm's authorize endpoint as the BROWSER reaches it, which
         # every sign-in redirect (this app's own, and the compatibility shim other apps still use)
         # targets. Left unset here, it silently fell back to the frontend's localhost dev default,
@@ -286,8 +287,9 @@ steps:
         - NEXT_PUBLIC_PSP_URL_MERCHANT_PRIVATE=http://sec-fsi-pci-dss-merchant-web-app:80
         # Private only: bankcore has no public hostname, so there is no public counterpart.
         - NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE=http://sec-fsi-pci-dss-bankcore-web-app:80
-        # The authority deploys from its own repository; this is the in-cluster service its chart publishes.
-        - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-web-app:80
+        # The authority deploys from its own repository; this is the in-cluster service its chart
+        # publishes, and its API half: the chart names it sec-giam-api-web-app, not sec-giam-web-app.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-api-web-app:80
         # PUBLIC and required: see the staging pipeline's identical entry for why this cannot be left unset.
         - NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=https://sec-giam-api.industrysolutions.prod.corp.mongodb.com/api/v1/realms/LeafyIdp
         # PUBLIC, unlike the bank's API: the simulator links to the bank's own app, so a browser navigates to

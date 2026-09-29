@@ -47,7 +47,7 @@ describe('the identity authority in the admin monitoring panel', () => {
 
   it('the frontend image is built knowing the private authority host', () => {
     // Without this the proxy has nothing to point at and the panel shows a permanent red light.
-    expect(read('.drone.yml').match(/NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http:\/\/sec-giam-web-app:80/g)?.length).toBe(2);
+    expect(read('.drone.yml').match(/NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http:\/\/sec-giam-api-web-app:80/g)?.length).toBe(2);
   });
 
   it('compose wires the same variable to the in-network authority', () => {
