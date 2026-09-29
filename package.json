@@ -1,7 +1,7 @@
 {
   "name": "sec-psp",
   "description": "LeafyPay is a PCI DSS-aligned Payment Service Provider (PSP) platform designed to provide digital banks and card issuers with secure and efficient payment processing capabilities, built on MongoDB.",
-  "version": "3.1.5",
+  "version": "3.1.6",
   "private": true,
   "scripts": {
     "setup": "npm install && npm install --prefix packages/eventbus && npm install --prefix packages/platform-links && npm install --prefix packages/mongo-compat && npm install --prefix psp/frontend && npm install --prefix psp/backend && npm install --prefix bank/backend && npm install --install-links --prefix merchant && npm install --prefix bank/frontend",
@@ -34,7 +34,7 @@
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "test:ci": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run test/psp/backend/unit test/psp/frontend/unit test/bank/backend/unit",
-    "test:integration": "vitest run test/psp/backend/integration test/psp/frontend/integration test/bank/backend/integration",
+    "test:integration": "vitest run --maxWorkers=4 test/psp/backend/integration test/psp/frontend/integration test/bank/backend/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
