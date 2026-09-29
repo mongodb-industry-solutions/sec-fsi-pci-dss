@@ -1,3 +1,8 @@
+replicaCount: 1
+# Pinned, not left to the chart default: PSP_OAUTH_KEY_PROVIDER=local below generates a signing key
+# per pod, so a second replica would sign tokens the published key set cannot verify. Production
+# pins it for the same reason. Raise it once the key provider is aws.
+
 env:
   NODE_ENV: staging
   PSP_KMS_PROVIDER: local
