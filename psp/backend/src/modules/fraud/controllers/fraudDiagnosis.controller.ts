@@ -1032,8 +1032,10 @@ Token TTL: 4 hours. Use \`POST /fraud/:id/escalate/approve\` again to renew.`,
     });
     if (!granted) {
       // No local fallback. An elevation the authority declined to record is one nobody can review,
-      // which is the entire reason it moved.
-      return reply.status(503 as 422).send({ error: 'The elevation could not be recorded; access was not granted.' });
+      // which is the entire reason it moved. Also reached when the authority answered with a
+      // holding that is not in force (expired, or still awaiting a reviewer): saying it was granted
+      // would hand the caller a scope every later check refuses.
+      return reply.status(503 as 422).send({ error: 'The elevation is not in force; access was not granted.' });
     }
     // The scope, not the authority's own `subjectId:roleId` addressing: `attachRbacContext` reads
     // this header back as `scopeKind:scopeRef` on every subsequent sensitive-field request, and it

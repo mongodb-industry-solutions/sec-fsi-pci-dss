@@ -41,11 +41,21 @@ export async function requestElevation(
   try {
     // The authority addresses an elevation by the (subjectId, roleId) pair, not a separate
     // assignment identifier: that is the whole holding, not a claim about one.
-    const created = await callAuthority<{ subjectId: string; roleId: string }>(request, '/elevations', {
+    const created = await callAuthority<{
+      subjectId: string; roleId: string; expiresAt?: string; pendingApproval?: boolean;
+    }>(request, '/elevations', {
       method: 'POST',
       body: input,
     });
-    return created.roleId ? `${created.subjectId}:${created.roleId}` : null;
+    if (!created.roleId) return null;
+    // A holding answered is not the same as a holding in force, and only the second one grants
+    // anything. The authority re-derives rather than refusing when the caller asks again for a scope
+    // they already hold, so a grant that has since expired, or one still waiting for a reviewer,
+    // comes back on the happy path; reading only the identifier reported both as success and handed
+    // the browser a scope every later check then answered "not elevated" to. Fails closed.
+    const expiresAt = created.expiresAt ? Date.parse(created.expiresAt) : NaN;
+    if (created.pendingApproval || !Number.isFinite(expiresAt) || expiresAt <= Date.now()) return null;
+    return `${created.subjectId}:${created.roleId}`;
   } catch (error) {
     if (error instanceof AuthorityError) return null;
     throw error;
