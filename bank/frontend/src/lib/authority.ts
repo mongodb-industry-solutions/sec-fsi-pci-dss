@@ -14,6 +14,15 @@ import { cache } from 'react';
 
 const SESSION_COOKIE = 'bankcore.session';
 /**
+ * The credential that outlives the access token, which script must never reach.
+ *
+ * The exchange used to read `access_token` and drop the rest on the floor, so a session lasted
+ * exactly one access token, fifteen minutes, and then ended with nothing able to recover it. The
+ * authority issues a refresh token in the same answer and its lifetime is measured in days: the
+ * console was throwing away the only thing that could keep somebody working.
+ */
+const REFRESH_COOKIE = 'bankcore.refresh';
+/**
  * Named per attempt, `bankcore.pkce.<state>`, not one fixed name.
  *
  * A fixed name is a shared mailbox: starting a second sign-in before the first finishes (a second
@@ -177,25 +186,98 @@ export async function completeSignIn(code: string, state: string): Promise<Excha
     });
     if (!response.ok) return { ok: false, error: 'token_refused' };
 
-    const { access_token: accessToken, expires_in: expiresIn } = await response.json() as {
-      access_token?: string; expires_in?: number;
+    const {
+      access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn,
+    } = await response.json() as {
+      access_token?: string; refresh_token?: string; expires_in?: number;
     };
     if (!accessToken) return { ok: false, error: 'no_token' };
 
-    store.set(SESSION_COOKIE, accessToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: expiresIn ?? 900,
-    });
+    persistSession(store, { accessToken, refreshToken, expiresIn });
     return { ok: true };
   } catch {
     return { ok: false, error: 'authority_unreachable' };
   }
 }
 
+/** Writes an issued set of tokens, in one place so signing in and renewing cannot disagree. */
+function persistSession(
+  store: Awaited<ReturnType<typeof cookies>>,
+  tokens: { accessToken: string; refreshToken?: string; expiresIn?: number },
+): void {
+  // The cookie lives exactly as long as the token does, so the console never believes it is signed
+  // in while every call is refused.
+  store.set(SESSION_COOKIE, tokens.accessToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: tokens.expiresIn ?? 900,
+  });
+  if (tokens.refreshToken) {
+    store.set(REFRESH_COOKIE, tokens.refreshToken, {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      // The authority's own refresh lifetime. A shorter cookie would end a session while the
+      // credential it holds is still good.
+      maxAge: 60 * 60 * 24 * 30,
+    });
+  }
+}
+
+/**
+ * Trades the refresh token for a new access token, and stores the rotated one.
+ *
+ * The authority RETIRES the presented token as it redeems it, so the replacement has to be written
+ * or the next renewal fails. That is why this cannot happen in the browser: the credential is
+ * httpOnly, and it is httpOnly because script has no business holding it.
+ */
+export async function renewSession(): Promise<ExchangeResult> {
+  const store = await cookies();
+  const presented = store.get(REFRESH_COOKIE)?.value;
+  if (!presented) return { ok: false, error: 'no_refresh_token' };
+
+  try {
+    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: presented,
+        client_id: CONSOLE_CLIENT_ID,
+      }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      // A refused renewal is a finished session, so nothing is left behind pretending otherwise.
+      clearSession(store);
+      return { ok: false, error: 'refresh_refused' };
+    }
+    const {
+      access_token: accessToken, refresh_token: refreshToken, expires_in: expiresIn,
+    } = await response.json() as {
+      access_token?: string; refresh_token?: string; expires_in?: number;
+    };
+    if (!accessToken) {
+      clearSession(store);
+      return { ok: false, error: 'no_token' };
+    }
+    persistSession(store, { accessToken, refreshToken, expiresIn });
+    return { ok: true };
+  } catch {
+    // Left alone on a transport failure: the session is probably still good and the next attempt
+    // will say so. Ending it because a network blinked is the worse answer.
+    return { ok: false, error: 'authority_unreachable' };
+  }
+}
+
+function clearSession(store: Awaited<ReturnType<typeof cookies>>): void {
+  store.delete(SESSION_COOKIE);
+  store.delete(REFRESH_COOKIE);
+}
+
 export async function signOut(): Promise<void> {
-  (await cookies()).delete(SESSION_COOKIE);
+  clearSession(await cookies());
 }
 
 /** The signed-in person's token, or '' when nobody is signed in. */
@@ -209,6 +291,8 @@ export interface StaffSession {
   roles: string[];
   /** Present for a self-scoped role (bank_customer): the record's own reference at this bank. */
   accountHolderRef?: string;
+  /** When the access token expires, epoch ms, so the gate renews on time rather than on a guess. */
+  expiresAt?: number;
 }
 
 /**
@@ -271,6 +355,7 @@ export async function currentStaff(): Promise<StaffSession | null> {
       ...(userName ? { userName } : {}),
       roles: Array.isArray(claims.roles) ? claims.roles.map(String) : [],
       ...(accountHolderRef ? { accountHolderRef } : {}),
+      ...(claims.exp ? { expiresAt: claims.exp * 1000 } : {}),
     };
   } catch {
     return null;

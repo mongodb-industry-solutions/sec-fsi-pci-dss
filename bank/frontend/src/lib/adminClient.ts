@@ -23,15 +23,43 @@ function queryString(query: Record<string, string | number | undefined>): string
   return search.size ? `?${search}` : '';
 }
 
+/** Announced when the bank refuses the session outright, so the gate can say so once, in one place. */
+export const SESSION_ENDED_EVENT = 'bankcore:session-ended';
+
+let renewing: Promise<boolean> | null = null;
+
+/** One renewal at a time: the authority retires the presented refresh token as it redeems it. */
+function renew(): Promise<boolean> {
+  if (!renewing) {
+    renewing = fetch('/api/auth/refresh', { method: 'POST' })
+      .then((r) => r.ok)
+      .catch(() => false)
+      .finally(() => { renewing = null; });
+  }
+  return renewing;
+}
+
 async function call<T>(
   resource: string,
   init: { method?: string; query?: Record<string, string | number | undefined>; body?: unknown } = {},
 ): Promise<T> {
-  const response = await fetch(`/api/admin/${resource}${queryString(init.query ?? {})}`, {
+  const send = () => fetch(`/api/admin/${resource}${queryString(init.query ?? {})}`, {
     method: init.method ?? 'GET',
     headers: init.body === undefined ? {} : { 'Content-Type': 'application/json' },
     ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
   });
+
+  let response = await send();
+
+  // The session, not the request. Renew once and ask again, because the common reason is an access
+  // token that aged out between the page loading and the action being taken, and the credential
+  // behind it is usually still good. Only when the renewal is refused is the session actually over,
+  // and then the gate is told rather than each screen inventing its own way of saying so.
+  if (response.status === 401) {
+    if (await renew()) response = await send();
+    else window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+  }
+
   const payload = await response.json().catch(() => null) as { error?: string } | null;
   if (!response.ok) {
     // The bank's own refusal text is what an operator needs. A generic "request failed" would hide the one
