@@ -32,12 +32,10 @@ export async function getDemoUsers(
   filters: { featured?: boolean; role?: string[]; q?: string } = {},
 ): Promise<DemoUser[]> {
   const issuer = config.giam.issuerUrl.replace(/\/+$/, '');
-  const realm = issuer.split('/realms/')[1] ?? 'LeafyIdp';
-  const base = issuer.split('/realms/')[0];
 
   let roster: RosterEntry[] = [];
   try {
-    const response = await fetch(`${base}/realms/${realm}/login-context`, {
+    const response = await fetch(`${issuer}/login-context`, {
       signal: AbortSignal.timeout(5000),
     });
     // An empty roster rather than an error. A demonstration screen with no personas is a screen that

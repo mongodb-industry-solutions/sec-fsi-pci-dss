@@ -63,7 +63,7 @@ export async function selfProfileController(fastify: FastifyInstance) {
     try {
       return await callAuthority<{ email?: string; name?: string }>(
         request,
-        '/protocol/openid-connect/userinfo',
+        '/protocol/oidc/userinfo',
       );
     } catch {
       // An unreachable authority must not empty a profile. The caller is still authenticated, the

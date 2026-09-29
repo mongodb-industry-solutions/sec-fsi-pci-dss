@@ -1058,7 +1058,7 @@ GET /api/auth/callback?code=...  (this app)   -> exchanges the code, sets the se
 ```
 
 The exchange runs server side in the Next.js route handler, against
-`PSP_GIAM_ISSUER_URL/protocol/openid-connect/token`. The registered client is `leafypay-console`
+`PSP_GIAM_ISSUER_URL/protocol/oidc/token`. The registered client is `leafypay-console`
 (public, PKCE required), whose redirect URI is `<app>/api/auth/callback`.
 
 The resulting access token is RS256, signed by the authority and verified against its published key

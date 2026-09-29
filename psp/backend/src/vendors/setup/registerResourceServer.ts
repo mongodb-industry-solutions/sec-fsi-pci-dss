@@ -40,7 +40,7 @@ export async function registerResourceServer(): Promise<{ registered: boolean; r
   };
 
   try {
-    const response = await fetch(`${adminBase}/admin/resource-servers/${config.giam.resourceServerName}/permissions`, {
+    const response = await fetch(`${adminBase}/api/v1/admin/resource-servers/${config.giam.resourceServerName}/permissions`, {
       method: 'PUT',
       headers: {
         'content-type': 'application/json',

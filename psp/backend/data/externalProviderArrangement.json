@@ -437,7 +437,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "protocol/openid-connect/token",
+        "tokenEndpoint": "protocol/oidc/token",
         "scopes": [
           "card-authorisations"
         ],
@@ -608,7 +608,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "protocol/openid-connect/token",
+        "tokenEndpoint": "protocol/oidc/token",
         "scopes": [
           "card-authorisations",
           "card-data"
@@ -627,7 +627,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "protocol/openid-connect/token",
+        "tokenEndpoint": "protocol/oidc/token",
         "scopes": [
           "accounts",
           "balances",
@@ -737,7 +737,7 @@
       "scheme": "oauth2_cc",
       "oauth2": {
         "clientId": "",
-        "tokenEndpoint": "protocol/openid-connect/token",
+        "tokenEndpoint": "protocol/oidc/token",
         "scopes": [
           "payments"
         ],

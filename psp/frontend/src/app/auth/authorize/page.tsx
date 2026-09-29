@@ -39,5 +39,5 @@ export default async function AuthorizePage({ searchParams }: AuthorizePageProps
   }
   const query = forwarded.toString();
   const issuer = AUTHORITY_ISSUER_URL.replace(/\/+$/, '');
-  redirect(`${issuer}/protocol/openid-connect/auth${query ? `?${query}` : ''}`);
+  redirect(`${issuer}/protocol/oidc/auth${query ? `?${query}` : ''}`);
 }

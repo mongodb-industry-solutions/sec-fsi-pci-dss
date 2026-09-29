@@ -27,7 +27,7 @@ async function stubSpecialistTokens(page: import('@playwright/test').Page) {
       { email: 'michael.obi@back.es', name: 'Michael Obi', role: 'level2_investigator', featured: true },
     ],
   })));
-  await page.route('**/protocol/openid-connect/token', (route) => route.fulfill(json({
+  await page.route('**/protocol/oidc/token', (route) => route.fulfill(json({
     access_token: mintJwt({ roles: ['level2_investigator'], sub: 'u-sim', email: 'michael.obi@back.es' }),
     token_type: 'Bearer',
     expires_in: 300,

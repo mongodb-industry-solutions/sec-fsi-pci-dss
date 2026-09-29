@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'invalid auth_req_id' }, { status: 400 });
   }
 
-  const res = await fetch(`${ENV.issuerUrl()}/protocol/openid-connect/ext/ciba/auth/${encodeURIComponent(authReqId)}`, {
+  const res = await fetch(`${ENV.issuerUrl()}/protocol/oidc/ext/ciba/auth/${encodeURIComponent(authReqId)}`, {
     cache: 'no-store',
   }).catch(() => null);
   if (!res) return NextResponse.json({ error: 'authority_unreachable' }, { status: 502 });

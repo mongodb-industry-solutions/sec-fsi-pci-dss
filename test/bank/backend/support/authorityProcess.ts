@@ -92,7 +92,7 @@ export async function machineToken(
   clientSecret: string,
   scope?: string,
 ): Promise<string | null> {
-  const response = await fetch(`${authority.baseUrl}/realms/${realm}/protocol/openid-connect/token`, {
+  const response = await fetch(`${authority.baseUrl}/api/v1/realms/${realm}/protocol/oidc/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     // A narrower scope than the client holds is how a test proves a scope gate rather than asserting

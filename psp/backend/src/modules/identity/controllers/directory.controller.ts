@@ -243,7 +243,7 @@ export async function directoryController(fastify: FastifyInstance) {
     try {
       const listed = await callAuthority<{ Resources?: ScimUser[]; totalResults?: number }>(
         request,
-        '/scim/v2/Users',
+        '/scim/Users',
         { query: { count: limit ?? 50, ...(q ? { filter: `userName co "${q}"` } : {}) } },
       );
       return reply.send({
@@ -265,7 +265,7 @@ export async function directoryController(fastify: FastifyInstance) {
   }, async (request: FastifyRequest, reply: FastifyReply) => {
     const { id } = request.params as { id: string };
     try {
-      const user = await callAuthority<ScimUser>(request, `/scim/v2/Users/${encodeURIComponent(id)}`);
+      const user = await callAuthority<ScimUser>(request, `/scim/Users/${encodeURIComponent(id)}`);
       return reply.send(asManagedUser(user));
     } catch (error) {
       return relayFailure(reply, error);

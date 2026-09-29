@@ -61,7 +61,7 @@ export async function resolvePartyReference(subjectId: string): Promise<string |
 
   try {
     const { config } = await import('../../config');
-    const response = await fetch(`${config.giam.issuerUrl.replace(/\/+$/, '')}/protocol/openid-connect/token`, {
+    const response = await fetch(`${config.giam.issuerUrl.replace(/\/+$/, '')}/protocol/oidc/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({

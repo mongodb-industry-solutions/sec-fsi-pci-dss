@@ -112,10 +112,10 @@ describe('per-environment link resolution', () => {
   });
 
   it('the issuer carries the realm, and is not doubled when the base URL already names one', () => {
-    expect(resolveLinks('{{authorityIssuer}}/protocol/openid-connect/token', {}))
-      .toBe('http://127.0.0.1:8085/realms/LeafyIdp/protocol/openid-connect/token');
-    expect(authorityIssuerUrl({ GIAM_ISSUER_URL: 'http://giam:80/realms/Other' }))
-      .toBe('http://giam:80/realms/Other');
+    expect(resolveLinks('{{authorityIssuer}}/protocol/oidc/token', {}))
+      .toBe('http://127.0.0.1:8085/api/v1/realms/LeafyIdp/protocol/oidc/token');
+    expect(authorityIssuerUrl({ GIAM_ISSUER_URL: 'http://giam:80/api/v1/realms/Other' }))
+      .toBe('http://giam:80/api/v1/realms/Other');
   });
 
   it('a typo in the environment throws instead of quietly meaning development', () => {

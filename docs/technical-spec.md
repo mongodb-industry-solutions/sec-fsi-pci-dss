@@ -3096,7 +3096,7 @@ PSP_BANKCORE_SEED_DATA_DIR=
 # spelled one (localhost vs 127.0.0.1) satisfies only (1) and every token is refused as wrong_issuer.
 # PSP_-prefixed deliberately: the shared link resolver reads the unprefixed name as a bare host, and a
 # realm URL there is joined onto paths that already carry their own realm.
-PSP_GIAM_ISSUER_URL=http://giam:8080/realms/LeafyIdp
+PSP_GIAM_ISSUER_URL=http://giam:8080/api/v1/realms/LeafyIdp
 # The bare authority host, no realm, for the shared link resolver.
 GIAM_BASE_URL=http://giam:8080
 # What a token must name in `aud`, and the name this platform registers its enforcement points under.
@@ -3113,7 +3113,7 @@ GIAM_JWKS_CACHE_SECONDS=900
 # The bank is a resource server in the SHARED realm, not a realm of its own (ADR-003). The boundary
 # is the audience and the resource server below, which a platform token does not carry. This named
 # `/realms/bankcore` until v41, and no such realm has ever been seeded.
-PSP_BANKCORE_GIAM_ISSUER_URL=http://giam:8080/realms/LeafyIdp
+PSP_BANKCORE_GIAM_ISSUER_URL=http://giam:8080/api/v1/realms/LeafyIdp
 PSP_BANKCORE_GIAM_AUDIENCE=bankcore
 PSP_BANKCORE_GIAM_RESOURCE_SERVER=bankcore
 # This bank's OWN client, for the calls it makes as itself, mirroring PSP_GIAM_CLIENT_ID/_SECRET
@@ -3137,7 +3137,7 @@ PSP_MERCHANT_GIAM_CLIENT_SECRET=
 # Browser-facing authority addresses. Separate variables on purpose: these are navigated to or fetched
 # from the page, so they are published addresses, never service names. The realm is resolved from the
 # request path, so a token minted through a public host still carries the private issuer above.
-NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=http://localhost:8085/realms/LeafyIdp
+NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=http://localhost:8085/api/v1/realms/LeafyIdp
 NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=http://localhost:8086
 NEXT_PUBLIC_BANKCORE_AUTHORITY_URL=http://localhost:8086
 # docker-compose only: the one knob the three variables above are derived from.

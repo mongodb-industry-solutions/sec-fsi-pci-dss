@@ -78,7 +78,7 @@ describe('the hosted payment pages', () => {
 
   it('go through the provider route, never to the authority from the browser', () => {
     expect(src).toContain('silentSignInUrl');
-    expect(src).not.toContain('openid-connect/token');
+    expect(src).not.toContain('oidc/token');
   });
 
   it('replace the history entry, so the back button cannot re-enter the flow', () => {

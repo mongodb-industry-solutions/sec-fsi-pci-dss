@@ -46,7 +46,7 @@ const TIMEOUT_MS = 10000;
 function issuerBase(): string {
   const raw = process.env.PSP_GIAM_ISSUER_URL
     ?? process.env.GIAM_ISSUER_URL
-    ?? 'http://127.0.0.1:8085/realms/LeafyIdp';
+    ?? 'http://127.0.0.1:8085/api/v1/realms/LeafyIdp';
   return raw.replace(/\/$/, '');
 }
 
@@ -65,7 +65,7 @@ function issuerBase(): string {
 function authorityIssuerPublic(): string {
   const raw = process.env.NEXT_PUBLIC_BANKCORE_AUTHORITY_ISSUER_URL
     ?? process.env.NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER
-    ?? 'http://localhost:8085/realms/LeafyIdp';
+    ?? 'http://localhost:8085/api/v1/realms/LeafyIdp';
   return raw.replace(/\/$/, '');
 }
 
@@ -128,7 +128,7 @@ export function startSignIn(): LoginStart {
    *
    * The realm is not a parameter: it is in the path.
    */
-  const url = new URL(`${authorityIssuerPublic()}/protocol/openid-connect/auth`);
+  const url = new URL(`${authorityIssuerPublic()}/protocol/oidc/auth`);
   url.searchParams.set('client_id', CONSOLE_CLIENT_ID);
   url.searchParams.set('redirect_uri', redirectUri());
   url.searchParams.set('response_type', 'code');
@@ -172,7 +172,7 @@ export async function completeSignIn(code: string, state: string): Promise<Excha
   if (!verifier) return { ok: false, error: 'state_mismatch' };
 
   try {
-    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+    const response = await fetch(`${issuerBase()}/protocol/oidc/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -238,7 +238,7 @@ export async function renewSession(): Promise<ExchangeResult> {
   if (!presented) return { ok: false, error: 'no_refresh_token' };
 
   try {
-    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+    const response = await fetch(`${issuerBase()}/protocol/oidc/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -308,7 +308,7 @@ export interface StaffSession {
  */
 const profileOf = cache(async (token: string): Promise<{ name?: string; preferred_username?: string }> => {
   try {
-    const response = await fetch(`${issuerBase()}/protocol/openid-connect/userinfo`, {
+    const response = await fetch(`${issuerBase()}/protocol/oidc/userinfo`, {
       headers: { authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(TIMEOUT_MS),
       cache: 'no-store',

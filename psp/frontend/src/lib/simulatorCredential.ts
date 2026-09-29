@@ -46,7 +46,7 @@ function tokenEndpoint(): string {
   const raw = process.env.PSP_GIAM_ISSUER_URL
     ?? process.env.GIAM_ISSUER_URL
     ?? AUTHORITY_ISSUER_URL;
-  return `${raw.replace(/\/+$/, '')}/protocol/openid-connect/token`;
+  return `${raw.replace(/\/+$/, '')}/protocol/oidc/token`;
 }
 
 async function post(body: URLSearchParams): Promise<string | null> {

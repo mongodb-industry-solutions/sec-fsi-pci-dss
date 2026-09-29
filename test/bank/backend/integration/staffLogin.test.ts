@@ -65,7 +65,7 @@ afterAll(async () => {
  * the fixture instead would be asserting the fixture against itself.
  */
 async function expanded(token: string, held: string[]): Promise<Set<string>> {
-  const response = await fetch(`${authority!.baseUrl}/realms/LeafyIdp/permissions`, {
+  const response = await fetch(`${authority!.baseUrl}/api/v1/realms/LeafyIdp/permissions`, {
     headers: { authorization: `Bearer ${token}` },
   });
   if (!response.ok) return new Set();

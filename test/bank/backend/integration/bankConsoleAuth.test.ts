@@ -17,7 +17,7 @@ const AUTHORITY = process.env.GIAM_BASE_URL ?? 'http://127.0.0.1:8085';
 // Seeded personas: one holds the bank's administrator role, one is an ordinary account holder.
 //
 // By USER NAME, not display name: a user name is the unique, stable, sign-in identifier and a
-// display name is neither. `/realms/:realm/login` refuses a display name outright (401), so this
+// display name is neither. `/api/v1/realms/:realm/login` refuses a display name outright (401), so this
 // was failing the flow it means to exercise and reporting it as "could not complete the flow"
 // rather than as the permission question the test is actually about.
 const ADMIN = 'samuel.adeyemi';
@@ -115,7 +115,7 @@ describe('v39: the bank console signs in at the authority and authorises by role
      * the application holding the session and not the directory.
      */
     expect(location.pathname, 'the request must go to the authorization endpoint')
-      .toBe('/realms/LeafyIdp/protocol/openid-connect/auth');
+      .toBe('/api/v1/realms/LeafyIdp/protocol/oidc/auth');
     expect(location.searchParams.get('response_type')).toBe('code');
     expect(location.searchParams.get('code_challenge_method'), 'PKCE is not optional here').toBe('S256');
     expect(location.searchParams.get('client_id')).toBe('bankcore-console');

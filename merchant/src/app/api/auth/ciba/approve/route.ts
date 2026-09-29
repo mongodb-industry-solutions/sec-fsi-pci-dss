@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid auth_req_id' }, { status: 400 });
   }
 
-  const res = await fetch(`${ENV.issuerUrl()}/protocol/openid-connect/ext/ciba/auth/${encodeURIComponent(authReqId)}/approve`, {
+  const res = await fetch(`${ENV.issuerUrl()}/protocol/oidc/ext/ciba/auth/${encodeURIComponent(authReqId)}/approve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ credentialId, signature }),

@@ -186,7 +186,7 @@ export function authorityIssuerUrl(env: Env = process.env): string {
   // The realm is not a link and has no per-environment column: one directory serves every
   // environment's own deployment of it (ADR-003).
   const realm = (env.PSP_GIAM_REALM ?? env.GIAM_REALM ?? '').trim() || DEFAULT_REALM;
-  return `${authorityBaseUrl}/realms/${realm}`;
+  return `${authorityBaseUrl}/api/v1/realms/${realm}`;
 }
 
 /** The address of each named link in THIS environment. */

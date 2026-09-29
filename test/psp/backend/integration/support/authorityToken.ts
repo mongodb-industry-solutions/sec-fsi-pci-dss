@@ -93,7 +93,7 @@ export async function authorityToken(
   authority ??= await start();
   if (!authority) return null;
 
-  const response = await fetch(`${authority.baseUrl}/realms/${REALM}/protocol/openid-connect/token`, {
+  const response = await fetch(`${authority.baseUrl}/api/v1/realms/${REALM}/protocol/oidc/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

@@ -35,7 +35,7 @@ export interface SignedInSession {
 export async function signIn(
   authority: string, realm: string, login: string, password: string,
 ): Promise<SignedInSession | null> {
-  const response = await fetch(`${authority}/realms/${realm}/login`, {
+  const response = await fetch(`${authority}/api/v1/realms/${realm}/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ login, password }),
@@ -66,7 +66,7 @@ export interface CodeRequest {
 export async function authorizationCode(
   authority: string, realm: string, cookie: string, request: CodeRequest,
 ): Promise<string> {
-  const url = new URL(`${authority}/realms/${realm}/protocol/openid-connect/auth`);
+  const url = new URL(`${authority}/api/v1/realms/${realm}/protocol/oidc/auth`);
   url.searchParams.set('client_id', request.clientId);
   url.searchParams.set('redirect_uri', request.redirectUri);
   url.searchParams.set('response_type', 'code');
@@ -93,7 +93,7 @@ export async function authorizationCode(
     const requestId = new URL(location).searchParams.get('request_id');
     if (!requestId) return '';
 
-    const decided = await fetch(`${authority}/realms/${realm}/protocol/openid-connect/auth/consent`, {
+    const decided = await fetch(`${authority}/api/v1/realms/${realm}/protocol/oidc/auth/consent`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', cookie },
       // No `granted_scopes`, which means all of them: this helper exists to obtain a working token,
@@ -134,7 +134,7 @@ export async function interactiveToken(
   });
   if (!code) return '';
 
-  const token = await fetch(`${authority}/realms/${realm}/protocol/openid-connect/token`, {
+  const token = await fetch(`${authority}/api/v1/realms/${realm}/protocol/oidc/token`, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({

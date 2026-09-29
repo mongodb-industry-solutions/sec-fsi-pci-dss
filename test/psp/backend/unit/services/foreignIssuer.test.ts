@@ -75,8 +75,8 @@ beforeAll(async () => {
     if (request.url?.endsWith('/.well-known/openid-configuration')) {
       return send({
         issuer,
-        jwks_uri: `${issuer}/protocol/openid-connect/certs`,
-        token_endpoint: `${issuer}/protocol/openid-connect/token`,
+        jwks_uri: `${issuer}/protocol/oidc/certs`,
+        token_endpoint: `${issuer}/protocol/oidc/token`,
       });
     }
     if (request.url?.endsWith('/certs')) {
@@ -87,7 +87,7 @@ beforeAll(async () => {
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  issuer = `http://127.0.0.1:${(server.address() as AddressInfo).port}/realms/${REALM}`;
+  issuer = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/v1/realms/${REALM}`;
 
   // The application is told to trust THIS issuer, and nothing else changes. That is the whole
   // integration: one URL. If more than this were needed, the contract would not be portable.

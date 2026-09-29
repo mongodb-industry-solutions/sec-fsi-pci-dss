@@ -50,7 +50,7 @@ const TIMEOUT_MS = 10000;
 function issuerBase(): string {
   const raw = process.env.PSP_GIAM_ISSUER_URL
     ?? process.env.GIAM_ISSUER_URL
-    ?? 'http://127.0.0.1:8085/realms/LeafyIdp';
+    ?? 'http://127.0.0.1:8085/api/v1/realms/LeafyIdp';
   return raw.replace(/\/$/, '');
 }
 
@@ -102,7 +102,7 @@ export function startSignIn(options: SignInOptions = {}): LoginStart {
   const state = randomBytes(16).toString('base64url');
   const nonce = randomBytes(16).toString('base64url');
 
-  const url = new URL(`${AUTHORITY_ISSUER_URL}/protocol/openid-connect/auth`);
+  const url = new URL(`${AUTHORITY_ISSUER_URL}/protocol/oidc/auth`);
   url.searchParams.set('client_id', CONSOLE_CLIENT_ID);
   url.searchParams.set('redirect_uri', redirectUri());
   url.searchParams.set('response_type', 'code');
@@ -210,7 +210,7 @@ export async function refreshSession(): Promise<ExchangeResult> {
   if (!presented) return { ok: false, error: 'no_refresh_token' };
 
   try {
-    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+    const response = await fetch(`${issuerBase()}/protocol/oidc/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -265,7 +265,7 @@ export async function completeSignIn(code: string, state: string): Promise<Excha
   if (!verifier) return { ok: false, error: 'state_mismatch' };
 
   try {
-    const response = await fetch(`${issuerBase()}/protocol/openid-connect/token`, {
+    const response = await fetch(`${issuerBase()}/protocol/oidc/token`, {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
