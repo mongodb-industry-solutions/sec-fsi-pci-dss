@@ -34,7 +34,7 @@
     "test": "npm run test:unit && npm run test:integration && npm run test:e2e",
     "test:ci": "npm run test:unit && npm run test:integration",
     "test:unit": "vitest run test/psp/backend/unit test/psp/frontend/unit test/bank/backend/unit",
-    "test:integration": "vitest run --maxWorkers=4 test/psp/backend/integration test/psp/frontend/integration test/bank/backend/integration",
+    "test:integration": "vitest run --maxWorkers=2 test/psp/backend/integration test/psp/frontend/integration test/bank/backend/integration",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",

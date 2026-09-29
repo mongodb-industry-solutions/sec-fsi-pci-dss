@@ -49,8 +49,14 @@ export function SessionKeeper() {
       if (secondsLeft > RENEW_BEFORE_SECONDS && !isTokenExpired(token)) return;
       if (inFlight) return inFlight;
 
+      // This one reasons about the expiry it can see: a token already past it that could not be
+      // renewed is finished, whatever stopped the renewal. Only a token still alive is given the
+      // benefit of the doubt, and then only until it is not.
       inFlight = renewSession()
-        .then((renewed) => { if (!renewed) endSession(); })
+        .then((outcome) => {
+          if (outcome === 'renewed') return;
+          if (outcome === 'session_over' || isTokenExpired(getToken() ?? '')) endSession();
+        })
         .catch(() => undefined)
         .finally(() => { inFlight = null; });
       return inFlight;

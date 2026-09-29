@@ -5,6 +5,16 @@
  */
 import { test, expect } from '@playwright/test';
 
+// A number to type. The simulator used to pre-fill one of its own, and that is exactly what was
+// wrong with it: it named a card no issuer on this platform had ever issued, so the payment it led
+// to was declined for a card the system had never heard of. With no scenario loaded there is no
+// payer and therefore no card on file, so a card is entered by hand, which is the other real path.
+const TYPED_CARD = '4539000000000010';
+
+async function enterCard(page: import('@playwright/test').Page) {
+  await page.getByPlaceholder('Enter card number').fill(TYPED_CARD);
+}
+
 test.describe('FR-v1-01: Simulator Payment Flow', () => {
   test.beforeEach(async ({ page }) => {
     // The simulator payment page reads sim_method from sessionStorage on mount.
@@ -21,27 +31,30 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
     await expect(page.locator('input').first()).toBeVisible();
   });
 
-  test('01.2 masks PAN: pre-filled demo card is already shown masked', async ({ page }) => {
-    // Page initialises maskedCard from simulatorConfig.defaultCard → ****-****-****-XXXX
-    await expect(page.locator('text=/\\*{4}/').first()).toBeVisible({ timeout: 2_000 });
-    // Static help text is always visible beneath the card selector
-    await expect(page.locator('text=/raw PAN never stored/i').first()).toBeVisible();
+  test('01.2 masks PAN: a typed number is shown back masked, never in clear', async ({ page }) => {
+    await enterCard(page);
+    // Only the last four survive, and the masking happens as the digits are entered.
+    await expect(page.getByText(`****-****-****-${TYPED_CARD.slice(-4)}`)).toBeVisible({ timeout: 4_000 });
+    await expect(page.getByText(TYPED_CARD)).toHaveCount(0);
+    await expect(page.locator('text=/raw PAN never leaves the browser/i').first()).toBeVisible();
   });
 
   test('01.3 Next advances to Step 2 with encryption explainer', async ({ page }) => {
-    // Defaults are pre-filled; clicking Next passes validation and shows step 2
+    await enterCard(page);
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     // Step 2 heading is "Review & Encryption"; table shows QE:equality fields
     await expect(page.locator('text=/encrypt/i').first()).toBeVisible({ timeout: 4_000 });
   });
 
   test('01.4 Back button returns to Step 1', async ({ page }) => {
+    await enterCard(page);
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     await page.locator('button:has-text("Back"), button:has-text("←")').first().click();
     await expect(page.locator('input').first()).toBeVisible();
   });
 
   test('01.5 Step 2 shows PCI DSS card token surrogate note', async ({ page }) => {
+    await enterCard(page);
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     // "surrogate" appears in the visible paragraph at bottom of step 2
     await expect(
@@ -71,6 +84,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
         body: `data: ${JSON.stringify({ status: 'authorized', fraudCaseCreated: true, caseId: 'case-sim-001' })}\n\n`,
       });
     });
+    await enterCard(page);
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     await page.locator('button:has-text("Confirm"), button:has-text("→")').last().click();
     // FraudAlert renders: "🚨 Fraud Alert…" + "Switching to Investigation in Ns…" countdown
@@ -100,6 +114,7 @@ test.describe('FR-v1-01: Simulator Payment Flow', () => {
         body: `data: ${JSON.stringify({ status: 'authorized', fraudCaseCreated: false })}\n\n`,
       });
     });
+    await enterCard(page);
     await page.locator('button:has-text("Next"), button:has-text("→")').first().click();
     await page.locator('button:has-text("Confirm"), button:has-text("→")').last().click();
     await expect(page.locator('text=/Payment Confirmed/i').first()).toBeVisible({ timeout: 8_000 });

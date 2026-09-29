@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { getToken, decodeToken, isTokenExpired } from '../../lib/auth';
 import { endSession, renewSession } from '../../lib/session';
 import { DebugModeProvider } from '../../lib/debugMode';
@@ -15,6 +15,7 @@ import { BRAND } from '../../config/brand';
 const NO_SHELL_PATHS = ['/system'];
 
 function DemoShell({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<ReturnType<typeof decodeToken>>(null);
 
@@ -33,15 +34,20 @@ function DemoShell({ children }: { children: React.ReactNode }) {
     const token = getToken();
     if (token && !isTokenExpired(token)) { setUser(decodeToken(token)); return; }
 
-    void renewSession().then((renewed) => {
+    void renewSession().then((outcome) => {
       if (cancelled) return;
-      const fresh = renewed ? getToken() : undefined;
-      if (fresh && !isTokenExpired(fresh)) setUser(decodeToken(fresh));
-      else endSession();
+      const fresh = outcome === 'renewed' ? getToken() : undefined;
+      if (fresh && !isTokenExpired(fresh)) { setUser(decodeToken(fresh)); return; }
+      // Arriving here with no session AT ALL is not an expiry, and saying so to somebody who never
+      // signed in is a lie that also strands them on a page explaining an event that never
+      // happened. Only a session the authority has refused gets the notice; everyone else gets the
+      // sign-in screen, which is what they came for.
+      if (outcome === 'session_over' || token) endSession();
+      else router.replace('/system');
     });
 
     return () => { cancelled = true; };
-  }, [pathname]);
+  }, [pathname, router]);
 
   if (NO_SHELL_PATHS.includes(pathname)) {
     return <>{children}</>;

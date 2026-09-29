@@ -34,13 +34,17 @@ async function apiFetch<T>(
 
   // The session token was refused. Renew once and send the request again, because the common reason
   // is an access token that expired between being read and being used, and the refresh token behind
-  // it is usually still good. Only when the renewal is refused too is the session actually over, and
-  // then it ends properly instead of leaving a half-signed-in page on screen.
+  // it is usually still good.
+  //
+  // Only the AUTHORITY refusing the credential ends the session. A 401 on its own does not prove
+  // one: this application has routes that answer 401 for reasons of their own, and a browser with
+  // no refresh token to present has told us nothing about whether it is still signed in. Ending a
+  // session on that much evidence signs people out of screens that were working.
   if (isSessionRefusal(res.status, token)) {
-    const renewed = await renewSession();
-    const fresh = renewed ? getToken() : undefined;
+    const outcome = await renewSession();
+    const fresh = outcome === 'renewed' ? getToken() : undefined;
     if (fresh && fresh !== token) res = await send(fresh);
-    else endSession();
+    else if (outcome === 'session_over') endSession();
   }
 
   if (!res.ok) {

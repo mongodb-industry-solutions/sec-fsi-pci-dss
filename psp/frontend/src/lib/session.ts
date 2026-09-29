@@ -21,7 +21,17 @@ const SIGN_IN_PATH = '/system';
 export const EXPIRED_QUERY = 'session';
 export const EXPIRED_REASON = 'expired';
 
-let renewal: Promise<boolean> | null = null;
+/**
+ * What a renewal attempt actually established.
+ *
+ * `renewed` and `session_over` are answers. `unavailable` is the absence of one, and the difference
+ * matters: only the authority refusing the credential proves the session is finished. Nothing to
+ * renew WITH, or no way to ask, proves nothing, and acting on either would sign somebody out over a
+ * network blink or over a single route that answered 401 for a reason of its own.
+ */
+export type RenewOutcome = 'renewed' | 'session_over' | 'unavailable';
+
+let renewal: Promise<RenewOutcome> | null = null;
 let ended = false;
 
 /**
@@ -30,11 +40,17 @@ let ended = false;
  * Shared, because the authority retires the refresh token as it redeems it: two renewals racing
  * means the loser holds a dead credential and ends a session that was perfectly alive.
  */
-export function renewSession(): Promise<boolean> {
+export function renewSession(): Promise<RenewOutcome> {
   if (renewal) return renewal;
   renewal = fetch('/api/auth/refresh', { method: 'POST' })
-    .then((response) => response.ok)
-    .catch(() => false)
+    .then(async (response): Promise<RenewOutcome> => {
+      if (response.ok) return 'renewed';
+      const { reason } = await response.json().catch(() => ({})) as { reason?: string };
+      // The authority looked at the credential and said no. Anything else (no refresh token to
+      // present, an authority that could not be reached) leaves the question open.
+      return reason === 'refresh_refused' || reason === 'no_token' ? 'session_over' : 'unavailable';
+    })
+    .catch((): RenewOutcome => 'unavailable')
     .finally(() => { renewal = null; });
   return renewal;
 }

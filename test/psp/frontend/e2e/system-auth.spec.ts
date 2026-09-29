@@ -102,6 +102,19 @@ test.describe('FR-v1-05: role-based dashboards', () => {
     const signOut = page.getByRole('menuitem', { name: 'Sign out' });
     await expect(signOut).toBeVisible({ timeout: 4000 });
     await signOut.click();
+    /**
+     * Signing out asks WHICH sign-out, and it is right to ask.
+     *
+     * One identity spans every application here, so leaving this one and leaving all of them are
+     * different acts with different consequences, and the menu item alone does not say which was
+     * meant. This spec predates the dialog and clicked straight through to an assertion about the
+     * login form, so it had been failing on a prompt that is working as designed. Leaving THIS one
+     * is the choice that returns to this app's own login form, which is what is asserted below;
+     * "everywhere" leaves for the authority and is a different journey.
+     */
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 4000 });
+    await dialog.getByRole('button', { name: /This app only/i }).click();
     await expect(page.getByRole('heading', { name: BRAND.full })).toBeVisible({ timeout: 6000 });
   });
 });

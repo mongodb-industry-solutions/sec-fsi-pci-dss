@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Landing } from './Landing';
-import { SESSION_ENDED_EVENT } from '../lib/adminClient';
+import { SESSION_ENDED_EVENT, renew } from '../lib/adminClient';
 import { SessionExpired } from './SessionExpired';
 
 /**
@@ -48,23 +48,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   // Somebody who never signed in is not somebody whose session ended: the landing page is the right
   // answer for them, and the expiry notice would be a lie.
   const wasSignedIn = useRef(false);
-  const renewing = useRef<Promise<boolean> | null>(null);
 
   const readSession = useCallback(async (): Promise<Session> => {
     const response = await fetch('/api/auth/session');
     return await response.json() as Session;
-  }, []);
-
-  // One renewal at a time: the authority retires the presented refresh token as it redeems it, so
-  // two racing renewals leave the loser holding a dead credential.
-  const renew = useCallback(async (): Promise<boolean> => {
-    if (!renewing.current) {
-      renewing.current = fetch('/api/auth/refresh', { method: 'POST' })
-        .then((r) => r.ok)
-        .catch(() => false)
-        .finally(() => { renewing.current = null; });
-    }
-    return renewing.current;
   }, []);
 
   const check = useCallback(async () => {
@@ -72,8 +59,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       let current = await readSession();
       const due = !current.signedIn
         || (current.expiresAt !== undefined && current.expiresAt - Date.now() < RENEW_BEFORE_MS);
+      // Renewal is shared with the admin client, so a call refused at the same moment as a tick
+      // does not present the refresh token twice: the authority retires it as it redeems it.
       if (due && wasSignedIn.current) {
-        if (await renew()) current = await readSession();
+        if (await renew() === 'renewed') current = await readSession();
       }
       if (current.signedIn) {
         wasSignedIn.current = true;
@@ -87,7 +76,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     } catch {
       setSession({ signedIn: false });
     }
-  }, [readSession, renew]);
+  }, [readSession]);
 
   useEffect(() => {
     setError(new URLSearchParams(window.location.search).get('signin_error'));

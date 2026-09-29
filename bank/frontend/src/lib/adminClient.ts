@@ -26,14 +26,24 @@ function queryString(query: Record<string, string | number | undefined>): string
 /** Announced when the bank refuses the session outright, so the gate can say so once, in one place. */
 export const SESSION_ENDED_EVENT = 'bankcore:session-ended';
 
-let renewing: Promise<boolean> | null = null;
+/**
+ * What a renewal attempt established. Only the authority refusing the credential is proof that the
+ * session is finished; nothing to renew with, or no way to ask, proves nothing.
+ */
+export type RenewOutcome = 'renewed' | 'session_over' | 'unavailable';
+
+let renewing: Promise<RenewOutcome> | null = null;
 
 /** One renewal at a time: the authority retires the presented refresh token as it redeems it. */
-function renew(): Promise<boolean> {
+export function renew(): Promise<RenewOutcome> {
   if (!renewing) {
     renewing = fetch('/api/auth/refresh', { method: 'POST' })
-      .then((r) => r.ok)
-      .catch(() => false)
+      .then(async (r): Promise<RenewOutcome> => {
+        if (r.ok) return 'renewed';
+        const { reason } = await r.json().catch(() => ({})) as { reason?: string };
+        return reason === 'refresh_refused' || reason === 'no_token' ? 'session_over' : 'unavailable';
+      })
+      .catch((): RenewOutcome => 'unavailable')
       .finally(() => { renewing = null; });
   }
   return renewing;
@@ -56,8 +66,9 @@ async function call<T>(
   // behind it is usually still good. Only when the renewal is refused is the session actually over,
   // and then the gate is told rather than each screen inventing its own way of saying so.
   if (response.status === 401) {
-    if (await renew()) response = await send();
-    else window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
+    const outcome = await renew();
+    if (outcome === 'renewed') response = await send();
+    else if (outcome === 'session_over') window.dispatchEvent(new Event(SESSION_ENDED_EVENT));
   }
 
   const payload = await response.json().catch(() => null) as { error?: string } | null;
