@@ -36,6 +36,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   const fastify = Fastify({
     logger: {
+      // Names the emitting service on every line. Several services run side by side in development
+      // behind a single interleaved console, where a bare pid says nothing about which one spoke.
+      name: 'leafypay-psp',
       // Mirror every warn/error/fatal into the admin ring buffer, whatever the call site
       // (fastify.log, request.log, plugin internals). A catch block that logs and answers 500
       // without throwing skips the onError hook, so the panel used to show a bare "-> 500".

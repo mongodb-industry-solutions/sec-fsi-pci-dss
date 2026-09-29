@@ -19,7 +19,7 @@
     "setup:tools": "npx playwright install chromium",
     "setup:corp:stg": "node tools/corp.mjs --env staging",
     "setup:corp:prd": "node tools/corp.mjs --env prod",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:bankcore\" \"npm run dev:frontend\" \"npm run dev:bankfront\" \"npm run dev:merchant\"",
+    "dev": "concurrently --names psp,bankcore,psp-web,bank-web,merchant --prefix-colors green,cyan,magenta,blue,yellow \"npm run dev:backend\" \"npm run dev:bankcore\" \"npm run dev:frontend\" \"npm run dev:bankfront\" \"npm run dev:merchant\"",
     "dev:stop": "node tools/devStop.mjs",
     "dev:restart": "npm run dev:stop && npm run dev",
     "dev:frontend": "npm run dev --prefix psp/frontend",

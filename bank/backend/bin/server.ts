@@ -28,6 +28,9 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   const fastify = Fastify({
     logger: {
+      // Names the emitting service on every line. Several services run side by side in development
+      // behind a single interleaved console, where a bare pid says nothing about which one spoke.
+      name: 'bankcore',
       // Mirror every warn/error/fatal into the ring buffer the PSP admin panel reads, whatever the
       // call site. A handler that logs and answers 500 without throwing skips the onError hook.
       hooks: {
