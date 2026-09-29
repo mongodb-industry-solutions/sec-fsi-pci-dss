@@ -16,6 +16,28 @@ export class PspError extends Error {
   get isAuth() {
     return this.status === 401 || this.status === 403;
   }
+  /**
+   * The PSP does not know who this is any more.
+   *
+   * Distinct from `isAuth`, which also covers 403: "we know you and you may not" is an ordinary
+   * refusal that leaves the session perfectly good, and treating it as an expiry would sign
+   * somebody out for opening a page their consent does not cover.
+   */
+  get isExpiredSession() {
+    return this.status === 401;
+  }
+}
+
+/**
+ * What a page should show when a read fails, decided once here rather than at each of them.
+ *
+ * Every page caught the error and kept only `e.message`, so the status was gone by the time
+ * anything could act on it: an expired session and an unreachable PSP rendered the same red box,
+ * and the one that needed the person to sign in again never said so.
+ */
+export function pspFailure(error: unknown, fallback: string): { message: string; status?: number } {
+  if (error instanceof PspError) return { message: error.message, status: error.status };
+  return { message: fallback };
 }
 
 interface RequestOpts {

@@ -1,7 +1,7 @@
 // History (C-17): the user's operations with status + applied commission.
 import { redirect } from 'next/navigation';
 import { ReceiptText, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { PspClient, PspError } from '@/lib/PspClient';
+import { PspClient, pspFailure } from '@/lib/PspClient';
 import { getSession, hasScope } from '@/lib/session';
 import { ScopeMissing, PspUnavailable } from '@/components/ScopeGate';
 import { Chip, EmptyState, InfoHint } from '@/components/ui/Bits';
@@ -99,7 +99,7 @@ export default async function HistoryPage() {
 
   const c = await PspClient.fromSession();
   let results: any[] = [];
-  let error: string | undefined;
+  let failure: { message: string; status?: number } | undefined;
   // The PSP /transactions merchant channel already returns a MERGED, merchant-isolated history
   // (executions + the party's card transactions made THROUGH this merchant). We only need to
   // request a high enough page size so nothing is truncated (default was 20).
@@ -107,7 +107,7 @@ export default async function HistoryPage() {
     const data = await c!.listHistory(1, 100);
     results = data.results ?? [];
   } catch (e) {
-    error = e instanceof PspError ? e.message : 'Failed to load history';
+    failure = pspFailure(e, 'Failed to load history');
   }
 
   // RTP requests the user is involved in: inbox (I am the payer → I approve/pay) and outbox (I am the
@@ -189,8 +189,8 @@ export default async function HistoryPage() {
         <InfoHint label="Every payment and transfer made on your behalf, with status, fees and the merchant commission." />
       </h1>
 
-      {error ? (
-        <PspUnavailable message={error} />
+      {failure ? (
+        <PspUnavailable {...failure} />
       ) : rows.length === 0 ? (
         <EmptyState icon={<ReceiptText className="h-8 w-8" />} title="No operations yet" hint="Payments and transfers will show up here once you make one." />
       ) : (
