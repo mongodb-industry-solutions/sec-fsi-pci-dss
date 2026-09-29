@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import simulator from '../../../../../psp/frontend/src/config/simulator.json';
 
 // The card issuer enforces Luhn, so a mistyped digit in the config makes that card decline with
-// `14 failed_luhn_check` at demo time. Three shipped PANs were invalid; this pins the checksum.
+// `14 failed_luhn_check` at demo time. This pins the checksum of every PAN the config still ships.
+//
+// The generic test-card list and the default card are gone: the api-card flow now offers the payer's
+// real cards on file, read from their own record, rather than numbers written here. What remains is
+// the hosted flows' new-card prefill.
 function luhnValid(pan: string): boolean {
   let sum = 0;
   let double = false;
@@ -18,28 +22,18 @@ function luhnValid(pan: string): boolean {
 
 const digits = (v: string) => v.replace(/\D/g, '');
 
-interface TestCard { number: string; label?: string }
-const cards = (simulator as { testCards?: TestCard[] }).testCards ?? [];
-const defaultCard = (simulator as { defaultCard?: string }).defaultCard;
+interface Scenario { id: string; prefill?: { cardHint?: string } }
+const hints = (simulator as { scenarios: Scenario[] }).scenarios
+  .filter((s) => s.prefill?.cardHint)
+  .map((s) => [s.id, digits(s.prefill!.cardHint!)] as const);
 
 describe('simulator card numbers', () => {
-  it('ships at least one test card', () => {
-    expect(cards.length).toBeGreaterThan(0);
+  it('ships no card numbers of its own outside the scenario prefills', () => {
+    expect((simulator as Record<string, unknown>).testCards).toBeUndefined();
+    expect((simulator as Record<string, unknown>).defaultCard).toBeUndefined();
   });
 
-  it.each(cards.map((c) => [c.label ?? c.number, digits(c.number)] as const))(
-    '%s passes the Luhn check',
-    (_label, pan) => { expect(luhnValid(pan)).toBe(true); },
-  );
-
-  it('the default card passes the Luhn check', () => {
-    expect(luhnValid(digits(defaultCard ?? ''))).toBe(true);
-  });
-
-  it('every label quotes its own number', () => {
-    for (const c of cards) {
-      const quoted = digits(c.label ?? '');
-      if (quoted) expect(quoted).toBe(digits(c.number));
-    }
+  it.each(hints)('%s prefills a card number that passes the Luhn check', (_id, pan) => {
+    expect(luhnValid(pan)).toBe(true);
   });
 });

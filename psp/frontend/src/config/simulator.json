@@ -1,23 +1,12 @@
 {
   "merchantId": "m0000002-0000-4000-8000-000000000002",
-  "merchantName": "Okafor Digital Services",
+  "merchantName": "Leafy Wallet - Digital Services at the Edge",
 
   "defaultCurrency": "USD",
   "fraudAmountThreshold": 500,
 
   "amountPresets": ["100.00", "250.00", "500.00", "850.00", "1200.00"],
 
-  "defaultCard": "4242424242424242",
-
-  "testCards": [
-    { "label": "Visa Standard (4242-4242-4242-4242)", "number": "4242424242424242" },
-    { "label": "Visa Business (4012-8888-8888-1881)", "number": "4012888888881881" },
-    { "label": "Mastercard Standard (5555-5555-5555-4444)", "number": "5555555555554444" },
-    { "label": "Mastercard Prepaid (5200-8282-8282-8210)", "number": "5200828282828210" },
-    { "label": "Amex Gold (3782-822463-10005)", "number": "378282246310005" },
-    { "label": "Amex Platinum (3714-496353-98431)", "number": "371449635398431" },
-    { "label": "Demo Card (4111-1111-1111-1111)", "number": "4111111111111111" }
-  ],
 
   "fallbackMerchants": [
     { "name": "TechGadgets Ltd.", "mcc": "5734" },
@@ -67,10 +56,6 @@
       "persona": "Luis Fernandez",
       "expectedOutcome": "fraud",
       "outcomeLabel": "🚨 Fraud case auto-created",
-      "savedCards": [
-        { "alias": "Personal Visa", "number": "4242424242424242" },
-        { "alias": "Business Visa", "number": "4012888888881881" }
-      ],
       "prefill": {
         "cardholderName": "Luis Fernandez",
         "email": "luis.fernandez@back.es",
@@ -79,7 +64,7 @@
         "currency": "EUR",
         "merchantName": "TechGadgets Ltd.",
         "merchantCategoryCode": "5734",
-        "description": "Electronics purchase, TechGadgets Ltd.",
+        "description": "High-value electronics purchase",
         "cardExpiry": "12/28",
         "cardHint": "4242424242424242",
         "cardAuthOutcome": "approved"
@@ -92,10 +77,6 @@
       "persona": "Julia Santos",
       "expectedOutcome": "legit",
       "outcomeLabel": "✅ Payment approved",
-      "savedCards": [
-        { "alias": "Personal Mastercard", "number": "5555555555554444" },
-        { "alias": "Prepaid Mastercard", "number": "5200828282828210" }
-      ],
       "prefill": {
         "cardholderName": "Julia Santos",
         "email": "julia.santos@back.es",
@@ -104,7 +85,7 @@
         "currency": "EUR",
         "merchantName": "Espresso Works Ltd.",
         "merchantCategoryCode": "5812",
-        "description": "Coffee and workspace, Espresso Works",
+        "description": "Coffee and workspace",
         "cardExpiry": "06/30",
         "cardHint": "5555555555554444",
         "cardAuthOutcome": "approved"
@@ -117,10 +98,6 @@
       "persona": "Amara Okafor",
       "expectedOutcome": "borderline",
       "outcomeLabel": "⚠️ Manual review triggered",
-      "savedCards": [
-        { "alias": "Personal Visa", "number": "4111111111111111" },
-        { "alias": "Amex Gold", "number": "378282246310005" }
-      ],
       "prefill": {
         "cardholderName": "Amara Okafor",
         "email": "amara.okafor@back.es",
@@ -129,7 +106,7 @@
         "currency": "EUR",
         "merchantName": "Okafor Digital Services",
         "merchantCategoryCode": "7372",
-        "description": "Software subscription, Okafor Digital",
+        "description": "Software subscription",
         "cardExpiry": "09/27",
         "cardHint": "4111111111111111",
         "cardAuthOutcome": "approved"

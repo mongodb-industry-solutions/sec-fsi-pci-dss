@@ -14,11 +14,14 @@ interface Props {
   scenario: SimulatorScenario;
   // The merchant (payee) selected on the landing page; defaults to the configured demo merchant.
   merchantId?: string;
+  // That merchant's own name. The payment is attributed to it, so it is also what the payer sees:
+  // the branding used to come from the scenario, which named a merchant other than the one paid.
+  merchantName?: string;
 }
 
 type FlowState = 'idle' | 'creating' | 'link_ready' | 'iframe_open' | 'complete' | 'error';
 
-export function PaymentLinkFlow({ scenario, merchantId }: Props) {
+export function PaymentLinkFlow({ scenario, merchantId, merchantName }: Props) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [linkCode, setLinkCode] = useState<string | null>(null);
@@ -29,6 +32,8 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
   const [copyLabel, setCopyLabel] = useState('Copy link');
 
   const { prefill } = scenario;
+  // What the payer is shown and what the descriptor says: the merchant actually being paid.
+  const payeeName = merchantName ?? prefill.merchantName;
 
   // Editable payment options (persona + merchant stay fixed). Initialized from the scenario.
   const [amount, setAmount] = useState<number>(prefill.amount);
@@ -37,7 +42,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
 
   function handleVary() {
     const a = variedAmountNum(amount);
-    const d = variedDescription(prefill.merchantName, description);
+    const d = variedDescription(payeeName, description);
     setAmount(a);
     setDescription(d);
     setVaryNote(`Distinct values generated. Find it by amount ${formatAmount(a, prefill.currency, { locale: 'en-EU' })} or descriptor “${d}”.`);
@@ -70,7 +75,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
         email: prefill.email,
         amount,
         currency: prefill.currency,
-        merchantName: prefill.merchantName,
+        merchantName: payeeName,
         method: 'payment-link',
         customerName: scenario.persona,
         linkCode,
@@ -147,7 +152,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
           {/* Fixed by the scenario */}
           <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-700 mb-3 space-y-1">
             <div><span className="font-medium">Customer:</span> {prefill.cardholderName}</div>
-            <div><span className="font-medium">Merchant:</span> {prefill.merchantName}</div>
+            <div><span className="font-medium">Merchant:</span> {payeeName}</div>
           </div>
 
           {/* Editable payment options */}
@@ -181,7 +186,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
                   type="text" maxLength={22}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder={prefill.merchantName.toUpperCase().slice(0, 22)}
+                  placeholder={payeeName.toUpperCase().slice(0, 22)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
                 />
               </div>
@@ -286,7 +291,7 @@ export function PaymentLinkFlow({ scenario, merchantId }: Props) {
 
     return (
       <MerchantBrandingWrapper
-        merchantName={prefill.merchantName}
+        merchantName={payeeName}
         amount={amount}
         currency={prefill.currency}
         description={description.trim() || prefill.description}

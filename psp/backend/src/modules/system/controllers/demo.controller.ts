@@ -223,18 +223,19 @@ export async function demoController(fastify: FastifyInstance) {
     schema: {
       tags: ['system'],
       summary: 'List demo users for quick login',
-      description: `Returns active pre-seeded demo user accounts (DB-backed) for the local domain.
+      description: `Returns the demo personas published by the identity authority for the local realm.
 **Public  -  no JWT required.** The single, non-hardcoded roster shared by the login picker and the simulator.
 
 Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (comma list), \`q=\`
-(name/email substring), \`isMerchant=true\` (only customers who own a merchant). Deterministic order.`,
+(name/email substring). Deterministic order.
+
+Merchants are not part of this roster: they are platform records, read from \`GET /api/v1/merchants/picker\`.`,
       querystring: {
         type: 'object',
         properties: {
           featured: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customerAuthenticationDemoFeatured users.' },
           role: { type: 'string', description: 'Comma-separated role filter.' },
           q: { type: 'string', description: 'Case-insensitive substring on name or email.' },
-          isMerchant: { type: 'string', enum: ['true', 'false'], description: 'When "true", only customers who own a merchant.' },
         },
       },
       response: {
@@ -256,17 +257,7 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
                     description: 'Role encoded in the JWT on login.',
                   },
                   featured: { type: 'boolean', description: 'True if part of the curated demo roster.' },
-                  partyRef: { type: 'string', description: 'partyInstanceReference (SD-13).' },
-                  merchant: {
-                    type: 'object',
-                    nullable: true,
-                    description: 'Present when this customer owns a merchant (customer + merchant).',
-                    properties: {
-                      id: { type: 'string', description: 'merchantAgreementInstanceReference.' },
-                      name: { type: 'string', description: 'Merchant display name.' },
-                      mcc: { type: 'string', nullable: true, description: 'Merchant Category Code (ISO 18245).' },
-                    },
-                  },
+                  partyRef: { type: 'string', description: 'Party instance reference.' },
                 },
               },
             },
@@ -278,12 +269,11 @@ Filters (combinable): \`featured=true\`, \`role=customer,merchant_officer\` (com
   }, async (request, reply) => {
     try {
       const db = (fastify as FastifyInstance & { db?: Db }).db as Db;
-      const { featured, role, q, isMerchant } = request.query as { featured?: string; role?: string; q?: string; isMerchant?: string };
+      const { featured, role, q } = request.query as { featured?: string; role?: string; q?: string };
       const users = await getDemoUsers(db, {
         featured: featured === 'true',
         ...(role ? { role: role.split(',').map((r) => r.trim()).filter(Boolean) } : {}),
         ...(q ? { q } : {}),
-        ...(isMerchant === 'true' ? { isMerchant: true } : {}),
       });
       return reply.send({ users });
     } catch (err) {

@@ -14,11 +14,14 @@ interface Props {
   scenario: SimulatorScenario;
   // The merchant (payee) selected on the landing page; defaults to the configured demo merchant.
   merchantId?: string;
+  // That merchant's own name. The payment is attributed to it, so it is also what the payer sees:
+  // the branding used to come from the scenario, which named a merchant other than the one paid.
+  merchantName?: string;
 }
 
 type FlowState = 'idle' | 'creating' | 'ready' | 'waiting' | 'complete' | 'error';
 
-export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
+export function RedirectionPaymentFlow({ scenario, merchantId, merchantName }: Props) {
   const router = useRouter();
   const [flowState, setFlowState] = useState<FlowState>('idle');
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -28,6 +31,8 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
   const { prefill } = scenario;
+  // What the payer is shown and what the descriptor says: the merchant actually being paid.
+  const payeeName = merchantName ?? prefill.merchantName;
 
   // Editable payment options (persona + merchant stay fixed). Initialized from the scenario.
   const [amount, setAmount] = useState<number>(prefill.amount);
@@ -36,7 +41,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
 
   function handleVary() {
     const a = variedAmountNum(amount);
-    const d = variedDescription(prefill.merchantName, description);
+    const d = variedDescription(payeeName, description);
     setAmount(a);
     setDescription(d);
     setVaryNote(`Distinct values generated. Find it by amount ${formatAmount(a, prefill.currency, { locale: 'en-EU' })} or descriptor “${d}”.`);
@@ -61,7 +66,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
           email: prefill.email,
           amount,
           currency: prefill.currency,
-          merchantName: prefill.merchantName,
+          merchantName: payeeName,
           method: 'redirection',
           customerName: scenario.persona,
           sessionId: sid,
@@ -119,7 +124,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
   if (flowState === 'idle' || flowState === 'creating') {
     return (
       <MerchantBrandingWrapper
-        merchantName={prefill.merchantName}
+        merchantName={payeeName}
         amount={amount}
         currency={prefill.currency}
         description={description.trim() || prefill.description}
@@ -156,7 +161,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
                     type="text" maxLength={22}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder={prefill.merchantName.toUpperCase().slice(0, 22)}
+                    placeholder={payeeName.toUpperCase().slice(0, 22)}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
                   />
                 </div>
@@ -203,7 +208,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
   if (flowState === 'ready' && sessionId) {
     return (
       <MerchantBrandingWrapper
-        merchantName={prefill.merchantName}
+        merchantName={payeeName}
         amount={amount}
         currency={prefill.currency}
         description={description.trim() || prefill.description}
@@ -243,7 +248,7 @@ export function RedirectionPaymentFlow({ scenario, merchantId }: Props) {
 
     return (
       <MerchantBrandingWrapper
-        merchantName={prefill.merchantName}
+        merchantName={payeeName}
         amount={amount}
         currency={prefill.currency}
         description={description.trim() || prefill.description}

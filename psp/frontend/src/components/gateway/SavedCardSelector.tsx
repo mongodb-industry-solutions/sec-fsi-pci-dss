@@ -56,8 +56,16 @@ function attemptSilentSignIn(): void {
  *
  * @param wantedCard optional ?card=<cardToken|cardRef> to preselect, honoured ONLY
  *   if it belongs to the fetched cards (never auto-uses a card outside the shown set).
+ * @param resolveToken optional: where the caller's token comes from, for a surface that does not
+ *   authenticate through a cookie on this origin. The simulator acts as a demo persona with a real
+ *   token minted for it, so it needs the same model with a different way of obtaining the token; the
+ *   silent sign-in dance is skipped, since there is no browser session to recover. Nothing else
+ *   changes: the cards are still whoever the token says, resolved server-side.
  */
-export function useViewerSavedCards(wantedCard?: string | null) {
+export function useViewerSavedCards(
+  wantedCard?: string | null,
+  resolveToken?: () => Promise<string | null>,
+) {
   const [savedCards, setSavedCards] = useState<SavedCardDisplay[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<string>(NEW_CARD);
   // Display name of the authenticated viewer (from their own session JWT), or null if not logged in.
@@ -69,11 +77,11 @@ export function useViewerSavedCards(wantedCard?: string | null) {
     let cancelled = false;
     (async () => {
       try {
-        const token = getToken();
-        // Nobody signed in on this origin. Ask the authority once, in case the payer signed in there
-        // through a merchant; until it answers there is no viewer, so no cards are loaded.
-        if (!token || isTokenExpired(token)) {
-          attemptSilentSignIn();
+        const token = resolveToken ? await resolveToken() : getToken();
+        if (!token || (!resolveToken && isTokenExpired(token))) {
+          // Nobody signed in on this origin. Ask the authority once, in case the payer signed in
+          // there through a merchant; until it answers there is no viewer, so no cards are loaded.
+          if (!resolveToken) attemptSilentSignIn();
           return;
         }
         const name = decodeToken(token)?.name ?? null;
@@ -94,7 +102,7 @@ export function useViewerSavedCards(wantedCard?: string | null) {
       }
     })();
     return () => { cancelled = true; };
-  }, [wantedCard]);
+  }, [wantedCard, resolveToken]);
 
   const usingSavedCard = selectedCardId !== NEW_CARD;
   const selectedCard = useMemo(

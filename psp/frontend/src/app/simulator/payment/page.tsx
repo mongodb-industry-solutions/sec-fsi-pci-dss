@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, awaitPaymentOutcome } from '../../../lib/api';
 import { FraudAlert } from '../../../components/FraudAlert';
@@ -14,6 +14,8 @@ import type { PaymentMethodId, SimulatorScenario } from '../../../types/simulato
 import simulatorConfig from '../../../config/simulator.json';
 import { variedAmount, variedDescription } from '../../../lib/simVary';
 import { deriveCardToken } from '../../../lib/cardTokenize';
+import { useViewerSavedCards, SavedCardSelector, PayingWithSummary } from '../../../components/gateway/SavedCardSelector';
+import { getSimToken } from '../../../lib/simulatorAuth';
 
 type Step = 1 | 2 | 3;
 
@@ -28,12 +30,6 @@ interface FormData {
   merchantName: string;
   merchantCategoryCode: string;
 }
-
-// Default card number for demo (masked immediately on mount)
-const DEMO_CARD_NUMBER = simulatorConfig.defaultCard;
-
-// Test card presets for demo selection
-const TEST_CARDS = simulatorConfig.testCards;
 
 const DEFAULTS: FormData = {
   cardholderName: 'Luis Fernandez',
@@ -127,90 +123,6 @@ function AmountSelector({ value, onChange }: { value: string; onChange: (v: stri
   );
 }
 
-// -- Card selector ------------------------------------------------------------─
-// Proposes a list of cards (the customer's cards on file when a scenario is loaded, or the
-// generic test cards otherwise) and always allows entering a different card number by hand.
-function CardSelector({
-  maskedCard,
-  onCardChange,
-  cards,
-  customerName,
-  defaultNumber,
-}: {
-  maskedCard: string;
-  onCardChange: (raw: string) => void;
-  cards: { label: string; number: string }[];
-  customerName?: string;
-  defaultNumber?: string;
-}) {
-  const [custom, setCustom] = useState(false);
-  const presetValue = defaultNumber && cards.some((c) => c.number === defaultNumber) ? defaultNumber : '';
-
-  function handlePreset(e: React.ChangeEvent<HTMLSelectElement>) {
-    if (e.target.value === '__custom__') {
-      setCustom(true);
-    } else if (e.target.value) {
-      onCardChange(e.target.value);
-    }
-  }
-
-  if (custom) {
-    return (
-      <div className="space-y-1">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Enter card number"
-            onChange={(e) => onCardChange(e.target.value.replace(/\D/g, '').slice(0, 16))}
-            className="flex-1 border rounded-lg px-3 py-2 font-mono text-sm"
-            maxLength={19}
-          />
-          <button
-            type="button"
-            onClick={() => setCustom(false)}
-            className="text-xs text-blue-600 underline whitespace-nowrap"
-          >
-            Use presets
-          </button>
-        </div>
-        {maskedCard && (
-          <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
-            <span className="text-[#00ED64]">🔒</span> {maskedCard}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1">
-      <select
-        onChange={handlePreset}
-        defaultValue={presetValue}
-        className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
-      >
-        <option value="" disabled>
-          {customerName ? `Select a card on file for ${customerName}…` : 'Select a test card or enter custom…'}
-        </option>
-        {cards.map((c) => (
-          <option key={c.number} value={c.number}>{c.label}</option>
-        ))}
-        <option value="__custom__">✏ Enter a different card number…</option>
-      </select>
-      {maskedCard && (
-        <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
-          <span className="text-[#00ED64]">🔒</span> {maskedCard}
-        </div>
-      )}
-      <p className="text-xs text-gray-500">
-        {customerName
-          ? 'Pick one of the customer’s cards on file, or enter a different one. Masked immediately; raw PAN never stored.'
-          : 'Masked immediately. Raw PAN never stored. Leave blank to use the pre-filled demo card.'}
-      </p>
-    </div>
-  );
-}
-
 // -- Validation ----------------------------------------------------------------
 interface ValidationErrors {
   cardNumber?: string;
@@ -220,9 +132,9 @@ interface ValidationErrors {
   merchantName?: string;
 }
 
-function validateStep1(form: FormData, maskedCard: string): ValidationErrors {
+function validateStep1(form: FormData, maskedCard: string, usingSavedCard: boolean): ValidationErrors {
   const errors: ValidationErrors = {};
-  if (!maskedCard) errors.cardNumber = 'Enter a card number to continue.';
+  if (!usingSavedCard && !maskedCard) errors.cardNumber = 'Enter a card number to continue.';
   if (!form.email.includes('@')) errors.email = 'Enter a valid email address.';
   if (!form.phone.trim()) errors.phone = 'Phone number is required.';
   const amt = parseFloat(form.amount);
@@ -238,13 +150,14 @@ export default function PaymentPage() {
   const [simScenario, setSimScenario] = useState<SimulatorScenario | null>(null);
   // The merchant (payee) chosen on the landing page; drives attribution + per-merchant callback.
   const [merchantId, setMerchantId] = useState<string>(simulatorConfig.merchantId);
+  const [payeeName, setPayeeName] = useState<string>(simulatorConfig.merchantName);
   const [methodReady, setMethodReady] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<FormData>(DEFAULTS);
   const [showCvv, setShowCvv] = useState(false);
-  const [maskedCard, setMaskedCard] = useState<string>(maskCardNumber(DEMO_CARD_NUMBER));
+  const [maskedCard, setMaskedCard] = useState<string>('');
   // Raw PAN digits kept only to derive the deterministic token at submit time (never sent).
-  const [rawCard, setRawCard] = useState<string>(DEMO_CARD_NUMBER.replace(/\D/g, ''));
+  const [rawCard, setRawCard] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<{
     txnId: string;
@@ -258,6 +171,37 @@ export default function PaymentPage() {
   const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
   const [varyNote, setVaryNote] = useState<string | null>(null);
   const cardTokenRef = useRef<string>(generateToken());
+  const [displayToken, setDisplayToken] = useState<string>('');
+
+  // The payer's REAL cards on file, read with a real token minted for that persona: the same model
+  // and the same endpoint the hosted payment pages use. The simulator used to offer card numbers
+  // written into its own config, which named no card any issuer had ever issued, so the payment was
+  // declined for a card the platform had never heard of.
+  const payerEmail = simScenario?.prefill.email ?? null;
+  const resolvePayerToken = useCallback(
+    () => (payerEmail ? getSimToken(payerEmail) : Promise.resolve(null)),
+    [payerEmail],
+  );
+  const { savedCards, selectedCardId, setSelectedCardId, selectedCard, usingSavedCard } =
+    useViewerSavedCards(null, resolvePayerToken);
+
+  // What the review and confirmation screens must show: the card this payment is actually on.
+  const payMaskedPan = (usingSavedCard && selectedCard ? selectedCard.paymentCardMaskedPanDisplay : maskedCard) || '';
+
+  // The token travels with the payment, so the review screen shows the real one rather than a
+  // placeholder it invented on mount. Derived as the typed number changes, so it is right before
+  // the payment is confirmed rather than only after.
+  useEffect(() => {
+    if (usingSavedCard && selectedCard) { cardTokenRef.current = selectedCard.cardToken; setDisplayToken(selectedCard.cardToken); return; }
+    if (!rawCard) { setDisplayToken(''); return; }
+    let cancelled = false;
+    void deriveCardToken(rawCard).then((t) => {
+      if (cancelled) return;
+      cardTokenRef.current = t;
+      setDisplayToken(t);
+    });
+    return () => { cancelled = true; };
+  }, [usingSavedCard, selectedCard, rawCard]);
 
   // Read sim_method + sim_scenario from sessionStorage on mount
   useEffect(() => {
@@ -271,6 +215,7 @@ export default function PaymentPage() {
     const selMerchantName = sessionStorage.getItem('sim_merchant_name') ?? simulatorConfig.merchantName;
     const selMerchantMcc = sessionStorage.getItem('sim_merchant_mcc') ?? undefined;
     setMerchantId(selMerchantId);
+    setPayeeName(selMerchantName);
 
     if (scenarioId) {
       const found = (simulatorConfig.scenarios as SimulatorScenario[]).find(s => s.id === scenarioId) ?? null;
@@ -280,8 +225,9 @@ export default function PaymentPage() {
         // (chosen on the landing page); the other values stay editable so the operator can vary them.
         setForm({
           cardholderName: found.prefill.cardholderName,
-          // Expiry is card data: take the scenario's own card expiry (not a blanket constant).
-          expiry: found.prefill.cardExpiry ?? '',
+          // Expiry is card data. A card on file already carries it at the issuer, so it is asked for
+          // only when a new card is typed.
+          expiry: '',
           // CVV is entered by the user at payment time (never predefined). Placeholder hints the demo value.
           cvv : '',
           email: found.prefill.email,
@@ -291,12 +237,6 @@ export default function PaymentPage() {
           merchantName: selMerchantName,
           merchantCategoryCode: selMerchantMcc ?? found.prefill.merchantCategoryCode,
         });
-        // Pre-select the customer's primary card on file so the masked display reflects their card.
-        const primary = found.savedCards?.[0]?.number ?? found.prefill.cardHint;
-        if (primary) {
-          setRawCard(primary.replace(/\D/g, ''));
-          setMaskedCard(maskCardNumber(primary));
-        }
       }
     } else if (method === 'api-card') {
       // No scenario: still reflect the merchant fixed on the landing page.
@@ -345,6 +285,7 @@ export default function PaymentPage() {
       <RedirectionPaymentFlow
         scenario={scenario}
         merchantId={merchantId}
+        merchantName={payeeName}
       />
     );
   }
@@ -355,17 +296,12 @@ export default function PaymentPage() {
       <PaymentLinkFlow
         scenario={scenario}
         merchantId={merchantId}
+        merchantName={payeeName}
       />
     );
   }
 
   // ── API Card flow (default) ───────────────────────────────────────────────
-
-  // Cards proposed in the selector: the customer's cards on file when a scenario is loaded,
-  // otherwise the generic demo test cards. A different card can always be entered by hand.
-  const customerCards = simScenario?.savedCards?.length
-    ? simScenario.savedCards.map((c) => ({ label: `${c.alias} ${maskCardNumber(c.number)}`, number: c.number }))
-    : TEST_CARDS;
 
   // One-click variation of the payment amount for repeated demo runs. The persona, merchant and
   // descriptor stay fixed; only the amount varies, so each run is easy to tell apart in history.
@@ -378,7 +314,7 @@ export default function PaymentPage() {
   }
 
   function handleNext() {
-    const errors = validateStep1(form, maskedCard);
+    const errors = validateStep1(form, maskedCard, usingSavedCard);
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       return;
@@ -392,9 +328,6 @@ export default function PaymentPage() {
     setSubmitting(true);
     setError(null);
     try {
-      // Deterministic token from the entered card number: paying again with the same card reuses
-      // the same token, so the card-on-file is never duplicated (dedups in the registry).
-      if (rawCard) cardTokenRef.current = await deriveCardToken(rawCard);
       const res = await api.transactions.create({
         cardToken: cardTokenRef.current,
         accountReference: form.email,
@@ -403,7 +336,7 @@ export default function PaymentPage() {
         cardTransactionMerchantName: form.merchantName,
         cardTransactionMerchantCategoryCode: form.merchantCategoryCode,
         cardTransactionChannel: 'online',
-        cardTransactionMaskedPanDisplay: maskedCard || '****-****-****-1234',
+        cardTransactionMaskedPanDisplay: payMaskedPan,
         cardTransactionType: 'purchase',
         cardTransactionDescription: (form.description.trim() || form.merchantName.toUpperCase()).slice(0, 22),
         // Acquiring-side link: the payment is charged to the MERCHANT selected on the landing page,
@@ -411,7 +344,10 @@ export default function PaymentPage() {
         merchantAgreementInstanceReference: merchantId,
         gatewayPayload: { source: 'simulator', timestamp: new Date().toISOString() },
         // Transient verification values sent to the card issuer for authorization (never stored/logged).
-        cardVerification: { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.cvv ? { cvv: form.cvv } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
+        // A card on file sends only the verification value: the issuer holds the number and the expiry.
+        cardVerification: usingSavedCard
+          ? { ...(form.cvv ? { cvv: form.cvv } : {}) }
+          : { ...(rawCard ? { cardNumber: rawCard } : {}), ...(form.cvv ? { cvv: form.cvv } : {}), ...(form.expiry ? { expiry: form.expiry } : {}) },
       });
 
       // dev.v8 F3: the payment is PENDING; wait for the issuer's async decision over SSE.
@@ -439,7 +375,7 @@ export default function PaymentPage() {
           merchantName: form.merchantName,
           method: 'api-card',
           customerName: simScenario?.persona ?? form.cardholderName,
-          _restore: { savedResult: newResult, savedForm: form, savedMasked: maskedCard },
+          _restore: { savedResult: newResult, savedForm: form, savedMasked: payMaskedPan },
         }));
       } catch { /* ignore storage errors */ }
       setResult(newResult);
@@ -465,14 +401,15 @@ export default function PaymentPage() {
     sessionStorage.removeItem('sim_step');
     setStep(1);
     setForm(DEFAULTS);
-    setMaskedCard(maskCardNumber(DEMO_CARD_NUMBER));
-    setRawCard(DEMO_CARD_NUMBER.replace(/\D/g, ''));
+    setMaskedCard('');
+    setRawCard('');
     setResult(null);
     setReturning(false);
     setError(null);
     setValidationErrors({});
     setVaryNote(null);
     cardTokenRef.current = generateToken();
+    setDisplayToken('');
     router.push('/simulator/setup');
   }
 
@@ -545,19 +482,45 @@ export default function PaymentPage() {
             {varyNote && <p className="text-xs text-blue-700 font-medium">{varyNote}</p>}
           </div>
 
-          {/* Card number */}
+          {/* The payer's cards on file, plus the option of a card they have not used here before. */}
           <div>
             <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-              Card Number
-              <Tooltip text="Select a test card or enter a custom PAN. The raw PAN is masked immediately on input and is never stored in component state or sent to the server. A secure token is generated instead." />
+              Card
+              <Tooltip text="The payer's cards on file, read from their own record. Paying with one sends its surrogate token, never a PAN. A new card is masked immediately on input; the raw PAN never leaves the browser." />
             </label>
-            <CardSelector
-              maskedCard={maskedCard}
-              onCardChange={(raw) => { setRawCard(raw); setMaskedCard(maskCardNumber(raw)); }}
-              cards={customerCards}
-              customerName={simScenario?.persona}
-              defaultNumber={rawCard}
-            />
+            <SavedCardSelector savedCards={savedCards} selectedCardId={selectedCardId} onSelect={setSelectedCardId} />
+            {usingSavedCard && selectedCard ? (
+              <PayingWithSummary card={selectedCard} />
+            ) : (
+              <div className="space-y-1">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="Enter card number"
+                  value={rawCard}
+                  onChange={(e) => {
+                    const raw = e.target.value.replace(/\D/g, '').slice(0, 19);
+                    setRawCard(raw);
+                    setMaskedCard(raw ? maskCardNumber(raw) : '');
+                  }}
+                  className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
+                />
+                {maskedCard && (
+                  <div className="font-mono text-gray-700 bg-gray-50 rounded px-3 py-2 flex items-center gap-2 text-sm">
+                    <span className="text-[#00ED64]">🔒</span> {maskedCard}
+                  </div>
+                )}
+                <p className="text-xs text-gray-500">
+                  Masked immediately; the raw PAN never leaves the browser. The issuer only authorizes a
+                  card it issued, so a number outside any registered issuer range is refused.
+                </p>
+              </div>
+            )}
+            {savedCards.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">
+                {simScenario?.persona ?? 'This payer'} has no card on file.
+              </p>
+            )}
             {validationErrors.cardNumber && (
               <p className="text-xs text-red-600 mt-0.5">{validationErrors.cardNumber}</p>
             )}
@@ -577,21 +540,23 @@ export default function PaymentPage() {
             />
           </div>
 
-          {/* Expiry + CVV */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
-                Expiry Date
-                <Tooltip text="Card expiration date (MM/YY). The card issuer declines an expired card; the value is sent for authorization only and never stored." />
-              </label>
-              <input
-                type="text"
-                value={form.expiry}
-                onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
-                className="w-full border rounded-lg px-3 py-2 font-mono"
-                placeholder="MM/YY"
-              />
-            </div>
+          {/* Expiry (new card only: the issuer already holds it for a card on file) + CVV */}
+          <div className={`grid gap-3 ${usingSavedCard ? 'grid-cols-1' : 'grid-cols-2'}`}>
+            {!usingSavedCard && (
+              <div>
+                <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
+                  Expiry Date
+                  <Tooltip text="Card expiration date (MM/YY). The card issuer declines an expired card; the value is sent for authorization only and never stored." />
+                </label>
+                <input
+                  type="text"
+                  value={form.expiry}
+                  onChange={(e) => setForm((f) => ({ ...f, expiry: e.target.value }))}
+                  className="w-full border rounded-lg px-3 py-2 font-mono"
+                  placeholder="MM/YY"
+                />
+              </div>
+            )}
             <div>
               <label className="flex items-center text-sm font-medium text-gray-700 mb-1">
                 CVV
@@ -797,16 +762,16 @@ export default function PaymentPage() {
               },
               {
                 label: 'Card Token',
-                value: cardTokenRef.current,
+                value: displayToken,
                 type: 'plaintext' as const,
-                cipher: cardTokenRef.current,
+                cipher: displayToken,
                 tooltip: 'Plain surrogate token (not the PAN). Under PCI DSS v4.0, a token is not Cardholder Data and may be stored in plaintext with a standard index.',
               },
               {
                 label: 'Masked PAN',
-                value: maskedCard,
+                value: payMaskedPan,
                 type: 'plaintext' as const,
-                cipher: maskedCard,
+                cipher: payMaskedPan,
                 tooltip: 'Last-4 display only (****-****-****-XXXX). PCI DSS permits storing the last four digits in plaintext.',
               },
               {
@@ -930,7 +895,7 @@ export default function PaymentPage() {
             <div className="flex justify-between">
               <span className="text-gray-600">Card</span>
               <span className="font-mono">
-                {maskedCard || '****-****-****-1234'}
+                {payMaskedPan}
                 <Tooltip text="Masked PAN (last 4 digits only). PCI DSS permits displaying this. The raw PAN was never stored." />
               </span>
             </div>

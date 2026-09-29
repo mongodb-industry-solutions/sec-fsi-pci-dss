@@ -44,8 +44,6 @@ export interface AuthUser {
   role: string;
   featured?: boolean;
   partyRef?: string;
-  /** Present when this customer owns a merchant (customer who is also a merchant owner). */
-  merchant?: { id: string; name: string; mcc?: string };
 }
 
 /** IST team contact point shown on /about (see config/team.json for the bundled fallback). */
@@ -65,7 +63,6 @@ export interface DemoUserFilters {
   featured?: boolean;
   role?: string[];
   q?: string;
-  isMerchant?: boolean;
 }
 
 // Build the demo-roster querystring. Accepts a legacy boolean (= { featured }) or a filters object.
@@ -75,7 +72,6 @@ function demoRosterQuery(arg?: boolean | DemoUserFilters): string {
   if (f.featured) qs.set('featured', 'true');
   if (f.role?.length) qs.set('role', f.role.join(','));
   if (f.q) qs.set('q', f.q);
-  if (f.isMerchant) qs.set('isMerchant', 'true');
   const s = qs.toString();
   return s ? `?${s}` : '';
 }

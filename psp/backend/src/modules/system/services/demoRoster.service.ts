@@ -29,7 +29,7 @@ interface RosterEntry {
 
 export async function getDemoUsers(
   _db: Db,
-  filters: { featured?: boolean; role?: string[]; q?: string; isMerchant?: boolean } = {},
+  filters: { featured?: boolean; role?: string[]; q?: string } = {},
 ): Promise<DemoUser[]> {
   const issuer = config.giam.issuerUrl.replace(/\/+$/, '');
   const realm = issuer.split('/realms/')[1] ?? 'LeafyIdp';

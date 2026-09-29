@@ -17,6 +17,9 @@ export default function SimulatorPaymentSetupPage() {
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   const [merchant, setMerchant] = useState<SimMerchant | null>(null);
 
+  // The payer the merchant list is read as: the simulator acts as this persona throughout the run.
+  const payerEmail = SCENARIOS.find((s) => s.id === scenarioId)?.prefill.email ?? null;
+
   function handleStart() {
     if (!method || !scenarioId || !merchant) return;
     SimulatorStateManager.clearAll();
@@ -57,10 +60,10 @@ export default function SimulatorPaymentSetupPage() {
           Select Customer Scenario
         </h2>
         <p className="text-xs text-gray-500 mb-3">Which customer (payer) story should the demo follow?</p>
-        <ScenarioSelector scenarios={SCENARIOS} selected={scenarioId} onSelect={setScenarioId} />
+        <ScenarioSelector scenarios={SCENARIOS} selected={scenarioId} onSelect={(id) => { setScenarioId(id); setMerchant(null); }} />
       </section>
 
-      {/* Step 3, Merchant (payee); real merchants from the shared demo roster */}
+      {/* Step 3, Merchant (payee); the real active merchant agreements on the platform */}
       <section className={`bg-white rounded-xl border p-5 mb-6 shadow-sm transition-opacity ${scenarioId ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
         <h2 className="font-semibold text-[#001E2B] mb-1 flex items-center gap-2">
           <span className="w-5 h-5 rounded-full bg-[#001E2B] text-[#00ED64] text-xs flex items-center justify-center font-bold">3</span>
@@ -70,7 +73,7 @@ export default function SimulatorPaymentSetupPage() {
           Which merchant (payee) receives the payment? The payment is attributed to this merchant and its
           webhook callback is notified; review it later in the system under this merchant.
         </p>
-        <MerchantSelector selected={merchant?.id ?? null} onSelect={setMerchant} />
+        <MerchantSelector payerEmail={payerEmail} selected={merchant?.id ?? null} onSelect={setMerchant} />
       </section>
 
       {/* CTA */}

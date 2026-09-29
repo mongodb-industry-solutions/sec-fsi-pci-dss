@@ -16,8 +16,6 @@ export interface SimulatorScenario {
   persona: string;
   expectedOutcome: 'fraud' | 'legit' | 'borderline';
   outcomeLabel: string;
-  /** Cards this customer already has on file; proposed in the API card-payment selector. */
-  savedCards?: { alias: string; number: string }[];
   prefill: {
     cardholderName: string;
     email: string;
@@ -42,8 +40,6 @@ export interface SimulatorConfig {
   defaultCurrency: string;
   fraudAmountThreshold: number;
   amountPresets: string[];
-  defaultCard: string;
-  testCards: { label: string; number: string }[];
   fallbackMerchants: { name: string; mcc: string }[];
   methods: PaymentMethod[];
   scenarios: SimulatorScenario[];
