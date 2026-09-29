@@ -4,7 +4,7 @@ psp/backend/keys/
 # format; this covers the directory, so a key written in any other format cannot slip through (v37).
 bank/backend/keys/
 *.pem
-
+*.test.ts.snap
 # Logs
 logs
 !psp/frontend/src/app/**/logs/
