@@ -21,7 +21,16 @@ interface CachedToken {
 }
 
 const REFRESH_MARGIN_MS = 15_000;
-const TIMEOUT_MS = 4000;
+/**
+ * The same budget every other call to the authority gets (`authorityApi`, and both consoles).
+ *
+ * It was four seconds, alone in that among the platform's authority calls, and the authority needs
+ * about two for a client-credentials exchange even at rest. Under any load it went over, the token
+ * came back empty, and the dispatch went out unauthenticated: the bank then answered "missing
+ * bearer token", which reads as the bank rejecting us rather than as us never having asked it
+ * properly. The reason was already recorded on the request, in a header nobody reads.
+ */
+const TIMEOUT_MS = 10_000;
 const cache = new Map<string, CachedToken>();
 
 export interface AccessTokenResult {
