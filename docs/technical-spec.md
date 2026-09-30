@@ -3104,10 +3104,13 @@ GIAM_AUDIENCE=leafypay
 GIAM_RESOURCE_SERVER=leafypay
 # This service's OWN client, for the calls it makes as itself. The authority derives the secret from
 # the client id when unset, so leaving both unset is coherent and setting only one is not.
-GIAM_CLIENT_ID=leafypay-backend
-GIAM_CLIENT_SECRET=
+PSP_GIAM_CLIENT_ID=leafypay-backend
+PSP_GIAM_CLIENT_SECRET=
 # Presented when registering the permission catalog at boot. Registration is non-fatal when absent.
-GIAM_REGISTRATION_TOKEN=
+# No registration token. Each service registers its own permission catalog with the access token
+# it obtains from its own client credentials above, against the realm endpoint the authority
+# judges. GIAM_REGISTRATION_TOKEN and GIAM_ADMIN_TOKEN are gone: both carried the authority's
+# administration credential for the narrowest of reasons.
 GIAM_JWKS_CACHE_SECONDS=900
 
 # The bank is a resource server in the SHARED realm, not a realm of its own (ADR-003). The boundary

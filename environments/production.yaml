@@ -81,7 +81,7 @@ env:
   GIAM_RESOURCE_SERVER: "leafypay"
   # This service's OWN client at GIAM, for the calls it makes as itself rather than for a person.
   # Registered in GIAM's client fixtures; the matching secret is in envSecrets.
-  GIAM_CLIENT_ID: "leafypay-backend"
+  PSP_GIAM_CLIENT_ID: "leafypay-backend"
   # How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old public
   # key can only verify signatures GIAM itself produced.
   GIAM_JWKS_CACHE_SECONDS: "900"
@@ -92,6 +92,10 @@ env:
   PSP_BANKCORE_GIAM_AUDIENCE: "bankcore"
   PSP_BANKCORE_GIAM_RESOURCE_SERVER: "bankcore"
   PSP_BANKCORE_GIAM_JWKS_CACHE_SECONDS: "900"
+  # The BANK's own client at the authority, the pair its client_credentials exchange presents. Both
+  # halves existed in the deployment secret and neither was declared nor read: the one call that
+  # needed authority borrowed the authority's admin token instead.
+  PSP_BANKCORE_GIAM_CLIENT_ID: "bankcore-backend"
 
   # ── bank/frontend, the bank's own staff console ────────────────────────────────────────
   # This image ships no NEXT_PUBLIC_* build argument (see bank/frontend/Dockerfile): everything
@@ -119,22 +123,25 @@ envSecrets:
   PSP_BANKCORE_DB_NAME: sec-fsi-pci-dss-secrets-prod
   # TPP client secret and the bank's token signing key. Never inline in this file.
   PSP_BANKCORE_TPP_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
-  PSP_BANKCORE_ACCESS_TOKEN_SECRET: sec-fsi-pci-dss-secrets-prod
+  # PSP_BANKCORE_ACCESS_TOKEN_SECRET is not declared: the bank derives it from its own root when
+  # unset, the documented secure default, and a declared key the secret lacks blocks the pod.
   PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-prod
   PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-prod
   PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-prod
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-prod
-  PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-prod
+  # PSP_OAUTH_AWS_KEY_ARN is not declared either: the key provider here is local (see above), so
+  # there is no ARN to read.
   # This platform's own client secret at GIAM, presented for the client_credentials calls it makes
   # as itself. GIAM derives it per client id, so the two sides must agree on one value.
-  GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
-  # Presented when registering this platform's enforcement points at GIAM's administration API. The
-  # same value GIAM holds as its admin token: the bank falls back to GIAM_ADMIN_TOKEN, the platform
-  # has no fallback and needs it under its own name.
-  GIAM_REGISTRATION_TOKEN: sec-fsi-pci-dss-secrets-prod
-  # The credential the bank presents to GIAM's administration API. Ours to hold, GIAM's to issue.
-  GIAM_ADMIN_TOKEN: sec-fsi-pci-dss-secrets-prod
+  PSP_GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
+  # The bank's own client secret at the authority. Its counterpart id is in env above.
+  PSP_BANKCORE_GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-prod
+  #
+  # GIAM_REGISTRATION_TOKEN and GIAM_ADMIN_TOKEN are gone on purpose. Both carried the
+  # authority's administration credential, and each service now registers its own permission
+  # catalog with its OWN access token against the realm endpoint, which the authority judges.
+  # Remove the two keys from the deployment secret as well; nothing reads them any more.
 
 resources:
   requests:

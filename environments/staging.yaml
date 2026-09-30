@@ -81,7 +81,12 @@ env:
   GIAM_RESOURCE_SERVER: "leafypay"
   # This service's OWN client at GIAM, for the calls it makes as itself rather than for a person.
   # Registered in GIAM's client fixtures; the matching secret is in envSecrets.
-  GIAM_CLIENT_ID: "leafypay-backend"
+  # PSP_-prefixed, like its secret: these are THIS service's credentials at the authority, and the
+  # config reads PSP_<NAME> before the bare <NAME>. The unprefixed spelling is only a legacy
+  # fallback, and having the id bare while the secret was prefixed is what made the pair hard to
+  # follow. Note this does NOT generalise: GIAM_BASE_URL is read unprefixed by the shared link
+  # resolver, so prefixing that one would silently drop it.
+  PSP_GIAM_CLIENT_ID: "leafypay-backend"
   # How long a fetched key set is reused before it is refreshed. A stale copy is safe: an old public
   # key can only verify signatures GIAM itself produced.
   GIAM_JWKS_CACHE_SECONDS: "900"
@@ -92,6 +97,10 @@ env:
   PSP_BANKCORE_GIAM_AUDIENCE: "bankcore"
   PSP_BANKCORE_GIAM_RESOURCE_SERVER: "bankcore"
   PSP_BANKCORE_GIAM_JWKS_CACHE_SECONDS: "900"
+  # The BANK's own client at the authority, the pair its client_credentials exchange presents. Both
+  # halves existed in the deployment secret and neither was declared nor read: the one call that
+  # needed authority borrowed the authority's admin token instead.
+  PSP_BANKCORE_GIAM_CLIENT_ID: "bankcore-backend"
 
   # ── bank/frontend, the bank's own staff console ────────────────────────────────────────
   # This image ships no NEXT_PUBLIC_* build argument (see bank/frontend/Dockerfile): everything
@@ -136,12 +145,13 @@ envSecrets:
   # PSP_<NAME> before the bare <NAME>. Declared bare, it named a key that does not exist, and the
   # pod never started: "couldn't find key GIAM_CLIENT_SECRET in Secret ...".
   PSP_GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
-  # Presented when registering this platform's enforcement points at GIAM's administration API. The
-  # same value GIAM holds as its admin token: the bank falls back to GIAM_ADMIN_TOKEN, the platform
-  # has no fallback and needs it under its own name.
-  GIAM_REGISTRATION_TOKEN: sec-fsi-pci-dss-secrets-staging
-  # The credential the bank presents to GIAM's administration API. Ours to hold, GIAM's to issue.
-  GIAM_ADMIN_TOKEN: sec-fsi-pci-dss-secrets-staging
+  # The bank's own client secret at the authority. Its counterpart id is in env above.
+  PSP_BANKCORE_GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
+  #
+  # GIAM_REGISTRATION_TOKEN and GIAM_ADMIN_TOKEN are gone on purpose. Both carried the
+  # authority's administration credential, and each service now registers its own permission
+  # catalog with its OWN access token against the realm endpoint, which the authority judges.
+  # Remove the two keys from the deployment secret as well; nothing reads them any more.
 
 resources:
   requests:

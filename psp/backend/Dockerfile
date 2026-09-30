@@ -60,6 +60,7 @@ COPY packages/ packages/
 RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
+RUN cd packages/giam-client && npm install
 
 # Root package.json provides test scripts and devDependencies (vitest, tsx).
 COPY package.json ./

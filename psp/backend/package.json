@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-backend",
-  "version": "3.1.8",
+  "version": "3.1.9",
   "private": true,
   "engines": {
     "node": ">=22"
@@ -30,6 +30,7 @@
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^6.1.0",
     "@leafypay/eventbus": "file:../../packages/eventbus",
+    "@leafypay/giam-client": "file:../../packages/giam-client",
     "@leafypay/mongo-compat": "file:../../packages/mongo-compat",
     "@leafypay/platform-links": "file:../../packages/platform-links",
     "bcryptjs": "^2.4.3",

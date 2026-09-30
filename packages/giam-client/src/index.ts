@@ -449,3 +449,7 @@ export function createCatalogCache(options: {
     invalidate(): void { fetchedAt = 0; },
   };
 }
+
+/** A service acting as itself at the authority (client credentials). */
+export { MachineTokenSource } from "./machineToken";
+export type { MachineTokenOptions } from "./machineToken";

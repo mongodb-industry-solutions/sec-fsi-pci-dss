@@ -100,9 +100,9 @@ export const config = {
     // to tell a realm-administration permission from a peer resource server's one (see
     // `ownRoleNames`), since only the second says a role belongs to somebody else.
     authorityResourceServerName: pspEnv('GIAM_AUTHORITY_RESOURCE_SERVER', 'authority')!,
-    // Presented when registering the catalog at boot. Absent is survivable: registration is
-    // non-fatal, and an unreachable authority must not stop this application serving.
-    registrationToken: pspEnv('GIAM_REGISTRATION_TOKEN'),
+    // No registration token. The catalog is registered with this service's OWN access token, from
+    // the client credentials below, so the authority decides whether this client may declare a
+    // catalog instead of the deployment holding a credential that administers everything.
     // This service's OWN client credentials, for the calls it makes as itself rather than on behalf
     // of a person. Absent means it was never registered to act as itself, and it degrades rather
     // than fabricating an identity.

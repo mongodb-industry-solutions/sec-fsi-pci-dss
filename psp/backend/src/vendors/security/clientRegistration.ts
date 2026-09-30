@@ -1,4 +1,5 @@
 import { config } from '../../config';
+import { authorityMachineToken } from './machineToken';
 
 /**
  * Registering an application at the identity authority.
@@ -21,9 +22,11 @@ async function call<T>(
   path: string,
   init: { method: string; body?: unknown },
 ): Promise<T | null> {
-  const token = config.giam.registrationToken;
-  // No credential means this service was never authorised to register anything. Returning null lets
-  // the caller fail honestly rather than inventing a client id nothing will recognise.
+  // This service's own token, not a static administration credential. Registering a merchant's
+  // client is this service acting as itself, so it presents its own credentials and the authority
+  // decides. No credential configured means it was never authorised to register anything, and
+  // returning null lets the caller fail honestly rather than inventing a client id nothing knows.
+  const token = await authorityMachineToken();
   if (!token) return null;
 
   try {

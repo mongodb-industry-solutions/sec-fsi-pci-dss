@@ -1,4 +1,5 @@
 import { PERMISSION_CATALOG, PERMISSION_CATALOG_VERSION } from '../../shared/models/permissionCatalog';
+import { authorityMachineToken } from '../security/machineToken';
 import { config } from '../../config';
 
 /**
@@ -39,12 +40,30 @@ export async function registerResourceServer(): Promise<{ registered: boolean; r
     permissions: PERMISSION_CATALOG,
   };
 
+  const token = await authorityMachineToken();
+  if (!token) {
+    return { registered: false, reason: 'no client credentials configured for this service' };
+  }
+
   try {
-    const response = await fetch(`${adminBase}/api/v1/admin/resource-servers/${config.giam.resourceServerName}/permissions`, {
+    /**
+     * The REALM endpoint, with this service's OWN token, not the admin one.
+     *
+     * Both endpoints reach the identical, idempotent write. The `/admin` one is gated by the
+     * authority's administration token, which this service held only in order to declare its own
+     * enforcement points: a credential that administers the whole authority, presented for the
+     * narrowest possible reason. The realm endpoint takes an ordinary access token and judges it,
+     * so the authority decides whether this client may register a catalog, which is the question
+     * that should have been asked all along.
+     *
+     * Requires the client to hold `permissions:manage` in the realm, granted by the authority's
+     * own seeder. Absent, this answers 403 rather than registering, and the caller reports it.
+     */
+    const response = await fetch(`${adminBase}/api/v1/realms/${realm}/resource-servers/${config.giam.resourceServerName}/permissions`, {
       method: 'PUT',
       headers: {
         'content-type': 'application/json',
-        ...(config.giam.registrationToken ? { authorization: `Bearer ${config.giam.registrationToken}` } : {}),
+        authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(body),
       // Bounded, because a boot step that can hang forever is a boot step that will.
