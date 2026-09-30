@@ -174,5 +174,12 @@ describe('v39 §10.11: the issuer contract is a contract, not a convention', () 
       await verifyAccessToken(mint(validClaims({ exp: Math.floor(Date.now() / 1000) - 3600 }))),
       'expired',
     ).toBeNull();
+
+    // A token carrying NO expiry, which used to pass: the check was guarded on the claim being
+    // present, so omitting it skipped the check instead of failing it. Nothing else here bounds a
+    // withdrawn session, so that token was a permanent credential.
+    const noExpiry = validClaims();
+    delete noExpiry.exp;
+    expect(await verifyAccessToken(mint(noExpiry)), 'no exp claim at all').toBeNull();
   });
 });

@@ -266,7 +266,17 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
 
   const now = Math.floor(Date.now() / 1000);
   const skew = 60;
-  if (typeof claims.exp === 'number' && claims.exp + skew < now) return recordFailure('expired');
+  /**
+   * `exp` is REQUIRED, not merely checked when present.
+   *
+   * Guarding the comparison on the claim's type made a token carrying no expiry at all skip the
+   * check and be accepted, which is a credential that never lapses. RFC 9068 2.2 requires the
+   * claim, and this platform leans on it harder than most: local verification asks the authority
+   * nothing, so the ONLY bound on a withdrawn session is the access-token lifetime. A token
+   * without one has no bound.
+   */
+  if (typeof claims.exp !== 'number') return recordFailure('missing_exp');
+  if (claims.exp + skew < now) return recordFailure('expired');
   if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return recordFailure('not_yet_valid');
 
   return {
