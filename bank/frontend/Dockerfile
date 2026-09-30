@@ -10,7 +10,12 @@ WORKDIR /app
 # this one has none to inline, which is the same reason its browser never learns the bank's host.
 
 COPY package*.json ./
-RUN npm ci --omit=dev || npm install --omit=dev
+# Dev dependencies INCLUDED, and they have to be: tailwindcss, postcss, autoprefixer and typescript
+# are all declared there and all needed by `next build`. This read `npm ci --omit=dev || npm install
+# --omit=dev`; lockfiles are ignored by policy here, so the ci arm always failed and the fallback
+# installed a tree with no build tooling. It passed locally only because no .dockerignore existed
+# and `COPY . .` carried the developer's own node_modules into the image, devDependencies and all.
+RUN npm install
 
 COPY . .
 RUN npm run build
