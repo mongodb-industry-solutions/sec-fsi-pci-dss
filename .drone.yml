@@ -54,7 +54,6 @@ steps:
         - NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=https://sec-giam-api.industrysolutions.staging.corp.mongodb.com/api/v1/realms/LeafyIdp
         # PUBLIC, unlike the bank's API: the simulator links to the bank's own app, so a browser navigates to
         # it and a private in-cluster host would be unreachable from one.
-        # TEST
         - NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC=https://sec-fsi-pci-dss-bank-frontend.industrysolutions.staging.corp.mongodb.com
       access_key:
         from_secret: ecr_access_key
