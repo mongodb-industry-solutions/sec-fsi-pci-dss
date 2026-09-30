@@ -11,6 +11,13 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# npm 10.x, which this base image ships, cannot resolve a `file:` dependency when no lockfile is
+# present: arborist crashes with "Cannot read properties of null (reading 'edgesOut')", which names
+# nothing that is actually wrong. This repository ignores lockfiles by policy (.gitignore), so the
+# CI context never has one, and every package.json here declares at least one file: link. Bisected
+# in this image: the install fails on npm 10 without a lockfile and succeeds on npm 11 without one.
+RUN npm install -g npm@11
+
 # crypt_shared 8.2.4, the SAME version the backend downloads. bankcore runs Queryable Encryption
 # against the SAME key vault, and a version mismatch between the two services surfaces as a generic
 # 503, so the version is pinned here rather than resolved.
@@ -40,8 +47,7 @@ RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
 
-# The lockfile comes too: npm 10.9.9 crashes resolving a file: dependency without one.
-COPY bank/backend/package.json bank/backend/package-lock.json bank/backend/
+COPY bank/backend/package.json bank/backend/
 RUN cd bank/backend && npm install
 
 # ── Source ────────────────────────────────────────────────────────

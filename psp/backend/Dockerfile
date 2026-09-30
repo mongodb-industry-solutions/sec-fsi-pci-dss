@@ -15,6 +15,13 @@ RUN apt-get update && \
 
 WORKDIR /app
 
+# npm 10.x, which this base image ships, cannot resolve a `file:` dependency when no lockfile is
+# present: arborist crashes with "Cannot read properties of null (reading 'edgesOut')", which names
+# nothing that is actually wrong. This repository ignores lockfiles by policy (.gitignore), so the
+# CI context never has one, and every package.json here declares at least one file: link. Bisected
+# in this image: the install fails on npm 10 without a lockfile and succeeds on npm 11 without one.
+RUN npm install -g npm@11
+
 # Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
 # Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
 # crypt_shared 8.2.4 matches the local dev library (Windows 8.2.4) and adds support for the QE
@@ -55,16 +62,11 @@ RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
 
 # Root package.json provides test scripts and devDependencies (vitest, tsx).
-#
-# The LOCKFILE travels with every package.json that declares a file: dependency, here and below.
-# npm 10.9.9, which node:22-slim ships, crashes resolving a file: link with no lockfile present:
-# "Cannot read properties of null (reading 'edgesOut')", which names nothing that is actually
-# wrong. Bisected in this image: install fails without the lockfile and succeeds with it.
-COPY package.json package-lock.json ./
+COPY package.json ./
 RUN npm install --ignore-scripts
 
 # Backend package.json — "fsi-pci-dss-demo": "file:../.." now resolves to /app/
-COPY psp/backend/package.json psp/backend/package-lock.json psp/backend/
+COPY psp/backend/package.json psp/backend/
 RUN cd psp/backend && npm install
 
 # Frontend types for the admin panel type-check command
@@ -75,7 +77,7 @@ RUN cd psp/frontend && npm install --ignore-scripts
 # bin/validate.ts and bin/setup-drop.ts each run `npm run <script> --prefix bank/backend`, and the admin
 # panel exposes the same scripts. Without it every one of them fails here with an npm path error while
 # working on a developer machine, which is the worst place for that difference to live.
-COPY bank/backend/package.json bank/backend/package-lock.json bank/backend/
+COPY bank/backend/package.json bank/backend/
 RUN cd bank/backend && npm install
 
 # ── Source & test infrastructure ──────────────────────────────────
