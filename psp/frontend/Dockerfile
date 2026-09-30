@@ -46,6 +46,10 @@ ARG NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC
 ENV NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC=$NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC
 
 # Install dependencies (layer cached unless package.json changes)
+# npm 10.x cannot resolve this package's `file:` dependency without a lockfile, and lockfiles are
+# ignored by policy here, so the CI context never has one. It crashes with an arborist error that
+# names nothing that is wrong. npm 11 resolves it.
+RUN npm install -g npm@11
 COPY package*.json ./
 RUN npm install
 

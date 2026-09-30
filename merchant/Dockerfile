@@ -5,6 +5,13 @@
 FROM node:20-alpine
 WORKDIR /app
 
+# npm 10.x, which this base image ships, cannot resolve a `file:` dependency when no lockfile is
+# present: arborist crashes with "Cannot read properties of null (reading 'edgesOut')", which names
+# nothing that is actually wrong. This repository ignores lockfiles by policy (.gitignore), so the
+# CI context never has one, and every package.json here declares at least one file: link. Bisected
+# in this image: the install fails on npm 10 without a lockfile and succeeds on npm 11 without one.
+RUN npm install -g npm@11
+
 # Shared workspace package, built before the app installs it via file:. Consumed through its
 # compiled dist, so it must be installed (its prepare script runs tsc) before the app's install.
 # Its tsconfig extends the shared base, so that file has to be here too or tsc reads no config at
