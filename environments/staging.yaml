@@ -117,18 +117,25 @@ envSecrets:
   MONGODB_DB_NAME: sec-fsi-pci-dss-secrets-staging
   # Bank database, separate from the PSP one on the same cluster.
   PSP_BANKCORE_DB_NAME: sec-fsi-pci-dss-secrets-staging
-  # TPP client secret and the bank's token signing key. Never inline in this file.
+  # TPP client secret. Never inline in this file.
   PSP_BANKCORE_TPP_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
-  PSP_BANKCORE_ACCESS_TOKEN_SECRET: sec-fsi-pci-dss-secrets-staging
+  # PSP_BANKCORE_ACCESS_TOKEN_SECRET is deliberately NOT declared: the bank derives it from its own
+  # root when unset, which is the documented secure default, and declaring a key the secret does not
+  # hold stops the container from being created at all.
   PSP_KMS_LOCAL_MASTER_KEY: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_DATABASE: sec-fsi-pci-dss-secrets-staging
   PSP_KMS_KEY_VAULT_COLLECTION: sec-fsi-pci-dss-secrets-staging
   PSP_ADM_USER: sec-fsi-pci-dss-secrets-staging
   PSP_ADM_PASS: sec-fsi-pci-dss-secrets-staging
-  PSP_OAUTH_AWS_KEY_ARN: sec-fsi-pci-dss-secrets-staging
+  # PSP_OAUTH_AWS_KEY_ARN is not declared either: the key provider here is local, so there is no
+  # ARN to read, and the key does not exist in the secret.
   # This platform's own client secret at GIAM, presented for the client_credentials calls it makes
   # as itself. GIAM derives it per client id, so the two sides must agree on one value.
-  GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
+  #
+  # PSP_-prefixed, which is both the name the secret holds and the one the config prefers: it reads
+  # PSP_<NAME> before the bare <NAME>. Declared bare, it named a key that does not exist, and the
+  # pod never started: "couldn't find key GIAM_CLIENT_SECRET in Secret ...".
+  PSP_GIAM_CLIENT_SECRET: sec-fsi-pci-dss-secrets-staging
   # Presented when registering this platform's enforcement points at GIAM's administration API. The
   # same value GIAM holds as its admin token: the bank falls back to GIAM_ADMIN_TOKEN, the platform
   # has no fallback and needs it under its own name.
