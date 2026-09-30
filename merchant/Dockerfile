@@ -7,6 +7,9 @@ WORKDIR /app
 
 # Shared workspace package, built before the app installs it via file:. Consumed through its
 # compiled dist, so it must be installed (its prepare script runs tsc) before the app's install.
+# Its tsconfig extends the shared base, so that file has to be here too or tsc reads no config at
+# all and compiles for ES5.
+COPY tsconfig.base.json ./
 COPY packages/platform-links/ packages/platform-links/
 RUN cd packages/platform-links && npm install
 

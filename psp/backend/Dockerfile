@@ -44,17 +44,27 @@ ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 # fails the build with a missing type rather than at runtime.
 # They are copied before the root install because the root package.json links platform-links with
 # file:, and npm crashes resolving the tree if that directory is not on disk yet.
+#
+# The shared tsconfig travels WITH them: each package's prepare script runs tsc, and every package
+# tsconfig extends ../../tsconfig.base.json. Without it tsc cannot read the file and falls back to
+# an ES5 target, which fails the build on ordinary Set iteration.
+COPY tsconfig.base.json ./
 COPY packages/ packages/
 RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
 
 # Root package.json provides test scripts and devDependencies (vitest, tsx).
-COPY package.json ./
+#
+# The LOCKFILE travels with every package.json that declares a file: dependency, here and below.
+# npm 10.9.9, which node:22-slim ships, crashes resolving a file: link with no lockfile present:
+# "Cannot read properties of null (reading 'edgesOut')", which names nothing that is actually
+# wrong. Bisected in this image: install fails without the lockfile and succeeds with it.
+COPY package.json package-lock.json ./
 RUN npm install --ignore-scripts
 
 # Backend package.json — "fsi-pci-dss-demo": "file:../.." now resolves to /app/
-COPY psp/backend/package.json psp/backend/
+COPY psp/backend/package.json psp/backend/package-lock.json psp/backend/
 RUN cd psp/backend && npm install
 
 # Frontend types for the admin panel type-check command
@@ -65,13 +75,13 @@ RUN cd psp/frontend && npm install --ignore-scripts
 # bin/validate.ts and bin/setup-drop.ts each run `npm run <script> --prefix bank/backend`, and the admin
 # panel exposes the same scripts. Without it every one of them fails here with an npm path error while
 # working on a developer machine, which is the worst place for that difference to live.
-COPY bank/backend/package.json bank/backend/
+COPY bank/backend/package.json bank/backend/package-lock.json bank/backend/
 RUN cd bank/backend && npm install
 
 # ── Source & test infrastructure ──────────────────────────────────
 COPY psp/backend/ psp/backend/
 COPY test/ test/
-COPY vitest.config.ts tsconfig.base.json ./
+COPY vitest.config.ts ./
 COPY psp/frontend/src/ psp/frontend/src/
 COPY psp/frontend/tsconfig.json psp/frontend/
 COPY bank/backend/ bank/backend/

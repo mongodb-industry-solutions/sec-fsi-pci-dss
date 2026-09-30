@@ -32,18 +32,20 @@ ENV PSP_BANKCORE_PORT=8080
 
 # ── Dependencies ──────────────────────────────────────────────────
 # Shared workspace packages first: bankcore installs them through file:, and their prepare script
-# builds dist/ during the install.
+# builds dist/ during the install. The shared tsconfig comes with them: every package tsconfig
+# extends it, and tsc falls back to an ES5 target without it, which fails on ordinary Set iteration.
+COPY tsconfig.base.json ./
 COPY packages/ packages/
 RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
 
-COPY bank/backend/package.json bank/backend/
+# The lockfile comes too: npm 10.9.9 crashes resolving a file: dependency without one.
+COPY bank/backend/package.json bank/backend/package-lock.json bank/backend/
 RUN cd bank/backend && npm install
 
 # ── Source ────────────────────────────────────────────────────────
 COPY bank/backend/ bank/backend/
-COPY tsconfig.base.json ./
 
 RUN cd bank/backend && npm run build
 
