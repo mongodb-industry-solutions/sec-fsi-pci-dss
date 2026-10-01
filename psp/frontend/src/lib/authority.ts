@@ -62,6 +62,11 @@ function redirectUri(): string {
   return `${appBase()}/api/auth/callback`;
 }
 
+/** This app's own public origin, the one the authority was given as a redirect target. */
+export function appPublicBase(): string {
+  return appBase();
+}
+
 export interface LoginStart {
   url: string;
   /** Attached to the redirect response by the caller, never through next/headers. */

@@ -123,6 +123,39 @@ describe('per-environment link resolution', () => {
     expect(() => platformEnvironment({ PSP_ENVIRONMENT: 'stagin' })).toThrow(/unknown platform environment/);
   });
 
+  /**
+   * The source every manifest actually sets. See the note on `platformEnvironment`.
+   *
+   * This is not a convenience: no deployment sets either dedicated name, so without this the
+   * staging and production clusters both resolved every per-environment record to its development
+   * column, silently.
+   */
+  it('falls back to NODE_ENV, which is the name the manifests declare', () => {
+    expect(platformEnvironment({ NODE_ENV: 'staging' })).toBe('staging');
+    expect(platformEnvironment({ NODE_ENV: 'production' })).toBe('production');
+    expect(platformEnvironment({ NODE_ENV: 'development' })).toBe('development');
+  });
+
+  it('tolerates the one NODE_ENV value a test runner sets, rather than refusing to start', () => {
+    expect(platformEnvironment({ NODE_ENV: 'test' })).toBe('development');
+    expect(platformEnvironment({ NODE_ENV: '' })).toBe('development');
+  });
+
+  /**
+   * A typo in NODE_ENV (`prodution`) is exactly the class of mistake this resolver exists to catch,
+   * and NODE_ENV is as deployment-controlled as the dedicated names. Silently falling back to
+   * development here would recreate the bug this whole function was added to fix, one layer down.
+   */
+  it('throws on a NODE_ENV this platform does not recognise, rather than defaulting to development', () => {
+    expect(() => platformEnvironment({ NODE_ENV: 'prodution' })).toThrow(/unknown NODE_ENV/);
+    expect(() => platformEnvironment({ NODE_ENV: 'Staging ' })).not.toThrow();
+    expect(platformEnvironment({ NODE_ENV: 'Staging ' })).toBe('staging');
+  });
+
+  it('prefers an explicit name over NODE_ENV, so one deployment can be repointed', () => {
+    expect(platformEnvironment({ NODE_ENV: 'production', PSP_ENVIRONMENT: 'staging' })).toBe('staging');
+  });
+
   it('a link name this platform does not have throws where it is read', () => {
     // Not left in the URL: that turns a typo into a DNS failure three layers away from its cause.
     expect(() => resolveLinks('{{bankore}}/v1/cards', {})).toThrow(/unknown platform link "bankore"/);

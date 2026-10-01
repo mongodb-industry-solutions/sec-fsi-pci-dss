@@ -97,6 +97,11 @@ export function appPublicBase(): string {
   return appBase();
 }
 
+/** The registration this app signs in and out under, so a route names it rather than repeating it. */
+export function consoleClientId(): string {
+  return CONSOLE_CLIENT_ID;
+}
+
 export interface LoginStart {
   url: string;
   /** Attached to the redirect response by the caller, never through next/headers. */

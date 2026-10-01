@@ -110,6 +110,9 @@ env:
   NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: "https://sec-giam-api.industrysolutions.prod.corp.mongodb.com/api/v1/realms/LeafyIdp"
   # PUBLIC GIAM console origin, for the SLO redirect (post_logout_redirect_uri).
   NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: "https://sec-giam-ui.industrysolutions.prod.corp.mongodb.com"
+  # The same address, read SERVER side by the sign-out page so it is this pod's configuration and
+  # not something frozen into the image when it was built.
+  PSP_URL_AUTHORITY_FRONTEND: "https://sec-giam-ui.industrysolutions.prod.corp.mongodb.com"
 
 envSecrets:
   MONGODB_URI: sec-fsi-pci-dss-secrets-prod
