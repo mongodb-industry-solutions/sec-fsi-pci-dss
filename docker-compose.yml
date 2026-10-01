@@ -52,7 +52,7 @@ services:
       GIAM_AUDIENCE: ${GIAM_AUDIENCE:-leafypay}
       GIAM_RESOURCE_SERVER: ${GIAM_RESOURCE_SERVER:-leafypay}
       # Secret left to .env: the authority derives it from the client id when unset.
-      GIAM_CLIENT_ID: ${GIAM_CLIENT_ID:-leafypay-backend}
+      PSP_GIAM_CLIENT_ID: ${PSP_GIAM_CLIENT_ID:-leafypay-backend}
       # In-network bank host. Private by construction: no host port is published for bankcore.
       PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
       # The credential the PSP presents to the bank diagnostics surface: the bank issued it.

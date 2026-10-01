@@ -2,15 +2,16 @@ import { MachineTokenSource } from '@leafypay/giam-client';
 import { config } from '../../config';
 
 /**
- * This service's own machine token, for the calls it makes as itself.
+ * The bank's own machine token, for the calls it makes as itself at the authority.
  *
- * The mechanics moved to the shared client (`@leafypay/giam-client`): the bank needs the identical
- * exchange, and two copies of renewal-and-caching are two behaviours the day one of them is fixed.
- * What stays here is the binding to THIS service's configuration, which is the only part that
- * differs between them.
+ * It had none. Its client id and secret were configured, seeded and held in the deployment secret,
+ * and no code read them: the one call that needed authority, registering its permission catalog,
+ * presented the authority's ADMIN token instead. That is a credential with far more reach than
+ * declaring one's own enforcement points requires, and it made the bank depend on holding the
+ * authority's master credential to complete its own boot.
  *
- * Credentials are read lazily rather than at module load, because a test that sets them after
- * importing would otherwise get a source built from the values that were absent at import time.
+ * Same exchange as the PSP's, from the same shared client, under this bank's own prefix so the two
+ * services never read each other's credential.
  */
 
 let source: MachineTokenSource | null = null;

@@ -103,7 +103,9 @@ export const config = {
     issuerUrl: pspEnv('BANKCORE_GIAM_ISSUER_URL', 'http://127.0.0.1:8085/api/v1/realms/LeafyIdp')!,
     audience: pspEnv('BANKCORE_GIAM_AUDIENCE', 'bankcore')!,
     resourceServerName: pspEnv('BANKCORE_GIAM_RESOURCE_SERVER', 'bankcore')!,
-    registrationToken: pspEnv('BANKCORE_GIAM_REGISTRATION_TOKEN') ?? pspEnv('GIAM_ADMIN_TOKEN'),
+    // No registration token, and in particular not the authority's admin one, which this used to
+    // fall back to. The catalog is registered with the bank's own access token from the credentials
+    // below, which is what those credentials were configured for and never used.
     // This bank's OWN client credentials, for the calls it makes as itself rather than on behalf of
     // a person. Absent means it was never registered to act as itself, and it degrades rather than
     // fabricating an identity. Mirrors PSP's identical pair (GIAM_CLIENT_ID/GIAM_CLIENT_SECRET),
