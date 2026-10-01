@@ -136,10 +136,20 @@ describe('per-environment link resolution', () => {
     expect(platformEnvironment({ NODE_ENV: 'development' })).toBe('development');
   });
 
-  it('tolerates a NODE_ENV this platform has no column for, rather than refusing to start', () => {
-    // `test` under a runner, and anything else a tool sets. An explicit PSP_ENVIRONMENT still throws.
+  it('tolerates the one NODE_ENV value a test runner sets, rather than refusing to start', () => {
     expect(platformEnvironment({ NODE_ENV: 'test' })).toBe('development');
     expect(platformEnvironment({ NODE_ENV: '' })).toBe('development');
+  });
+
+  /**
+   * A typo in NODE_ENV (`prodution`) is exactly the class of mistake this resolver exists to catch,
+   * and NODE_ENV is as deployment-controlled as the dedicated names. Silently falling back to
+   * development here would recreate the bug this whole function was added to fix, one layer down.
+   */
+  it('throws on a NODE_ENV this platform does not recognise, rather than defaulting to development', () => {
+    expect(() => platformEnvironment({ NODE_ENV: 'prodution' })).toThrow(/unknown NODE_ENV/);
+    expect(() => platformEnvironment({ NODE_ENV: 'Staging ' })).not.toThrow();
+    expect(platformEnvironment({ NODE_ENV: 'Staging ' })).toBe('staging');
   });
 
   it('prefers an explicit name over NODE_ENV, so one deployment can be repointed', () => {

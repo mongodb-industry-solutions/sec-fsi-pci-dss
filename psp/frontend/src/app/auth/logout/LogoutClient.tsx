@@ -12,7 +12,7 @@ import { logoutSession } from '../../../lib/logout';
  * default). Read at request time instead, the address is whatever the pod is configured with.
  */
 /** This console's own registration at the authority, the same one `startSignIn` authorizes as. */
-const CONSOLE_CLIENT_ID = 'leafypay-console';
+export const CONSOLE_CLIENT_ID = 'leafypay-console';
 
 interface LogoutProps {
   authorityUiUrl: string;
@@ -34,19 +34,67 @@ interface LogoutProps {
  * return to is not a list that ends; landing on this origin's own registered root once signed out
  * everywhere is the ordinary shape RP-initiated logout takes elsewhere too, and it is what the bank's
  * own equivalent already does.
+ *
+ * `appOrigin` is a parameter rather than a `window.location` read, so this and the function below it
+ * are plain, testable functions: the security-sensitive part of this page (which client is named,
+ * which address it is allowed to land on) can be asserted directly, without rendering the component
+ * or mocking the browser.
  */
-function safeRedirect(raw: string | null, merchantUrl: string): string {
-  if (!raw) return window.location.origin;
-  if (/^\/(?![/\\])/.test(raw)) return window.location.origin; // same-origin: land on our own registered root
+export function safeRedirect(raw: string | null, appOrigin: string, merchantUrl: string): string {
+  if (!raw) return appOrigin;
+  if (/^\/(?![/\\])/.test(raw)) return appOrigin; // same-origin: land on our own registered root
   try {
     const url = new URL(raw);
-    const allowed = new Set<string>([window.location.origin]);
+    const allowed = new Set<string>([appOrigin]);
     try { allowed.add(new URL(merchantUrl).origin); } catch { /* ignore bad config */ }
     if ((url.protocol === 'https:' || url.protocol === 'http:') && allowed.has(url.origin)) {
       return url.origin;
     }
   } catch { /* not a parseable URL */ }
-  return window.location.origin;
+  return appOrigin;
+}
+
+export interface LogoutRequest {
+  /** Where this browser already is. The landing page `safeRedirect` falls back to. */
+  appOrigin: string;
+  /** The `redirect` query parameter this page was opened with, verbatim. */
+  requestedRedirect: string | null;
+  /** The merchant app's public origin, the only other return this page will honour. */
+  merchantUrl: string;
+  /**
+   * The `client_id` query parameter: set when a relying party cannot clear this origin's cookie
+   * itself and is relaying its own sign-out through this page.
+   */
+  onBehalfOf: string | null;
+  /** An ID token this authority issued to THIS console, when somebody is signed in here. */
+  idTokenHint?: string;
+}
+
+/**
+ * The authority URL this page leaves for, with WHOSE sign-out this is attached to it.
+ *
+ * That is not always this console's own. A relying party that cannot clear this origin's cookie
+ * itself sends the browser here and names itself, because the address it wants to land on is
+ * registered to IT and the authority checks a return address against the registration of the client
+ * that asked. Relaying that name is honest: the merchant initiated this, and this hop only clears a
+ * cookie on the way. Nothing is taken on trust, since the authority still has to find the address in
+ * that client's own registration.
+ *
+ * The hint is only sent for this console's own sign-out: it is this console's token, so it would
+ * contradict another client's name, and an ID token has no business travelling through a third
+ * party's URL anyway.
+ */
+export function buildAuthorityLogoutUrl(authorityUiUrl: string, request: LogoutRequest): string {
+  const authority = new URL('/auth/logout', authorityUiUrl);
+  const back = safeRedirect(request.requestedRedirect, request.appOrigin, request.merchantUrl);
+  authority.searchParams.set('post_logout_redirect_uri', back);
+  if (request.onBehalfOf) {
+    authority.searchParams.set('client_id', request.onBehalfOf);
+  } else {
+    authority.searchParams.set('client_id', CONSOLE_CLIENT_ID);
+    if (request.idTokenHint) authority.searchParams.set('id_token_hint', request.idTokenHint);
+  }
+  return authority.toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -76,31 +124,14 @@ function LogoutInner({ authorityUiUrl, merchantUrl, idTokenHint }: LogoutProps) 
       // same-origin cookie. Both happen before we redirect onward.
       await logoutSession();
       if (cancelled) return;
-      const back = safeRedirect(searchParams.get('redirect'), merchantUrl);
-      const authority = new URL('/auth/logout', authorityUiUrl);
-      authority.searchParams.set('post_logout_redirect_uri', back);
-      /**
-       * WHOSE sign-out this is, which is not always this console's.
-       *
-       * A relying party that cannot clear this origin's cookie itself sends the browser here and
-       * names itself, because the address it wants to land on is registered to IT and the authority
-       * checks a return address against the registration of the client that asked. Relaying that
-       * name is honest: the merchant initiated this, and this hop only clears a cookie on the way.
-       * Nothing is taken on trust, since the authority still has to find the address in that
-       * client's own registration.
-       *
-       * The hint is only sent for this console's own sign-out: it is this console's token, so it
-       * would contradict another client's name, and an ID token has no business travelling through
-       * a third party's URL anyway.
-       */
-      const onBehalfOf = searchParams.get('client_id');
-      if (onBehalfOf) {
-        authority.searchParams.set('client_id', onBehalfOf);
-      } else {
-        authority.searchParams.set('client_id', CONSOLE_CLIENT_ID);
-        if (idTokenHint) authority.searchParams.set('id_token_hint', idTokenHint);
-      }
-      window.location.replace(authority.toString());
+      const target = buildAuthorityLogoutUrl(authorityUiUrl, {
+        appOrigin: window.location.origin,
+        requestedRedirect: searchParams.get('redirect'),
+        merchantUrl,
+        onBehalfOf: searchParams.get('client_id'),
+        idTokenHint,
+      });
+      window.location.replace(target);
     })();
     return () => { cancelled = true; };
   }, [searchParams, authorityUiUrl, merchantUrl, idTokenHint]);
