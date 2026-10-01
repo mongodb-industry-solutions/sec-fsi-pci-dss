@@ -1,6 +1,6 @@
 {
   "name": "leafy-bank-admin",
-  "version": "3.2.2",
+  "version": "3.2.3",
   "private": true,
   "description": "BankCore: the bank's own administration app. Talks to bank/backend only; no PSP coupling.",
   "scripts": {
