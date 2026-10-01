@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { signOut, authorityUiPublic, appPublicBase } from '../../../lib/authority';
+import { signOut, authorityUiPublic, appPublicBase, consoleClientId } from '../../../lib/authority';
 
 /**
  * Sign out everywhere, not just this app.
@@ -15,5 +15,9 @@ export async function GET() {
   await signOut();
   const target = new URL('/auth/logout', authorityUiPublic());
   target.searchParams.set('post_logout_redirect_uri', appPublicBase());
+  // Which client is asking. The authority holds the address above against THIS registration and no
+  // other, so saying who is asking is what makes the return address verifiable rather than a name
+  // in a shared pool.
+  target.searchParams.set('client_id', consoleClientId());
   return NextResponse.redirect(target);
 }

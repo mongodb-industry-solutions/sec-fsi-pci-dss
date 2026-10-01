@@ -52,6 +52,10 @@ steps:
         # targets. Left unset here, it silently fell back to the frontend's localhost dev default,
         # baked into the staging bundle at build time, so every sign-in redirected to a dead address.
         - NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=https://sec-giam-api.industrysolutions.staging.corp.mongodb.com/api/v1/realms/LeafyIdp
+        # PUBLIC and required too, for the same reason: the sign-out page is a client component, so
+        # this address is baked into the bundle and cannot be read from the pod environment. Left
+        # unset, signing out sent the browser to the localhost dev default instead of the authority.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=https://sec-giam-ui.industrysolutions.staging.corp.mongodb.com
         # PUBLIC, unlike the bank's API: the simulator links to the bank's own app, so a browser navigates to
         # it and a private in-cluster host would be unreachable from one.
         - NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC=https://sec-fsi-pci-dss-bank-frontend.industrysolutions.staging.corp.mongodb.com
@@ -292,6 +296,10 @@ steps:
         - NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE=http://sec-giam-api-web-app:80
         # PUBLIC and required: see the staging pipeline's identical entry for why this cannot be left unset.
         - NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER=https://sec-giam-api.industrysolutions.prod.corp.mongodb.com/api/v1/realms/LeafyIdp
+        # PUBLIC and required too, for the same reason: the sign-out page is a client component, so
+        # this address is baked into the bundle and cannot be read from the pod environment. Left
+        # unset, signing out sent the browser to the localhost dev default instead of the authority.
+        - NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC=https://sec-giam-ui.industrysolutions.prod.corp.mongodb.com
         # PUBLIC, unlike the bank's API: the simulator links to the bank's own app, so a browser navigates to
         # it and a private in-cluster host would be unreachable from one. Missing here previously, even
         # though bank/frontend was never built or deployed by this pipeline at all until now.

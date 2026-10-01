@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { completeSignIn, consumeReturnTo } from '../../../../lib/authority';
+import { appPublicBase, completeSignIn, consumeReturnTo } from '../../../../lib/authority';
 
 // The registered redirect for leafypay-console. The authority returns a code here, or an error.
 export async function GET(request: NextRequest) {
@@ -8,7 +8,11 @@ export async function GET(request: NextRequest) {
   // Where this attempt asked to land. Only the silent flow stores one; an ordinary sign-in lands on
   // the console. Consumed first so a refusal below still clears it.
   const returnTo = state ? await consumeReturnTo(state) : null;
-  const home = new URL(returnTo ?? '/system', request.nextUrl.origin);
+  // This app's CONFIGURED public origin, not the one in the request. Behind an ingress the host
+  // reaching the pod is not the host the browser used, and deriving the landing page from it sent
+  // people to the container's own address (localhost:8080/system) after a perfectly good sign-in.
+  // It is also the origin the authority holds as this client's redirect target, so the two agree.
+  const home = new URL(returnTo ?? '/system', appPublicBase());
 
   const error = params.get('error');
   if (error) {

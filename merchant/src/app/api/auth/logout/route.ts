@@ -21,7 +21,11 @@ async function handle() {
   // which then redirects back here. Full navigation (the logout link is a plain <a>), so the PSP
   // page's JS runs.
   const back = new URL('/', ENV.baseUrl()).toString();
-  const pspLogout = `${ENV.pspLogoutUrl()}?redirect=${encodeURIComponent(back)}`;
+  // This app's OWN client id travels with it. The authority checks a post-logout address against the
+  // registration of the client that asked, and the address below is registered to this app, not to
+  // the PSP whose page clears its cookie along the way.
+  const pspLogout = `${ENV.pspLogoutUrl()}?redirect=${encodeURIComponent(back)}`
+    + `&client_id=${encodeURIComponent(ENV.clientId())}`;
   // Expire the session cookie ON the redirect response: cookies() mutation isn't reliably merged
   // into a returned NextResponse.redirect across Next versions.
   const res = NextResponse.redirect(pspLogout);
