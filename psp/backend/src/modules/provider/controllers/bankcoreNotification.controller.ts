@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import {
-  verifyNotification, applyConsentStatusChange, mapPaymentStatusChange,
+  verifyNotification, applyConsentStatusChange, mapPaymentStatusChange, recordBankNotification,
 } from '../services/bankcoreNotification.service';
 import { getIdempotent, saveIdempotent } from '../../gateway/services/idempotency.service';
 
@@ -53,12 +53,14 @@ export async function bankcoreNotificationController(fastify: FastifyInstance) {
       },
     },
   }, async (request, reply) => {
+    const startedAt = Date.now();
     const token = typeof request.body === 'string' ? request.body : '';
     const verified = await verifyNotification(fastify.db, token);
     if (!verified.ok) {
       // Logged at warn so it reaches the admin log buffer: a rejected notification from the bank is
       // exactly the kind of failure that is invisible until a transfer hangs.
       request.log.warn(`[bankcore/notification] refused: ${verified.error}`);
+      await recordBankNotification(fastify.db, { token, outcome: 'refused', detail: verified.error, responseCode: verified.status, latencyMs: Date.now() - startedAt });
       return reply.status(verified.status).send({ error: verified.error });
     }
     const { notification } = verified;
@@ -68,6 +70,7 @@ export async function bankcoreNotificationController(fastify: FastifyInstance) {
     const scope = 'bankcore.notification';
     const seen = await getIdempotent<{ detail: string }>(fastify.db, scope, 'bankcore', notification.eventId);
     if (seen) {
+      await recordBankNotification(fastify.db, { token, notification, outcome: 'replayed', detail: seen.detail ?? 'already applied', responseCode: 200, latencyMs: Date.now() - startedAt });
       return {
         received: true, eventType: notification.eventType, detail: seen.detail ?? 'already applied', replayed: true,
       };
@@ -93,6 +96,7 @@ export async function bankcoreNotificationController(fastify: FastifyInstance) {
 
     // Stored AFTER applying, so a crash midway leaves the event redeliverable rather than swallowed.
     await saveIdempotent(fastify.db, scope, 'bankcore', notification.eventId, { detail: applied.detail });
+    await recordBankNotification(fastify.db, { token, notification, outcome: 'applied', detail: applied.detail, responseCode: 200, latencyMs: Date.now() - startedAt, busEvent: applied.busEvent?.name });
 
     return {
       received: true,

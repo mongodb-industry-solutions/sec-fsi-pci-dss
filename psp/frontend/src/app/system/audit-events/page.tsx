@@ -412,7 +412,18 @@ function AuditEventsView() {
               return (
                 <li key={ev.id} className="px-5 py-3">
                   <div className="flex items-start gap-2">
-                    <button onClick={() => setExpanded(open ? null : ev.id)} className="flex-1 min-w-0 flex items-start gap-3 text-left">
+                    {/* A div, not a button: the row holds the copy and filter buttons, and a button cannot nest in one. */}
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={open}
+                      onClick={() => setExpanded(open ? null : ev.id)}
+                      onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(open ? null : ev.id); }
+                      }}
+                      className="flex-1 min-w-0 flex items-start gap-3 text-left cursor-pointer"
+                    >
                       {open ? <ChevronDown size={14} className="mt-1 text-gray-400 shrink-0" /> : <ChevronRight size={14} className="mt-1 text-gray-400 shrink-0" />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -447,7 +458,7 @@ function AuditEventsView() {
                         </div>
                       </div>
                       <div className="text-xs text-gray-400 shrink-0 tabular-nums">{new Date(ev.eventDateTime).toLocaleString()}</div>
-                    </button>
+                    </div>
                     {href && (
                       <Link href={href} title={`Open related ${ENTITY_LABEL[ev.entityType ?? ''] ?? 'entity'}`}
                         className="shrink-0 inline-flex items-center gap-1 text-xs text-[#001E2B] font-medium hover:underline mt-0.5">

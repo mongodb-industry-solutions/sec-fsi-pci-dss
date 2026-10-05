@@ -224,6 +224,15 @@ export class PayoutOrchestrationProcess {
     );
     if (!txn) return;
 
+    // One live payout per transaction. A second trigger (an authorization replay, a case cleared after the
+    // payout already started) would otherwise release the hold or pay the merchant twice, and a bank balance
+    // moved twice is not recoverable by this process. A failed or excepted execution may be retried.
+    const live = await db.collection(PAYMENT_EXECUTION_COLLECTION).findOne(
+      { cardTransactionInstanceReference: txnId, paymentExecutionStatus: { $nin: ['failed', 'exception'] } },
+      { projection: { paymentExecutionInstanceReference: 1 } },
+    );
+    if (live) return;
+
     const merchantRef = txn.merchantAgreementInstanceReference;
     if (!merchantRef) return;
 
@@ -394,6 +403,10 @@ export class PayoutOrchestrationProcess {
           });
           return;
         }
+        await appendResolutionStep(db, execRef, {
+          stepName: 'aspsp.hold.release', stepOutcome: 'found',
+          stepNote: `authorisation hold ${heldAmount} ${fundingCcy} released at the bank (ref ${txnId})`,
+        });
         const initiated = await initiatePaymentAtBank({
           debtorAccount: funding,
           creditorIban: payoutAccount.payoutAccountIban,
@@ -407,8 +420,12 @@ export class PayoutOrchestrationProcess {
         });
         if (!initiated.bankPaymentReference) {
           // Refused: the cardholder's funds go back on hold so the authorized payment stays covered.
-          await holdFundsAtBank({
+          const restored = await holdFundsAtBank({
             account: funding, amount: heldAmount, currency: fundingCcy, transactionType: 'purchase', clientReference: txnId,
+          });
+          await appendResolutionStep(db, execRef, {
+            stepName: 'aspsp.hold.restored', stepOutcome: restored.approved ? 'found' : 'failed',
+            stepNote: restored.approved ? 'cardholder funds held again at the bank' : `could not hold again: ${restored.error ?? restored.responseCode}`,
           });
           await appendResolutionStep(db, execRef, { stepName: 'provider.payment_initiation.transfer', stepOutcome: 'failed', stepNote: `aspsp refused: ${initiated.error}` });
           await this.abortPayout({
@@ -441,7 +458,8 @@ export class PayoutOrchestrationProcess {
           processType: 'payment_processing', processAction: 'payout.execution.initiated',
           processOutcome: 'in_flight',
           performedByPartyReference: null, performedByRole: null,
-          eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, netAmount, feeAmount, currency, aspspPaymentReference: initiated.bankPaymentReference },
+          // bankAmount/bankCurrency: what the bank actually moved, in the cardholder account currency.
+          eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, netAmount, feeAmount, currency, bankAmount: heldAmount, bankCurrency: fundingCcy, aspspPaymentReference: initiated.bankPaymentReference },
           bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
         });
         return;

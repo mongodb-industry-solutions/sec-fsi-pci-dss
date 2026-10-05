@@ -256,8 +256,12 @@ export class ProviderGroups {
     // owns the routing key, so this reactor states the SUBJECT and not how to find the bank from it.
     void institutionGroupFor(this.db, 'account_information').ask({
       event: 'funds.check.requested',
+      // The bank's funds confirmation addresses the account by IBAN and states the amount, under the consent.
       payload: {
-        payoutAccountInstanceReference: accountRef, clientReference: txnId, requestedFields: ['balance', 'status'],
+        payoutAccountInstanceReference: accountRef, clientReference: txnId, correlationId: txnId,
+        consentId: account.payoutAccountConsentReference,
+        account: { iban: account.payoutAccountIban },
+        instructedAmount: { currency: accountCurrency, amount: amountInAccountCcy.toFixed(2) },
       },
       subject: { accountReference: accountRef },
       businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' },

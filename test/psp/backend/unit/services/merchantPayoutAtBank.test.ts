@@ -106,7 +106,7 @@ describe('merchant payout at the bank', () => {
   beforeEach(() => {
     h.order.length = 0;
     h.updates.length = 0;
-    for (const fn of [h.debitPending, h.creditAvailable, h.creditDirect, h.appendResolutionStep, h.transitionExecution, h.ask]) fn.mockClear();
+    for (const fn of [h.debitPending, h.creditAvailable, h.creditDirect, h.appendResolutionStep, h.transitionExecution, h.ask, h.createExecution]) fn.mockClear();
     h.initiatePaymentAtBank.mockResolvedValue({ bankPaymentReference: 'bank-pay-1', transactionStatus: 'ACTC' });
   });
 
@@ -153,5 +153,22 @@ describe('merchant payout at the bank', () => {
     expect(h.creditAvailable).not.toHaveBeenCalled();
     expect(h.creditDirect).not.toHaveBeenCalled();
     expect(h.updates.some((u) => JSON.stringify(u.update).includes('"cardTransactionStatus":"settled"'))).toBe(true);
+  });
+});
+
+describe('a payout never moves a bank balance twice', () => {
+  it('does nothing when a live execution already exists for the transaction', async () => {
+    docs.paymentExecutionProcedure = { paymentExecutionInstanceReference: 'exec-live', paymentExecutionStatus: 'in_flight' };
+    h.order.length = 0;
+    try {
+      const bus = new EventBusInProcess();
+      new PayoutOrchestrationProcess(fakeDb(), bus).register();
+      await bus.publish(caseCleared);
+      await flush();
+      expect(h.order).toEqual([]);
+      expect(h.createExecution).not.toHaveBeenCalled();
+    } finally {
+      delete docs.paymentExecutionProcedure;
+    }
   });
 });
