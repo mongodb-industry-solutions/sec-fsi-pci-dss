@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getProviderAccessToken, getProviderBaseUrl } from '../../../modules/provider/services/providerAccessToken.service';
 import { PayoutAccountArrangement } from '../../../modules/gateway/models/payoutAccount.model';
 import { config } from '../../../config';
+import { recordBankCall, type BankCallAudit } from '../../../modules/provider/services/bankCallAudit.service';
 
 // The PSP as PISP: it initiates the credit transfer at the DEBTOR's bank and that bank executes it.
 //
@@ -59,6 +60,8 @@ export async function initiatePaymentAtBank(
     // The PSP's own execution reference, carried as the end to end id so one query correlates both sides.
     endToEndIdentification: string;
     product: PaymentProduct;
+    // Where to record the call in the provider's event log; absent means the call is not audited here.
+    audit?: BankCallAudit;
   },
   fetchImpl: typeof fetch = fetch,
 ): Promise<InitiatedPayment> {
@@ -79,38 +82,50 @@ export async function initiatePaymentAtBank(
     return { error: 'the debtor account has no account access consent' };
   }
 
+  const url = `${host}/v1/payments/${input.product}`;
+  const requestHeaders = {
+    Authorization: `Bearer ${accessToken}`,
+    'Consent-ID': consentReference,
+    // The idempotency key at the bank, so a retried initiation cannot become two payments.
+    'X-Request-ID': input.endToEndIdentification,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  const requestBody = {
+    instructedAmount: { currency: input.currency, amount: input.amount.toFixed(2) },
+    debtorAccount: { iban: input.debtorAccount.payoutAccountIban },
+    creditorAccount: { iban: input.creditorIban },
+    creditorName: input.creditorName,
+    creditorAgent: input.creditorAgentBic,
+    endToEndIdentification: input.endToEndIdentification,
+    remittanceInformationUnstructured: input.remittanceInformation,
+  };
+  const startedAt = Date.now();
   try {
-    const response = await fetchImpl(`${host}/v1/payments/${input.product}`, {
+    const response = await fetchImpl(url, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Consent-ID': consentReference,
-        // The idempotency key at the bank, so a retried initiation cannot become two payments.
-        'X-Request-ID': input.endToEndIdentification,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
-        instructedAmount: { currency: input.currency, amount: input.amount.toFixed(2) },
-        debtorAccount: { iban: input.debtorAccount.payoutAccountIban },
-        creditorAccount: { iban: input.creditorIban },
-        creditorName: input.creditorName,
-        creditorAgent: input.creditorAgentBic,
-        endToEndIdentification: input.endToEndIdentification,
-        remittanceInformationUnstructured: input.remittanceInformation,
-      }),
+      headers: requestHeaders,
+      body: JSON.stringify(requestBody),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const body = await response.json().catch(() => ({})) as {
       paymentId?: string; transactionStatus?: string; tppMessages?: Array<{ code?: string; text?: string }>;
     };
+    await recordBankCall(input.audit, 'payment_initiation', {
+      method: 'POST', url, headers: requestHeaders, body: requestBody,
+      status: response.status, responseBody: body, latencyMs: Date.now() - startedAt,
+    });
     if (!response.ok || !body.paymentId) {
       const refusal = body.tppMessages?.[0];
       return { error: `the bank refused the payment: ${refusal?.code ?? `HTTP ${response.status}`} ${refusal?.text ?? ''}`.trim() };
     }
     return { bankPaymentReference: body.paymentId, transactionStatus: body.transactionStatus };
   } catch (err) {
-    return { error: `payment initiation unreachable: ${err instanceof Error ? err.message : String(err)}` };
+    const reason = err instanceof Error ? err.message : String(err);
+    await recordBankCall(input.audit, 'payment_initiation', {
+      method: 'POST', url, headers: requestHeaders, body: requestBody, latencyMs: Date.now() - startedAt, error: reason,
+    });
+    return { error: `payment initiation unreachable: ${reason}` };
   }
 }
 

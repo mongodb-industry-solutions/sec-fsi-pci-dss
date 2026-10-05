@@ -283,6 +283,7 @@ export async function executeBankTransfer(
         currency: input.currency,
         creditorCountryCode: input.destination.countryCode,
       }),
+      audit: { db, triggeredBy: 'provider.payment_initiation.transfer.requested', businessContext: { entityType: 'execution', entityId: executionRef, processType: 'payment_processing' } },
     });
     submitted = Boolean(initiated.bankPaymentReference);
     bankPaymentReference = initiated.bankPaymentReference;

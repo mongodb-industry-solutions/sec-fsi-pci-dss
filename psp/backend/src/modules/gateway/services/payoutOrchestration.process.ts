@@ -394,6 +394,7 @@ export class PayoutOrchestrationProcess {
         // has already taken out of the balance, so paying with the hold in place would debit twice.
         const released = await disposeHoldAtBank({
           account: funding, amount: heldAmount, currency: fundingCcy, authorisationReference: txnId, disposition: 'release',
+          audit: { db, triggeredBy: 'card.authorisation.hold.release.requested', businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' } },
         });
         if (!released.applied) {
           await appendResolutionStep(db, execRef, { stepName: 'aspsp.hold.release', stepOutcome: 'failed', stepNote: released.error ?? 'not applied' });
@@ -417,11 +418,13 @@ export class PayoutOrchestrationProcess {
           remittanceInformation: `Merchant settlement ${merchantRef}`,
           endToEndIdentification: execRef,
           product: selectPaymentProduct({ currency: fundingCcy, creditorCountryCode: payoutAccount.payoutAccountCountryCode }),
+          audit: { db, triggeredBy: 'provider.payment_initiation.transfer.requested', businessContext: { entityType: 'execution', entityId: execRef, processType: 'payment_processing' } },
         });
         if (!initiated.bankPaymentReference) {
           // Refused: the cardholder's funds go back on hold so the authorized payment stays covered.
           const restored = await holdFundsAtBank({
             account: funding, amount: heldAmount, currency: fundingCcy, transactionType: 'purchase', clientReference: txnId,
+            audit: { db, triggeredBy: 'card.authorisation.hold.requested', businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' } },
           });
           await appendResolutionStep(db, execRef, {
             stepName: 'aspsp.hold.restored', stepOutcome: restored.approved ? 'found' : 'failed',
@@ -720,6 +723,7 @@ export class PayoutOrchestrationProcess {
           const held = await holdFundsAtBank({
             account: funding, amount: await this.convert(execution.grossAmount ?? 0, execution.currency, fundingCcy),
             currency: fundingCcy, transactionType: 'purchase', clientReference: execution.cardTransactionInstanceReference,
+            audit: { db, triggeredBy: 'card.authorisation.hold.requested', businessContext: { entityType: 'transaction', entityId: execution.cardTransactionInstanceReference, processType: 'payment_processing' } },
           });
           await appendResolutionStep(db, execRef, {
             stepName: 'aspsp.hold.restored', stepOutcome: held.approved ? 'found' : 'failed',

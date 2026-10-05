@@ -283,6 +283,7 @@ export class ProviderGroups {
       const bankHold = await holdFundsAtBank({
         account, amount: amountInAccountCcy, currency: accountCurrency,
         cardToken: p.cardToken, transactionType: p.cardTransactionType, clientReference: txnId,
+        audit: { db: this.db, triggeredBy: 'card.authorisation.hold.requested', businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' } },
       });
       if (bankHold.error) {
         // FAIL CLOSED. A funds gate that fails open authorises a payment nobody checked, and the

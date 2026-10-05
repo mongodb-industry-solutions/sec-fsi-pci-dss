@@ -223,6 +223,7 @@ export async function executeP2PTransfer(
         // requested from the rail alone. When one is added, this is the single place that decides it.
         instant: false,
       }),
+      audit: { db, triggeredBy: 'provider.payment_initiation.transfer.requested', businessContext: { entityType: 'p2p_transfer', entityId: transferRef, processType: 'payment_processing' } },
     });
     submitted = Boolean(initiated.bankPaymentReference);
     dispatchNote = submitted
