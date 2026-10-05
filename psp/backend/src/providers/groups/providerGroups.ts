@@ -256,8 +256,12 @@ export class ProviderGroups {
     // owns the routing key, so this reactor states the SUBJECT and not how to find the bank from it.
     void institutionGroupFor(this.db, 'account_information').ask({
       event: 'funds.check.requested',
+      // The bank's funds confirmation addresses the account by IBAN and states the amount, under the consent.
       payload: {
-        payoutAccountInstanceReference: accountRef, clientReference: txnId, requestedFields: ['balance', 'status'],
+        payoutAccountInstanceReference: accountRef, clientReference: txnId, correlationId: txnId,
+        consentId: account.payoutAccountConsentReference,
+        account: { iban: account.payoutAccountIban },
+        instructedAmount: { currency: accountCurrency, amount: amountInAccountCcy.toFixed(2) },
       },
       subject: { accountReference: accountRef },
       businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' },
@@ -279,6 +283,7 @@ export class ProviderGroups {
       const bankHold = await holdFundsAtBank({
         account, amount: amountInAccountCcy, currency: accountCurrency,
         cardToken: p.cardToken, transactionType: p.cardTransactionType, clientReference: txnId,
+        audit: { db: this.db, triggeredBy: 'card.authorisation.hold.requested', businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' } },
       });
       if (bankHold.error) {
         // FAIL CLOSED. A funds gate that fails open authorises a payment nobody checked, and the

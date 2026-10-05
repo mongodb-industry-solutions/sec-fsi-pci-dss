@@ -9,6 +9,7 @@ import { CARD_TRANSACTION_COLLECTION } from '../../transaction/models/cardTransa
 import { PAYMENT_ORDER_COLLECTION } from '../models/paymentOrder.model';
 import { PAYMENT_EXECUTION_COLLECTION, type PaymentExecutionStatus } from '../models/paymentExecution.model';
 import { MERCHANT_AGREEMENT_COLLECTION } from '../models/merchantAgreement.model';
+import { PAYMENT_CARD_COLLECTION } from '../../customer/models/paymentCard.model';
 import { createExecution, transitionExecution, appendResolutionStep, getExecution, resolveMerchantFee } from './paymentExecution.service';
 import { getDefaultPayoutAccount } from './payoutAccount.service';
 import { creditAvailable, debitPending, settleReservedDebit, creditDirect, releaseReservation, releasePendingCredit } from './payoutAccountBalance.service';
@@ -16,6 +17,9 @@ import { postCommission, requiresFeeRelease } from './commissionSettlement.servi
 // ADR-039: AIS + PISP are reached ONLY through dispatchProvider (never a direct builtin import),
 // so an external provider can replace the builtin module without changing this flow.
 import { dispatchProvider } from '../../provider/services/integrationDispatch.service';
+import { institutionGroupFor } from '../../../providers/groups/capabilityGroup';
+import { disposeHoldAtBank, holdFundsAtBank, isBankLinked } from '../../../providers/card-authorization/services/bankcoreCardAuthorisation.client';
+import { initiatePaymentAtBank, selectPaymentProduct } from '../../../providers/payment-initiation/services/bankcorePis.client';
 import { emitProcessEvent } from '../../provider/services/businessProcessEvent.service';
 import type { BankTransferSettled, BankTransferFailed } from '../../../shared/models/events/payoutOrchestration.events';
 import { PAYOUT_ACCOUNT_COLLECTION, PayoutAccountArrangement } from '../models/payoutAccount.model';
@@ -220,6 +224,15 @@ export class PayoutOrchestrationProcess {
     );
     if (!txn) return;
 
+    // One live payout per transaction. A second trigger (an authorization replay, a case cleared after the
+    // payout already started) would otherwise release the hold or pay the merchant twice, and a bank balance
+    // moved twice is not recoverable by this process. A failed or excepted execution may be retried.
+    const live = await db.collection(PAYMENT_EXECUTION_COLLECTION).findOne(
+      { cardTransactionInstanceReference: txnId, paymentExecutionStatus: { $nin: ['failed', 'exception'] } },
+      { projection: { paymentExecutionInstanceReference: 1 } },
+    );
+    if (live) return;
+
     const merchantRef = txn.merchantAgreementInstanceReference;
     if (!merchantRef) return;
 
@@ -256,10 +269,17 @@ export class PayoutOrchestrationProcess {
       return;
     }
 
+    // A card funded from a bank account had its funds held AT THE BANK at authorization, so the bank moves
+    // them to the merchant's IBAN and the PSP keeps no local reservation. Otherwise the PSP ledger does.
+    const funding = await this.fundingAccountFor(txnId);
+    const delegated = Boolean(funding && isBankLinked(funding));
+
     // Debit pending balance (funds held until settlement confirmed). Convert to the merchant account
     // currency (FX) so the merchant ledger is always mutated in its own currency.
     const amountInAccountCcy = await this.convert(amount, currency, payoutAccount.payoutAccountCurrency);
-    await debitPending(db, payoutAccount.payoutAccountInstanceReference, amountInAccountCcy);
+    if (!delegated) await debitPending(db, payoutAccount.payoutAccountInstanceReference, amountInAccountCcy);
+    // What a compensation must give back on the PSP ledger: nothing when no local reservation was taken.
+    const localHold = delegated ? 0 : amountInAccountCcy;
 
     // Everything past the reservation is wrapped: an unexpected failure (a provider throwing, a
     // timeout, a database error) must never leave the merchant holding an amount that will not
@@ -289,6 +309,13 @@ export class PayoutOrchestrationProcess {
         paymentExecutionRail: payoutAccount.payoutAccountPreferredRail,
       });
       execRef = execution.paymentExecutionInstanceReference;
+      // Recorded BEFORE dispatch, so the settlement handler knows what was done and not what the config says later.
+      if (delegated) {
+        await db.collection(PAYMENT_EXECUTION_COLLECTION).updateOne(
+          { paymentExecutionInstanceReference: execRef },
+          { $set: { paymentExecutionDelegatedToAspsp: true } },
+        );
+      }
 
       // Link the execution to the card transaction NOW, not after the rail accepts: the payout may end
       // in exception or failed, and the audit trail must still be reachable from the transaction id.
@@ -300,17 +327,21 @@ export class PayoutOrchestrationProcess {
       // AIS: validate the payout account via the account_information provider (ADR-039).
       // cardTransactionInstanceReference travels in the payload as the end-to-end reference, so the
       // sanitized wire log is findable by transaction id whichever provider served the call.
-      const aisDispatch = await dispatchProvider(
-        db,
-        'account_information',
-        'provider.account_information.account.validation.requested',
-        {
+      // Asked of the institution that holds the account, and carrying what its read endpoint addresses by:
+      // the bank's own account id in the path and the consent in the header.
+      const aisDispatch = await institutionGroupFor(db, 'account_information').ask({
+        event: 'provider.account_information.account.validation.requested',
+        payload: {
           payoutAccountInstanceReference: payoutAccount.payoutAccountInstanceReference,
+          payoutAccountBankAccountReference: payoutAccount.payoutAccountBankAccountReference,
+          consentId: payoutAccount.payoutAccountConsentReference,
+          correlationId: execRef,
           clientReference: execRef,
           cardTransactionInstanceReference: txnId,
         },
-        { entityType: 'execution', entityId: execRef, processType: 'payment_processing' },
-      );
+        subject: { accountReference: payoutAccount.payoutAccountInstanceReference },
+        businessContext: { entityType: 'execution', entityId: execRef, processType: 'payment_processing' },
+      });
       // The institution states the account's STATUS, in the standard's own vocabulary. Whether that status is
       // good enough to receive this payout is the PROVIDER's decision about its own payout, so it is made
       // here rather than expected as a boolean from the bank (v37 P12).
@@ -336,7 +367,7 @@ export class PayoutOrchestrationProcess {
           execRef, status: 'exception',
           reason: `AIS validation failed: account not verified (provider=${aisDispatch.provider} status=${aisBody.accountStatus ?? aisDispatch.status})`,
           payoutAccountRef: payoutAccount.payoutAccountInstanceReference,
-          heldAmount: amountInAccountCcy, merchantRef, txnId,
+          heldAmount: localHold, merchantRef, txnId,
         });
         return;
       }
@@ -346,6 +377,96 @@ export class PayoutOrchestrationProcess {
         (await this.getMerchantSettlementSchedule(merchantRef)) ?? 'T+2';
 
       await transitionExecution(db, execRef, 'scheduled', { scheduledAt: new Date() });
+
+      if (delegated && funding) {
+        // As PISP, at the bank that holds the DEBTOR (the cardholder's funding account), straight to the
+        // IBAN the merchant declared to be paid into. The PSP never touches the money.
+        if (!payoutAccount.payoutAccountIban) {
+          await this.abortPayout({
+            execRef, status: 'exception', reason: 'the merchant payout account declares no IBAN to be paid into',
+            payoutAccountRef: payoutAccount.payoutAccountInstanceReference, heldAmount: 0, merchantRef, txnId,
+          });
+          return;
+        }
+        const fundingCcy = funding.payoutAccountCurrency;
+        const heldAmount = await this.convert(amount, currency, fundingCcy);
+        // The authorisation hold goes back first: the bank's payment debits AVAILABLE funds, which the hold
+        // has already taken out of the balance, so paying with the hold in place would debit twice.
+        const released = await disposeHoldAtBank({
+          account: funding, amount: heldAmount, currency: fundingCcy, authorisationReference: txnId, disposition: 'release',
+          audit: { db, triggeredBy: 'card.authorisation.hold.release.requested', businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' } },
+        });
+        if (!released.applied) {
+          await appendResolutionStep(db, execRef, { stepName: 'aspsp.hold.release', stepOutcome: 'failed', stepNote: released.error ?? 'not applied' });
+          await this.abortPayout({
+            execRef, status: 'exception', reason: `the authorisation hold could not be released at the bank: ${released.error ?? 'not applied'}`,
+            payoutAccountRef: payoutAccount.payoutAccountInstanceReference, heldAmount: 0, merchantRef, txnId,
+          });
+          return;
+        }
+        await appendResolutionStep(db, execRef, {
+          stepName: 'aspsp.hold.release', stepOutcome: 'found',
+          stepNote: `authorisation hold ${heldAmount} ${fundingCcy} released at the bank (ref ${txnId})`,
+        });
+        const initiated = await initiatePaymentAtBank({
+          debtorAccount: funding,
+          creditorIban: payoutAccount.payoutAccountIban,
+          creditorName: payoutAccount.payoutAccountAlias ?? 'Merchant',
+          creditorAgentBic: payoutAccount.payoutAccountBicSwift,
+          amount: heldAmount,
+          currency: fundingCcy,
+          remittanceInformation: `Merchant settlement ${merchantRef}`,
+          endToEndIdentification: execRef,
+          product: selectPaymentProduct({ currency: fundingCcy, creditorCountryCode: payoutAccount.payoutAccountCountryCode }),
+          audit: { db, triggeredBy: 'provider.payment_initiation.transfer.requested', businessContext: { entityType: 'execution', entityId: execRef, processType: 'payment_processing' } },
+        });
+        if (!initiated.bankPaymentReference) {
+          // Refused: the cardholder's funds go back on hold so the authorized payment stays covered.
+          const restored = await holdFundsAtBank({
+            account: funding, amount: heldAmount, currency: fundingCcy, transactionType: 'purchase', clientReference: txnId,
+            audit: { db, triggeredBy: 'card.authorisation.hold.requested', businessContext: { entityType: 'transaction', entityId: txnId, processType: 'payment_processing' } },
+          });
+          await appendResolutionStep(db, execRef, {
+            stepName: 'aspsp.hold.restored', stepOutcome: restored.approved ? 'found' : 'failed',
+            stepNote: restored.approved ? 'cardholder funds held again at the bank' : `could not hold again: ${restored.error ?? restored.responseCode}`,
+          });
+          await appendResolutionStep(db, execRef, { stepName: 'provider.payment_initiation.transfer', stepOutcome: 'failed', stepNote: `aspsp refused: ${initiated.error}` });
+          await this.abortPayout({
+            execRef, status: 'failed', reason: `aspsp refused: ${initiated.error ?? 'no payment reference'}`,
+            payoutAccountRef: payoutAccount.payoutAccountInstanceReference, heldAmount: 0, merchantRef, txnId,
+          });
+          return;
+        }
+
+        handedToRail = true;
+        await db.collection(PAYMENT_EXECUTION_COLLECTION).updateOne(
+          { paymentExecutionInstanceReference: execRef },
+          { $set: { aspspPaymentReference: initiated.bankPaymentReference, recordUpdatedDateTime: new Date() } },
+        );
+        await transitionExecution(db, execRef, 'in_flight', { initiatedAt: new Date(), paymentExecutionRail: payoutAccount.payoutAccountPreferredRail });
+        await appendResolutionStep(db, execRef, {
+          stepName: 'provider.payment_initiation.transfer', stepOutcome: 'found',
+          stepNote: `aspsp payment=${initiated.bankPaymentReference} status=${initiated.transactionStatus}`,
+        });
+        // The cardholder is debited the full purchase and there is no PSP account at the bank to receive a
+        // commission, so the fee is not collected on this path. Said here rather than left to be inferred.
+        if (feeAmount > 0) {
+          await appendResolutionStep(db, execRef, {
+            stepName: 'commission.not.collected', stepOutcome: 'fallback',
+            stepNote: `fee ${feeAmount} ${currency} not collected: the payment is made at the bank and the PSP has no bank account to receive it`,
+          });
+        }
+        emitProcessEvent(db, {
+          entityType: 'execution', entityId: execRef,
+          processType: 'payment_processing', processAction: 'payout.execution.initiated',
+          processOutcome: 'in_flight',
+          performedByPartyReference: null, performedByRole: null,
+          // bankAmount/bankCurrency: what the bank actually moved, in the cardholder account currency.
+          eventSummary: { txnId, merchantRef, payoutAccountRef: payoutAccount.payoutAccountInstanceReference, amount, netAmount, feeAmount, currency, bankAmount: heldAmount, bankCurrency: fundingCcy, aspspPaymentReference: initiated.bankPaymentReference },
+          bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+        });
+        return;
+      }
 
       // PISP: initiate the bank transfer via the payment_initiation provider (ADR-039). The builtin
       // module (or an external PISP) emits bank.transfer.settled/failed on the bus after T+N; this
@@ -380,7 +501,7 @@ export class PayoutOrchestrationProcess {
           execRef, status: 'failed',
           reason: `PISP dispatch ${pispDispatch.status}: ${pispDispatch.error ?? 'no submission'}`,
           payoutAccountRef: payoutAccount.payoutAccountInstanceReference,
-          heldAmount: amountInAccountCcy, merchantRef, txnId,
+          heldAmount: localHold, merchantRef, txnId,
         });
         return;
       }
@@ -419,11 +540,11 @@ export class PayoutOrchestrationProcess {
         await this.abortPayout({
           execRef, status: 'exception', reason,
           payoutAccountRef: payoutAccount.payoutAccountInstanceReference,
-          heldAmount: amountInAccountCcy, merchantRef, txnId,
+          heldAmount: localHold, merchantRef, txnId,
         });
       } else {
         // The failure happened before the control record existed: release the reservation directly.
-        await releasePendingCredit(db, payoutAccount.payoutAccountInstanceReference, amountInAccountCcy);
+        if (localHold > 0) await releasePendingCredit(db, payoutAccount.payoutAccountInstanceReference, localHold);
       }
       throw err;
     }
@@ -464,6 +585,8 @@ export class PayoutOrchestrationProcess {
           stepNote: `the bank moved the money (${execution.aspspPaymentReference ?? 'no bank reference'});`
             + ' the PSP holds no balance for this transfer',
         });
+        // A merchant payment still reaches its terminal state, with no balance moved and no local hold to clear.
+        if (execution.cardTransactionInstanceReference) await this.recordCardPaymentSettled(execRef, execution, p.railRef, false);
         return;
       }
 
@@ -506,39 +629,67 @@ export class PayoutOrchestrationProcess {
         }
       }
 
-      // Mark card transaction as settled + clear cardholder pending hold (PCI DSS)
-      if (execution.cardTransactionInstanceReference) {
-        await db.collection(CARD_TRANSACTION_COLLECTION).updateOne(
-          { cardTransactionInstanceReference: execution.cardTransactionInstanceReference },
-          { $set: { cardTransactionStatus: 'settled', recordUpdatedDateTime: new Date() } },
-        );
-        // Clear the pending hold on the cardholder's funding account now that settlement is confirmed.
-        // The buyer was held the GROSS amount, so the commission must not shrink what is released.
-        void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, execution.grossAmount, execution.currency);
-      }
-
-      // Mark the linked payment order as settled (if any)
-      await db.collection(PAYMENT_ORDER_COLLECTION).updateOne(
-        { $or: [
-          { paymentOrderExecutionReference: execRef },
-          { linkedCardTransactionReference: execution.cardTransactionInstanceReference },
-        ]},
-        { $set: { paymentOrderStatus: 'settled', paymentOrderSettledDateTime: new Date(), recordUpdatedDateTime: new Date() } },
-      );
-
-      emitProcessEvent(db, {
-        entityType: 'execution', entityId: execRef,
-        processType: 'payment_processing', processAction: 'payout.execution.completed',
-        processOutcome: 'settled',
-        performedByPartyReference: null, performedByRole: null,
-        // txnId in the summary: the audit trail's deep reference match finds this event by the
-        // originating transaction id, not only by the execution reference.
-        eventSummary: { execRef, txnId: execution.cardTransactionInstanceReference, railRef: p.railRef, grossAmount: execution.grossAmount, netAmount: execution.netAmount, feeAmount: execution.feeAmount ?? 0, currency: execution.currency },
-        bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
-      });
+      await this.recordCardPaymentSettled(execRef, execution, p.railRef, true);
     } catch (err) {
       console.error(`[payout-orch] Error processing bank.transfer.settled for exec ${execRef}:`, err);
     }
+  }
+
+  // The card payment reaches its terminal state once the money has moved: the transaction and its order are
+  // settled and the event is recorded. The local cardholder hold is only cleared when the PSP ledger held it.
+  private async recordCardPaymentSettled(
+    execRef: string,
+    execution: NonNullable<Awaited<ReturnType<typeof getExecution>>>,
+    railRef: string,
+    clearLocalHold: boolean,
+  ): Promise<void> {
+    const db = this.db;
+    // Mark card transaction as settled + clear cardholder pending hold (PCI DSS)
+    if (execution.cardTransactionInstanceReference) {
+      await db.collection(CARD_TRANSACTION_COLLECTION).updateOne(
+        { cardTransactionInstanceReference: execution.cardTransactionInstanceReference },
+        { $set: { cardTransactionStatus: 'settled', recordUpdatedDateTime: new Date() } },
+      );
+      // Clear the pending hold on the cardholder's funding account now that settlement is confirmed.
+      // The buyer was held the GROSS amount, so the commission must not shrink what is released.
+      if (clearLocalHold) void this.clearCardholderPendingHold(execution.cardTransactionInstanceReference, execution.grossAmount, execution.currency);
+    }
+
+    // Mark the linked payment order as settled (if any)
+    await db.collection(PAYMENT_ORDER_COLLECTION).updateOne(
+      { $or: [
+        { paymentOrderExecutionReference: execRef },
+        { linkedCardTransactionReference: execution.cardTransactionInstanceReference },
+      ]},
+      { $set: { paymentOrderStatus: 'settled', paymentOrderSettledDateTime: new Date(), recordUpdatedDateTime: new Date() } },
+    );
+
+    emitProcessEvent(db, {
+      entityType: 'execution', entityId: execRef,
+      processType: 'payment_processing', processAction: 'payout.execution.completed',
+      processOutcome: 'settled',
+      performedByPartyReference: null, performedByRole: null,
+      // txnId in the summary: the audit trail's deep reference match finds this event by the
+      // originating transaction id, not only by the execution reference.
+      eventSummary: { execRef, txnId: execution.cardTransactionInstanceReference, railRef, grossAmount: execution.grossAmount, netAmount: execution.netAmount, feeAmount: execution.feeAmount ?? 0, currency: execution.currency },
+      bianServiceDomain: 'SD-65 Payment Execution', bianControlRecordType: 'PaymentExecutionProcedure',
+    });
+  }
+
+  // The cardholder's funding account for a card transaction, through the card it was made with.
+  private async fundingAccountFor(txnId: string): Promise<PayoutAccountArrangement | null> {
+    const txn = await this.db.collection<{ paymentCardReference?: string; paymentCardInstanceReference?: string }>(CARD_TRANSACTION_COLLECTION)
+      .findOne({ cardTransactionInstanceReference: txnId }, { projection: { paymentCardReference: 1, paymentCardInstanceReference: 1 } });
+    // The transaction carries the card TOKEN, which is what the funds gate resolved the account by.
+    const cardFilter = txn?.paymentCardReference
+      ? { paymentCardReference: txn.paymentCardReference }
+      : txn?.paymentCardInstanceReference ? { paymentCardInstanceReference: txn.paymentCardInstanceReference } : null;
+    if (!cardFilter) return null;
+    const card = await this.db.collection<{ fundingPayoutAccountInstanceReference?: string }>(PAYMENT_CARD_COLLECTION)
+      .findOne(cardFilter, { projection: { fundingPayoutAccountInstanceReference: 1 } });
+    if (!card?.fundingPayoutAccountInstanceReference) return null;
+    return this.db.collection<PayoutAccountArrangement>(PAYOUT_ACCOUNT_COLLECTION)
+      .findOne({ payoutAccountInstanceReference: card.fundingPayoutAccountInstanceReference });
   }
 
   private async onTransferFailed(e: DomainEvent): Promise<void> {
@@ -564,7 +715,22 @@ export class PayoutOrchestrationProcess {
       // a P2P sender gets its OWN money back (pending -> available), whereas a merchant beneficiary
       // was only promised an incoming credit that now will not arrive (pending -> nothing). Crediting
       // the merchant here would invent money the rail never moved.
-      if (execution.sourcePayoutAccountReference) {
+      if (execution.paymentExecutionDelegatedToAspsp && execution.cardTransactionInstanceReference) {
+        // The bank refused after accepting: the authorized payment must stay covered, so the hold goes back.
+        const funding = await this.fundingAccountFor(execution.cardTransactionInstanceReference);
+        if (funding) {
+          const fundingCcy = funding.payoutAccountCurrency;
+          const held = await holdFundsAtBank({
+            account: funding, amount: await this.convert(execution.grossAmount ?? 0, execution.currency, fundingCcy),
+            currency: fundingCcy, transactionType: 'purchase', clientReference: execution.cardTransactionInstanceReference,
+            audit: { db, triggeredBy: 'card.authorisation.hold.requested', businessContext: { entityType: 'transaction', entityId: execution.cardTransactionInstanceReference, processType: 'payment_processing' } },
+          });
+          await appendResolutionStep(db, execRef, {
+            stepName: 'aspsp.hold.restored', stepOutcome: held.approved ? 'found' : 'failed',
+            stepNote: held.approved ? 'cardholder funds held again at the bank' : `could not hold again: ${held.error ?? held.responseCode}`,
+          });
+        }
+      } else if (execution.sourcePayoutAccountReference) {
         await releaseReservation(db, execution.sourcePayoutAccountReference, execution.grossAmount ?? 0);
       } else if (execution.resolvedPayoutAccountReference) {
         const heldAmount = await this.convert(

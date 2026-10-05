@@ -63,8 +63,10 @@ export async function approveRtpRequest(db: Db, ref: string, input: ApproveRtpIn
       event: 'funds.check.requested',
       payload: {
         payoutAccountInstanceReference: funding.payoutAccountInstanceReference,
-        amount: req.amount,
-        currency: req.currency,
+        correlationId: ref,
+        consentId: funding.payoutAccountConsentReference,
+        account: { iban: funding.payoutAccountIban },
+        instructedAmount: { currency: req.currency, amount: req.amount.toFixed(2) },
       },
       subject: { accountReference: funding.payoutAccountInstanceReference },
       businessContext: { entityType: 'payment_request', entityId: ref, processType: 'payment_processing' },

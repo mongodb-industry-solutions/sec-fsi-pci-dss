@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getProviderAccessToken, getProviderBaseUrl } from '../../../modules/provider/services/providerAccessToken.service';
 import { PayoutAccountArrangement } from '../../../modules/gateway/models/payoutAccount.model';
 import { config } from '../../../config';
+import { recordBankCall, type BankCallAudit } from '../../../modules/provider/services/bankCallAudit.service';
 
 // The funds gate as a call to the institution that holds the money.
 //
@@ -41,6 +42,7 @@ async function bankRequest(
   consentReference: string,
   correlationId: string,
   fetchImpl: typeof fetch,
+  audit?: BankCallAudit,
 ): Promise<{ status: number; payload: Record<string, unknown> } | { error: string }> {
   const { baseUrl, error: endpointError } = await getProviderBaseUrl('card_authorization')
     .then((resolved) => (resolved.baseUrl ? resolved : getProviderBaseUrl('account_information')));
@@ -53,23 +55,33 @@ async function bankRequest(
   });
   if (!accessToken) return { error: `card authorisation authorisation failed: ${tokenError}` };
 
+  const url = `${host}${path}`;
+  const requestHeaders = {
+    Authorization: `Bearer ${accessToken}`,
+    'Consent-ID': consentReference,
+    'X-Request-ID': correlationId,
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+  const startedAt = Date.now();
   try {
-    const response = await fetchImpl(`${host}${path}`, {
+    const response = await fetchImpl(url, {
       method,
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Consent-ID': consentReference,
-        'X-Request-ID': correlationId,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
+      headers: requestHeaders,
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
+    await recordBankCall(audit, 'card_authorization', {
+      method, url, headers: requestHeaders, body, status: response.status, responseBody: payload, latencyMs: Date.now() - startedAt,
+    });
     return { status: response.status, payload };
   } catch (err) {
-    return { error: `bank unreachable: ${err instanceof Error ? err.message : String(err)}` };
+    const reason = err instanceof Error ? err.message : String(err);
+    await recordBankCall(audit, 'card_authorization', {
+      method, url, headers: requestHeaders, body, latencyMs: Date.now() - startedAt, error: reason,
+    });
+    return { error: `bank unreachable: ${reason}` };
   }
 }
 
@@ -85,6 +97,8 @@ export async function holdFundsAtBank(
     cardToken?: string;
     transactionType?: string;
     clientReference: string;
+    // Where to record the call in the provider's event log; absent means the call is not audited here.
+    audit?: BankCallAudit;
   },
   fetchImpl: typeof fetch = fetch,
 ): Promise<CardHoldResult> {
@@ -102,6 +116,7 @@ export async function holdFundsAtBank(
     input.account.payoutAccountConsentReference ?? '',
     correlationId,
     fetchImpl,
+    input.audit,
   );
   if ('error' in result) return { approved: false, error: result.error };
 
@@ -132,6 +147,7 @@ export async function disposeHoldAtBank(
     currency: string;
     authorisationReference: string;
     disposition: 'release' | 'settle';
+    audit?: BankCallAudit;
   },
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ applied: boolean; error?: string }> {
@@ -146,6 +162,7 @@ export async function disposeHoldAtBank(
     input.account.payoutAccountConsentReference ?? '',
     input.authorisationReference,
     fetchImpl,
+    input.audit,
   );
   if ('error' in result) return { applied: false, error: result.error };
   return { applied: result.payload.applied === true, error: result.payload.reason as string | undefined };

@@ -2,6 +2,8 @@ import { Db } from 'mongodb';
 import jwt, { JwtPayload } from 'jsonwebtoken';
 import { createPublicKey } from 'crypto';
 import { getProviderBaseUrl } from './providerAccessToken.service';
+import { getActiveProviderForType } from './integrationRegistry.service';
+import { logEvent } from './integrationDispatch.service';
 import { PAYOUT_ACCOUNT_COLLECTION } from '../../gateway/models/payoutAccount.model';
 
 // The PSP as the RECEIVER of the bank's notifications.
@@ -273,4 +275,52 @@ export function mapPaymentStatusChange(notification: VerifiedNotification): Appl
     applied: true,
     detail: `${status} noted, no terminal action`,
   };
+}
+
+/**
+ * Records a bank notification in the provider's own event log, so the provider section can audit every
+ * callback the bank sent: the signed token as received, what it said, and what the PSP did with it.
+ *
+ * Refused tokens are recorded too: a notification that never verified is the one an audit most needs to
+ * see, and it is exactly the one that leaves no other trace. Never throws: auditing must not be able to
+ * fail the acknowledgement the bank is waiting for.
+ */
+export async function recordBankNotification(
+  db: Db,
+  input: {
+    token: string;
+    notification?: VerifiedNotification;
+    outcome: 'applied' | 'replayed' | 'refused';
+    detail: string;
+    responseCode: number;
+    latencyMs: number;
+    busEvent?: string;
+  },
+): Promise<void> {
+  try {
+    // A consent change belongs to the account information provider, a payment change to the payment
+    // initiation one. A token that never verified names neither, so it is filed under payment initiation.
+    const capability = input.notification?.eventType === 'consent.status.changed' ? 'account_information' : 'payment_initiation';
+    const provider = await getActiveProviderForType(db, capability);
+    if (!provider) return;
+    const n = input.notification;
+    await logEvent(db, {
+      arrangementId: provider.externalProviderArrangementInstanceReference,
+      type: 'callback',
+      status: input.outcome === 'refused' ? 'error' : 'received',
+      triggeredBy: n ? `bankcore.${n.eventType}` : 'bankcore.notification.refused',
+      payload: n ? {
+        eventId: n.eventId, eventType: n.eventType, subjectReference: n.subjectReference, status: n.status,
+        correlationId: n.correlationId, issuer: n.issuer, ...n.detail,
+      } : { detail: input.detail },
+      responseCode: input.responseCode,
+      latencyMs: input.latencyMs,
+      error: input.outcome === 'refused' ? input.detail : undefined,
+      meta: { outcome: input.outcome, detail: input.detail, ...(input.busEvent ? { reEmittedAs: input.busEvent } : {}) },
+      // The signed token as it arrived, so the verification can be repeated by whoever audits it.
+      request: { method: 'POST', headers: { 'content-type': 'application/secevent+jwt' }, body: input.token },
+      response: { status: input.responseCode, body: { detail: input.detail, outcome: input.outcome } },
+      ...(n ? { businessContext: { entityType: n.eventType === 'consent.status.changed' ? 'account' : 'execution', entityId: n.correlationId ?? n.subjectReference, processType: 'payment_processing' } } : {}),
+    });
+  } catch { /* the audit trail never fails the acknowledgement */ }
 }
