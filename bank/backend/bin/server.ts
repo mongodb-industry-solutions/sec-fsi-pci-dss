@@ -210,8 +210,8 @@ async function start() {
     // the two produces a 401 on every request and no error here.
     const issuerCheck = await checkIssuerCoherence();
     const issuerLine = issuerCheck.ok
-      ? `  authority issuer confirmed: ${config.giam.issuerUrl}`
-      : `  ! authority issuer NOT usable: ${issuerCheck.reason}`;
+      ? `  authority confirmed: ${issuerCheck.detail}`
+      : `  ! authority NOT usable: ${issuerCheck.reason}`;
     console.log(issuerLine);
     appendLog(`[${new Date().toISOString()}] STARTUP ${issuerLine.trim()}`);
 

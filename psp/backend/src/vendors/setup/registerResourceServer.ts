@@ -1,5 +1,6 @@
 import { PERMISSION_CATALOG, PERMISSION_CATALOG_VERSION } from '../../shared/models/permissionCatalog';
 import { authorityMachineToken } from '../security/machineToken';
+import { discoverAuthority, fetchAuthorityJson } from '@leafypay/giam-client';
 import { config } from '../../config';
 
 /**
@@ -82,33 +83,28 @@ export async function registerResourceServer(): Promise<{ registered: boolean; r
 export interface IssuerCheck {
   ok: boolean;
   reason?: string;
+  /** What was found, for the startup line. */
+  detail?: string;
 }
 
 /**
- * Checks, at boot, that the configured issuer is both reachable and the one the authority claims.
+ * Checks, at boot, that the authority is reachable on the configured address and says where its keys are.
  *
- * The configured URL does two jobs: it is where discovery is fetched from, and it is what every
- * token's `iss` is compared against. When it satisfies only one of them, nothing fails at boot and
- * every request afterwards returns 401, which reads as an authorisation bug anywhere but here. One
- * request at startup turns that into a single line naming the mismatch.
+ * The configured address is only where this process calls the authority. The issuer tokens carry is
+ * learned from discovery, so what is checked is that discovery answers, names the SAME realm, and that
+ * the key set it points at can be fetched from here. Any of those failing returns 401 on every request
+ * afterwards, which reads as an authorisation bug anywhere but here.
  */
 export async function checkIssuerCoherence(): Promise<IssuerCheck> {
-  const issuer = config.giam.issuerUrl?.replace(/\/+$/, '');
-  if (!issuer) return { ok: false, reason: 'no authority issuer is configured' };
+  const calling = config.giam.issuerUrl?.replace(/[/]+$/, '');
+  if (!calling) return { ok: false, reason: 'no authority address is configured' };
 
   try {
-    const response = await fetch(`${issuer}/.well-known/openid-configuration`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) return { ok: false, reason: `discovery answered ${response.status}` };
-    const metadata = await response.json() as { issuer?: string };
-    if (!metadata.issuer) return { ok: false, reason: 'discovery document carries no issuer' };
-    if (metadata.issuer.replace(/\/+$/, '') !== issuer) {
-      return { ok: false, reason: `the authority issues "${metadata.issuer}", this service expects "${issuer}"` };
-    }
-    return { ok: true };
+    const found = await discoverAuthority(calling);
+    await fetchAuthorityJson(found.jwksUri, 'key set');
+    const rebased = found.jwksUri !== found.advertisedJwksUri ? ` (advertised as ${found.advertisedJwksUri})` : '';
+    return { ok: true, detail: `calling ${calling}, tokens carry iss ${found.issuer}, keys at ${found.jwksUri}${rebased}` };
   } catch (err) {
-    const reason = err instanceof Error ? err.message : 'discovery failed';
-    return { ok: false, reason: `${issuer} is not reachable from this process (${reason})` };
+    return { ok: false, reason: err instanceof Error ? err.message : 'discovery failed' };
   }
 }

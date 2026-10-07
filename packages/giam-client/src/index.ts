@@ -1,4 +1,5 @@
 import { createPublicKey, verify as cryptoVerify, KeyObject } from 'crypto';
+import { discoverAuthority, fetchAuthorityJson, AuthorityDiscovery } from './discovery';
 
 /**
  * The verifier every resource server uses.
@@ -82,7 +83,7 @@ interface CachedKeySet {
 export class GiamClient {
   private cache: CachedKeySet | null = null;
 
-  private jwksUri: string | null = null;
+  private discovered: AuthorityDiscovery | null = null;
 
   private inFlight: Promise<void> | null = null;
 
@@ -116,25 +117,15 @@ export class GiamClient {
     return null;
   }
 
-  /** The key set URL is discovered, never assumed: the path beneath an issuer is the authority's. */
-  private async discoverJwksUri(): Promise<string> {
-    if (this.jwksUri) return this.jwksUri;
-    const issuer = this.options.issuerUrl.replace(/\/+$/, '');
-    const response = await this.fetchImpl(`${issuer}/.well-known/openid-configuration`, {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!response.ok) throw new Error(`discovery answered ${response.status}`);
-    const metadata = await response.json() as { jwks_uri?: string };
-    if (!metadata.jwks_uri) throw new Error('discovery document carries no jwks_uri');
-    this.jwksUri = metadata.jwks_uri;
-    return this.jwksUri;
+  /** The issuer and key set URL are discovered, never assumed: the path beneath an issuer is the authority's. */
+  private async discover(): Promise<AuthorityDiscovery> {
+    if (!this.discovered) this.discovered = await discoverAuthority(this.options.issuerUrl, this.fetchImpl);
+    return this.discovered;
   }
 
   private async fetchKeySet(): Promise<void> {
-    const uri = await this.discoverJwksUri();
-    const response = await this.fetchImpl(uri, { signal: AbortSignal.timeout(5000) });
-    if (!response.ok) throw new Error(`key set answered ${response.status}`);
-    const document = await response.json() as { keys?: Array<Record<string, unknown>> };
+    const { jwksUri } = await this.discover();
+    const document = await fetchAuthorityJson<{ keys?: Array<Record<string, unknown>> }>(jwksUri, 'key set', this.fetchImpl);
 
     const keys = new Map<string, KeyObject>();
     const algByKid = new Map<string, string>();
@@ -254,7 +245,8 @@ export class GiamClient {
     const claims = this.decode(parts[1]);
     if (!claims) return this.fail('malformed');
 
-    if (claims.iss !== this.options.issuerUrl) return this.fail('wrong_issuer');
+    // What the authority says it issues under, learned through the address this process calls it on.
+    if (claims.iss !== this.discovered?.issuer) return this.fail('wrong_issuer');
 
     const wantedAudience = expected?.audience ?? this.options.audience;
     if (wantedAudience) {
@@ -334,7 +326,7 @@ export class GiamClient {
   /** Forgets what was cached, so the next verification rediscovers. */
   reset(): void {
     this.cache = null;
-    this.jwksUri = null;
+    this.discovered = null;
     this.lastRefetchByKid.clear();
     this.denyList.clear();
   }
@@ -453,3 +445,7 @@ export function createCatalogCache(options: {
 /** A service acting as itself at the authority (client credentials). */
 export { MachineTokenSource } from "./machineToken";
 export type { MachineTokenOptions } from "./machineToken";
+
+/** Discovery from the address this process reaches the authority on; the issuer is learned, not configured. */
+export { discoverAuthority, fetchAuthorityJson, rebaseAdvertised } from "./discovery";
+export type { AuthorityDiscovery } from "./discovery";

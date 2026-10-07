@@ -260,8 +260,8 @@ async function start() {
     // that satisfies only one of the two produces a 401 on every request and no error here.
     const issuerCheck = await checkIssuerCoherence();
     console.log(issuerCheck.ok
-      ? `  authority issuer confirmed: ${config.giam.issuerUrl}`
-      : `  ! authority issuer NOT usable: ${issuerCheck.reason}`);
+      ? `  authority confirmed: ${issuerCheck.detail}`
+      : `  ! authority NOT usable: ${issuerCheck.reason}`);
 
     const registration = await registerResourceServer();
     console.log(registration.registered

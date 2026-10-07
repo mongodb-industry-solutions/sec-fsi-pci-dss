@@ -3181,15 +3181,19 @@ written to a cookie script cannot reach. `POST /api/auth/logout` exists for the 
 only the readable cookies would leave a live refresh token behind, and the next renewal would sign the
 person back in after they asked to leave.
 
-**The issuer is persisted, not recomputed.** The authority writes each realm's issuer onto the realm
-record at seed time, composed from its own public URL. Changing that URL therefore requires re-running
-the authority's seeder before the new value reaches any token; until then the deployed services and the
-tokens disagree, and every request returns 401.
+**The issuer is composed at runtime and learned, never stored or pinned.** The authority composes each
+realm's issuer from its own public URL every time it issues or reads, and writes nothing to the realm
+record, so one database serves local, compose, staging and production, each issuing under its own origin.
+A resource server configures only the address it CALLS the authority on (`*_GIAM_ISSUER_URL`, private in
+a cluster). The issuer its tokens carry is read from discovery, whose path must be the configured realm's
+path (the origin may differ), and a key set address advertised under the public origin is rebased onto the
+address this process can reach. Both backends and `@leafypay/giam-client` share `discoverAuthority`.
 
-**Both backends check this at boot.** `checkIssuerCoherence()` fetches discovery from the configured
-issuer and compares the `issuer` it reports against the configured value, printing one startup line
-either way. Without it, an incoherent issuer fails nothing at boot and returns 401 on every subsequent
-request, which reads as an authorisation bug rather than a configuration one.
+**Both backends check this at boot.** `checkIssuerCoherence()` fetches discovery, requires it to name the
+same realm, and fetches the key set it advertises, printing one startup line with the address called, the
+issuer tokens carry and where the keys were read. Afterwards every refused token logs one line per cause
+and minute (`[giam] token refused (cause) ...`) and an unreachable authority logs the exact URL and network
+code, so the admin panel names the failing hop instead of a bare `fetch failed`.
 
 **Signing keys on disk.** The bank persists its notification signing key under `bank/backend/keys/`, explicitly
 git-ignored, with the `kid` derived from the key itself. A deployment therefore pins `replicaCount=1`: two
