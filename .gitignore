@@ -167,3 +167,5 @@ psp/frontend/next-env.d.ts
 
 # Playwright storage state: a real signed-in session, captured for reuse. Never committed.
 test/.auth/
+
+.env.example
