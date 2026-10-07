@@ -48,11 +48,27 @@ function pathOf(url: string): string {
   }
 }
 
-/** An advertised address under the advertised issuer, moved under the address this process calls. */
+/**
+ * An advertised address, moved onto the address this process calls.
+ *
+ * Under the advertised issuer (on a path boundary, so `<issuer>Other` does not count) it is moved under
+ * the reachable issuer, which also covers an ingress that adds or drops a path prefix. Anywhere else on
+ * the advertised origin it keeps its path and takes the reachable origin. An address on a third host is
+ * left alone: it was never ours to move.
+ */
 export function rebaseAdvertised(advertised: string, advertisedIssuer: string, reachableIssuer: string): string {
-  return advertised.startsWith(advertisedIssuer)
-    ? `${trimmed(reachableIssuer)}${advertised.slice(advertisedIssuer.length)}`
-    : advertised;
+  const reachable = trimmed(reachableIssuer);
+  const rest = advertised.slice(advertisedIssuer.length);
+  if (advertised.startsWith(advertisedIssuer) && (rest === '' || /^[/?#]/.test(rest))) {
+    return `${reachable}${rest}`;
+  }
+  try {
+    const target = new URL(advertised);
+    if (target.origin !== new URL(advertisedIssuer).origin) return advertised;
+    return `${new URL(reachable).origin}${target.pathname}${target.search}${target.hash}`;
+  } catch {
+    return advertised;
+  }
 }
 
 export async function discoverAuthority(
