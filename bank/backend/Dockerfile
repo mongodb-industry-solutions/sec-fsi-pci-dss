@@ -18,14 +18,14 @@ WORKDIR /app
 # in this image: the install fails on npm 10 without a lockfile and succeeds on npm 11 without one.
 RUN npm install -g npm@11
 
-# crypt_shared 8.2.4, the SAME version the backend downloads. bankcore runs Queryable Encryption
+# crypt_shared 9.0.2, the SAME version the PSP backend downloads. bankcore runs Queryable Encryption
 # against the SAME key vault, and a version mismatch between the two services surfaces as a generic
 # 503, so the version is pinned here rather than resolved.
 RUN ARCH=$(dpkg --print-architecture) && \
     if [ "$ARCH" = "arm64" ]; then \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-8.2.4.tgz -O crypt.tgz; \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-9.0.2.tgz -O crypt.tgz; \
     else \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-8.2.4.tgz -O crypt.tgz; \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-9.0.2.tgz -O crypt.tgz; \
     fi && \
     tar -xzf crypt.tgz && \
     mkdir -p /usr/local/lib && \
