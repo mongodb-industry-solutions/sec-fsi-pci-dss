@@ -38,14 +38,10 @@ services:
       MONGODB_CRYPT_SHARED_LIB_PATH: /usr/local/lib/mongo_crypt_v1.so
       # Used by the merchant seeder to resolve the OIDC branding URLs (logo_uri/client_uri).
       PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
-      # Must match GIAM_PUBLIC_URL byte for byte: it is both the discovery origin and the expected
-      # `iss`. Spelling it differently (localhost vs 127.0.0.1) is refused as wrong_issuer.
-      #
-      # So the authority, which runs outside this file, has to be started with
-      #   GIAM_PUBLIC_URL=http://host.docker.internal:8085
-      # Its own default is http://localhost:8085, which a container cannot reach: discovery would
-      # fail, and a token minted under that spelling is refused here even when everything else is
-      # right. One variable on that side, and it is the only thing this arrangement needs.
+      # Only where this container CALLS the authority (discovery, key set, token). It need not equal
+      # the issuer in the tokens: that is read from discovery, and the authority composes it from its
+      # own GIAM_PUBLIC_URL at runtime. A container cannot reach the authority's default
+      # http://localhost:8085, so this is the address that works from in here.
       PSP_GIAM_ISSUER_URL: ${PSP_GIAM_ISSUER_URL:-http://host.docker.internal:8085/api/v1/realms/LeafyIdp}
       # The bare authority host, for the shared link resolver. No realm: it joins its own paths.
       GIAM_BASE_URL: ${GIAM_BASE_URL:-http://host.docker.internal:8085}

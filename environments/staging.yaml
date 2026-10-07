@@ -71,9 +71,12 @@ env:
   # PRIVATE in-cluster service: discovery, token, introspection and JWKS, all called server side.
   # Also the bare host the shared link resolver builds absolute endpoints on, so it carries NO realm.
   GIAM_BASE_URL: "http://sec-giam-api-web-app:80"
-  # The platform realm issuer, private for the same reason. PSP_-prefixed deliberately: the shared
-  # link resolver reads the UNPREFIXED name as a bare host, and a realm URL there would be joined
-  # onto fixture paths that already carry their own realm, producing /realms/x/api/v1/realms/y.
+  # The platform realm as THIS service calls it, private for the same reason. It is NOT the issuer
+  # in the tokens: GIAM composes that at runtime from its own public URL, and every service learns it
+  # from discovery, so this value can differ per deployment without touching GIAM or its database.
+  # PSP_-prefixed deliberately: the shared link resolver reads the UNPREFIXED name as a bare host,
+  # and a realm URL there would be joined onto fixture paths that already carry their own realm,
+  # producing /realms/x/api/v1/realms/y.
   PSP_GIAM_ISSUER_URL: "http://sec-giam-api-web-app:80/api/v1/realms/LeafyIdp"
   # What a token must name in its audience claim to be accepted here, and the name this platform
   # registers its enforcement points under. Both are the realm GIAM seeds for this platform.

@@ -1,4 +1,5 @@
 import { createPublicKey, verify as cryptoVerify, KeyObject } from 'crypto';
+import { discoverAuthority, fetchAuthorityJson, AuthorityDiscovery } from '@leafypay/giam-client';
 import { config } from '../../config';
 import { expandRoles } from './roleCatalog';
 
@@ -60,28 +61,41 @@ interface CachedKeySet {
 }
 
 let cache: CachedKeySet | null = null;
-let jwksUri: string | null = null;
+let discovered: AuthorityDiscovery | null = null;
 let inFlight: Promise<void> | null = null;
 const lastRefetchByKid = new Map<string, number>();
 
-async function discoverJwksUri(): Promise<string> {
-  if (jwksUri) return jwksUri;
-  const issuer = config.giam.issuerUrl.replace(/\/+$/, '');
-  const response = await fetch(`${issuer}/.well-known/openid-configuration`, {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!response.ok) throw new Error(`discovery answered ${response.status}`);
-  const metadata = await response.json() as { jwks_uri?: string };
-  if (!metadata.jwks_uri) throw new Error('discovery document carries no jwks_uri');
-  jwksUri = metadata.jwks_uri;
-  return jwksUri;
+let lastUnreachableWarning = 0;
+
+/** Rate limited to one a minute: this is reached per request, and a flooded log hides its own cause. */
+function warnUnreachable(err: unknown): void {
+  if (Date.now() - lastUnreachableWarning < 60_000) return;
+  lastUnreachableWarning = Date.now();
+  const reason = err instanceof Error ? err.message : 'unknown error';
+  console.warn(`[giam] no key set available: ${reason}`);
+  console.warn(`[giam] calling=${config.giam.issuerUrl} advertisedIssuer=${discovered?.issuer ?? 'not discovered yet'} jwks_uri=${discovered?.jwksUri ?? 'not discovered yet'}. Every token is refused as unknown_kid until the key set loads. The address in GIAM_ISSUER_URL must be reachable from this process; the issuer a token carries is learned from it.`);
+}
+
+const lastRefusalLog = new Map<string, number>();
+
+/** One line per cause a minute, so a refused token names its reason without flooding the log. */
+function refuse(cause: string, detail: Record<string, unknown> = {}): null {
+  if (Date.now() - (lastRefusalLog.get(cause) ?? 0) >= 60_000) {
+    lastRefusalLog.set(cause, Date.now());
+    const fields = Object.entries(detail).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(' ');
+    console.warn(`[giam] token refused (${cause}) ${fields}`.trimEnd());
+  }
+  return null;
+}
+
+async function discover(): Promise<AuthorityDiscovery> {
+  if (!discovered) discovered = await discoverAuthority(config.giam.issuerUrl);
+  return discovered;
 }
 
 async function fetchKeySet(): Promise<void> {
-  const uri = await discoverJwksUri();
-  const response = await fetch(uri, { signal: AbortSignal.timeout(5000) });
-  if (!response.ok) throw new Error(`key set answered ${response.status}`);
-  const document = await response.json() as { keys?: Array<Record<string, unknown>> };
+  const { jwksUri } = await discover();
+  const document = await fetchAuthorityJson<{ keys?: Array<Record<string, unknown>> }>(jwksUri, 'key set');
 
   const keys = new Map<string, KeyObject>();
   const algByKid = new Map<string, string>();
@@ -109,10 +123,13 @@ async function resolveKey(kid: string): Promise<{ key: KeyObject; alg: string } 
   if (!cache || Date.now() - cache.fetchedAt >= ttl) {
     try {
       await ensureKeySet();
-    } catch {
+    } catch (err) {
       // A stale set is safe and an unreachable authority must not close the bank: an old public key
       // validates only what the authority itself signed.
-      if (!cache) return null;
+      if (!cache) {
+        warnUnreachable(err);
+        return null;
+      }
     }
   }
 
@@ -126,7 +143,8 @@ async function resolveKey(kid: string): Promise<{ key: KeyObject; alg: string } 
   lastRefetchByKid.set(kid, Date.now());
   try {
     await ensureKeySet();
-  } catch {
+  } catch (err) {
+    warnUnreachable(err);
     return null;
   }
   const found = cache?.keys.get(kid);
@@ -149,17 +167,18 @@ function decodeSegment(segment: string): Record<string, unknown> | null {
  */
 export async function verifyRealmToken(token: string): Promise<VerifiedClaims | null> {
   const parts = token.split('.');
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3) return refuse('malformed');
 
   const header = decodeSegment(parts[0]);
-  if (!header) return null;
-  if (header.alg !== 'RS256') return null;
+  if (!header) return refuse('malformed_header');
+  if (header.alg !== 'RS256') return refuse('unexpected_alg', { alg: header.alg });
   // A token may not nominate the key that validates it.
-  if (header.jku || header.jwk || header.x5u || header.x5c) return null;
-  if (typeof header.kid !== 'string') return null;
+  if (header.jku || header.jwk || header.x5u || header.x5c) return refuse('header_key_injection');
+  if (typeof header.kid !== 'string') return refuse('missing_kid');
 
   const resolved = await resolveKey(header.kid);
-  if (!resolved || resolved.alg !== 'RS256') return null;
+  if (!resolved) return refuse('unknown_kid', { kid: header.kid, knownKids: cache ? [...cache.keys.keys()] : 'key set not loaded' });
+  if (resolved.alg !== 'RS256') return refuse('alg_mismatch', { kid: header.kid, published: resolved.alg });
 
   const valid = cryptoVerify(
     'sha256',
@@ -167,14 +186,16 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
     resolved.key,
     Buffer.from(parts[2], 'base64url'),
   );
-  if (!valid) return null;
+  if (!valid) return refuse('bad_signature', { kid: header.kid });
 
   const claims = decodeSegment(parts[1]);
-  if (!claims) return null;
+  if (!claims) return refuse('malformed_payload');
 
   // The issuer names the REALM. A token from the platform's realm carries a different issuer and is
   // refused here even if it were somehow signed by a key this bank knows.
-  if (claims.iss !== config.giam.issuerUrl) return null;
+  if (claims.iss !== discovered?.issuer) {
+    return refuse('wrong_issuer', { tokenIssuer: claims.iss, expected: discovered?.issuer, calling: config.giam.issuerUrl, clientId: claims.client_id });
+  }
 
   /**
    * And the audience names who the token was FOR.
@@ -186,12 +207,14 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
    */
   const audience = (Array.isArray(claims.aud) ? claims.aud : [claims.aud]).map(String);
   const accepted = new Set([config.giam.audience, config.giam.resourceServerName].filter(Boolean));
-  if (!audience.some((entry) => accepted.has(entry))) return null;
+  if (!audience.some((entry) => accepted.has(entry))) {
+    return refuse('wrong_audience', { aud: audience, accepted: [...accepted], clientId: claims.client_id });
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const skew = 60;
-  if (typeof claims.exp === 'number' && claims.exp + skew < now) return null;
-  if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return null;
+  if (typeof claims.exp === 'number' && claims.exp + skew < now) return refuse('expired', { exp: claims.exp, now, clientId: claims.client_id });
+  if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return refuse('not_yet_valid', { nbf: claims.nbf, now });
 
   const roles = Array.isArray(claims.roles) ? claims.roles as string[] : [];
   /**
@@ -241,6 +264,6 @@ export async function verifyRealmToken(token: string): Promise<VerifiedClaims | 
 
 export function resetVerifierCache(): void {
   cache = null;
-  jwksUri = null;
+  discovered = null;
   lastRefetchByKid.clear();
 }

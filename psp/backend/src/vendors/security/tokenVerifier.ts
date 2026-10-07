@@ -1,4 +1,5 @@
 import { createPublicKey, verify as cryptoVerify, KeyObject } from 'crypto';
+import { discoverAuthority, fetchAuthorityJson, AuthorityDiscovery } from '@leafypay/giam-client';
 import { config } from '../../config';
 
 /**
@@ -61,7 +62,7 @@ interface CachedKeySet {
 }
 
 let cache: CachedKeySet | null = null;
-let jwksUri: string | null = null;
+let discovered: AuthorityDiscovery | null = null;
 let inFlight: Promise<void> | null = null;
 const lastRefetchByKid = new Map<string, number>();
 
@@ -80,49 +81,42 @@ function warnUnreachable(err: unknown): void {
   if (Date.now() - lastUnreachableWarning < 60_000) return;
   lastUnreachableWarning = Date.now();
   const reason = err instanceof Error ? err.message : 'unknown error';
-  console.warn(`[giam] no key set available from ${config.giam.issuerUrl}: ${reason}`);
-  console.warn('[giam] every token will be refused as unknown_kid until this resolves; check GIAM_ISSUER_URL is reachable from this process');
+  console.warn(`[giam] no key set available: ${reason}`);
+  console.warn(`[giam] calling=${config.giam.issuerUrl} advertisedIssuer=${discovered?.issuer ?? 'not discovered yet'} jwks_uri=${discovered?.jwksUri ?? 'not discovered yet'}. Every token is refused as unknown_kid until the key set loads. The address in GIAM_ISSUER_URL must be reachable from this process; the issuer a token carries is learned from it.`);
 }
 
-const mismatchedIssuersSeen = new Set<string>();
+const lastRefusalLog = new Map<string, number>();
 
-/** Once per distinct issuer, so a scripted probe cannot grow the log without bound. */
-function warnIssuerMismatch(seen: string): void {
-  if (mismatchedIssuersSeen.has(seen) || mismatchedIssuersSeen.size > 20) return;
-  mismatchedIssuersSeen.add(seen);
-  console.warn(`[giam] token issuer "${seen}" does not match the expected "${config.giam.issuerUrl}"`);
+/** One line per cause a minute, so a refused token names its reason without flooding the log. */
+function logRefusal(cause: string, detail: Record<string, unknown>): void {
+  if (Date.now() - (lastRefusalLog.get(cause) ?? 0) < 60_000) return;
+  lastRefusalLog.set(cause, Date.now());
+  const fields = Object.entries(detail).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(' ');
+  console.warn(`[giam] token refused (${cause}) ${fields}`.trimEnd());
 }
 
-function recordFailure(cause: string): null {
+function recordFailure(cause: string, detail: Record<string, unknown> = {}): null {
   verifierMetrics.failuresByCause.set(cause, (verifierMetrics.failuresByCause.get(cause) ?? 0) + 1);
+  logRefusal(cause, detail);
   return null;
 }
 
 /**
  * Discovery, once, then the key set.
  *
- * The key set URL is never hardcoded: a realm's issuer is configuration and the path beneath it
- * belongs to the authority, so hardcoding it would break the first time the authority reorganised
- * its own routes.
+ * Discovery is read from the address this process calls the authority on, and it is what says which
+ * issuer the tokens carry and where the keys are. Neither is hardcoded or configured here: the
+ * issuer is the authority's public identity and differs per environment, while the address called
+ * here is whatever this deployment can route to.
  */
-async function discoverJwksUri(): Promise<string> {
-  if (jwksUri) return jwksUri;
-  const issuer = config.giam.issuerUrl.replace(/\/+$/, '');
-  const response = await fetch(`${issuer}/.well-known/openid-configuration`, {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!response.ok) throw new Error(`discovery answered ${response.status}`);
-  const metadata = await response.json() as { jwks_uri?: string };
-  if (!metadata.jwks_uri) throw new Error('discovery document carries no jwks_uri');
-  jwksUri = metadata.jwks_uri;
-  return jwksUri;
+async function discover(): Promise<AuthorityDiscovery> {
+  if (!discovered) discovered = await discoverAuthority(config.giam.issuerUrl);
+  return discovered;
 }
 
 async function fetchKeySet(): Promise<void> {
-  const uri = await discoverJwksUri();
-  const response = await fetch(uri, { signal: AbortSignal.timeout(5000) });
-  if (!response.ok) throw new Error(`key set answered ${response.status}`);
-  const document = await response.json() as { keys?: Array<Record<string, unknown>> };
+  const { jwksUri } = await discover();
+  const document = await fetchAuthorityJson<{ keys?: Array<Record<string, unknown>> }>(jwksUri, 'key set');
 
   const keys = new Map<string, KeyObject>();
   const algByKid = new Map<string, string>();
@@ -224,9 +218,9 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
   if (typeof header.kid !== 'string') return recordFailure('missing_kid');
 
   const resolved = await resolveKey(header.kid);
-  if (!resolved) return recordFailure('unknown_kid');
+  if (!resolved) return recordFailure('unknown_kid', { kid: header.kid, knownKids: cache ? [...cache.keys.keys()] : 'key set not loaded' });
   // The algorithm the AUTHORITY published for this key, not the one the token asked for.
-  if (resolved.alg !== 'RS256') return recordFailure('alg_mismatch');
+  if (resolved.alg !== 'RS256') return recordFailure('alg_mismatch', { kid: header.kid, published: resolved.alg });
 
   const signatureValid = cryptoVerify(
     'sha256',
@@ -234,16 +228,15 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
     resolved.key,
     Buffer.from(parts[2], 'base64url'),
   );
-  if (!signatureValid) return recordFailure('bad_signature');
+  if (!signatureValid) return recordFailure('bad_signature', { kid: header.kid });
 
   const claims = decodeSegment(parts[1]);
   if (!claims) return recordFailure('malformed_payload');
 
-  if (claims.iss !== config.giam.issuerUrl) {
+  if (claims.iss !== discovered?.issuer) {
     // A signature this key set validated, from an issuer this service does not expect, is far more
     // often a misconfigured issuer URL than a forgery. Report both spellings so it is one look.
-    warnIssuerMismatch(String(claims.iss));
-    return recordFailure('wrong_issuer');
+    return recordFailure('wrong_issuer', { tokenIssuer: claims.iss, expected: discovered?.issuer, calling: config.giam.issuerUrl, clientId: claims.client_id });
   }
 
   /**
@@ -259,10 +252,12 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
    * registered under its own name; a deployment where those differ is ordinary.
    */
   const audience = (Array.isArray(claims.aud) ? claims.aud : [claims.aud]).map(String);
-  if (audience.length === 0) return recordFailure('missing_audience');
+  if (audience.length === 0) return recordFailure('missing_audience', { clientId: claims.client_id });
 
   const accepted = new Set([config.giam.audience, config.giam.resourceServerName].filter(Boolean));
-  if (!audience.some((entry) => accepted.has(entry))) return recordFailure('wrong_audience');
+  if (!audience.some((entry) => accepted.has(entry))) {
+    return recordFailure('wrong_audience', { aud: audience, accepted: [...accepted], clientId: claims.client_id });
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const skew = 60;
@@ -276,8 +271,8 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
    * without one has no bound.
    */
   if (typeof claims.exp !== 'number') return recordFailure('missing_exp');
-  if (claims.exp + skew < now) return recordFailure('expired');
-  if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return recordFailure('not_yet_valid');
+  if (claims.exp + skew < now) return recordFailure('expired', { exp: claims.exp, now, clientId: claims.client_id });
+  if (typeof claims.nbf === 'number' && claims.nbf - skew > now) return recordFailure('not_yet_valid', { nbf: claims.nbf, now });
 
   return {
     ...claims,
@@ -319,6 +314,6 @@ export async function verifyAccessToken(token: string): Promise<VerifiedClaims |
 /** Test and diagnostic support: forget what was cached so the next call rediscovers. */
 export function resetVerifierCache(): void {
   cache = null;
-  jwksUri = null;
+  discovered = null;
   lastRefetchByKid.clear();
 }
