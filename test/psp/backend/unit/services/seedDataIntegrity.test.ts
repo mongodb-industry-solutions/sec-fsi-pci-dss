@@ -380,6 +380,33 @@ describe('v33 seed-data integrity: the transaction-to-card link (F3)', () => {
     const future = transactions.filter((t) => new Date(t.cardTransactionDateTime as string).getTime() > now);
     expect(future.map((t) => t.cardTransactionInstanceReference)).toEqual([]);
   });
+
+  /**
+   * A bug class found while auditing the seed data (2026-10-08): `recordUpdatedDateTime` and
+   * `recordCreatedDateTime` were drawn from `faker.date.recent()`/`faker.date.soon()` with no
+   * `refDate`, so they were independent of both `cardTransactionDateTime` AND of the generator's
+   * own fixed `NOW` anchor. A run on any real date after NOW could (and in the committed fixture,
+   * did: 12 "settled"/"disputed"/"authorized" transactions) stamp `recordUpdatedDateTime` BEFORE
+   * the transaction it supposedly updated, and independently scattered `recordCreatedDateTime` up
+   * to 27 days on either side of it (188 of 233 records).
+   *
+   * These two checks compare fields WITHIN each record against each other, so unlike the "no
+   * transaction is dated in the future" check above they never depend on the real wall clock and
+   * will catch a regression regardless of when the suite runs or the fixture was last generated.
+   */
+  it('no transaction record claims to be updated before the transaction it describes', () => {
+    const offenders = transactions.filter(
+      (t) => new Date(t.recordUpdatedDateTime as string).getTime() < new Date(t.cardTransactionDateTime as string).getTime(),
+    );
+    expect(offenders.map((t) => t.cardTransactionInstanceReference)).toEqual([]);
+  });
+
+  it('a transaction log record is created at the same instant as the transaction it describes', () => {
+    const offenders = transactions.filter(
+      (t) => t.recordCreatedDateTime && t.recordCreatedDateTime !== t.cardTransactionDateTime,
+    );
+    expect(offenders.map((t) => t.cardTransactionInstanceReference)).toEqual([]);
+  });
 });
 
 describe('v33 seed-data integrity: the deprecated government-ID field is gone (F5)', () => {
