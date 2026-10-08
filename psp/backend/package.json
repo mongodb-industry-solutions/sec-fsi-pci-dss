@@ -1,6 +1,6 @@
 {
   "name": "fsi-pci-dss-backend",
-  "version": "3.2.5",
+  "version": "3.2.6",
   "private": true,
   "engines": {
     "node": ">=22"
