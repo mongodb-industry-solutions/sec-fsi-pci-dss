@@ -476,7 +476,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| `crypt_shared` library version mismatch with the MongoDB Node.js driver | Medium | High | Pin both `mongodb` and `mongodb-client-encryption` to the same minor version; document in `package.json` peer dependency notes |
+| `crypt_shared` library version mismatch with the MongoDB Node.js driver, or with the declared `MONGODB_TYPE`/`MONGODB_VERSION` | Medium | High | Resolved by `@leafypay/mongo-compat` (`resolveCryptSharedLibPath`, `cryptSharedHint`, `detectDeployment`), shared by PSP, bankcore and GIAM instead of three independent checks; see ADR-081. Pin `mongodb` and `mongodb-client-encryption` to the same minor version as a second line of defense |
 | AWS KMS latency degrades demo flow | Low | Medium | Cache the unwrapped DEK in memory for the process lifetime; only call KMS on startup |
 | Atlas M0 / M2 / M5 (free tier) used by a developer: QE not supported | High | High | Gate `bin/setup.ts` with a cluster tier check; fail fast with a clear error message |
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
@@ -3077,3 +3077,36 @@ found eight surviving violations on its first run, including a service still min
 shared secret and a client-secret generator, both of which had survived a deliberate deletion pass.
 Naming each exception rather than loosening the pattern means a second offender cannot hide behind an
 allowance made for the first.
+
+### ADR-081: MongoDB edition/version compatibility lives in one vendored package, not per-service
+
+**Context.** `@leafypay/mongo-compat` existed to make the QE text-search query-type table (`substringPreview`
+vs `substring`) a single source of truth for PSP and bankcore, but five independent places still
+decided the same kind of question on their own: GIAM built its own, more complete deployment
+classifier (Community Edition detection, live `buildInfo`/`hello` probing, a broader capability set
+covering range queries, change streams, time series and Atlas Search) without knowing an identical,
+unused copy of `mongo-compat` already sat in its own repo; PSP's `demo.controller.ts` had a THIRD,
+differently-spelled classifier for a health-check field; and crypt_shared library resolution existed
+in three shapes (PSP's full OS auto-detection, bank's and GIAM's bare `existsSync`-only checks,
+copy-pasted from each other). The triggering incident was a production 500
+(`crypt_shared 8.2.4` rejecting the GA query type name `suffix` against a 9.0 server) - exactly the
+failure mode this module exists to prevent, caused by one of those five places getting the version
+story wrong.
+
+**Decision.** `packages/mongo-compat` absorbs the full capability surface (edition: `atlas`/`ea`/`ce`;
+version gates for QE at all, range, and text search; change streams/transactions; time series; Atlas
+Search; server audit log; Atlas Admin API availability), the live `buildInfo`/`hello` probe, and
+crypt_shared path resolution. It stays dependency-free (`detectDeployment` takes a structurally-typed
+`MongoClientLike` rather than importing the `mongodb` driver), so every vendored copy works against
+whichever `mongodb` version sits next to it. PSP, bankcore and GIAM each call into this one module for
+every version/edition-sensitive decision, including setup/installation differences (Atlas Admin API
+steps, the crypt_shared version the Dockerfiles download); none re-implements version comparison,
+edition detection, or query-type naming locally.
+
+**Distribution.** The package is not published to a registry: it is vendored as an identical `file:`
+dependency into every repo that needs it (currently `psp/backend`, `bank/backend`, and GIAM's own
+repo), and the copies are kept byte-for-byte in sync by hand. GIAM's own duplicate engine
+(`vendors/mongodb/deployment.ts`) is now a thin wrapper that re-exports the shared package's
+functions under its previous names, so none of its eight existing call sites had to change; this also
+fixed a real bug where GIAM's text-search gate only ever resolved to the GA query-type name or
+`equality`, never the `*Preview` names an 8.2-8.3 server needs.

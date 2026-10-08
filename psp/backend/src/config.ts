@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
-import { resolveQeProfile, MongoDeploymentType } from '@leafypay/mongo-compat';
+import { resolveQeProfile, parseDeploymentType, DEFAULT_MONGODB_VERSION } from '@leafypay/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
@@ -18,7 +18,6 @@ function env(name: string, fallback?: string): string | undefined {
 
 // Default target: the current Atlas rapid release. Both knobs always have a value, so nothing
 // downstream has to cope with "unset".
-const DEFAULT_MONGODB_VERSION = '9.0.0';
 const QE_PROFILE = resolveQeProfile(env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!);
 
 export const config = {
@@ -40,8 +39,9 @@ export const config = {
     dbName: env('MONGODB_DB_NAME', 'pcidb')!,
     cryptSharedLibPath: env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
     // Deployment kind. 'atlas' provisions custom roles and DB users through the Atlas Admin API;
-    // 'ea' (Enterprise Advanced, self-managed) has no such API, so setup skips those steps.
-    type: (env('MONGODB_TYPE', 'atlas')! === 'ea' ? 'ea' : 'atlas') as MongoDeploymentType,
+    // 'ea' (Enterprise Advanced) and 'ce' (Community Edition, no automatic encryption) have no
+    // such API, so setup skips those steps.
+    type: parseDeploymentType(env('MONGODB_TYPE', 'atlas')),
     // Target server version. Decides the QE text-search query type names and limits (see
     // qeCapabilities). The crypt_shared library must match it.
     version: env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!,

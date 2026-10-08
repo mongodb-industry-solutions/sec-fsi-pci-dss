@@ -1,14 +1,11 @@
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { resolveCryptSharedLibPath } from '@leafypay/mongo-compat';
 import { config } from '../../config';
 
 /**
  * Resolves the path to the MongoDB Automatic Encryption Shared Library
- * (mongo_crypt_v1.dll / .dylib / .so).
- *
- * Resolution order:
- *   1. MONGODB_CRYPT_SHARED_LIB_PATH env var (explicit, highest priority)
- *   2. Platform-specific default install locations
+ * (mongo_crypt_v1.dll / .dylib / .so), using the shared resolution chain in
+ * `@leafypay/mongo-compat` (explicit path → platform defaults → node_modules), and logs the
+ * outcome in PSP's own style.
  *
  * If the library cannot be found, returns undefined and the caller should
  * set cryptSharedLibRequired: false so MongoDB falls back to auto-discovery
@@ -18,31 +15,6 @@ import { config } from '../../config';
  *   https://www.mongodb.com/try/download/enterprise
  *   → Select platform → "Cryptography Library (crypt_shared)"
  */
-
-const LIB_NAME: Partial<Record<NodeJS.Platform, string>> = {
-  win32:  'mongo_crypt_v1.dll',
-  darwin: 'mongo_crypt_v1.dylib',
-  linux:  'mongo_crypt_v1.so',
-};
-
-const DEFAULT_PATHS: Partial<Record<NodeJS.Platform, string[]>> = {
-  win32: [
-    'C:/Program Files/MongoDB/Shared Library/bin/mongo_crypt_v1.dll',
-    'C:/Program Files/MongoDB/Cryptography Library/bin/mongo_crypt_v1.dll',
-    'C:/Program Files/MongoDB/Server/8.0/bin/mongo_crypt_v1.dll',
-    'C:/Program Files/MongoDB/Server/7.0/bin/mongo_crypt_v1.dll',
-  ],
-  darwin: [
-    '/usr/local/lib/mongo_crypt_v1.dylib',
-    '/opt/homebrew/lib/mongo_crypt_v1.dylib',
-    '/usr/lib/mongo_crypt_v1.dylib',
-  ],
-  linux: [
-    '/usr/lib/mongo_crypt_v1.so',
-    '/usr/local/lib/mongo_crypt_v1.so',
-    '/usr/lib/x86_64-linux-gnu/mongo_crypt_v1.so',
-  ],
-};
 
 export interface CryptLibOptions {
   /** Absolute path to the crypt_shared library, or undefined if not found. */
@@ -54,43 +26,33 @@ export interface CryptLibOptions {
   cryptSharedLibRequired: boolean;
 }
 
-export function resolveCryptLibOptions(): CryptLibOptions {
-  const libName = LIB_NAME[process.platform];
+const LIB_NAME: Partial<Record<NodeJS.Platform, string>> = {
+  win32: 'mongo_crypt_v1.dll',
+  darwin: 'mongo_crypt_v1.dylib',
+  linux: 'mongo_crypt_v1.so',
+};
 
-  // 1. Explicit config value takes highest priority
+export function resolveCryptLibOptions(): CryptLibOptions {
   const envPath = config.mongodb.cryptSharedLibPath;
-  if (envPath) {
-    if (existsSync(envPath)) {
-      console.log(`[crypt] Using library from MONGODB_CRYPT_SHARED_LIB_PATH: ${envPath}`);
-      return { cryptSharedLibPath: envPath, cryptSharedLibRequired: true };
-    }
+  const resolved = resolveCryptSharedLibPath(envPath);
+  if (envPath && resolved.source !== 'explicit') {
     console.warn(`[crypt] WARNING: MONGODB_CRYPT_SHARED_LIB_PATH="${envPath}" does not exist  -  ignoring.`);
   }
 
-  // 2. Default platform locations
-  if (libName) {
-    const defaults = DEFAULT_PATHS[process.platform] ?? [];
-    for (const candidate of defaults) {
-      if (existsSync(candidate)) {
-        console.log(`[crypt] Found library at default path: ${candidate}`);
-        console.log(`[crypt] Tip: set MONGODB_CRYPT_SHARED_LIB_PATH=${candidate} in .env to skip auto-detection.`);
-        return { cryptSharedLibPath: candidate, cryptSharedLibRequired: true };
-      }
+  if (resolved.path) {
+    if (resolved.source === 'explicit') {
+      console.log(`[crypt] Using library from MONGODB_CRYPT_SHARED_LIB_PATH: ${resolved.path}`);
+    } else if (resolved.source === 'default-path') {
+      console.log(`[crypt] Found library at default path: ${resolved.path}`);
+      console.log(`[crypt] Tip: set MONGODB_CRYPT_SHARED_LIB_PATH=${resolved.path} in .env to skip auto-detection.`);
+    } else {
+      console.log(`[crypt] Found library in node_modules: ${resolved.path}`);
     }
-
-    // 3. Try resolving from node_modules (some versions ship it there)
-    try {
-      const pkgJson = require.resolve('mongodb-client-encryption/package.json');
-      const pkgDir  = join(pkgJson, '..', 'lib', 'binding');
-      const libPath = join(pkgDir, libName);
-      if (existsSync(libPath)) {
-        console.log(`[crypt] Found library in node_modules: ${libPath}`);
-        return { cryptSharedLibPath: libPath, cryptSharedLibRequired: true };
-      }
-    } catch { /* package not found  -  skip */ }
+    return { cryptSharedLibPath: resolved.path, cryptSharedLibRequired: true };
   }
 
   // Not found  -  warn with download instructions
+  const libName = LIB_NAME[process.platform];
   console.warn(
     '\n[crypt] WARNING: mongo_crypt_v1 shared library not found.\n' +
     '  MongoDB Queryable Encryption requires this library.\n' +

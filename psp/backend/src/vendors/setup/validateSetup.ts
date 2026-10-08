@@ -6,7 +6,7 @@ import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 import { config } from '../../config';
-import { describeTarget, versionMismatch, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
 import { assertLinks, type LinkAssertion } from '@leafypay/platform-links';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
@@ -268,23 +268,21 @@ function checkEnvVars(): boolean {
  * encrypted query on the affected collection fails with an error that names none of them.
  */
 async function checkCompatibility(client: MongoClient, dbName: string): Promise<void> {
-  const declared = config.mongodb.version;
-  check('pass', 'declared target', describeTarget(config.mongodb.type, declared));
+  const declared = declaredDeployment(config.mongodb.type, config.mongodb.version);
+  check('pass', 'declared target', describeDeployment(declared));
 
-  let actual = '';
-  try {
-    ({ version: actual } = await client.db('admin').command({ buildInfo: 1 }));
-  } catch (e) {
-    check('warn', 'server version', `could not read buildInfo - ${(e as Error).message}`);
+  const current = await detectDeployment(client, declared);
+  if (current.source === 'declared') {
+    check('warn', 'server version', 'could not read buildInfo - declared values are in force');
+  } else {
+    check(current.mismatch ? 'fail' : 'pass', 'server version', current.mismatch ?? `cluster reports ${describeDeployment(current)}`);
+  }
+  for (const finding of capabilityFindings(current)) {
+    if (finding.text === current.mismatch) continue; // already reported above as 'server version'
+    check(finding.warn ? 'warn' : 'pass', 'capability', finding.text);
   }
 
-  if (actual) {
-    const mismatch = versionMismatch(declared, actual);
-    if (mismatch) check('fail', 'server version', mismatch);
-    else check('pass', 'server version', `cluster reports ${actual}`);
-  }
-
-  const hint = cryptSharedHint(declared, config.mongodb.cryptSharedLibPath);
+  const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
   if (hint) check('warn', 'crypt_shared library', hint);
   else if (config.mongodb.cryptSharedLibPath) check('pass', 'crypt_shared library', 'matches the declared version');
 

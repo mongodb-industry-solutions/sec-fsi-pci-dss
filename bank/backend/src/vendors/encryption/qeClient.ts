@@ -1,12 +1,12 @@
 // Queryable Encryption client for bankcore. It points at the PSP key vault and reuses its DEKs, so
 // no new key material exists on this side.
 //
-// Unlike the PSP's client this one never searches platform default locations for crypt_shared: the
-// path is required and validated at startup. A wrong or missing library fails the whole connection
-// and surfaces as a generic 503, which is expensive to diagnose, and the two services must load the
-// same version anyway.
-import { existsSync } from 'fs';
+// Uses the same crypt_shared resolution chain as the PSP (explicit path, then platform defaults,
+// then node_modules) via @leafypay/mongo-compat, but still HARD-FAILS at startup if nothing is
+// found: a wrong or missing library fails the whole connection and surfaces as a generic 503,
+// which is expensive to diagnose, and the two services must load the same version anyway.
 import { MongoClient, KMSProviders } from 'mongodb';
+import { resolveCryptSharedLibPath } from '@leafypay/mongo-compat';
 import { config, keyVaultNamespaceParts } from '../../config';
 
 let client: MongoClient | null = null;
@@ -28,17 +28,15 @@ export function buildKmsProviders(): KMSProviders {
 
 // Fails at startup rather than at first encrypted read, where it looks like a connection outage.
 export function assertCryptSharedLib(): string {
-  const path = config.mongodb.cryptSharedLibPath;
-  if (!path) {
+  const resolved = resolveCryptSharedLibPath(config.mongodb.cryptSharedLibPath);
+  if (!resolved.path) {
     throw new Error(
-      'crypt_shared library path is not set. Set PSP_BANKCORE_CRYPT_SHARED_LIB_PATH, or '
-      + 'MONGODB_CRYPT_SHARED_LIB_PATH to share the PSP value. Both services must load the same version.',
+      'crypt_shared library not found. Set PSP_BANKCORE_CRYPT_SHARED_LIB_PATH, or '
+      + 'MONGODB_CRYPT_SHARED_LIB_PATH to share the PSP value, or install it at a platform default '
+      + 'location. Both services must load the same version.',
     );
   }
-  if (!existsSync(path)) {
-    throw new Error(`crypt_shared library not found at "${path}" (PSP_BANKCORE_CRYPT_SHARED_LIB_PATH)`);
-  }
-  return path;
+  return resolved.path;
 }
 
 export async function getQEClient(): Promise<MongoClient> {

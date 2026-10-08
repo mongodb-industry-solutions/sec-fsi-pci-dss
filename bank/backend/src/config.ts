@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
 import { clientSecretFor } from '@leafypay/platform-links';
-import { MongoDeploymentType } from '@leafypay/mongo-compat';
+import { parseDeploymentType, DEFAULT_MONGODB_VERSION } from '@leafypay/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 
@@ -59,8 +59,8 @@ export const config = {
     cryptSharedLibPath: pspEnv('BANKCORE_CRYPT_SHARED_LIB_PATH')
       ?? env('MONGODB_CRYPT_SHARED_LIB_PATH', '')!,
     // Same cluster as the PSP, so the same deployment kind and version apply.
-    type: (env('MONGODB_TYPE', 'atlas')! === 'ea' ? 'ea' : 'atlas') as MongoDeploymentType,
-    version: env('MONGODB_VERSION', '9.0.0')!,
+    type: parseDeploymentType(env('MONGODB_TYPE', 'atlas')),
+    version: env('MONGODB_VERSION', DEFAULT_MONGODB_VERSION)!,
   },
 
   kms: {

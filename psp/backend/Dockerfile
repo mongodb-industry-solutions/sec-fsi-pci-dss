@@ -22,36 +22,15 @@ WORKDIR /app
 # in this image: the install fails on npm 10 without a lockfile and succeeds on npm 11 without one.
 RUN npm install -g npm@11
 
-# Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
-# Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
-# crypt_shared 9.0.2 matches MONGODB_VERSION's default (9.0.0, see config.ts) and the GA QE
-# text-search query types (substring / prefix / suffix) used by the v27 KYC search. An 8.x library
-# does not know those GA names ("Enumeration value 'suffix' ... is not a valid value") against a
-# 9.0+ server, which refuses the old *Preview names outright. Compatible with the mongodb +
-# mongodb-client-encryption pinned in psp/backend/package.json. The Linux build is used here (the
-# image is Linux); update the local dev library to the same series when bumping this.
-RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "arm64" ]; then \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-9.0.2.tgz -O crypt.tgz; \
-    else \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-9.0.2.tgz -O crypt.tgz; \
-    fi && \
-    tar -xzf crypt.tgz && \
-    mkdir -p /usr/local/lib && \
-    cp lib/mongo_crypt_v1.so /usr/local/lib/ && \
-    rm -rf crypt.tgz lib
-
-ENV MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.so
-ENV PORT=8080
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-
 # ── Dependencies ──────────────────────────────────────────────────
 # Shared workspace packages, built before the backend installs them via file: (v37). EVERY declared
 # one is needed: the backend imports @leafypay/eventbus, @leafypay/platform-links and
 # @leafypay/mongo-compat, and each is consumed through its compiled dist, so an uninstalled package
 # fails the build with a missing type rather than at runtime.
 # They are copied before the root install because the root package.json links platform-links with
-# file:, and npm crashes resolving the tree if that directory is not on disk yet.
+# file:, and npm crashes resolving the tree if that directory is not on disk yet. Copied before the
+# crypt_shared download below too: that step reads the recommended version FROM the compiled
+# @leafypay/mongo-compat, so the deployment and installation steps stay driven by the same source.
 #
 # The shared tsconfig travels WITH them: each package's prepare script runs tsc, and every package
 # tsconfig extends ../../tsconfig.base.json. Without it tsc cannot read the file and falls back to
@@ -62,6 +41,32 @@ RUN cd packages/eventbus && npm install
 RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
 RUN cd packages/giam-client && npm install
+
+# Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
+# Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
+# The version comes from @leafypay/mongo-compat's MONGODB_CRYPT_SHARED_LIB_VERSION, the same
+# constant the server targets by default (MONGODB_VERSION, see config.ts), instead of a literal
+# copied into this Dockerfile and bankcore's. An 8.x library does not know the GA query type names
+# ("Enumeration value 'suffix' ... is not a valid value") against a 9.0+ server, which refuses the
+# old *Preview names outright. Compatible with the mongodb + mongodb-client-encryption pinned in
+# psp/backend/package.json. The Linux build is used here (the image is Linux); update the local
+# dev library to the same series when this constant changes.
+RUN ARCH=$(dpkg --print-architecture) && \
+    CRYPT_VERSION=$(node -e "console.log(require('./packages/mongo-compat/dist').MONGODB_CRYPT_SHARED_LIB_VERSION)") && \
+    echo "crypt_shared target: $CRYPT_VERSION" && \
+    if [ "$ARCH" = "arm64" ]; then \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-${CRYPT_VERSION}.tgz -O crypt.tgz; \
+    else \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-${CRYPT_VERSION}.tgz -O crypt.tgz; \
+    fi && \
+    tar -xzf crypt.tgz && \
+    mkdir -p /usr/local/lib && \
+    cp lib/mongo_crypt_v1.so /usr/local/lib/ && \
+    rm -rf crypt.tgz lib
+
+ENV MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.so
+ENV PORT=8080
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # Root package.json provides test scripts and devDependencies (vitest, tsx).
 COPY package.json ./

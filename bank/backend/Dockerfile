@@ -18,14 +18,30 @@ WORKDIR /app
 # in this image: the install fails on npm 10 without a lockfile and succeeds on npm 11 without one.
 RUN npm install -g npm@11
 
-# crypt_shared 9.0.2, the SAME version the PSP backend downloads. bankcore runs Queryable Encryption
-# against the SAME key vault, and a version mismatch between the two services surfaces as a generic
-# 503, so the version is pinned here rather than resolved.
+# ── Dependencies ──────────────────────────────────────────────────
+# Shared workspace packages first: bankcore installs them through file:, and their prepare script
+# builds dist/ during the install. The shared tsconfig comes with them: every package tsconfig
+# extends it, and tsc falls back to an ES5 target without it, which fails on ordinary Set iteration.
+# Copied before the crypt_shared download below: that step reads the recommended version FROM the
+# compiled @leafypay/mongo-compat, so the deployment and installation steps stay driven by the same
+# source instead of a literal copied into this Dockerfile and the PSP's.
+COPY tsconfig.base.json ./
+COPY packages/ packages/
+RUN cd packages/eventbus && npm install
+RUN cd packages/platform-links && npm install
+RUN cd packages/mongo-compat && npm install
+RUN cd packages/giam-client && npm install
+
+# crypt_shared, the SAME version the PSP backend downloads (@leafypay/mongo-compat's
+# MONGODB_CRYPT_SHARED_LIB_VERSION). bankcore runs Queryable Encryption against the SAME key
+# vault, and a version mismatch between the two services surfaces as a generic 503.
 RUN ARCH=$(dpkg --print-architecture) && \
+    CRYPT_VERSION=$(node -e "console.log(require('./packages/mongo-compat/dist').MONGODB_CRYPT_SHARED_LIB_VERSION)") && \
+    echo "crypt_shared target: $CRYPT_VERSION" && \
     if [ "$ARCH" = "arm64" ]; then \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-9.0.2.tgz -O crypt.tgz; \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-aarch64-enterprise-ubuntu2204-${CRYPT_VERSION}.tgz -O crypt.tgz; \
     else \
-        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-9.0.2.tgz -O crypt.tgz; \
+        wget -q https://downloads.mongodb.com/linux/mongo_crypt_shared_v1-linux-x86_64-enterprise-ubuntu2204-${CRYPT_VERSION}.tgz -O crypt.tgz; \
     fi && \
     tar -xzf crypt.tgz && \
     mkdir -p /usr/local/lib && \
@@ -36,17 +52,6 @@ ENV MONGODB_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.so
 ENV PSP_BANKCORE_CRYPT_SHARED_LIB_PATH=/usr/local/lib/mongo_crypt_v1.so
 ENV PORT=8080
 ENV PSP_BANKCORE_PORT=8080
-
-# ── Dependencies ──────────────────────────────────────────────────
-# Shared workspace packages first: bankcore installs them through file:, and their prepare script
-# builds dist/ during the install. The shared tsconfig comes with them: every package tsconfig
-# extends it, and tsc falls back to an ES5 target without it, which fails on ordinary Set iteration.
-COPY tsconfig.base.json ./
-COPY packages/ packages/
-RUN cd packages/eventbus && npm install
-RUN cd packages/platform-links && npm install
-RUN cd packages/mongo-compat && npm install
-RUN cd packages/giam-client && npm install
 
 COPY bank/backend/package.json bank/backend/
 RUN cd bank/backend && npm install

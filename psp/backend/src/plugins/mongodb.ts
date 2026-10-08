@@ -5,7 +5,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { getQEClient } from '../vendors/encryption/qeClient';
 import { config } from '../config';
-import { describeTarget, versionMismatch, cryptSharedHint } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@leafypay/mongo-compat';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -45,24 +45,20 @@ let activeTimers: NodeJS.Timeout[] = [];
  * drop + setup + seed, WITHOUT restarting the process.
  */
 /**
- * States, once per connection, which MongoDB this build targets and whether the cluster agrees.
- * A version declared wrong picks the wrong QE query types, and the resulting failures name
- * neither the version nor the library, so they are impossible to place without this line.
+ * States, once per connection, which MongoDB this build targets, what the live cluster actually
+ * is, and what that deployment can and cannot do. A version or edition declared wrong picks the
+ * wrong QE query types, and the resulting failures name neither the version nor the library, so
+ * they are impossible to place without this line.
  */
 async function reportCompatibility(client: MongoClient): Promise<void> {
-  const declared = config.mongodb.version;
-  console.log(`[mongodb] target: ${describeTarget(config.mongodb.type, declared)}`);
-  try {
-    const { version } = await client.db('admin').command({ buildInfo: 1 });
-    for (const warning of [
-      versionMismatch(declared, version),
-      cryptSharedHint(declared, config.mongodb.cryptSharedLibPath),
-    ]) {
-      if (warning) console.warn(`[mongodb] ${warning}`);
-    }
-  } catch {
-    // buildInfo needs no privilege the app lacks, but a check must never block startup.
+  const declared = declaredDeployment(config.mongodb.type, config.mongodb.version);
+  const current = await detectDeployment(client, declared);
+  console.log(`[mongodb] target: ${describeDeployment(current)}`);
+  for (const finding of capabilityFindings(current)) {
+    console[finding.warn ? 'warn' : 'log'](`[mongodb] ${finding.text}`);
   }
+  const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
+  if (hint) console.warn(`[mongodb] ${hint}`);
 }
 
 async function connectAndWire(fastify: FastifyInstance): Promise<void> {

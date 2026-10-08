@@ -141,12 +141,17 @@ describe('v37: the backend image ships what it orchestrates', () => {
     }
   });
 
-  it('pins the same crypt_shared version in both images, since they share a key vault', () => {
-    const version = /crypt_shared_v1-linux-[a-z0-9_]+-enterprise-ubuntu2204-([0-9.]+)\.tgz/;
-    const backendVersion = version.exec(read('psp/backend/Dockerfile'))?.[1];
-    const bankcoreVersion = version.exec(read('bank/backend/Dockerfile'))?.[1];
-    expect(backendVersion).toBeDefined();
-    // A mismatch between two services against one key vault surfaces as a generic 503.
-    expect(bankcoreVersion).toBe(backendVersion);
+  it('derives crypt_shared from @leafypay/mongo-compat in both images, since they share a key vault', () => {
+    // Neither Dockerfile hand-copies a version literal any more (ADR-081): both read
+    // MONGODB_CRYPT_SHARED_LIB_VERSION from the same compiled package at build time, so a drift
+    // between them (a generic 503 against the shared key vault) is structurally impossible rather
+    // than merely checked.
+    const extraction = /MONGODB_CRYPT_SHARED_LIB_VERSION/;
+    expect(read('psp/backend/Dockerfile')).toMatch(extraction);
+    expect(read('bank/backend/Dockerfile')).toMatch(extraction);
+    // Both must build the constant from the very same require path, not two different ones.
+    const requirePath = /require\('\.\/packages\/mongo-compat\/dist'\)\.MONGODB_CRYPT_SHARED_LIB_VERSION/;
+    expect(read('psp/backend/Dockerfile')).toMatch(requirePath);
+    expect(read('bank/backend/Dockerfile')).toMatch(requirePath);
   });
 });

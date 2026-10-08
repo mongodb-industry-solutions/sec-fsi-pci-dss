@@ -1,7 +1,7 @@
 {
   "name": "@leafypay/mongo-compat",
-  "version": "3.2.4",
-  "description": "Which MongoDB this deployment targets (Atlas or Enterprise Advanced, and which version) and what it accepts for Queryable Encryption. Shared by the PSP and bankcore so the compatibility table exists once.",
+  "version": "3.3.0",
+  "description": "Which MongoDB deployment this is (Atlas, Enterprise Advanced or Community Edition, and which version), the full capability set that implies (Queryable Encryption automatic/range/text-search, change streams, time series, Atlas Search, audit log), crypt_shared library resolution, and which setup commands apply. The single source of truth, shared by every service (PSP, bankcore, GIAM) as an identical vendored copy.",
   "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -7,6 +7,7 @@ export default defineConfig({
     alias: {
       '@leafypay/eventbus': resolve(__dirname, 'packages/eventbus/src/index.ts'),
       '@leafypay/platform-links': resolve(__dirname, 'packages/platform-links/src/index.ts'),
+      '@leafypay/mongo-compat': resolve(__dirname, 'packages/mongo-compat/src/index.ts'),
     },
   },
   test: {

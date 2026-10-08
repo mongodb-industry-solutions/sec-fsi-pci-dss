@@ -6,7 +6,7 @@ import { provisionCardIssuerCvk } from '../encryption/cardVerificationKey.servic
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
-import { describeTarget, versionMismatch, cryptSharedHint } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@leafypay/mongo-compat';
 
 // Works regardless of CWD: npm --prefix changes it to bankcore/.
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -27,17 +27,15 @@ export async function runSetup(reset = false): Promise<void> {
   const client = await getQEClient();
   try {
     const db = client.db(config.mongodb.dbName);
-    const { version } = await client.db('admin').command({ buildInfo: 1 });
+    const declared = declaredDeployment(config.mongodb.type, config.mongodb.version);
+    const current = await detectDeployment(client, declared);
     console.log(`Connected to the bank database "${config.mongodb.dbName}"`);
-    console.log(`target: ${describeTarget(config.mongodb.type, config.mongodb.version)}; cluster reports ${version}\n`);
+    console.log(`target: ${describeDeployment(current)}\n`);
 
-    // Same cluster as the PSP: a declared version that disagrees breaks QE the same way here.
-    for (const warning of [
-      versionMismatch(config.mongodb.version, version),
-      cryptSharedHint(config.mongodb.version, config.mongodb.cryptSharedLibPath),
-    ]) {
-      if (warning) console.warn(`  [WARN] ${warning}`);
-    }
+    // Same cluster as the PSP: a declared version or edition that disagrees breaks QE the same way here.
+    for (const finding of capabilityFindings(current)) console.warn(`  [${finding.warn ? 'WARN' : 'INFO'}] ${finding.text}`);
+    const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
+    if (hint) console.warn(`  [WARN] ${hint}`);
 
     // A bank database that survived a PSP reset points at DEKs the shared vault no longer has. Fail
     // here with the remedy, instead of at the first encrypted read with a driver-level message.

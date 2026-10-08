@@ -1,4 +1,5 @@
 import { MongoClient, ClientEncryption, Document } from 'mongodb';
+import { isUnsupportedQueryTypeError } from '@leafypay/mongo-compat';
 import { buildKmsProviders, getKmsConfig } from '../encryption/kms';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';
@@ -125,7 +126,7 @@ export async function createCollections(
       console.log(`  created: ${name}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      if (!/queryType|substring|prefix|suffix/i.test(message)) throw err;
+      if (!isUnsupportedQueryTypeError(message)) throw err;
 
       console.warn(
         `  warn:    ${name}: this driver refuses the declared text query type, so the encrypted `

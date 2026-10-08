@@ -1342,27 +1342,41 @@ an ISO string (`QE:none`) to a **BSON Date** with `QE:range`. Auth fields
 (`partyEmailAddress`, `partyMobilePhoneNumber`) are unchanged `QE:equality` (one query type per
 field; auth depends on equality).
 
-**Text-search gating.** `buildEncryptedFieldsMaps(deks, tier, textSearch = config.qe.textSearch)`;
-the query types come from `@leafypay/mongo-compat`, resolved from the declared `MONGODB_VERSION`:
+**Text-search gating (ADR-081).** `buildEncryptedFieldsMaps(deks, tier, textSearch = config.qe.textSearch)`;
+the query types come from `@leafypay/mongo-compat` (`resolveQeProfile`), resolved from the declared
+`MONGODB_VERSION`. This is one table inside a larger, dependency-free package that is the single
+source of truth for MongoDB edition/version compatibility across PSP, bankcore, **and GIAM** (vendored
+identically into each repo as a `file:` dependency; there is no registry, so the copies are kept in
+sync by hand):
 
-| Declared version | Text search | Query types | substring `strMaxQueryLength` | crypt_shared |
-|---|---|---|---|---|
-| < 8.2 | no (equality fallback) | - | - | any |
-| 8.2 - 8.3.x | yes | `substringPreview` / `prefixPreview` / `suffixPreview` | <= 10 | 8.2.x - 8.3.x |
-| >= 9.0 | yes | `substring` / `prefix` / `suffix` | <= 6 (server rejects more, error 12860002) | 9.0.x |
+| Declared version | QE at all | Range (`$lt`/`$gt`/...) | Text search | Query types | substring `strMaxQueryLength` | crypt_shared |
+|---|---|---|---|---|---|---|
+| < 7.0 | no | no | no | - | - | any |
+| 7.0 - 7.x | yes (equality only) | no | no | - | - | 7.x |
+| 8.0 - 8.1.x | yes | yes | no | - | - | 8.0.x - 8.1.x |
+| 8.2 - 8.3.x | yes | yes | yes | `substringPreview` / `prefixPreview` / `suffixPreview` | <= 10 | 8.2.x - 8.3.x |
+| >= 9.0 | yes | yes | yes | `substring` / `prefix` / `suffix` | <= 6 (server rejects more, error 12860002) | 9.0.x |
 
 A version newer than the table uses the newest row rather than failing. Both knobs always have a
-value: `MONGODB_TYPE` defaults to `atlas`, `MONGODB_VERSION` to `9.0.0`.
+value: `MONGODB_TYPE` defaults to `atlas`, `MONGODB_VERSION` to `9.0.0` (`DEFAULT_MONGODB_VERSION`);
+the Dockerfiles install crypt_shared `MONGODB_CRYPT_SHARED_LIB_VERSION` (`9.0.2`), read from the same
+package at build time rather than hand-copied.
 
-The two spellings are mutually exclusive and the library must match the server: an 8.x
+`MONGODB_TYPE` is `atlas` | `ea` (Enterprise Advanced) | `ce` (Community Edition). Automatic
+encryption (the crypt_shared query analysis every service here relies on) needs Atlas or Enterprise
+Advanced; Community can hold QE collections but cannot analyse a query against them, so every
+encrypted read fails. `ea` and `ce` both skip the Atlas Admin API steps (custom roles and DB users)
+in setup and drop, since neither exposes that API.
+
+The two text-search spellings are mutually exclusive and the library must match the server: an 8.x
 crypt_shared does not know the GA names, and a 9.0 server refuses the `*Preview` ones both at
 creation (12915800) and at query time (12915801), where the refusal breaks **every** encrypted
-query on the collection, not only the text ones. The same table is checked at every stage: `setup:db` and the backend at
-startup read `buildInfo` and warn when the declared version disagrees with the cluster or with the
-configured crypt_shared path, and `setup:check` additionally compares the encrypted fields STORED
-in each collection against the ones this build declares, field by field. `MONGODB_TYPE` (`atlas` | `ea`) selects the
-deployment kind; `ea` skips the Atlas Admin API steps (custom roles and DB users) in setup and
-drop, since a self-managed cluster has no such API.
+query on the collection, not only the text ones. The same table is checked at every stage: `setup:db`
+and the backend at startup call `detectDeployment` (a live `buildInfo`/`hello` probe) and warn when
+the declared version or edition disagrees with the cluster or with the configured crypt_shared path
+(`cryptSharedHint`, `resolveCryptSharedLibPath`), and `setup:check` additionally compares the
+encrypted fields STORED in each collection against the ones this build declares, field by field
+(`encryptedFieldsDrift`).
 
 Because both supported versions have text search, no flag is normally needed. `PSP_QE_TEXT_SEARCH=false`
 stays as an escape hatch: it degrades every text field to `QE:equality` (contention 8), keeping them

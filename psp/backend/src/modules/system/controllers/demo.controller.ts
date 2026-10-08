@@ -3,6 +3,7 @@ import { Db } from 'mongodb';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
+import { classifyProbe, resolveCryptSharedLibPath } from '@leafypay/mongo-compat';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
 import { getDemoUsers } from '../services/demoRoster.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';
@@ -35,7 +36,10 @@ interface CheckEntry {
 
 function serverChecks(): Record<string, CheckEntry[]> {
   const cryptPath = config.mongodb.cryptSharedLibPath;
-  const cryptExists = cryptPath ? fs.existsSync(cryptPath) : false;
+  // Auto-detected paths count as present too: the running QE client may have found the library at
+  // a platform default even when MONGODB_CRYPT_SHARED_LIB_PATH is unset (see resolveCryptLibOptions).
+  const resolved = resolveCryptSharedLibPath(cryptPath);
+  const cryptExists = Boolean(resolved.path);
   const mem = process.memoryUsage();
   return {
     'server:uptime': [{
@@ -60,10 +64,10 @@ function serverChecks(): Record<string, CheckEntry[]> {
       observedValue: process.env.NODE_ENV ?? 'development',
     }],
     'server:cryptSharedLib': [{
-      status: cryptPath && cryptExists ? 'pass' : cryptPath ? 'fail' : 'warn',
+      status: cryptExists ? 'pass' : cryptPath ? 'fail' : 'warn',
       componentType: 'system',
-      observedValue: { path: cryptPath || null, exists: cryptExists },
-      output: !cryptPath ? 'MONGODB_CRYPT_SHARED_LIB_PATH not set' : !cryptExists ? 'File not found' : undefined,
+      observedValue: { path: resolved.path ?? cryptPath ?? null, source: resolved.source, exists: cryptExists },
+      output: !cryptPath && !cryptExists ? 'MONGODB_CRYPT_SHARED_LIB_PATH not set and no default path found' : !cryptExists ? 'File not found' : undefined,
     }],
     'server:kmsProvider': [{
       status: 'pass',
@@ -73,19 +77,20 @@ function serverChecks(): Record<string, CheckEntry[]> {
   };
 }
 
-function resolveMongoType(modules: string[], host: string): 'Atlas' | 'Enterprise Advanced' | 'Community' {
-  const isEnterprise = modules.some((m) => m.toLowerCase() === 'enterprise');
-  if (isEnterprise && host.includes('.mongodb.net')) return 'Atlas';
-  if (isEnterprise) return 'Enterprise Advanced';
-  return 'Community';
-}
+const MONGO_TYPE_LABEL: Record<string, 'Atlas' | 'Enterprise Advanced' | 'Community'> = {
+  atlas: 'Atlas',
+  ea: 'Enterprise Advanced',
+  ce: 'Community',
+};
 
 async function dbChecks(db: Db): Promise<Record<string, CheckEntry[]>> {
   const checks: Record<string, CheckEntry[]> = {};
   try {
     const buildInfo = await db.admin().command({ buildInfo: 1 }) as { version?: string; modules?: string[] };
+    const hello = await db.admin().command({ hello: 1 }) as { setName?: string; msg?: string };
     const host = config.mongodb.uri.replace(/^mongodb(\+srv)?:\/\/[^@]*@/, '').split('/')[0].split('?')[0];
-    const mongoType = resolveMongoType(buildInfo.modules ?? [], host);
+    const probed = classifyProbe(buildInfo, hello, config.mongodb.uri);
+    const mongoType = MONGO_TYPE_LABEL[probed.type];
     checks['db:server'] = [{
       status: 'pass',
       componentType: 'datastore',

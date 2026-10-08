@@ -6,7 +6,7 @@ import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 import { createAtlasRoles } from './createAtlasRoles';
 import { config } from '../../config';
-import { versionMismatch, describeTarget, cryptSharedHint } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@leafypay/mongo-compat';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -26,15 +26,15 @@ export async function runSetup(reset = false) {
   const client = new MongoClient(uri);
   try {
     await client.connect();
-    const { version } = await client.db('admin').command({ buildInfo: 1 });
-    console.log(`Connected: ${describeTarget(config.mongodb.type, config.mongodb.version)}; cluster reports ${version}\n`);
+    const declared = declaredDeployment(config.mongodb.type, config.mongodb.version);
+    const current = await detectDeployment(client, declared);
+    console.log(`Connected: ${describeDeployment(current)}\n`);
 
-    // A declared version that does not match the cluster picks the wrong QE text query types
-    // for every collection created below, and the failure surfaces far from here.
-    for (const warning of [
-      versionMismatch(config.mongodb.version, version),
-      cryptSharedHint(config.mongodb.version, config.mongodb.cryptSharedLibPath),
-    ].filter(Boolean)) console.warn(`  [WARN] ${warning}\n`);
+    // A declared version or edition that does not match the cluster picks the wrong QE text
+    // query types for every collection created below, and the failure surfaces far from here.
+    for (const finding of capabilityFindings(current)) console.warn(`  [${finding.warn ? 'WARN' : 'INFO'}] ${finding.text}\n`);
+    const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
+    if (hint) console.warn(`  [WARN] ${hint}\n`);
 
     // v2: create Atlas custom roles + DB users before provisioning DEKs so the
     // role-specific connection strings (MONGODB_URI_LEVEL1/2) are ready for the pools.
