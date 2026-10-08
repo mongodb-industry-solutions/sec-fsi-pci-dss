@@ -17,7 +17,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
-  backend:
+  psp-backend:
     extra_hosts:
       # GIAM runs outside this compose file, on the host. `localhost` inside a container is the
       # container, so the host gateway is what a server side call has to name. Automatic on Docker
@@ -65,9 +65,59 @@ services:
       retries: 6
       start_period: 10s
 
+  psp-frontend:
+    extra_hosts:
+      # GIAM runs outside this compose file, on the host. `localhost` inside a container is the
+      # container, so the host gateway is what a server side call has to name. Automatic on Docker
+      # Desktop, absent on Linux without this line.
+      - "host.docker.internal:host-gateway"
+    build:
+      context: ./psp/frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: ${NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC:-http://localhost:8081}
+        # Private/in-network backend URL. Its presence (a) enables same-origin proxy mode (browser
+        # fetches go through the Next.js rewrites server-side, matching staging/prod), and (b) powers
+        # the Public/Private URL toggle on the merchant SSO OIDC endpoints panel. Default is the
+        # compose-network service address, which is exactly the "private" URL an in-VPC integrator uses.
+        NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE: ${NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE:-http://backend:8080}
+        NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
+        # Private only for the API: the admin monitoring page probes bankcore through the Next.js proxy, so
+        # the browser never leaves the frontend origin and the bank's API needs no published port.
+        NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+        # In-network authority, for the same reason: the monitoring panel probes it through the proxy,
+        # so the browser stays on this origin and needs no CORS entry for a health check.
+        NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE: ${GIAM_BASE_URL:-http://host.docker.internal:8085}
+        # PUBLIC, and it must be: the simulator calls the realm's token endpoint from the page itself,
+        # so this is the published authority port and not its service name. The realm is resolved from
+        # the path, so the token still carries the private issuer the backend expects.
+        NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: ${GIAM_BROWSER_URL:-http://localhost:8085}/api/v1/realms/LeafyIdp
+        # PUBLIC for the same reason: a person is redirected to the console to sign in.
+        NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: ${GIAM_FRONTEND_URL:-http://localhost:8086}
+        # PUBLIC, and it has to be: the simulator LINKS to the bank's own app, so a browser navigates there.
+        # A private in-cluster host would work for a server-side probe and be unreachable from a laptop.
+        NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      # Read at RUNTIME by the sign-in route handlers, not baked into the bundle: the code exchange
+      # happens on this server, so it uses the private realm URL and the secret never reaches a page.
+      PSP_GIAM_ISSUER_URL: ${PSP_GIAM_ISSUER_URL:-http://host.docker.internal:8085/api/v1/realms/LeafyIdp}
+      # This app's own public address: the authority redirects the browser back to it, so it must be
+      # the address a browser uses and must match a registered redirect URI of leafypay-console.
+      PSP_URL_FRONTEND: ${PSP_URL_FRONTEND:-http://localhost:8080}
+    depends_on:
+      backend:
+        condition: service_healthy
+      bankcore:
+        condition: service_started
+
   # bankcore: the Open Banking bank (ASPSP). PRIVATE service: the browser never calls it, the PSP
   # dispatches to it over the compose network. No host port is published on purpose.
-  bankcore:
+  bank-backend:
     extra_hosts:
       # GIAM runs outside this compose file, on the host. `localhost` inside a container is the
       # container, so the host gateway is what a server side call has to name. Automatic on Docker
@@ -137,56 +187,6 @@ services:
     depends_on:
       bankcore:
         condition: service_healthy
-
-  frontend:
-    extra_hosts:
-      # GIAM runs outside this compose file, on the host. `localhost` inside a container is the
-      # container, so the host gateway is what a server side call has to name. Automatic on Docker
-      # Desktop, absent on Linux without this line.
-      - "host.docker.internal:host-gateway"
-    build:
-      context: ./psp/frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC: ${NEXT_PUBLIC_PSP_URL_BACKEND_PUBLIC:-http://localhost:8081}
-        # Private/in-network backend URL. Its presence (a) enables same-origin proxy mode (browser
-        # fetches go through the Next.js rewrites server-side, matching staging/prod), and (b) powers
-        # the Public/Private URL toggle on the merchant SSO OIDC endpoints panel. Default is the
-        # compose-network service address, which is exactly the "private" URL an in-VPC integrator uses.
-        NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE: ${NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE:-http://backend:8080}
-        NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
-        # Private only for the API: the admin monitoring page probes bankcore through the Next.js proxy, so
-        # the browser never leaves the frontend origin and the bank's API needs no published port.
-        NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
-        # In-network authority, for the same reason: the monitoring panel probes it through the proxy,
-        # so the browser stays on this origin and needs no CORS entry for a health check.
-        NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE: ${GIAM_BASE_URL:-http://host.docker.internal:8085}
-        # PUBLIC, and it must be: the simulator calls the realm's token endpoint from the page itself,
-        # so this is the published authority port and not its service name. The realm is resolved from
-        # the path, so the token still carries the private issuer the backend expects.
-        NEXT_PUBLIC_PSP_URL_AUTHORITY_ISSUER: ${GIAM_BROWSER_URL:-http://localhost:8085}/api/v1/realms/LeafyIdp
-        # PUBLIC for the same reason: a person is redirected to the console to sign in.
-        NEXT_PUBLIC_PSP_URL_AUTHORITY_FRONTEND_PUBLIC: ${GIAM_FRONTEND_URL:-http://localhost:8086}
-        # PUBLIC, and it has to be: the simulator LINKS to the bank's own app, so a browser navigates there.
-        # A private in-cluster host would work for a server-side probe and be unreachable from a laptop.
-        NEXT_PUBLIC_PSP_URL_BANKCORE_FRONTEND_PUBLIC: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
-    ports:
-      - "8080:8080"
-    env_file:
-      - .env
-    environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      # Read at RUNTIME by the sign-in route handlers, not baked into the bundle: the code exchange
-      # happens on this server, so it uses the private realm URL and the secret never reaches a page.
-      PSP_GIAM_ISSUER_URL: ${PSP_GIAM_ISSUER_URL:-http://host.docker.internal:8085/api/v1/realms/LeafyIdp}
-      # This app's own public address: the authority redirects the browser back to it, so it must be
-      # the address a browser uses and must match a registered redirect URI of leafypay-console.
-      PSP_URL_FRONTEND: ${PSP_URL_FRONTEND:-http://localhost:8080}
-    depends_on:
-      backend:
-        condition: service_healthy
-      bankcore:
-        condition: service_started
 
   # External merchant demo (Espresso Works). Autonomous Next.js app, NO database.
   # Integrates with the PSP purely via OAuth2/OIDC SSO + API. Container on 8080, host 8082.
