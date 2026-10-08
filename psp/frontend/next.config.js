@@ -23,7 +23,7 @@ try {
 let SIMULATOR_CLIENT_SECRET = process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_SECRET || '';
 if (!SIMULATOR_CLIENT_SECRET) {
     try {
-        SIMULATOR_CLIENT_SECRET = require('@leafypay/platform-links').clientSecretFor(
+        SIMULATOR_CLIENT_SECRET = require('@ist-sec/platform-links').clientSecretFor(
             process.env.NEXT_PUBLIC_PSP_SIMULATOR_CLIENT_ID || 'leafypay-simulator',
         );
     } catch {

@@ -1,4 +1,4 @@
-// bankcore binding for the shared @leafypay/eventbus package: its own settings, its own database,
+// bankcore binding for the shared @ist-sec/eventbus package: its own settings, its own database,
 // its own domainEvent store. The PSP has an equivalent binding; the implementation is shared.
 import {
   initEventBus as initSharedEventBus,
@@ -8,7 +8,7 @@ import {
   type EventBusSettings,
   type EventStore,
   type EventStoreDb,
-} from '@leafypay/eventbus';
+} from '@ist-sec/eventbus';
 import { config } from '../../config';
 
 function bankSettings(): EventBusSettings {
@@ -35,4 +35,4 @@ export function resolveEventBusEngine(): EventBusEngine {
   return resolveSharedEngine(config.app.eventBusEngine);
 }
 
-export * from '@leafypay/eventbus';
+export * from '@ist-sec/eventbus';

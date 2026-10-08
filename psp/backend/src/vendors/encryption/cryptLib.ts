@@ -1,10 +1,10 @@
-import { resolveCryptSharedLibPath } from '@leafypay/mongo-compat';
+import { resolveCryptSharedLibPath } from '@ist-sec/mongo-compat';
 import { config } from '../../config';
 
 /**
  * Resolves the path to the MongoDB Automatic Encryption Shared Library
  * (mongo_crypt_v1.dll / .dylib / .so), using the shared resolution chain in
- * `@leafypay/mongo-compat` (explicit path → platform defaults → node_modules), and logs the
+ * `@ist-sec/mongo-compat` (explicit path → platform defaults → node_modules), and logs the
  * outcome in PSP's own style.
  *
  * If the library cannot be found, returns undefined and the caller should

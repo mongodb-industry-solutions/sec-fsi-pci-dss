@@ -21,7 +21,7 @@ vi.mock('../../../../../psp/backend/src/modules/gateway/services/payoutAccountBa
   releaseReservation: h.releaseReservation,
 }));
 
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { makeEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 import type { Db } from 'mongodb';
 import { PaymentAuthorizationSaga } from '../../../../../psp/backend/src/modules/transaction/services/paymentAuthorization.saga';

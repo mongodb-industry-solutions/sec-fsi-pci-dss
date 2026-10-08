@@ -62,6 +62,6 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@leafypay/platform-links": "file:./packages/platform-links"
+    "@ist-sec/platform-links": "file:./packages/platform-links"
   }
 }

@@ -6,7 +6,7 @@ import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 import { createAtlasRoles } from './createAtlasRoles';
 import { config } from '../../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@ist-sec/mongo-compat';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });

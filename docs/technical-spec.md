@@ -1343,7 +1343,7 @@ an ISO string (`QE:none`) to a **BSON Date** with `QE:range`. Auth fields
 field; auth depends on equality).
 
 **Text-search gating (ADR-081).** `buildEncryptedFieldsMaps(deks, tier, textSearch = config.qe.textSearch)`;
-the query types come from `@leafypay/mongo-compat` (`resolveQeProfile`), resolved from the declared
+the query types come from `@ist-sec/mongo-compat` (`resolveQeProfile`), resolved from the declared
 `MONGODB_VERSION`. This is one table inside a larger, dependency-free package that is the single
 source of truth for MongoDB edition/version compatibility across PSP, bankcore, **and GIAM** (vendored
 identically into each repo as a `file:` dependency; there is no registry, so the copies are kept in
@@ -3201,7 +3201,7 @@ record, so one database serves local, compose, staging and production, each issu
 A resource server configures only the address it CALLS the authority on (`*_GIAM_ISSUER_URL`, private in
 a cluster). The issuer its tokens carry is read from discovery, whose path must be the configured realm's
 path (the origin may differ), and a key set address advertised under the public origin is rebased onto the
-address this process can reach. Both backends and `@leafypay/giam-client` share `discoverAuthority`.
+address this process can reach. Both backends and `@ist-sec/giam-client` share `discoverAuthority`.
 
 **Both backends check this at boot.** `checkIssuerCoherence()` fetches discovery, requires it to name the
 same realm, and fetches the key set it advertises, printing one startup line with the address called, the

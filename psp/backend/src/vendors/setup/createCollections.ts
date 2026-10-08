@@ -1,5 +1,5 @@
 import { MongoClient, ClientEncryption, Document } from 'mongodb';
-import { isUnsupportedQueryTypeError } from '@leafypay/mongo-compat';
+import { isUnsupportedQueryTypeError } from '@ist-sec/mongo-compat';
 import { buildKmsProviders, getKmsConfig } from '../encryption/kms';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 import { DEKs } from '../encryption/keyVault';

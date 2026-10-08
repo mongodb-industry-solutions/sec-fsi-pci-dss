@@ -5,7 +5,7 @@ import * as dotenv from 'dotenv';
 import { resolve } from 'path';
 import { getQEClient } from '../vendors/encryption/qeClient';
 import { config } from '../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@ist-sec/mongo-compat';
 
 declare module 'fastify' {
   interface FastifyInstance {

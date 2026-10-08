@@ -18,7 +18,7 @@ import {
   emitComplianceEvent,
   LedgerProjection,
 } from '../../../../../psp/backend/src/modules/provider/services/businessProcessEvent.service';
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { setEventBus, getEventBus, makeEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 
 const mockDb = { collection: h.collection } as never;

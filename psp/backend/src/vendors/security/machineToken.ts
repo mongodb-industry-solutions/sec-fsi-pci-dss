@@ -1,10 +1,10 @@
-import { MachineTokenSource } from '@leafypay/giam-client';
+import { MachineTokenSource } from '@ist-sec/giam-client';
 import { config } from '../../config';
 
 /**
  * This service's own machine token, for the calls it makes as itself.
  *
- * The mechanics moved to the shared client (`@leafypay/giam-client`): the bank needs the identical
+ * The mechanics moved to the shared client (`@ist-sec/giam-client`): the bank needs the identical
  * exchange, and two copies of renewal-and-caching are two behaviours the day one of them is fixed.
  * What stays here is the binding to THIS service's configuration, which is the only part that
  * differs between them.

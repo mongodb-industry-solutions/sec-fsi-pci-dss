@@ -11,7 +11,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@leafypay/platform-links": "file:../packages/platform-links",
+    "@ist-sec/platform-links": "file:../packages/platform-links",
     "@radix-ui/react-tooltip": "^1.1.4",
     "jose": "^5.9.6",
     "lucide-react": "^0.462.0",

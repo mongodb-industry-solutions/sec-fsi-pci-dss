@@ -5,13 +5,13 @@
  * when those engines are selected; their logic IS this BrokerEventBus).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventBusInProcess } from '@leafypay/eventbus';
-import { BrokerEventBus } from '@leafypay/eventbus';
-import { EventBusKafka } from '@leafypay/eventbus';
-import { EventBusRabbit } from '@leafypay/eventbus';
-import { BrokerTransport, BrokerMessage } from '@leafypay/eventbus';
-import { EventStore } from '@leafypay/eventbus';
-import { EventBus } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
+import { BrokerEventBus } from '@ist-sec/eventbus';
+import { EventBusKafka } from '@ist-sec/eventbus';
+import { EventBusRabbit } from '@ist-sec/eventbus';
+import { BrokerTransport, BrokerMessage } from '@ist-sec/eventbus';
+import { EventStore } from '@ist-sec/eventbus';
+import { EventBus } from '@ist-sec/eventbus';
 import { makeEvent, DomainEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));

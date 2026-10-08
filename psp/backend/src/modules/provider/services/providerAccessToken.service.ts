@@ -1,5 +1,5 @@
 import { Db } from 'mongodb';
-import { resolveLinks } from '@leafypay/platform-links';
+import { resolveLinks } from '@ist-sec/platform-links';
 import { tryProviderBaseUrl } from './providerLink.service';
 import { IntegrationProviderType, OAuth2Config } from '../models/externalProviderArrangement.model';
 import { getActiveProvidersForType } from './integrationRegistry.service';

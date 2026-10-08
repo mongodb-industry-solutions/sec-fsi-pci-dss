@@ -3,10 +3,10 @@
  * event store, so a journey is traceable by correlationId. Pure: an injected in-memory store.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { setEventBus } from '../../../../../psp/backend/src/vendors/eventbus';
-import type { EventStore } from '@leafypay/eventbus';
-import type { DomainEvent } from '@leafypay/eventbus';
+import type { EventStore } from '@ist-sec/eventbus';
+import type { DomainEvent } from '@ist-sec/eventbus';
 import { emitProcessEvent } from '../../../../../psp/backend/src/modules/provider/services/businessProcessEvent.service';
 
 class FakeStore implements EventStore {

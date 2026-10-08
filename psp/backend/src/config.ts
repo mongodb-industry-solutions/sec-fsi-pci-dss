@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv';
 import { resolve } from 'path';
-import { resolveQeProfile, parseDeploymentType, DEFAULT_MONGODB_VERSION } from '@leafypay/mongo-compat';
+import { resolveQeProfile, parseDeploymentType, DEFAULT_MONGODB_VERSION } from '@ist-sec/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 

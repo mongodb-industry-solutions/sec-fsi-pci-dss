@@ -24,13 +24,13 @@ RUN npm install -g npm@11
 
 # ── Dependencies ──────────────────────────────────────────────────
 # Shared workspace packages, built before the backend installs them via file: (v37). EVERY declared
-# one is needed: the backend imports @leafypay/eventbus, @leafypay/platform-links and
-# @leafypay/mongo-compat, and each is consumed through its compiled dist, so an uninstalled package
+# one is needed: the backend imports @ist-sec/eventbus, @ist-sec/platform-links and
+# @ist-sec/mongo-compat, and each is consumed through its compiled dist, so an uninstalled package
 # fails the build with a missing type rather than at runtime.
 # They are copied before the root install because the root package.json links platform-links with
 # file:, and npm crashes resolving the tree if that directory is not on disk yet. Copied before the
 # crypt_shared download below too: that step reads the recommended version FROM the compiled
-# @leafypay/mongo-compat, so the deployment and installation steps stay driven by the same source.
+# @ist-sec/mongo-compat, so the deployment and installation steps stay driven by the same source.
 #
 # The shared tsconfig travels WITH them: each package's prepare script runs tsc, and every package
 # tsconfig extends ../../tsconfig.base.json. Without it tsc cannot read the file and falls back to
@@ -44,7 +44,7 @@ RUN cd packages/giam-client && npm install
 
 # Download MongoDB Automatic Encryption Shared Library (mongo_crypt_v1.so)
 # Requires glibc, this is why we use node:22-slim (Debian) instead of Alpine.
-# The version comes from @leafypay/mongo-compat's MONGODB_CRYPT_SHARED_LIB_VERSION, the same
+# The version comes from @ist-sec/mongo-compat's MONGODB_CRYPT_SHARED_LIB_VERSION, the same
 # constant the server targets by default (MONGODB_VERSION, see config.ts), instead of a literal
 # copied into this Dockerfile and bankcore's. An 8.x library does not know the GA query type names
 # ("Enumeration value 'suffix' ... is not a valid value") against a 9.0+ server, which refuses the

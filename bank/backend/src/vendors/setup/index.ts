@@ -6,7 +6,7 @@ import { provisionCardIssuerCvk } from '../encryption/cardVerificationKey.servic
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@ist-sec/mongo-compat';
 
 // Works regardless of CWD: npm --prefix changes it to bankcore/.
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });

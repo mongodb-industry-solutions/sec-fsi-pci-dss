@@ -5,7 +5,7 @@ import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 import { config } from '../../config';
-import { supportsAtlasAdminApi } from '@leafypay/mongo-compat';
+import { supportsAtlasAdminApi } from '@ist-sec/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
 

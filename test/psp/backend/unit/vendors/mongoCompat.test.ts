@@ -3,9 +3,9 @@ import {
   parseVersion, atLeast, compareVersions, parseDeploymentType, declaredDeployment,
   resolveQeProfile, capabilitiesOf, classifyProbe, isUnsupportedQueryTypeError,
   versionMismatch, describeTarget, describeDeployment, encryptedFieldsDrift,
-} from '@leafypay/mongo-compat';
+} from '@ist-sec/mongo-compat';
 
-// @leafypay/mongo-compat is shared verbatim by PSP, bankcore and GIAM (vendored, no registry), so
+// @ist-sec/mongo-compat is shared verbatim by PSP, bankcore and GIAM (vendored, no registry), so
 // its pure functions are tested once here rather than once per consumer.
 
 describe('mongo-compat: version parsing', () => {

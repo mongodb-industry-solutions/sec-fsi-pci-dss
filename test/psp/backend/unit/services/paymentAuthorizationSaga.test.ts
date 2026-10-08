@@ -15,7 +15,7 @@ vi.mock('../../../../../psp/backend/src/modules/transaction/services/cardTransac
   declineTransaction: h.declineTransaction,
 }));
 
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { makeEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 import type { Db } from 'mongodb';
 import { PaymentAuthorizationSaga } from '../../../../../psp/backend/src/modules/transaction/services/paymentAuthorization.saga';

@@ -3,7 +3,7 @@ import { Db } from 'mongodb';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { classifyProbe, resolveCryptSharedLibPath } from '@leafypay/mongo-compat';
+import { classifyProbe, resolveCryptSharedLibPath } from '@ist-sec/mongo-compat';
 import { getRawClient } from '../../../vendors/encryption/rawClient';
 import { getDemoUsers } from '../services/demoRoster.service';
 import { getDbForRole } from '../../../vendors/encryption/roleClients';

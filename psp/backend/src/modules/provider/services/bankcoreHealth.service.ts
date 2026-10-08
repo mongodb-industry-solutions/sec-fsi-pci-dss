@@ -1,5 +1,5 @@
 import { config } from '../../../config';
-import { linkKind } from '@leafypay/platform-links';
+import { linkKind } from '@ist-sec/platform-links';
 
 // Health of the bank as a service, for the admin service list. Same states the provider registry
 // already uses, plus one this platform needs and did not have.

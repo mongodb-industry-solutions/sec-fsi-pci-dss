@@ -1,5 +1,5 @@
 import { createPublicKey, verify as cryptoVerify, KeyObject } from 'crypto';
-import { discoverAuthority, fetchAuthorityJson, AuthorityDiscovery } from '@leafypay/giam-client';
+import { discoverAuthority, fetchAuthorityJson, AuthorityDiscovery } from '@ist-sec/giam-client';
 import { config } from '../../config';
 import { expandRoles } from './roleCatalog';
 

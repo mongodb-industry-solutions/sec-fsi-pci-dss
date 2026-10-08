@@ -14,7 +14,7 @@ import supertest from 'supertest';
 import * as crypto from 'crypto';
 import { buildApp } from '../../../../../psp/backend/bin/server';
 import type { FastifyInstance } from 'fastify';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 
 const SKIP = !process.env.TEST_MONGODB_URI;
 const skip = SKIP ? it.skip : it;

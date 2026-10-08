@@ -27,7 +27,7 @@
 import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { config } from '../../config';
-import { supportsAtlasAdminApi } from '@leafypay/mongo-compat';
+import { supportsAtlasAdminApi } from '@ist-sec/mongo-compat';
 
 const ATLAS_API_BASE = 'cloud.mongodb.com';
 const ATLAS_API_PATH_BASE = '/api/atlas/v2';

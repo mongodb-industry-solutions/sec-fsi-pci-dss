@@ -5,9 +5,9 @@ export default defineConfig({
   resolve: {
     // v37: run the shared package from source, so a test never sees a stale dist build.
     alias: {
-      '@leafypay/eventbus': resolve(__dirname, 'packages/eventbus/src/index.ts'),
-      '@leafypay/platform-links': resolve(__dirname, 'packages/platform-links/src/index.ts'),
-      '@leafypay/mongo-compat': resolve(__dirname, 'packages/mongo-compat/src/index.ts'),
+      '@ist-sec/eventbus': resolve(__dirname, 'packages/eventbus/src/index.ts'),
+      '@ist-sec/platform-links': resolve(__dirname, 'packages/platform-links/src/index.ts'),
+      '@ist-sec/mongo-compat': resolve(__dirname, 'packages/mongo-compat/src/index.ts'),
     },
   },
   test: {

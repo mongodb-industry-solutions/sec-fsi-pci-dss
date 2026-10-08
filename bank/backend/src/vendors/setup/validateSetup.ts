@@ -1,6 +1,6 @@
 import { Db } from 'mongodb';
 import { BANK_PROFILE_COLLECTION, BankProfileControlRecord } from '../../modules/aspsp/models/bankProfile.model';
-import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
+import { DOMAIN_EVENT_COLLECTION } from '@ist-sec/eventbus';
 import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accountArrangement.model';
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
@@ -20,7 +20,7 @@ import {
 import {
   COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION, CounterpartyBankControlRecord,
 } from '../../modules/payment-hub/models/counterpartyBank.model';
-import { assertLinks as assertSubscriptionLinks } from '@leafypay/platform-links';
+import { assertLinks as assertSubscriptionLinks } from '@ist-sec/platform-links';
 import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
@@ -31,10 +31,10 @@ import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
 import { findOrphanedDeks } from '../encryption/keyVault';
 import { validateCrossSide } from './validateCrossSide';
-import { assertLinks, resolvePlatformLinks } from '@leafypay/platform-links';
+import { assertLinks, resolvePlatformLinks } from '@ist-sec/platform-links';
 import { readSeedFile } from '../seed/readSeedFile';
 import { config, keyVaultNamespaceParts } from '../../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@ist-sec/mongo-compat';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
 export interface ValidationResult {

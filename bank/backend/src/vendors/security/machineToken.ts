@@ -1,4 +1,4 @@
-import { MachineTokenSource } from '@leafypay/giam-client';
+import { MachineTokenSource } from '@ist-sec/giam-client';
 import { config } from '../../config';
 
 /**

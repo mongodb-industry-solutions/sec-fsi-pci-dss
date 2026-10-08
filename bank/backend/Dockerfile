@@ -23,7 +23,7 @@ RUN npm install -g npm@11
 # builds dist/ during the install. The shared tsconfig comes with them: every package tsconfig
 # extends it, and tsc falls back to an ES5 target without it, which fails on ordinary Set iteration.
 # Copied before the crypt_shared download below: that step reads the recommended version FROM the
-# compiled @leafypay/mongo-compat, so the deployment and installation steps stay driven by the same
+# compiled @ist-sec/mongo-compat, so the deployment and installation steps stay driven by the same
 # source instead of a literal copied into this Dockerfile and the PSP's.
 COPY tsconfig.base.json ./
 COPY packages/ packages/
@@ -32,7 +32,7 @@ RUN cd packages/platform-links && npm install
 RUN cd packages/mongo-compat && npm install
 RUN cd packages/giam-client && npm install
 
-# crypt_shared, the SAME version the PSP backend downloads (@leafypay/mongo-compat's
+# crypt_shared, the SAME version the PSP backend downloads (@ist-sec/mongo-compat's
 # MONGODB_CRYPT_SHARED_LIB_VERSION). bankcore runs Queryable Encryption against the SAME key
 # vault, and a version mismatch between the two services surfaces as a generic 503.
 RUN ARCH=$(dpkg --print-architecture) && \

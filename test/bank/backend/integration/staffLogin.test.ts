@@ -10,7 +10,7 @@
 // hand-rolled and no signature is faked.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 import {
   startAuthority, machineToken, interactiveToken, decodeClaims, type Authority,
 } from '../support/authorityProcess';

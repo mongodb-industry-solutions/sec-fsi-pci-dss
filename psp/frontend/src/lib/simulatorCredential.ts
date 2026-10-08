@@ -29,7 +29,7 @@ function clientSecret(): string {
   // in that case the value arrives through the variable above.
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { clientSecretFor } = require('@leafypay/platform-links') as {
+    const { clientSecretFor } = require('@ist-sec/platform-links') as {
       clientSecretFor: (clientId: string) => string;
     };
     return clientSecretFor(SIMULATOR_CLIENT_ID);

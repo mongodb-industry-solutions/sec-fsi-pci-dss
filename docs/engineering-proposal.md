@@ -476,7 +476,7 @@ If a breaking schema change is needed (e.g., adding a QE range field), the colle
 
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
-| `crypt_shared` library version mismatch with the MongoDB Node.js driver, or with the declared `MONGODB_TYPE`/`MONGODB_VERSION` | Medium | High | Resolved by `@leafypay/mongo-compat` (`resolveCryptSharedLibPath`, `cryptSharedHint`, `detectDeployment`), shared by PSP, bankcore and GIAM instead of three independent checks; see ADR-081. Pin `mongodb` and `mongodb-client-encryption` to the same minor version as a second line of defense |
+| `crypt_shared` library version mismatch with the MongoDB Node.js driver, or with the declared `MONGODB_TYPE`/`MONGODB_VERSION` | Medium | High | Resolved by `@ist-sec/mongo-compat` (`resolveCryptSharedLibPath`, `cryptSharedHint`, `detectDeployment`), shared by PSP, bankcore and GIAM instead of three independent checks; see ADR-081. Pin `mongodb` and `mongodb-client-encryption` to the same minor version as a second line of defense |
 | AWS KMS latency degrades demo flow | Low | Medium | Cache the unwrapped DEK in memory for the process lifetime; only call KMS on startup |
 | Atlas M0 / M2 / M5 (free tier) used by a developer: QE not supported | High | High | Gate `bin/setup.ts` with a cluster tier check; fail fast with a clear error message |
 | QE `$lookup` limitation breaks a planned join | Low | High | All joins are application-side sequential queries: no `$lookup` used. Documented in ADR-001 |
@@ -3080,7 +3080,7 @@ allowance made for the first.
 
 ### ADR-081: MongoDB edition/version compatibility lives in one vendored package, not per-service
 
-**Context.** `@leafypay/mongo-compat` existed to make the QE text-search query-type table (`substringPreview`
+**Context.** `@ist-sec/mongo-compat` existed to make the QE text-search query-type table (`substringPreview`
 vs `substring`) a single source of truth for PSP and bankcore, but five independent places still
 decided the same kind of question on their own: GIAM built its own, more complete deployment
 classifier (Community Edition detection, live `buildInfo`/`hello` probing, a broader capability set

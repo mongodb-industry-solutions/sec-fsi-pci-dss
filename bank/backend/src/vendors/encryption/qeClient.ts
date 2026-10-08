@@ -2,11 +2,11 @@
 // no new key material exists on this side.
 //
 // Uses the same crypt_shared resolution chain as the PSP (explicit path, then platform defaults,
-// then node_modules) via @leafypay/mongo-compat, but still HARD-FAILS at startup if nothing is
+// then node_modules) via @ist-sec/mongo-compat, but still HARD-FAILS at startup if nothing is
 // found: a wrong or missing library fails the whole connection and surfaces as a generic 503,
 // which is expensive to diagnose, and the two services must load the same version anyway.
 import { MongoClient, KMSProviders } from 'mongodb';
-import { resolveCryptSharedLibPath } from '@leafypay/mongo-compat';
+import { resolveCryptSharedLibPath } from '@ist-sec/mongo-compat';
 import { config, keyVaultNamespaceParts } from '../../config';
 
 let client: MongoClient | null = null;

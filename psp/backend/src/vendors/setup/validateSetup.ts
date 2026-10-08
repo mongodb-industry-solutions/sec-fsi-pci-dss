@@ -6,8 +6,8 @@ import * as https from 'https';
 import { buildBasicAuthHeader } from '../encryption/digest';
 import { getKmsConfig } from '../encryption/kms';
 import { config } from '../../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
-import { assertLinks, type LinkAssertion } from '@leafypay/platform-links';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@ist-sec/mongo-compat';
+import { assertLinks, type LinkAssertion } from '@ist-sec/platform-links';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });

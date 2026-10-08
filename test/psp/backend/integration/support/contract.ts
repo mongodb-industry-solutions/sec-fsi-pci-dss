@@ -5,7 +5,7 @@ import { resolve } from 'path';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../../../../../psp/backend/bin/server';
 import { authorityToken, stopAuthority } from './authorityToken';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 
 export { stopAuthority };
 

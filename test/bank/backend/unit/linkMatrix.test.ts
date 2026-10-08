@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { LINK_MATRIX, PLATFORM_ENVIRONMENTS, type PlatformEnvironment } from '@leafypay/platform-links';
+import { LINK_MATRIX, PLATFORM_ENVIRONMENTS, type PlatformEnvironment } from '@ist-sec/platform-links';
 
 /** The environment variable each link is configured by, in the manifests. */
 const VARIABLE_FOR = {

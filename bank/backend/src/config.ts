@@ -1,8 +1,8 @@
 import * as dotenv from 'dotenv';
 import { createHash } from 'crypto';
 import { resolve } from 'path';
-import { clientSecretFor } from '@leafypay/platform-links';
-import { parseDeploymentType, DEFAULT_MONGODB_VERSION } from '@leafypay/mongo-compat';
+import { clientSecretFor } from '@ist-sec/platform-links';
+import { parseDeploymentType, DEFAULT_MONGODB_VERSION } from '@ist-sec/mongo-compat';
 
 dotenv.config({ path: resolve(__dirname, '../../../.env') });
 

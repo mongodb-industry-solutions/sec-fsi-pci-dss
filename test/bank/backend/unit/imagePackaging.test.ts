@@ -141,7 +141,7 @@ describe('v37: the backend image ships what it orchestrates', () => {
     }
   });
 
-  it('derives crypt_shared from @leafypay/mongo-compat in both images, since they share a key vault', () => {
+  it('derives crypt_shared from @ist-sec/mongo-compat in both images, since they share a key vault', () => {
     // Neither Dockerfile hand-copies a version literal any more (ADR-081): both read
     // MONGODB_CRYPT_SHARED_LIB_VERSION from the same compiled package at build time, so a drift
     // between them (a generic 503 against the shared key vault) is structurally impossible rather

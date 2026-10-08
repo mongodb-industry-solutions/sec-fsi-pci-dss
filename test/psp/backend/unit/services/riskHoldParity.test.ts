@@ -54,7 +54,7 @@ vi.mock('../../../../../psp/backend/src/modules/notification/notifications.servi
 }));
 
 import type { Db } from 'mongodb';
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { makeEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../../psp/backend/src/modules/transaction/services/paymentAuthorization.saga';
 import { PayoutOrchestrationProcess } from '../../../../../psp/backend/src/modules/gateway/services/payoutOrchestration.process';

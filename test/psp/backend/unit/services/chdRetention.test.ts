@@ -5,7 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { purgeChd, sweepAbandonedChd, ChdRetention } from '../../../../../psp/backend/src/modules/transaction/services/chdRetention.service';
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { makeEvent } from '../../../../../psp/backend/src/vendors/eventbus';
 
 const flush = () => new Promise((r) => setTimeout(r, 0));

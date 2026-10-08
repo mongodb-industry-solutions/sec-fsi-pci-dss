@@ -1,4 +1,4 @@
-// PSP binding for the shared @leafypay/eventbus package: supplies this service's settings and DB.
+// PSP binding for the shared @ist-sec/eventbus package: supplies this service's settings and DB.
 // The implementation lives in packages/eventbus, so bankcore reuses it instead of copying it.
 import type { Db } from 'mongodb';
 import {
@@ -8,7 +8,7 @@ import {
   type EventBusEngine,
   type EventBusSettings,
   type EventStore,
-} from '@leafypay/eventbus';
+} from '@ist-sec/eventbus';
 import { config } from '../../config';
 
 function pspSettings(): EventBusSettings {
@@ -35,4 +35,4 @@ export function resolveEventBusEngine(): EventBusEngine {
   return resolveSharedEngine(config.app.eventBusEngine);
 }
 
-export * from '@leafypay/eventbus';
+export * from '@ist-sec/eventbus';
