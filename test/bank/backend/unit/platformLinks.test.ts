@@ -5,7 +5,7 @@ import {
   resolvePlatformLinks, absoluteEndpoint, isAbsoluteHttpUrl, linkKind, assertLinks,
   resolveLinks, tryResolveLinks, platformEnvironment, authorityIssuerUrl,
   LINK_MATRIX, PLATFORM_ENVIRONMENTS,
-} from '@leafypay/platform-links';
+} from '@ist-sec/platform-links';
 
 const LOCAL = {};
 const STAGING = {

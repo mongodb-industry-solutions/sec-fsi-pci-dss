@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { generateKeyPairSync, createSign, createHmac, randomUUID } from 'node:crypto';
 import { readSeedFile } from './support/contract';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 import { interactiveToken } from '../../../support/authorizationFlow';
 import { readFileSync } from 'fs';
 import { giamPath } from '../../../support/giamRepo';

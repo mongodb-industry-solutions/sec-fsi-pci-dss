@@ -1,6 +1,6 @@
 import { Db } from 'mongodb';
 import { BANK_PROFILE_COLLECTION, BankProfileControlRecord } from '../../modules/aspsp/models/bankProfile.model';
-import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
+import { DOMAIN_EVENT_COLLECTION } from '@ist-sec/eventbus';
 import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accountArrangement.model';
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';
@@ -20,7 +20,7 @@ import {
 import {
   COUNTERPARTY_BANK_COLLECTION, INTERBANK_MESSAGE_LOG_COLLECTION, CounterpartyBankControlRecord,
 } from '../../modules/payment-hub/models/counterpartyBank.model';
-import { assertLinks as assertSubscriptionLinks } from '@leafypay/platform-links';
+import { assertLinks as assertSubscriptionLinks } from '@ist-sec/platform-links';
 import {
   CARD_ISSUER_VAULT_COLLECTION, ISSUED_CARD_REGISTRY_COLLECTION,
 } from '../../modules/card-issuer/models/cardIssuerVault.model';
@@ -31,10 +31,10 @@ import { plannedIndexes } from './createIndexes';
 import { assertCryptSharedLib } from '../encryption/qeClient';
 import { findOrphanedDeks } from '../encryption/keyVault';
 import { validateCrossSide } from './validateCrossSide';
-import { assertLinks, resolvePlatformLinks } from '@leafypay/platform-links';
+import { assertLinks, resolvePlatformLinks } from '@ist-sec/platform-links';
 import { readSeedFile } from '../seed/readSeedFile';
 import { config, keyVaultNamespaceParts } from '../../config';
-import { describeTarget, versionMismatch, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@leafypay/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, encryptedFieldsDrift, EncryptedFieldQuery } from '@ist-sec/mongo-compat';
 import { buildEncryptedFieldsMaps } from '../encryption/encryptedFieldsMaps';
 
 export interface ValidationResult {
@@ -80,16 +80,16 @@ export async function validateSetup(db: Db): Promise<ValidationResult> {
   }
 
   // Declared target vs the cluster. The bank shares the PSP's cluster and key vault, so a version
-  // that disagrees breaks encrypted reads on both sides for the same reason.
-  add('declared target', true, describeTarget(config.mongodb.type, config.mongodb.version));
-  try {
-    const { version } = await db.client.db('admin').command({ buildInfo: 1 });
-    const mismatch = versionMismatch(config.mongodb.version, version);
-    add('server version', !mismatch, mismatch ?? `cluster reports ${version}`);
-  } catch (err) {
-    add('server version', true, `could not read buildInfo (${err instanceof Error ? err.message : String(err)})`);
+  // or edition that disagrees breaks encrypted reads on both sides for the same reason.
+  const declared = declaredDeployment(config.mongodb.type, config.mongodb.version);
+  add('declared target', true, describeDeployment(declared));
+  const current = await detectDeployment(db.client, declared);
+  add('server version', !current.mismatch, current.mismatch ?? `cluster reports ${describeDeployment(current)}`);
+  for (const finding of capabilityFindings(current)) {
+    if (finding.text === current.mismatch) continue; // already reported above as 'server version'
+    add('capability', !finding.warn, finding.text);
   }
-  const hint = cryptSharedHint(config.mongodb.version, config.mongodb.cryptSharedLibPath);
+  const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
   if (hint) add('crypt_shared version', false, hint);
 
   // What the bank database holds vs what this build declares, field by field.

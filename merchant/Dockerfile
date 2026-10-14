@@ -1,5 +1,5 @@
 # ── Merchant demo app (Espresso Works) ────────────────────────────
-# Build context: repo root, because the app installs the shared @leafypay/platform-links package
+# Build context: repo root, because the app installs the shared @ist-sec/platform-links package
 # via `file:../packages/platform-links` (same arrangement as the PSP and bank backends).
 # ──────────────────────────────────────────────────────────────────
 FROM node:20-alpine

@@ -24,7 +24,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveBankcoreLink } from '../../../../../psp/backend/src/vendors/seed/resolveProviderCredential';
-import { resolveLinks } from '@leafypay/platform-links';
+import { resolveLinks } from '@ist-sec/platform-links';
 import type { ExternalProviderArrangement } from '../../../../../psp/backend/src/modules/provider/models/externalProviderArrangement.model';
 
 const FIXTURE = join(process.cwd(), 'psp', 'backend', 'data', 'externalProviderArrangement.json');

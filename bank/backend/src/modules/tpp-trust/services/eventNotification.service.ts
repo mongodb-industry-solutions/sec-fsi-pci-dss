@@ -1,7 +1,7 @@
 import { Db } from 'mongodb';
 import jwt from 'jsonwebtoken';
 import { v4 as uuidv4 } from 'uuid';
-import { resolveLinks } from '@leafypay/platform-links';
+import { resolveLinks } from '@ist-sec/platform-links';
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_WEBHOOK_DELIVERY_LOG_COLLECTION,
   TppEventSubscriptionControlRecord, TppWebhookDeliveryLogRecord, TppEventType, DeliveryOutcome,

@@ -370,6 +370,13 @@ async function main() {
     const txType = TX_TYPES[i % TX_TYPES.length];
     const { description, narrative } = descriptorFor(merchantName, txType);
 
+    // Anchored to NOW (and to each other), not to the real wall-clock date: faker defaults
+    // `refDate` to `new Date()`, so a run on any day after 2026-05-27 produced a transaction dated
+    // AFTER every other record's recordUpdatedDateTime=NOW, i.e. "settled" before it happened.
+    // recordCreatedDateTime is the transaction's own timestamp (a log entry is created when the
+    // event is recorded, not at some unrelated random moment), matching every curated record.
+    const transactionDateTime = faker.date.recent({ days: 30, refDate: NOW });
+
     // v2: sensitive gateway fields (QE:none, DEK-sensitive tier) merged inline.
     cardTransactions.push({
       cardTransactionInstanceReference: uuid(),
@@ -382,11 +389,11 @@ async function main() {
       },
       processorTransactionMetadata: {
         networkId: 'VISA_NET',
-        settlementDate: faker.date.soon({ days: 3 }),
+        settlementDate: faker.date.soon({ days: 3, refDate: transactionDateTime }),
         processingFlags: ['standard'],
       },
       cardTransactionAmount: { amount, currency: 'EUR' },
-      cardTransactionDateTime: faker.date.recent({ days: 30 }),
+      cardTransactionDateTime: transactionDateTime,
       cardTransactionStatus: STATUSES[i % STATUSES.length],
       cardTransactionType: txType,
       cardTransactionChannel: CHANNELS[i % CHANNELS.length],
@@ -398,7 +405,7 @@ async function main() {
       cardTransactionNarrative: narrative,
       bianServiceDomain: 'Card Transaction',
       bianControlRecordType: 'CardTransactionLog',
-      recordCreatedDateTime: faker.date.recent({ days: 30 }),
+      recordCreatedDateTime: transactionDateTime,
       recordUpdatedDateTime: NOW,
       schemaVersion: 3,
     });

@@ -2,7 +2,7 @@ import {
   platformEnvironment,
   resolveLinks,
   type PlatformEnvironment,
-} from '@leafypay/platform-links';
+} from '@ist-sec/platform-links';
 import type {
   ExternalProviderArrangement, ProviderBaseUrlByEnvironment,
 } from '../models/externalProviderArrangement.model';

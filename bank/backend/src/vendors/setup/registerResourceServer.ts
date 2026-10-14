@@ -1,6 +1,6 @@
 import { BANK_PERMISSION_CATALOG, BANK_PERMISSION_CATALOG_VERSION } from '../../shared/models/permissionCatalog';
 import { authorityMachineToken } from '../security/machineToken';
-import { discoverAuthority, fetchAuthorityJson } from '@leafypay/giam-client';
+import { discoverAuthority, fetchAuthorityJson } from '@ist-sec/giam-client';
 import { config } from '../../config';
 
 /**

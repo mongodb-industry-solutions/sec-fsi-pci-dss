@@ -82,7 +82,7 @@ vi.mock('../../../../../psp/backend/src/modules/gateway/services/merchantCallbac
 
 import { createTransaction, getTransactionById, getAllTransactions } from '../../../../../psp/backend/src/modules/transaction/services/cardTransaction.service';
 import { dispatchProvider } from '../../../../../psp/backend/src/modules/provider/services/integrationDispatch.service';
-import { EventBusInProcess } from '@leafypay/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
 import { setEventBus, getEventBus } from '../../../../../psp/backend/src/vendors/eventbus';
 import { PaymentAuthorizationSaga } from '../../../../../psp/backend/src/modules/transaction/services/paymentAuthorization.saga';
 import { ProviderGroups } from '../../../../../psp/backend/src/providers/groups/providerGroups';

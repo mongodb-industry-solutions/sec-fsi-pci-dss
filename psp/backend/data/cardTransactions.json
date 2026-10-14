@@ -232,7 +232,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T18:25:55.855Z",
+    "recordCreatedDateTime": "2026-05-21T00:50:09.504Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -253,7 +253,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T19:10:32.850Z",
+    "recordCreatedDateTime": "2026-05-20T08:54:01.228Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -274,7 +274,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-08T06:49:34.685Z",
+    "recordCreatedDateTime": "2026-05-20T03:29:35.900Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -295,7 +295,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T04:50:59.126Z",
+    "recordCreatedDateTime": "2026-05-11T14:54:38.361Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -316,7 +316,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T23:03:01.748Z",
+    "recordCreatedDateTime": "2026-05-06T20:01:09.846Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -337,7 +337,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T03:41:08.994Z",
+    "recordCreatedDateTime": "2026-04-30T07:47:39.023Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -358,7 +358,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T04:00:17.365Z",
+    "recordCreatedDateTime": "2026-05-20T13:47:24.181Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -379,7 +379,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T12:05:32.879Z",
+    "recordCreatedDateTime": "2026-05-16T08:59:03.499Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -400,7 +400,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T12:57:05.941Z",
+    "recordCreatedDateTime": "2026-05-19T09:43:29.736Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -421,7 +421,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T14:28:49.909Z",
+    "recordCreatedDateTime": "2026-05-12T11:06:38.684Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -442,7 +442,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-28T05:09:33.679Z",
+    "recordCreatedDateTime": "2026-05-25T23:39:21.626Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -463,7 +463,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T02:20:21.558Z",
+    "recordCreatedDateTime": "2026-05-25T15:37:26.934Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -484,7 +484,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-13T19:13:37.147Z",
+    "recordCreatedDateTime": "2026-05-26T10:19:47.557Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -505,7 +505,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-03T08:50:15.243Z",
+    "recordCreatedDateTime": "2026-05-20T23:57:09.963Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -517,7 +517,7 @@
       "amount": 268.99,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-28T22:59:38.496Z",
+    "cardTransactionDateTime": "2026-05-17T04:05:15.650Z",
     "cardTransactionStatus": "disputed",
     "cardTransactionChannel": "contactless",
     "cardTransactionInitiationType": "customerInitiated",
@@ -526,7 +526,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T18:10:31.301Z",
+    "recordCreatedDateTime": "2026-05-17T04:05:15.650Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -547,7 +547,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-04-30T00:42:26.625Z",
+    "recordCreatedDateTime": "2026-05-19T21:01:29.610Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -568,7 +568,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T15:01:40.745Z",
+    "recordCreatedDateTime": "2026-05-12T19:01:10.037Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -589,7 +589,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-18T12:42:10.628Z",
+    "recordCreatedDateTime": "2026-05-04T13:15:31.084Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -610,7 +610,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T07:48:27.454Z",
+    "recordCreatedDateTime": "2026-05-01T02:53:10.961Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -631,7 +631,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T23:53:08.618Z",
+    "recordCreatedDateTime": "2026-05-27T01:01:16.044Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -652,7 +652,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T13:48:15.899Z",
+    "recordCreatedDateTime": "2026-05-13T23:44:27.407Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -673,7 +673,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T00:05:55.244Z",
+    "recordCreatedDateTime": "2026-05-05T03:35:26.348Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -685,7 +685,7 @@
       "amount": 137.72,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-27T14:49:16.055Z",
+    "cardTransactionDateTime": "2026-05-25T15:31:58.411Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "contactless",
     "cardTransactionInitiationType": "customerInitiated",
@@ -694,7 +694,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T17:03:56.822Z",
+    "recordCreatedDateTime": "2026-05-25T15:31:58.411Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -715,7 +715,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T03:21:05.991Z",
+    "recordCreatedDateTime": "2026-05-01T06:10:18.851Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -736,7 +736,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T22:13:17.027Z",
+    "recordCreatedDateTime": "2026-05-06T06:03:22.949Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -757,7 +757,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-22T23:37:42.556Z",
+    "recordCreatedDateTime": "2026-05-21T12:58:09.165Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -778,7 +778,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T22:23:46.250Z",
+    "recordCreatedDateTime": "2026-05-01T20:57:20.785Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -799,7 +799,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-28T02:26:20.466Z",
+    "recordCreatedDateTime": "2026-05-09T16:30:58.094Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -820,7 +820,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-20T15:27:38.618Z",
+    "recordCreatedDateTime": "2026-05-08T03:17:18.389Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -841,7 +841,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T03:29:54.910Z",
+    "recordCreatedDateTime": "2026-05-02T15:13:38.304Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -862,7 +862,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T04:22:13.893Z",
+    "recordCreatedDateTime": "2026-05-04T04:23:05.018Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -883,7 +883,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T07:37:33.845Z",
+    "recordCreatedDateTime": "2026-05-07T17:58:25.471Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -904,7 +904,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T05:40:36.283Z",
+    "recordCreatedDateTime": "2026-05-07T08:22:26.418Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -925,7 +925,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T11:24:16.887Z",
+    "recordCreatedDateTime": "2026-05-19T10:54:20.647Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -946,7 +946,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T04:13:44.391Z",
+    "recordCreatedDateTime": "2026-05-02T00:40:13.925Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -967,7 +967,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T13:03:04.902Z",
+    "recordCreatedDateTime": "2026-05-19T20:53:22.136Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -988,7 +988,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T17:25:18.575Z",
+    "recordCreatedDateTime": "2026-05-16T22:38:39.139Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1009,7 +1009,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-13T04:38:48.169Z",
+    "recordCreatedDateTime": "2026-05-03T15:49:49.566Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1030,7 +1030,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T15:29:08.323Z",
+    "recordCreatedDateTime": "2026-05-27T02:48:55.079Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1051,7 +1051,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-18T18:01:53.918Z",
+    "recordCreatedDateTime": "2026-04-30T14:05:39.024Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1072,7 +1072,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T04:30:31.019Z",
+    "recordCreatedDateTime": "2026-04-30T07:12:42.722Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1093,7 +1093,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T19:34:24.057Z",
+    "recordCreatedDateTime": "2026-05-03T17:54:30.588Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1114,7 +1114,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-16T12:12:10.644Z",
+    "recordCreatedDateTime": "2026-05-18T09:11:20.994Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1135,7 +1135,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T03:32:32.339Z",
+    "recordCreatedDateTime": "2026-05-13T03:56:47.378Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1156,7 +1156,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-22T12:15:06.557Z",
+    "recordCreatedDateTime": "2026-05-19T06:52:00.919Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1177,7 +1177,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T20:26:52.854Z",
+    "recordCreatedDateTime": "2026-05-21T14:51:36.226Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1198,7 +1198,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-28T13:26:08.050Z",
+    "recordCreatedDateTime": "2026-05-05T21:35:41.291Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1219,7 +1219,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T02:39:46.471Z",
+    "recordCreatedDateTime": "2026-05-08T12:23:16.823Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1240,7 +1240,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T19:05:20.317Z",
+    "recordCreatedDateTime": "2026-05-09T02:24:29.618Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1261,7 +1261,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T15:11:59.241Z",
+    "recordCreatedDateTime": "2026-05-18T18:09:26.944Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1282,7 +1282,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T05:02:16.912Z",
+    "recordCreatedDateTime": "2026-05-01T23:30:23.043Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1294,7 +1294,7 @@
       "amount": 1033.89,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-29T08:42:39.035Z",
+    "cardTransactionDateTime": "2026-05-20T23:53:01.736Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "atm",
     "cardTransactionInitiationType": "customerInitiated",
@@ -1303,7 +1303,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T09:46:03.473Z",
+    "recordCreatedDateTime": "2026-05-20T23:53:01.736Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1315,7 +1315,7 @@
       "amount": 1205.03,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-28T06:16:06.789Z",
+    "cardTransactionDateTime": "2026-05-22T13:21:02.714Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "online",
     "cardTransactionInitiationType": "customerInitiated",
@@ -1324,7 +1324,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T12:42:05.429Z",
+    "recordCreatedDateTime": "2026-05-22T13:21:02.714Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1345,7 +1345,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T08:22:12.446Z",
+    "recordCreatedDateTime": "2026-05-08T00:16:57.111Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1366,7 +1366,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T13:41:20.217Z",
+    "recordCreatedDateTime": "2026-05-27T10:37:26.997Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1387,7 +1387,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T01:47:37.798Z",
+    "recordCreatedDateTime": "2026-05-12T14:14:23.451Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1408,7 +1408,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-20T02:09:19.840Z",
+    "recordCreatedDateTime": "2026-05-14T09:59:31.920Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1429,7 +1429,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-04-30T19:27:39.854Z",
+    "recordCreatedDateTime": "2026-05-08T00:52:48.842Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1450,7 +1450,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T03:14:37.850Z",
+    "recordCreatedDateTime": "2026-05-21T03:28:00.923Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1471,7 +1471,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T11:43:20.688Z",
+    "recordCreatedDateTime": "2026-05-10T10:30:01.976Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1492,7 +1492,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T08:36:57.835Z",
+    "recordCreatedDateTime": "2026-05-08T04:42:31.352Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1513,7 +1513,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T19:54:54.615Z",
+    "recordCreatedDateTime": "2026-05-04T05:06:28.153Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1534,7 +1534,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-10T12:49:54.853Z",
+    "recordCreatedDateTime": "2026-05-02T18:32:33.189Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1555,7 +1555,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-26T06:04:04.734Z",
+    "recordCreatedDateTime": "2026-05-02T14:45:10.462Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1576,7 +1576,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-28T13:40:49.933Z",
+    "recordCreatedDateTime": "2026-05-07T10:26:49.055Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1597,7 +1597,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-08T21:25:00.146Z",
+    "recordCreatedDateTime": "2026-05-16T23:10:07.099Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1618,7 +1618,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T06:25:39.316Z",
+    "recordCreatedDateTime": "2026-05-13T05:50:23.569Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1639,7 +1639,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-05T04:05:26.570Z",
+    "recordCreatedDateTime": "2026-05-02T00:51:27.192Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1660,7 +1660,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T18:57:28.196Z",
+    "recordCreatedDateTime": "2026-05-05T01:47:34.311Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1681,7 +1681,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T03:05:29.174Z",
+    "recordCreatedDateTime": "2026-05-16T02:55:18.705Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1702,7 +1702,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T01:33:22.201Z",
+    "recordCreatedDateTime": "2026-05-07T06:25:55.100Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1714,7 +1714,7 @@
       "amount": 50.61,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-29T01:11:52.765Z",
+    "cardTransactionDateTime": "2026-05-15T21:49:43.695Z",
     "cardTransactionStatus": "disputed",
     "cardTransactionChannel": "atm",
     "cardTransactionInitiationType": "customerInitiated",
@@ -1723,7 +1723,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T05:39:27.391Z",
+    "recordCreatedDateTime": "2026-05-15T21:49:43.695Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1744,7 +1744,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T15:51:23.014Z",
+    "recordCreatedDateTime": "2026-05-10T03:04:48.173Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1765,7 +1765,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T05:06:09.477Z",
+    "recordCreatedDateTime": "2026-05-13T16:03:25.540Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1786,7 +1786,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-03T01:45:40.046Z",
+    "recordCreatedDateTime": "2026-05-23T01:54:39.102Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1807,7 +1807,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T20:08:45.646Z",
+    "recordCreatedDateTime": "2026-05-12T21:00:52.824Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1828,7 +1828,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-26T21:27:31.095Z",
+    "recordCreatedDateTime": "2026-05-05T10:09:46.726Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1849,7 +1849,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-12T06:14:20.334Z",
+    "recordCreatedDateTime": "2026-05-24T11:04:43.759Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1870,7 +1870,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T07:43:43.654Z",
+    "recordCreatedDateTime": "2026-04-29T23:07:23.109Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1891,7 +1891,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T02:28:06.679Z",
+    "recordCreatedDateTime": "2026-05-02T22:41:28.601Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1912,7 +1912,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T17:24:13.690Z",
+    "recordCreatedDateTime": "2026-05-25T15:06:23.921Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1933,7 +1933,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T05:29:56.822Z",
+    "recordCreatedDateTime": "2026-05-01T00:36:35.162Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1954,7 +1954,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-04-30T23:12:02.362Z",
+    "recordCreatedDateTime": "2026-05-27T00:52:20.334Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1975,7 +1975,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T10:03:07.540Z",
+    "recordCreatedDateTime": "2026-05-10T05:33:31.319Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -1996,7 +1996,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T05:09:08.141Z",
+    "recordCreatedDateTime": "2026-05-14T10:14:27.865Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2017,7 +2017,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T02:59:43.662Z",
+    "recordCreatedDateTime": "2026-05-16T08:25:57.214Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2038,7 +2038,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T22:31:07.936Z",
+    "recordCreatedDateTime": "2026-05-26T05:54:25.461Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2059,7 +2059,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T18:28:39.277Z",
+    "recordCreatedDateTime": "2026-05-19T17:44:35.280Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2080,7 +2080,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T14:44:19.810Z",
+    "recordCreatedDateTime": "2026-05-08T15:25:41.685Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2101,7 +2101,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-16T15:22:54.757Z",
+    "recordCreatedDateTime": "2026-05-20T10:00:12.335Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2122,7 +2122,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-26T10:12:16.470Z",
+    "recordCreatedDateTime": "2026-05-24T20:08:38.527Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2143,7 +2143,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T10:26:47.393Z",
+    "recordCreatedDateTime": "2026-05-19T09:46:59.655Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2155,7 +2155,7 @@
       "amount": 977.91,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-27T21:09:39.444Z",
+    "cardTransactionDateTime": "2026-05-23T11:38:15.654Z",
     "cardTransactionStatus": "disputed",
     "cardTransactionChannel": "online",
     "cardTransactionInitiationType": "customerInitiated",
@@ -2164,7 +2164,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T09:16:31.309Z",
+    "recordCreatedDateTime": "2026-05-23T11:38:15.654Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2185,7 +2185,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T10:28:44.741Z",
+    "recordCreatedDateTime": "2026-05-14T09:23:52.497Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2206,7 +2206,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-10T18:48:45.422Z",
+    "recordCreatedDateTime": "2026-05-09T03:47:10.122Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2227,7 +2227,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-20T09:33:10.895Z",
+    "recordCreatedDateTime": "2026-05-15T22:03:03.859Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2248,7 +2248,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T23:43:27.411Z",
+    "recordCreatedDateTime": "2026-04-30T03:39:54.149Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2269,7 +2269,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T19:08:13.963Z",
+    "recordCreatedDateTime": "2026-05-25T17:23:19.241Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2290,7 +2290,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T09:27:51.255Z",
+    "recordCreatedDateTime": "2026-04-30T13:51:18.299Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2302,7 +2302,7 @@
       "amount": 1361.51,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-29T11:47:09.541Z",
+    "cardTransactionDateTime": "2026-05-13T22:11:22.424Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "atm",
     "cardTransactionInitiationType": "customerInitiated",
@@ -2311,7 +2311,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-04-30T06:22:44.848Z",
+    "recordCreatedDateTime": "2026-05-13T22:11:22.424Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2332,7 +2332,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T00:45:37.146Z",
+    "recordCreatedDateTime": "2026-05-13T10:39:24.527Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2353,7 +2353,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T20:43:19.319Z",
+    "recordCreatedDateTime": "2026-05-26T05:57:29.150Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2374,7 +2374,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T20:35:42.234Z",
+    "recordCreatedDateTime": "2026-05-20T02:57:03.741Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2395,7 +2395,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-07T17:24:49.133Z",
+    "recordCreatedDateTime": "2026-05-27T09:21:16.537Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2416,7 +2416,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T23:44:38.176Z",
+    "recordCreatedDateTime": "2026-05-14T02:33:43.111Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2437,7 +2437,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-07T10:51:16.624Z",
+    "recordCreatedDateTime": "2026-05-26T07:30:15.847Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2458,7 +2458,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-10T23:35:13.414Z",
+    "recordCreatedDateTime": "2026-04-30T07:03:26.483Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2479,7 +2479,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T03:47:46.645Z",
+    "recordCreatedDateTime": "2026-05-21T07:58:59.178Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2500,7 +2500,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T21:17:58.717Z",
+    "recordCreatedDateTime": "2026-05-18T02:54:45.059Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2521,7 +2521,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-13T19:50:34.987Z",
+    "recordCreatedDateTime": "2026-05-23T12:30:15.519Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2542,7 +2542,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T06:52:39.214Z",
+    "recordCreatedDateTime": "2026-04-29T17:35:22.689Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2563,7 +2563,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T22:46:27.075Z",
+    "recordCreatedDateTime": "2026-05-12T00:27:18.694Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2584,7 +2584,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-12T21:30:00.740Z",
+    "recordCreatedDateTime": "2026-05-01T15:36:32.435Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2605,7 +2605,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-28T22:47:07.611Z",
+    "recordCreatedDateTime": "2026-05-11T05:58:44.907Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2617,7 +2617,7 @@
       "amount": 164.62,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-28T03:14:01.004Z",
+    "cardTransactionDateTime": "2026-05-21T03:06:11.408Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "contactless",
     "cardTransactionInitiationType": "customerInitiated",
@@ -2626,7 +2626,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T16:12:22.816Z",
+    "recordCreatedDateTime": "2026-05-21T03:06:11.408Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2647,7 +2647,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T08:54:48.479Z",
+    "recordCreatedDateTime": "2026-04-30T02:38:31.595Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2668,7 +2668,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T08:19:35.850Z",
+    "recordCreatedDateTime": "2026-05-04T17:33:33.932Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2689,7 +2689,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T22:17:06.691Z",
+    "recordCreatedDateTime": "2026-05-07T12:44:54.908Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2710,7 +2710,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T05:03:35.355Z",
+    "recordCreatedDateTime": "2026-05-07T04:32:05.103Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2731,7 +2731,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-22T23:20:32.331Z",
+    "recordCreatedDateTime": "2026-05-24T03:00:28.546Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2752,7 +2752,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-18T23:02:08.266Z",
+    "recordCreatedDateTime": "2026-05-12T10:50:14.904Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2764,7 +2764,7 @@
       "amount": 887.73,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-28T02:05:12.091Z",
+    "cardTransactionDateTime": "2026-05-20T18:58:35.340Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "pos",
     "cardTransactionInitiationType": "customerInitiated",
@@ -2773,7 +2773,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-13T23:57:10.680Z",
+    "recordCreatedDateTime": "2026-05-20T18:58:35.340Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2794,7 +2794,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T05:10:51.962Z",
+    "recordCreatedDateTime": "2026-05-02T19:01:01.196Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2815,7 +2815,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-03T11:12:57.720Z",
+    "recordCreatedDateTime": "2026-05-04T18:47:12.107Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2836,7 +2836,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T15:13:52.157Z",
+    "recordCreatedDateTime": "2026-05-07T02:03:04.327Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2857,7 +2857,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-13T19:41:51.086Z",
+    "recordCreatedDateTime": "2026-05-08T20:52:49.613Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2878,7 +2878,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-23T19:28:40.853Z",
+    "recordCreatedDateTime": "2026-05-12T20:05:46.431Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2899,7 +2899,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T21:33:08.729Z",
+    "recordCreatedDateTime": "2026-05-08T03:27:57.402Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2920,7 +2920,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T07:06:34.952Z",
+    "recordCreatedDateTime": "2026-05-19T02:55:03.127Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2941,7 +2941,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T21:37:03.402Z",
+    "recordCreatedDateTime": "2026-05-04T02:27:56.227Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2962,7 +2962,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-20T12:50:40.112Z",
+    "recordCreatedDateTime": "2026-05-01T06:33:03.823Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -2983,7 +2983,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-12T11:32:37.158Z",
+    "recordCreatedDateTime": "2026-05-03T14:27:13.222Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3004,7 +3004,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T06:55:22.104Z",
+    "recordCreatedDateTime": "2026-05-21T15:08:10.164Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3025,7 +3025,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T03:01:08.890Z",
+    "recordCreatedDateTime": "2026-05-18T21:30:50.132Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3046,7 +3046,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T06:39:01.802Z",
+    "recordCreatedDateTime": "2026-05-23T02:17:46.139Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3067,7 +3067,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-26T03:28:10.403Z",
+    "recordCreatedDateTime": "2026-05-19T11:26:41.610Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3088,7 +3088,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-28T04:53:20.417Z",
+    "recordCreatedDateTime": "2026-05-01T09:04:31.937Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3109,7 +3109,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T21:43:57.981Z",
+    "recordCreatedDateTime": "2026-05-18T21:28:16.370Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3130,7 +3130,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T17:23:39.863Z",
+    "recordCreatedDateTime": "2026-05-16T02:47:01.171Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3151,7 +3151,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-05T13:13:16.000Z",
+    "recordCreatedDateTime": "2026-05-21T17:05:48.615Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3172,7 +3172,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T22:22:54.893Z",
+    "recordCreatedDateTime": "2026-05-19T22:00:11.384Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3193,7 +3193,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-03T13:06:45.676Z",
+    "recordCreatedDateTime": "2026-05-27T00:07:43.387Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3214,7 +3214,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T15:10:52.133Z",
+    "recordCreatedDateTime": "2026-05-19T12:35:05.065Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3235,7 +3235,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T10:43:23.952Z",
+    "recordCreatedDateTime": "2026-05-23T04:06:58.933Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3256,7 +3256,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-08T09:25:42.247Z",
+    "recordCreatedDateTime": "2026-05-03T18:33:14.820Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3277,7 +3277,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T19:27:52.475Z",
+    "recordCreatedDateTime": "2026-05-23T02:24:01.998Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3298,7 +3298,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-05T19:49:58.616Z",
+    "recordCreatedDateTime": "2026-05-04T17:18:45.697Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3319,7 +3319,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-15T08:35:46.324Z",
+    "recordCreatedDateTime": "2026-05-01T04:06:45.680Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3331,7 +3331,7 @@
       "amount": 1369.65,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-29T11:25:17.609Z",
+    "cardTransactionDateTime": "2026-05-14T09:25:01.491Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "online",
     "cardTransactionInitiationType": "customerInitiated",
@@ -3340,7 +3340,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T04:50:02.982Z",
+    "recordCreatedDateTime": "2026-05-14T09:25:01.491Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3361,7 +3361,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-18T13:47:31.368Z",
+    "recordCreatedDateTime": "2026-05-04T01:38:25.017Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3382,7 +3382,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0144",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T10:25:48.001Z",
+    "recordCreatedDateTime": "2026-05-20T15:15:53.203Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3403,7 +3403,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1177",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T20:23:10.177Z",
+    "recordCreatedDateTime": "2026-05-26T09:44:57.519Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3424,7 +3424,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1229",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T12:43:01.893Z",
+    "recordCreatedDateTime": "2026-05-16T02:28:05.951Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3445,7 +3445,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4335",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T11:58:54.335Z",
+    "recordCreatedDateTime": "2026-05-11T18:58:14.036Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3466,7 +3466,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5812",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T21:26:26.075Z",
+    "recordCreatedDateTime": "2026-05-11T14:38:09.046Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3487,7 +3487,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8280",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-10T23:54:33.013Z",
+    "recordCreatedDateTime": "2026-05-23T03:21:50.145Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3508,7 +3508,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7519",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T21:05:57.779Z",
+    "recordCreatedDateTime": "2026-05-11T09:52:11.705Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3529,7 +3529,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7419",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-06T14:12:13.220Z",
+    "recordCreatedDateTime": "2026-05-07T13:25:37.270Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3550,7 +3550,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5062",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T18:07:49.389Z",
+    "recordCreatedDateTime": "2026-05-26T20:04:58.729Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3571,7 +3571,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0296",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T04:07:59.813Z",
+    "recordCreatedDateTime": "2026-05-18T19:59:58.650Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3592,7 +3592,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8147",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-08T20:57:06.231Z",
+    "recordCreatedDateTime": "2026-05-12T02:05:41.683Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3613,7 +3613,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2402",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-04-30T02:10:12.133Z",
+    "recordCreatedDateTime": "2026-05-16T12:02:19.035Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3634,7 +3634,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5828",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-21T19:04:16.642Z",
+    "recordCreatedDateTime": "2026-05-16T05:01:52.049Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3655,7 +3655,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4281",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T15:58:30.893Z",
+    "recordCreatedDateTime": "2026-05-22T18:10:00.128Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3676,7 +3676,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3443",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-12T12:29:57.315Z",
+    "recordCreatedDateTime": "2026-05-23T21:29:28.651Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3697,7 +3697,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3382",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-12T13:56:44.808Z",
+    "recordCreatedDateTime": "2026-05-10T14:17:22.109Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3718,7 +3718,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2164",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-20T11:42:24.547Z",
+    "recordCreatedDateTime": "2026-05-01T21:20:52.002Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3739,7 +3739,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4487",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-10T15:18:42.989Z",
+    "recordCreatedDateTime": "2026-05-06T00:38:17.716Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3760,7 +3760,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8346",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T00:49:50.178Z",
+    "recordCreatedDateTime": "2026-05-21T20:48:37.202Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3781,7 +3781,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7350",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-07T02:38:23.136Z",
+    "recordCreatedDateTime": "2026-05-05T17:27:58.815Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3802,7 +3802,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1380",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T06:06:04.049Z",
+    "recordCreatedDateTime": "2026-05-21T12:09:25.594Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3823,7 +3823,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3407",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-16T20:47:56.284Z",
+    "recordCreatedDateTime": "2026-04-29T18:32:01.489Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3844,7 +3844,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3424",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-18T04:32:59.509Z",
+    "recordCreatedDateTime": "2026-05-27T04:39:47.012Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3865,7 +3865,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1313",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-22T14:59:44.751Z",
+    "recordCreatedDateTime": "2026-04-30T05:21:26.116Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3886,7 +3886,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5749",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T07:47:48.529Z",
+    "recordCreatedDateTime": "2026-05-20T01:43:49.978Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3907,7 +3907,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0310",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T12:35:50.887Z",
+    "recordCreatedDateTime": "2026-05-05T22:48:33.526Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3928,7 +3928,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4544",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-26T00:01:30.675Z",
+    "recordCreatedDateTime": "2026-05-11T07:31:46.732Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3949,7 +3949,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9265",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-18T06:04:17.028Z",
+    "recordCreatedDateTime": "2026-05-21T10:04:53.643Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3970,7 +3970,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7283",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-22T11:04:33.160Z",
+    "recordCreatedDateTime": "2026-05-16T06:50:01.770Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -3991,7 +3991,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-7919",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-27T21:55:00.958Z",
+    "recordCreatedDateTime": "2026-05-05T04:46:33.484Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4012,7 +4012,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-9820",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T06:52:25.062Z",
+    "recordCreatedDateTime": "2026-05-20T21:37:16.887Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4033,7 +4033,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0842",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T17:23:45.873Z",
+    "recordCreatedDateTime": "2026-05-01T02:45:31.101Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4054,7 +4054,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-3555",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-09T06:02:14.119Z",
+    "recordCreatedDateTime": "2026-05-13T15:07:05.302Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4075,7 +4075,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1529",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-04T18:37:02.246Z",
+    "recordCreatedDateTime": "2026-05-06T08:39:56.328Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4096,7 +4096,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0285",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-14T18:27:24.848Z",
+    "recordCreatedDateTime": "2026-05-08T07:12:12.656Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4117,7 +4117,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4214",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-05T13:54:35.714Z",
+    "recordCreatedDateTime": "2026-05-21T21:51:26.445Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4138,7 +4138,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0835",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-17T14:27:10.768Z",
+    "recordCreatedDateTime": "2026-05-18T11:37:38.323Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4159,7 +4159,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2017",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-19T10:50:57.929Z",
+    "recordCreatedDateTime": "2026-05-12T21:29:37.313Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4180,7 +4180,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-1362",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T14:28:37.603Z",
+    "recordCreatedDateTime": "2026-05-04T01:16:26.102Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4201,7 +4201,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4579",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-24T18:38:36.336Z",
+    "recordCreatedDateTime": "2026-05-19T17:00:49.369Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4222,7 +4222,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8545",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T12:37:20.446Z",
+    "recordCreatedDateTime": "2026-05-04T10:34:42.281Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4243,7 +4243,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-8854",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-22T18:12:26.734Z",
+    "recordCreatedDateTime": "2026-05-24T01:48:55.020Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4255,7 +4255,7 @@
       "amount": 700.51,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-28T02:32:21.003Z",
+    "cardTransactionDateTime": "2026-05-17T10:35:01.672Z",
     "cardTransactionStatus": "authorized",
     "cardTransactionChannel": "online",
     "cardTransactionInitiationType": "customerInitiated",
@@ -4264,7 +4264,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-4348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-07T07:10:03.345Z",
+    "recordCreatedDateTime": "2026-05-17T10:35:01.672Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4285,7 +4285,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-5308",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-08T03:34:38.824Z",
+    "recordCreatedDateTime": "2026-05-18T16:43:46.388Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4306,7 +4306,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0914",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-11T14:44:07.137Z",
+    "recordCreatedDateTime": "2026-05-09T09:49:33.761Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4327,7 +4327,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-0348",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-04-30T17:06:27.104Z",
+    "recordCreatedDateTime": "2026-05-06T05:46:48.865Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4348,7 +4348,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2823",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-02T21:43:54.784Z",
+    "recordCreatedDateTime": "2026-05-17T18:58:39.440Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4369,7 +4369,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-6486",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-08T17:23:16.087Z",
+    "recordCreatedDateTime": "2026-05-12T18:56:43.342Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4390,7 +4390,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2865",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-01T17:14:13.278Z",
+    "recordCreatedDateTime": "2026-05-17T02:42:55.682Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },
@@ -4402,7 +4402,7 @@
       "amount": 978.26,
       "currency": "EUR"
     },
-    "cardTransactionDateTime": "2026-05-28T11:32:34.758Z",
+    "cardTransactionDateTime": "2026-05-26T09:55:32.554Z",
     "cardTransactionStatus": "settled",
     "cardTransactionChannel": "atm",
     "cardTransactionInitiationType": "customerInitiated",
@@ -4411,7 +4411,7 @@
     "cardTransactionMaskedPanDisplay": "****-****-****-2949",
     "bianServiceDomain": "Card Transaction",
     "bianControlRecordType": "CardTransactionLog",
-    "recordCreatedDateTime": "2026-05-25T05:51:05.108Z",
+    "recordCreatedDateTime": "2026-05-26T09:55:32.554Z",
     "recordUpdatedDateTime": "2026-05-27T14:00:00.000Z",
     "schemaVersion": 1
   },

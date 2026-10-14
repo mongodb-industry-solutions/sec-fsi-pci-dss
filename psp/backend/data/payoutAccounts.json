@@ -29,7 +29,8 @@
     "payoutAccountCorrespondentBic": "DEUTDEFFXXX",
     "payoutAccountAspspReference": "bank0001-0000-4000-8000-000000000001",
     "payoutAccountBankAccountReference": "acc00063-0000-4000-8000-000000000063",
-    "payoutAccountConsentReference": "cns00001-0000-4000-8000-000000000001"
+    "payoutAccountConsentReference": "cns00001-0000-4000-8000-000000000001",
+    "payoutAccountHolderName": "Luis Fernandez"
   },
   {
     "payoutAccountInstanceReference": "pau00064-0000-4000-8000-000000000064",
@@ -61,7 +62,8 @@
     "payoutAccountCorrespondentBic": "DEUTDEFFXXX",
     "payoutAccountAspspReference": "bank0001-0000-4000-8000-000000000001",
     "payoutAccountBankAccountReference": "acc00064-0000-4000-8000-000000000064",
-    "payoutAccountConsentReference": "cns00058-0000-4000-8000-000000000058"
+    "payoutAccountConsentReference": "cns00058-0000-4000-8000-000000000058",
+    "payoutAccountHolderName": "Amara Okafor"
   },
   {
     "payoutAccountInstanceReference": "pau00065-0000-4000-8000-000000000065",

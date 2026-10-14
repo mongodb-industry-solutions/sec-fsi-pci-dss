@@ -2,9 +2,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   absoluteEndpoint, hasLinkPlaceholder, linkPlaceholder, PLATFORM_ENVIRONMENTS,
-} from '@leafypay/platform-links';
+} from '@ist-sec/platform-links';
 import { ExternalProviderArrangement } from '../../modules/provider/models/externalProviderArrangement.model';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 
 // Declares the bank's address in EVERY environment on the provider record, and fills in the TPP
 // credential the PSP holds against it. Promoting local to staging to production is one variable, not a

@@ -10,7 +10,7 @@ import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 
 // Optional fallback: parse the repo-root .env (one level above the merchant package). Read-only,
 // loaded once, best-effort. In containers the parent .env usually doesn't exist and env comes from

@@ -6,7 +6,7 @@
 // in `pending` and nothing fails.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Db } from 'mongodb';
-import type { EventBus, EventHandler, Subscription, DomainEvent } from '@leafypay/eventbus';
+import type { EventBus, EventHandler, Subscription, DomainEvent } from '@ist-sec/eventbus';
 
 // Records who subscribes to what, without running any handler.
 class RecordingBus implements EventBus {

@@ -1,7 +1,7 @@
 [
   {
     "accountHolderInstanceReference": "hld00001-0000-4000-8000-000000000001",
-    "accountHolderName": "Account holder",
+    "accountHolderName": "Luis Fernandez",
     "accountHolderCountryCode": "ES",
     "accountHolderStatus": "active",
     "bianServiceDomain": "Party Reference Data Directory",
@@ -11,7 +11,7 @@
   },
   {
     "accountHolderInstanceReference": "hld00058-0000-4000-8000-000000000058",
-    "accountHolderName": "Account holder",
+    "accountHolderName": "Amara Okafor",
     "accountHolderCountryCode": "ES",
     "accountHolderStatus": "active",
     "bianServiceDomain": "Party Reference Data Directory",
@@ -21,7 +21,7 @@
   },
   {
     "accountHolderInstanceReference": "hld00057-0000-4000-8000-000000000057",
-    "accountHolderName": "Account holder",
+    "accountHolderName": "Ahmed Hassan",
     "accountHolderCountryCode": "DE",
     "accountHolderStatus": "active",
     "bianServiceDomain": "Party Reference Data Directory",

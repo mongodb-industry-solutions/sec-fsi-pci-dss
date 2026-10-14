@@ -17,7 +17,7 @@ const nextConfig = {
   // (lucide-react, @radix-ui/*) live only in merchant/node_modules. Rooting it at the repo instead
   // made every render compile the whole monorepo and left the app's own client components out of
   // the React Client Manifest ("Could not find the module .../error.tsx#default"), so the shared
-  // @leafypay/platform-links package is installed COPIED rather than symlinked (`--install-links`)
+  // @ist-sec/platform-links package is installed COPIED rather than symlinked (`--install-links`)
   // and resolves from inside this root like any other dependency.
   turbopack: {
     root: __dirname,

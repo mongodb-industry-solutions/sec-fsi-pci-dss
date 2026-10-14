@@ -22,7 +22,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { giamPath, hasGiam } from '../../../../support/giamRepo';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   repointTransactionsToCards,
@@ -62,6 +62,17 @@ const payoutAccounts = read<PayoutAccountSeed>('payoutAccounts.json');
 const fraudCases = read<Record<string, unknown>>('fraudCases.json');
 const fraudCaseEvents = read<Record<string, unknown>>('fraudCaseEvents.json');
 const merchants = read<Record<string, unknown>>('merchants.json');
+// Unmapped, so accountHolderRefs (dropped by the `logins` projection above) survives for the
+// cross-institution binding check below.
+const rawIdentities = (HAS_LOGINS ? JSON.parse(readFileSync(
+  giamPath('backend/data/identities.json'),
+  'utf-8',
+)) as Array<Record<string, unknown>> : []);
+const BANK_DATA = join(process.cwd(), 'bank', 'backend', 'data');
+const HAS_BANK_DATA = existsSync(join(BANK_DATA, 'accountArrangements.json'));
+const bankAccounts = HAS_BANK_DATA
+  ? (JSON.parse(readFileSync(join(BANK_DATA, 'accountArrangements.json'), 'utf-8')) as Array<Record<string, unknown>>)
+  : [];
 
 const customers = parties.filter((p) => p.partyType === 'customer');
 const employees = parties.filter((p) => p.partyType === 'employee');
@@ -324,6 +335,46 @@ describe('v33 seed-data integrity: a complete population (D-3)', () => {
     expect(logins.length).toBeGreaterThan(featured.length);
   });
 
+  /**
+   * Found 2026-10-08 while investigating a customer who appeared to have no cards in bankcore's
+   * admin console: GIAM's identity for them named a DIFFERENT (orphaned, cardless) BankCore account
+   * holder than the one their real accounts and cards actually belong to. The bank's own
+   * `accountHolderInstanceReference` is per-institution (SD-13 at the PSP, a separate reference at
+   * the bank), and nothing checked that the one on the identity still named a holder that owns an
+   * account this party's own payoutAccounts.json points at. `bindOwnAccountHolder`
+   * (bank/backend/src/vendors/middleware/staffAuth.ts) scopes every list query to this claim, so a
+   * wrong one is not a display bug: it is an account holder who is shown nothing of their own.
+   */
+  it.skipIf(!HAS_LOGINS || !HAS_BANK_DATA)('a customer\'s GIAM-bound bankcore holder owns an account they actually hold', () => {
+    const holderByBankAccountRef = new Map(
+      bankAccounts.map((a) => [a.accountArrangementInstanceReference as string, a.accountHolderInstanceReference as string]),
+    );
+    const ownedHoldersByParty = new Map<string, Set<string>>();
+    for (const pa of payoutAccounts) {
+      const bankRef = pa.payoutAccountBankAccountReference as string | undefined;
+      const holder = bankRef ? holderByBankAccountRef.get(bankRef) : undefined;
+      if (!holder) continue;
+      const set = ownedHoldersByParty.get(pa.partyInstanceReference) ?? new Set();
+      set.add(holder);
+      ownedHoldersByParty.set(pa.partyInstanceReference, set);
+    }
+
+    const offenders = rawIdentities
+      .map((identity) => {
+        const refs = identity.accountHolderRefs as Record<string, string> | undefined;
+        const partyRef = refs?.leafypay;
+        const boundHolder = refs?.bankcore;
+        if (!partyRef || !boundHolder) return null;
+        const owned = ownedHoldersByParty.get(partyRef);
+        // No real bank account on file for this party: nothing to check the binding against.
+        if (!owned || owned.size === 0) return null;
+        if (owned.has(boundHolder)) return null;
+        return { user: identity.userName, bound: boundHolder, owns: [...owned] };
+      })
+      .filter(Boolean);
+    expect(offenders).toEqual([]);
+  });
+
   it('the three merchant-owning parties are still present (hard constraint)', () => {
     for (const name of ['Luis Fernandez', 'David Chen', 'Amara Okafor']) {
       expect(customers.map((p) => p.partyName)).toContain(name);
@@ -379,6 +430,33 @@ describe('v33 seed-data integrity: the transaction-to-card link (F3)', () => {
     const now = Date.now();
     const future = transactions.filter((t) => new Date(t.cardTransactionDateTime as string).getTime() > now);
     expect(future.map((t) => t.cardTransactionInstanceReference)).toEqual([]);
+  });
+
+  /**
+   * A bug class found while auditing the seed data (2026-10-08): `recordUpdatedDateTime` and
+   * `recordCreatedDateTime` were drawn from `faker.date.recent()`/`faker.date.soon()` with no
+   * `refDate`, so they were independent of both `cardTransactionDateTime` AND of the generator's
+   * own fixed `NOW` anchor. A run on any real date after NOW could (and in the committed fixture,
+   * did: 12 "settled"/"disputed"/"authorized" transactions) stamp `recordUpdatedDateTime` BEFORE
+   * the transaction it supposedly updated, and independently scattered `recordCreatedDateTime` up
+   * to 27 days on either side of it (188 of 233 records).
+   *
+   * These two checks compare fields WITHIN each record against each other, so unlike the "no
+   * transaction is dated in the future" check above they never depend on the real wall clock and
+   * will catch a regression regardless of when the suite runs or the fixture was last generated.
+   */
+  it('no transaction record claims to be updated before the transaction it describes', () => {
+    const offenders = transactions.filter(
+      (t) => new Date(t.recordUpdatedDateTime as string).getTime() < new Date(t.cardTransactionDateTime as string).getTime(),
+    );
+    expect(offenders.map((t) => t.cardTransactionInstanceReference)).toEqual([]);
+  });
+
+  it('a transaction log record is created at the same instant as the transaction it describes', () => {
+    const offenders = transactions.filter(
+      (t) => t.recordCreatedDateTime && t.recordCreatedDateTime !== t.cardTransactionDateTime,
+    );
+    expect(offenders.map((t) => t.cardTransactionInstanceReference)).toEqual([]);
   });
 });
 

@@ -11,7 +11,7 @@ import { authenticateTpp, hashClientSecret } from '../../../../bank/backend/src/
 import { requireTpp } from '../../../../bank/backend/src/vendors/middleware/tppAuth';
 import { config } from '../../../../bank/backend/src/config';
 import type { TppRegistrationControlRecord } from '../../../../bank/backend/src/modules/tpp-trust/models/tppRegistration.model';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 
 const SECRET = clientSecretFor('leafypay-psp');
 

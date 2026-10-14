@@ -8,7 +8,7 @@
 //
 // So this asks the authority. It is slower and it is the real path.
 import { startAuthority, machineToken, type Authority } from './authorityProcess';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 
 /**
  * The SHARED realm (ADR-003). The bank is a client in it, not a directory of its own: what keeps it

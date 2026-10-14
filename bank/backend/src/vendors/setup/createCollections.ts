@@ -21,7 +21,7 @@ import {
 import { CREDIT_ASSESSMENT_COLLECTION } from '../../modules/credit-bureau/models/creditAssessment.model';
 import { BANK_AUDIT_LOG_COLLECTION } from '../../modules/audit/models/bankAuditLog.model';
 import { buildEncryptedFieldsMaps, BankDeks } from '../encryption/encryptedFieldsMaps';
-import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
+import { DOMAIN_EVENT_COLLECTION } from '@ist-sec/eventbus';
 
 // Infrastructure of the bank database. Each later phase adds its own collections here rather than
 // declaring them early: setup SKIPS a collection that already exists, so a collection created now

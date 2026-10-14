@@ -17,7 +17,7 @@ import {
 } from '../services/integrationDispatch.service';
 import {
   platformEnvironment, PLATFORM_ENVIRONMENTS, type PlatformEnvironment,
-} from '@leafypay/platform-links';
+} from '@ist-sec/platform-links';
 import { declaredFor, providerBaseUrl, resolveConfiguredUrl } from '../services/providerLink.service';
 import type { ExternalProviderArrangement } from '../models/externalProviderArrangement.model';
 

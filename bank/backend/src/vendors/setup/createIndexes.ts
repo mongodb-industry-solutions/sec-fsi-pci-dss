@@ -1,6 +1,6 @@
 import { Db, IndexSpecification, CreateIndexesOptions } from 'mongodb';
 import { BANK_PROFILE_COLLECTION } from '../../modules/aspsp/models/bankProfile.model';
-import { DOMAIN_EVENT_COLLECTION } from '@leafypay/eventbus';
+import { DOMAIN_EVENT_COLLECTION } from '@ist-sec/eventbus';
 import { ACCOUNT_ARRANGEMENT_COLLECTION } from '../../modules/aspsp/models/accountArrangement.model';
 import { ACCOUNT_HOLDER_COLLECTION } from '../../modules/aspsp/models/accountHolder.model';
 import { ACCOUNT_MOVEMENT_COLLECTION } from '../../modules/aspsp/models/accountMovement.model';

@@ -5,10 +5,10 @@
  */
 import { describe, it, expect, afterEach } from 'vitest';
 import { resolveEventBusEngine, initEventBus } from '../../../../../psp/backend/src/vendors/eventbus';
-import { BrokerEventBus } from '@leafypay/eventbus';
-import { EventBusInProcess } from '@leafypay/eventbus';
-import type { EventStore } from '@leafypay/eventbus';
-import type { DomainEvent } from '@leafypay/eventbus';
+import { BrokerEventBus } from '@ist-sec/eventbus';
+import { EventBusInProcess } from '@ist-sec/eventbus';
+import type { EventStore } from '@ist-sec/eventbus';
+import type { DomainEvent } from '@ist-sec/eventbus';
 
 const fakeStore: EventStore = {
   async append() {}, async trail() { return [] as DomainEvent[]; }, async byProcess() { return [] as DomainEvent[]; },

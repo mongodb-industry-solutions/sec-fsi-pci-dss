@@ -1,6 +1,6 @@
 import { Db } from 'mongodb';
 import { v4 as uuidv4 } from 'uuid';
-import { platformEnvironment, resolveLinks } from '@leafypay/platform-links';
+import { platformEnvironment, resolveLinks } from '@ist-sec/platform-links';
 import { declaredFor, providerBaseUrl, resolveConfiguredUrl } from './providerLink.service';
 import {
   EXTERNAL_PROVIDER_ARRANGEMENT_ACTION_LOG_COLLECTION,

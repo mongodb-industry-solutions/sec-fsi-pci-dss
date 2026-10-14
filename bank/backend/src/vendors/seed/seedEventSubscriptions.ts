@@ -1,5 +1,5 @@
 import { Db } from 'mongodb';
-import { absoluteEndpoint, linkPlaceholder } from '@leafypay/platform-links';
+import { absoluteEndpoint, linkPlaceholder } from '@ist-sec/platform-links';
 import {
   TPP_EVENT_SUBSCRIPTION_COLLECTION, TPP_EVENT_TYPES, TppEventSubscriptionControlRecord,
 } from '../../modules/tpp-trust/models/tppEventSubscription.model';

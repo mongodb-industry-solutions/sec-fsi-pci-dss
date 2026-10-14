@@ -6,7 +6,7 @@
 // what this replaces.
 import { describe, it, expect, beforeEach } from 'vitest';
 import type { Db } from 'mongodb';
-import { clientSecretFor } from '@leafypay/platform-links';
+import { clientSecretFor } from '@ist-sec/platform-links';
 import {
   getProviderAccessToken, getProviderBaseUrl, resetProviderTokenCache,
 } from '../../../../../psp/backend/src/modules/provider/services/providerAccessToken.service';

@@ -1,4 +1,4 @@
-import type { PlatformEnvironment } from '@leafypay/platform-links';
+import type { PlatformEnvironment } from '@ist-sec/platform-links';
 
 // Collection names migrated to pure control records (dev.v7 plan, Fase 2). The constant
 // IDENTIFIERS keep their INTEGRATION_* names until the module rename in Fase 3, only the stored
