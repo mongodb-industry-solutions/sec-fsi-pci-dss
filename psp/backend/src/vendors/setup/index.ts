@@ -6,7 +6,7 @@ import { createCollections } from './createCollections';
 import { createIndexes } from './createIndexes';
 import { createAtlasRoles } from './createAtlasRoles';
 import { config } from '../../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@ist-sec/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, versionMismatch } from '@ist-sec/mongo-compat';
 
 // Load .env from project root  -  works regardless of CWD (npm --prefix changes CWD to backend/)
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -35,6 +35,16 @@ export async function runSetup(reset = false) {
     for (const finding of capabilityFindings(current)) console.warn(`  [${finding.warn ? 'WARN' : 'INFO'}] ${finding.text}\n`);
     const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
     if (hint) console.warn(`  [WARN] ${hint}\n`);
+
+    // Collections below are built from the DECLARED config.qe.profile, not from `current`: the
+    // runtime server reads the same declared value, so substituting the detected one here would
+    // create collections the running server cannot query against. A mismatch that crosses a QE
+    // text-search profile boundary (preview vs GA query type names) is not safe to proceed on
+    // silently; abort and point at the fix instead of building collections with the wrong names.
+    const profileMismatch = versionMismatch(declared.version.raw, current.version.raw);
+    if (profileMismatch) {
+      throw new Error(`${profileMismatch}\n  Setup aborted before creating any collection.`);
+    }
 
     // v2: create Atlas custom roles + DB users before provisioning DEKs so the
     // role-specific connection strings (MONGODB_URI_LEVEL1/2) are ready for the pools.

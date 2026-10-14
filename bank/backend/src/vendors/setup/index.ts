@@ -6,7 +6,7 @@ import { provisionCardIssuerCvk } from '../encryption/cardVerificationKey.servic
 import { createIndexes } from './createIndexes';
 import { getQEClient, closeQEClient, assertCryptSharedLib } from '../encryption/qeClient';
 import { config } from '../../config';
-import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint } from '@ist-sec/mongo-compat';
+import { declaredDeployment, detectDeployment, describeDeployment, capabilityFindings, cryptSharedHint, versionMismatch } from '@ist-sec/mongo-compat';
 
 // Works regardless of CWD: npm --prefix changes it to bankcore/.
 dotenv.config({ path: resolve(__dirname, '../../../../../.env') });
@@ -36,6 +36,15 @@ export async function runSetup(reset = false): Promise<void> {
     for (const finding of capabilityFindings(current)) console.warn(`  [${finding.warn ? 'WARN' : 'INFO'}] ${finding.text}`);
     const hint = cryptSharedHint(current.version.raw, config.mongodb.cryptSharedLibPath);
     if (hint) console.warn(`  [WARN] ${hint}`);
+
+    // Collections below are built from the DECLARED config.qe.profile, not from `current`: the
+    // running server reads the same declared value, so substituting the detected one here would
+    // create collections the server cannot query against. Abort rather than build collections with
+    // the wrong QE text-search query type names across a profile boundary.
+    const profileMismatch = versionMismatch(declared.version.raw, current.version.raw);
+    if (profileMismatch) {
+      throw new Error(`${profileMismatch}\n  Setup aborted before creating any collection.`);
+    }
 
     // A bank database that survived a PSP reset points at DEKs the shared vault no longer has. Fail
     // here with the remedy, instead of at the first encrypted read with a driver-level message.

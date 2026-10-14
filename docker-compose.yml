@@ -1,10 +1,10 @@
 # ── PSP Platform FSI PCI DSS Demo ───────────────────────────────────────────────
 # Usage:
 #   docker compose up --build                       # build + start both services
-#   docker compose up --build backend               # rebuild backend only
-#   docker compose exec backend npm run setup:db    # provision QE collections
-#   docker compose exec backend npm run setup:seed  # seed demo data
-#   docker compose exec backend npm run test:unit   # run unit tests in-container
+#   docker compose up --build psp-backend            # rebuild backend only
+#   docker compose exec psp-backend npm run setup:db    # provision QE collections
+#   docker compose exec psp-backend npm run setup:seed  # seed demo data
+#   docker compose exec psp-backend npm run test:unit   # run unit tests in-container
 #
 # Prerequisites:
 #   1. Copy .env.example to .env and fill in MONGODB_URI, JWT_SECRET, KMS_PROVIDER.
@@ -50,11 +50,11 @@ services:
       # Secret left to .env: the authority derives it from the client id when unset.
       PSP_GIAM_CLIENT_ID: ${PSP_GIAM_CLIENT_ID:-leafypay-backend}
       # In-network bank host. Private by construction: no host port is published for bankcore.
-      PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+      PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bank-backend:8080}
       # The credential the PSP presents to the bank diagnostics surface: the bank issued it.
       PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
     depends_on:
-      bankcore:
+      bank-backend:
         condition: service_started
     volumes:
       - ./psp/backend/keys:/app/psp/backend/keys:ro
@@ -80,11 +80,11 @@ services:
         # fetches go through the Next.js rewrites server-side, matching staging/prod), and (b) powers
         # the Public/Private URL toggle on the merchant SSO OIDC endpoints panel. Default is the
         # compose-network service address, which is exactly the "private" URL an in-VPC integrator uses.
-        NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE: ${NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE:-http://backend:8080}
+        NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE: ${NEXT_PUBLIC_PSP_URL_BACKEND_PRIVATE:-http://psp-backend:8080}
         NEXT_PUBLIC_PSP_URL_MERCHANT: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
         # Private only for the API: the admin monitoring page probes bankcore through the Next.js proxy, so
         # the browser never leaves the frontend origin and the bank's API needs no published port.
-        NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+        NEXT_PUBLIC_PSP_URL_BANKCORE_PRIVATE: ${PSP_BANKCORE_BASE_URL:-http://bank-backend:8080}
         # In-network authority, for the same reason: the monitoring panel probes it through the proxy,
         # so the browser stays on this origin and needs no CORS entry for a health check.
         NEXT_PUBLIC_PSP_URL_AUTHORITY_PRIVATE: ${GIAM_BASE_URL:-http://host.docker.internal:8085}
@@ -110,9 +110,9 @@ services:
       # the address a browser uses and must match a registered redirect URI of leafypay-console.
       PSP_URL_FRONTEND: ${PSP_URL_FRONTEND:-http://localhost:8080}
     depends_on:
-      backend:
+      psp-backend:
         condition: service_healthy
-      bankcore:
+      bank-backend:
         condition: service_started
 
   # bankcore: the Open Banking bank (ASPSP). PRIVATE service: the browser never calls it, the PSP
@@ -136,7 +136,7 @@ services:
       # The bank derives its TPP and diagnostics keys from its OWN root (v39 P4).
       PSP_BANKCORE_SECRET: ${PSP_BANKCORE_SECRET:-bankcore-local-secret-change-in-production}
       # In-network PSP host, for the consent status callbacks bankcore delivers to its TPP.
-      PSP_BASE_URL: ${PSP_BASE_URL:-http://backend:8080}
+      PSP_BASE_URL: ${PSP_BASE_URL:-http://psp-backend:8080}
       # The bank is a resource server in the SHARED realm, not a realm of its own (ADR-003): the
       # boundary is its audience and roles, which a platform token does not carry.
       PSP_BANKCORE_GIAM_ISSUER_URL: ${PSP_BANKCORE_GIAM_ISSUER_URL:-http://host.docker.internal:8085/api/v1/realms/LeafyIdp}
@@ -168,7 +168,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       # Server side only: this app calls the bank from its own route handlers, so the address never reaches
       # the browser and the private in-network one is the right one to use.
-      PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bankcore:8080}
+      PSP_BANKCORE_BASE_URL: ${PSP_BANKCORE_BASE_URL:-http://bank-backend:8080}
       # v39 P4: the BANK's own root, never the platform secret. This app administers a separate
       # institution and presents a credential that institution issued; passing the platform secret
       # here is what made the boundary between them documentation rather than key material.
@@ -185,7 +185,7 @@ services:
       # This app's own public address: the authority redirects the browser back to it.
       PSP_BANKCORE_FRONTEND_URL: ${PSP_BANKCORE_FRONTEND_PUBLIC_URL:-http://localhost:8084}
     depends_on:
-      bankcore:
+      bank-backend:
         condition: service_healthy
 
   # External merchant demo (Espresso Works). Autonomous Next.js app, NO database.
@@ -208,8 +208,8 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       PSP_MERCHANT_PORT: 8080
       PSP_MERCHANT_BASE_URL: ${PSP_MERCHANT_BASE_URL:-http://localhost:8082}
-      # Inside the compose network the business API is reachable as the backend service on 8080.
-      PSP_MERCHANT_PSP_BASE_URL: ${PSP_MERCHANT_PSP_BASE_URL:-http://backend:8080}
+      # Inside the compose network the business API is reachable as the psp-backend service on 8080.
+      PSP_MERCHANT_PSP_BASE_URL: ${PSP_MERCHANT_PSP_BASE_URL:-http://psp-backend:8080}
       # Discovery, token and introspection now come from the authority, not the business API.
       PSP_MERCHANT_ISSUER_URL: ${PSP_MERCHANT_ISSUER_URL:-http://host.docker.internal:8085/api/v1/realms/LeafyIdp}
       # The authorization ENDPOINT, on the authority's public origin: sign-in is a browser navigation.
@@ -235,5 +235,5 @@ services:
       retries: 6
       start_period: 15s
     depends_on:
-      backend:
+      psp-backend:
         condition: service_healthy
